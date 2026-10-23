@@ -506,24 +506,14 @@ namespace Analyse
 
         internal static HistoryRecipe Capture(Element element, bool allowHeavyTerrain = true)
         {
-            if (_processing || element == null || element.Document.IsFamilyDocument || element is ElementType
+            if (_processing || element == null || ElementHistoryExternalModels.IsExcluded(element)
+                || element.Document.IsFamilyDocument || element is ElementType
                 || element.ViewSpecific || element.Category == null
-                || IsCalo(element)
-                || (!(element is Group) && element.get_BoundingBox(null) == null)) return null;
-            var root = Root(element);
-            if (!(root is Group) && root.Category?.CategoryType != CategoryType.Model) return Find(element.Document, element.UniqueId);
-            var state = For(element.Document);
-            if (state.Ready.TryGetValue(element.UniqueId, out var cached)) return cached;
-            if (!allowHeavyTerrain && IsHeavyTerrain(root)) return null;
-            if (!state.Pending.TryGetValue(root.UniqueId, out var pending))
-                state.Pending[root.UniqueId] = pending = new Pending { RootId = root.Id, RootUid = root.UniqueId,
-                    CostKey = HistoryCaptureCosts.Key(root), ElementClass = root.GetType().Name };
-            var receipt = new HistoryNativeArtifact { RootSourceUniqueId = root.UniqueId,
-                MemberSourceUniqueId = element.UniqueId, RequestedUtc = DateTime.UtcNow };
-            var queued = pending.Receipts.FirstOrDefault(r => r.MemberSourceUniqueId == element.UniqueId);
-            if (queued != null) return Recipe(element, queued);
-            pending.Receipts.Add(receipt);
-            return Recipe(element, receipt);
+                || IsCalo(element)) return null;
+            // One opening-file checkpoint covers an unfinished inventory. New
+            // events never request a per-object native archive or family copy.
+            // Unsupported direct recipes will be reported as unavailable.
+            return ElementHistoryOpeningArchive.TryCreateRecipe(element.Document, element);
         }
 
         private static HistoryRecipe Recipe(Element element, HistoryNativeArtifact artifact)
@@ -987,6 +977,9 @@ namespace Analyse
 
         private static Element CopyRoot(Document source,Element root,Document destination,CopyPasteOptions options)
         {
+            if (ElementHistoryExternalModels.IsExcluded(root)
+                || Aggregate(source, root).Any(ElementHistoryExternalModels.IsExcluded))
+                throw new InvalidOperationException("Un lien/import externe ou un ensemble qui en contient est exclu de la copie des objets historiques.");
             if(root is Group group)
             {
                 // Copy the useful members directly. Copying a definition that
@@ -1382,6 +1375,7 @@ namespace Analyse
                 ValidateDurableTypeCompatibility(source, destination, artifact.TypeVersion);
             var root = source.GetElement(artifact.RootUniqueId);
             if (root == null) throw new InvalidOperationException("L’objet est absent de son archive native.");
+            RequireRestorableNativeRoot(source, root);
             var toCopy = root;
             if (existingRoot != null)
             {
@@ -1393,6 +1387,7 @@ namespace Analyse
             }
             using (var options = Options())
             {
+                var externalBefore = SnapshotExternalModelIds(destination);
                 ICollection<ElementId> ids;
                 if(toCopy is Group)
                 {
@@ -1401,6 +1396,7 @@ namespace Analyse
                 }
                 else ids = ElementTransformUtils.CopyElements(source, new[] { toCopy.Id }, destination, Transform.Identity, options);
                 destination.Regenerate();
+                ValidateNoExternalModelsAdded(destination, externalBefore);
                 origins = new Dictionary<string, string>();
                 var copied = ids.Select(destination.GetElement).Where(e => e != null && !(e is ElementType)).ToList();
                 var roots = copied.Where(e => (ElementHistoryRestoration.GetOrigins(e) ?? new List<string>()).Contains(toCopy.UniqueId)).ToList();
@@ -1436,6 +1432,31 @@ namespace Analyse
                     throw new InvalidOperationException("L’identité de l’objet n’a pas été conservée lors de sa copie native.");
                 return destination.GetElement(uid);
             }
+        }
+
+        // Old small archives and already-published durable conversions bypass
+        // opening-checkpoint hydration. Enforce today's object policy again at
+        // the final native paste boundary, without rejecting the RVT source file.
+        internal static void RequireRestorableNativeRoot(Document source, Element root)
+        {
+            void Require(Element element)
+            {
+                if (ElementHistoryExternalModels.IsExcluded(element)
+                    || ElementHistoryExternalModels.IsExcluded(source.GetElement(element.GetTypeId())))
+                    throw new InvalidOperationException("Les objets de maquettes liees ou importees sont exclus de la restauration historique.");
+            }
+            Require(root);
+            foreach (var member in Aggregate(source, root)) Require(member);
+        }
+
+        internal static HashSet<ElementId> SnapshotExternalModelIds(Document document)
+            => new HashSet<ElementId>(new[] { typeof(ImportInstance), typeof(RevitLinkInstance), typeof(CADLinkType), typeof(RevitLinkType) }
+                .SelectMany(type => new FilteredElementCollector(document).OfClass(type).ToElementIds()));
+
+        internal static void ValidateNoExternalModelsAdded(Document document, HashSet<ElementId> previous)
+        {
+            if (SnapshotExternalModelIds(document).Any(id => !previous.Contains(id)))
+                throw new InvalidOperationException("La copie native aurait reintroduit un objet de maquette liee ou importee ; restauration annulee.");
         }
     }
 }

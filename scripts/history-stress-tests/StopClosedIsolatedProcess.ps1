@@ -16,7 +16,14 @@ if($partial -and (!$proof.SourcesDisposed -or !$proof.RequestsFrozen -or $proof.
     (Get-FileHash -LiteralPath (Join-Path $run 'partial-subset.json')).Hash -ne $proof.SubsetManifestSha256)){throw 'Partial checkpoint/source closure proof is incomplete or changed.'}
 $process=Get-Process -Id $ready.Pid
 $started=$process.StartTime.ToUniversalTime();$readyAt=(Get-Item -LiteralPath $readyPath).LastWriteTimeUtc
-if($started -gt $readyAt -or ($readyAt-$started).TotalMinutes -gt 5){throw 'Process identity/time differs from launched test.'}
+$pidMarker=Join-Path $run 'observer-pid.txt'
+if(Test-Path -LiteralPath $pidMarker){
+    $launchPid=[int][IO.File]::ReadAllText($pidMarker).Trim()
+    $markedAt=(Get-Item -LiteralPath $pidMarker).LastWriteTimeUtc
+    # A user may spend more than five minutes on Revit's unsigned-addin prompt.
+    # Match the launch-time PID marker, not the later readiness delay.
+    if($launchPid -ne $ready.Pid -or $markedAt -lt $started -or ($markedAt-$started).TotalSeconds -gt 30 -or $started -gt $readyAt){throw 'Process identity/time differs from the exact launch marker.'}
+} elseif($started -gt $readyAt -or ($readyAt-$started).TotalMinutes -gt 5){throw 'Process identity/time differs from launched test.'}
 if($process.MainWindowHandle.ToInt64() -ne $ready.MainWindowHandle -or $process.MainWindowTitle -match 'Projet_AntibesV2|SIGMA'){throw 'Refusing to stop a different or original-project window.'}
 $title=$process.MainWindowTitle
 Stop-Process -Id $process.Id

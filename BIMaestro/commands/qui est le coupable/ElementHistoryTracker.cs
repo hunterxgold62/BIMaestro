@@ -43,6 +43,7 @@ namespace Analyse
         {
             public string UniqueId { get; set; }
             public string Category { get; set; }
+            public long CategoryId { get; set; }
             public string Family { get; set; }
             public string TypeName { get; set; }
             public int TypeId { get; set; }
@@ -63,6 +64,7 @@ namespace Analyse
             public DateTime LastLogged { get; set; }
             public DateTime CapturedUtc { get; set; }
             public string CaptureSource { get; set; }
+            public string SourceClass { get; set; }
             public List<string> SketchDependentUniqueIds { get; set; }
             [JsonIgnore] public string CaptureCostKey { get; set; }
             [JsonIgnore] public string CaptureClass { get; set; }
@@ -74,6 +76,16 @@ namespace Analyse
             public List<double[]> Vertices { get; set; } = new List<double[]>();
             public List<int[]> Faces { get; set; } = new List<int[]>();
         }
+
+        private sealed class ExcludedElementMetadata
+        {
+            public string SourceUniqueId, Category, Class, Reason;
+            public int SourceElementId;
+            public long CategoryId;
+            public bool CapturedWhileAlive, ViewSpecific;
+        }
+        private static readonly Dictionary<string, ExcludedElementMetadata> ExcludedElements =
+            new Dictionary<string, ExcludedElementMetadata>(StringComparer.OrdinalIgnoreCase);
 
         private sealed class GhostMeshBuilder
         {
@@ -304,6 +316,7 @@ namespace Analyse
         private static readonly string RuntimeSessionId = Guid.NewGuid().ToString("N");
         private static CancellationTokenSource _cts;
         private static Task _worker;
+        private static int _localStageScheduled;
         private const double MinMoveFeet = 0.00656168; // ~2 mm
         internal const int DefaultHistoryEventLimit = 10000;
         private const int DefaultElementHistoryTake = DefaultHistoryEventLimit;
@@ -420,13 +433,19 @@ namespace Analyse
 
         internal static void FlushPendingForHistory()
         {
-            try { Flush(); FlushAudit(); }
-            catch { }
+            // Opening the history window must not wait for a network drive or
+            // a disk flush. The regular transport worker delivers the spool.
+            ScheduleLocalStage();
         }
 
         // Used by the bridge's IO worker before declaring a session closed.
         // Unlike a UI refresh, failure here must prevent bridge deletion.
-        internal static void FlushPendingForDurability() => Flush();
+        internal static void FlushPendingForDurability()
+        {
+            Flush();
+            if (ElementHistoryLocalSpool.Default.HasPending(CollaborativeModelTrackerStore.ActiveDirectory))
+                throw new IOException("Des suppressions restent dans le journal local ; la copie de secours reste conservée.");
+        }
 
         internal static void ForgetAudit(Document doc)
             => ForgetAuditForKey(doc, GetDocumentKey(doc));
@@ -457,6 +476,9 @@ namespace Analyse
                 foreach (var snapshotKey in SnapshotByElementId.Keys
                     .Where(value => value.StartsWith(key + "|element|", StringComparison.OrdinalIgnoreCase)).ToList())
                     SnapshotByElementId.Remove(snapshotKey);
+                foreach (var excludedKey in ExcludedElements.Keys
+                    .Where(value => value.StartsWith(key + "|element|", StringComparison.OrdinalIgnoreCase)).ToList())
+                    ExcludedElements.Remove(excludedKey);
                 foreach (var typeKey in FamilyTypeSnapshotByKey.Keys
                     .Where(value => value.StartsWith(key + "|", StringComparison.OrdinalIgnoreCase)).ToList())
                     FamilyTypeSnapshotByKey.Remove(typeKey);
@@ -650,7 +672,8 @@ namespace Analyse
         {
             // Metadata is tracked for history, but cannot benefit from geometric/native enrichment.
             element = element ?? doc.GetElement(id);
-            if (element == null || element is ElementType || element is Material || element is GraphicsStyle
+            if (element == null || ElementHistoryExternalModels.IsExcluded(element)
+                || element is ElementType || element is Material || element is GraphicsStyle
                 || element is View || element is ProjectInfo || element is Autodesk.Revit.DB.Plumbing.PipeSegment) return;
             var key = GetDocumentKey(doc);
             if (!RestorationCaptureByDocumentKey.TryGetValue(key, out var state))
@@ -738,6 +761,7 @@ namespace Analyse
                     state.ChangedPriorityIds.Remove(idValue);
                     var id = ElementIdExtensions.CreateElementId(idValue);
                     var element = doc.GetElement(id);
+                    if (ElementHistoryExternalModels.IsExcluded(element)) { RememberExcludedElement(element); continue; }
                     if (element == null || !SnapshotByElementId.TryGetValue(BuildElementSnapshotKey(doc, id), out var current)
                         || !ReferenceEquals(current, expected)) continue;
                     // During this session the local bridge protects unchanged
@@ -901,7 +925,8 @@ namespace Analyse
         {
             try
             {
-                if (el == null || ShouldIgnoreElement(el)) return 0;
+                if (el == null) return 0;
+                if (ShouldIgnoreElement(el)) { RememberExcludedElement(el); return 0; }
                 // The initial project scan protects model geometry first. Revit's
                 // collector also yields thousands of materials, views and other
                 // project metadata; those are captured on demand if changed or
@@ -910,7 +935,8 @@ namespace Analyse
                     && !(el is Sketch)) return 0;
                 if (source == "preload" && HasSnapshot(BuildElementSnapshotKey(el.Document, el.Id))) return 0;
                 var snapshot = BuildSnapshot(el, includeOrientedCorners: false,
-                    includeRestoration: source != "preload", typeParameterCache: typeParameterCache);
+                    includeRestoration: source != "preload", typeParameterCache: typeParameterCache,
+                    captureCurrentState: source != "preload");
                 snapshot.CaptureSource = source;
                 StoreSnapshot(el.Document, el.Id, snapshot);
                 QueueRestorationCapture(el.Document, el.Id, snapshot, el, changedPriority: source != "preload");
@@ -946,6 +972,13 @@ namespace Analyse
                 foreach (var id in selectedIds)
                 {
                     if (id == null || id == ElementId.InvalidElementId) continue;
+                    var element = doc.GetElement(id);
+                    if (ElementHistoryExternalModels.IsExcluded(element))
+                    {
+                        RememberExcludedElement(element);
+                        lock (SnapshotByElementId) SnapshotByElementId.Remove(BuildElementSnapshotKey(doc, id));
+                        continue;
+                    }
                     var idValue = id.GetIdValue();
                     selectedIdValues.Add(idValue);
                     var snapshotKey = selectionKeyPrefix + idValue.ToString(CultureInfo.InvariantCulture);
@@ -967,7 +1000,6 @@ namespace Analyse
                         continue;
                     }
 
-                    var element = doc.GetElement(id);
                     if (element == null) continue;
                     var keepSimpleOnly = ShouldKeepSelectionSnapshotSimple(element);
                     if (ShouldIgnoreElement(element) && !keepSimpleOnly) continue;
@@ -1123,6 +1155,18 @@ namespace Analyse
         }
 
         public static void CaptureDocumentChanges(Document doc, DocumentChangedEventArgs e)
+        {
+            if (doc == null || e == null || ElementHistoryNativeArchive.Owns(doc)) return;
+            var timer = Stopwatch.StartNew();
+            try { CaptureDocumentChangesCore(doc, e); }
+            finally
+            {
+                HistoryPerformanceLog.Record(doc, "document_changed_total", timer.Elapsed.TotalMilliseconds,
+                    e.GetAddedElementIds().Count + e.GetModifiedElementIds().Count + e.GetDeletedElementIds().Count, 0, true);
+            }
+        }
+
+        private static void CaptureDocumentChangesCore(Document doc, DocumentChangedEventArgs e)
         {
             if (doc == null || e == null || ElementHistoryNativeArchive.Owns(doc)) return;
             InvalidateCaptureCaches(doc);
@@ -1430,6 +1474,21 @@ namespace Analyse
         internal static bool IsDisplayableHistoryEvent(ElementHistoryEvent ev)
         {
             if (ev == null) return false;
+            if (ev.Delta != null && ev.Delta.TryGetValue("excluded3D", out var excluded) && excluded != null)
+            {
+                try
+                {
+                    var metadata = JObject.FromObject(excluded);
+                    ev.Delta.TryGetValue("deletedUniqueId", out var deletedUid);
+                    if ((string)metadata["Reason"] == "external_model"
+                        && (bool?)metadata["CapturedWhileAlive"] == true
+                        && (int?)metadata["SourceElementId"] == ev.ElementId
+                        && !string.IsNullOrWhiteSpace((string)metadata["SourceUniqueId"])
+                        && string.Equals((string)metadata["SourceUniqueId"], Convert.ToString(deletedUid), StringComparison.Ordinal)
+                        && ElementHistoryExternalModels.IsExcludedClass((string)metadata["Class"])) return false;
+                }
+                catch (Exception) { /* Malformed evidence is never an exclusion proof. */ }
+            }
             if (IsLowValueParameterChange(ev)) return false;
             if (IsNoisy3DViewEvent(ev)) return false;
             return IsUsefulHistoryText(ev.Category) && !IsIgnoredCategoryName(ev.Category);
@@ -1679,7 +1738,8 @@ namespace Analyse
         {
             if (id == null || id == ElementId.InvalidElementId) return false;
             var el = doc.GetElement(id);
-            if (el == null || ShouldIgnoreElement(el)) return false;
+            if (el == null) return false;
+            if (ShouldIgnoreElement(el)) { RememberExcludedElement(el); return false; }
 
             Dictionary<string, object> relatedTypeParameterDelta = null;
             if (!isCreate && !(el is FamilySymbol))
@@ -1687,7 +1747,7 @@ namespace Analyse
 
             // Preserve the changed values immediately. Triangle/OBB previews
             // belong to deferred selection work, never an unbounded transaction callback.
-            var current = BuildSnapshot(el, includeOrientedCorners: false);
+            var current = BuildSnapshot(el, includeOrientedCorners: false, captureCurrentState: true);
             ElementSnapshot previous;
             lock (SnapshotByElementId)
             {
@@ -1730,7 +1790,7 @@ namespace Analyse
                 Category = current.Category,
                 Family = current.Family,
                 TypeName = current.TypeName,
-                ThumbnailPath = ResolveThumbnailPath(doc, current.TypeId, current.Family, current.TypeName),
+                ThumbnailPath = null,
                 Action = action,
                 User = user,
                 Tx = tx,
@@ -1887,7 +1947,7 @@ namespace Analyse
                             Category = current.Category,
                             Family = current.Family,
                             TypeName = current.TypeName,
-                            ThumbnailPath = ResolveThumbnailPath(doc, current.TypeId, current.Family, current.TypeName),
+                            ThumbnailPath = null,
                             Action = action,
                             User = user,
                             Tx = tx,
@@ -1951,7 +2011,8 @@ namespace Analyse
         }
 
         private static ElementSnapshot BuildSnapshot(Element el, bool includeOrientedCorners, int detailedGeometryTimeoutMs = 0,
-            bool includeRestoration = true, Dictionary<int, Dictionary<string, string>> typeParameterCache = null)
+            bool includeRestoration = true, Dictionary<int, Dictionary<string, string>> typeParameterCache = null,
+            bool captureCurrentState = false)
         {
             var captureTimer = Stopwatch.StartNew();
             bool captured = false;
@@ -1989,19 +2050,22 @@ namespace Analyse
             AddTypeParametersToSnapshot(el, parameters, typeParameterCache);
 
             string captureFailure = null;
-            var recipe = deferHeavy ? null : ElementHistoryReconstruction.Capture(el, reason => captureFailure = reason,
-                includeDetails: includeRestoration, allowHeavyTerrain: CaptureDetailedDeletedMesh, automaticCapture: true);
-            if (deferHeavy) captureFailure = "Préparation réservée au mode détaillé en inactivité.";
+            var recipe = captureCurrentState
+                ? ElementHistoryReconstruction.CaptureDirectForChange(el, reason => captureFailure = reason)
+                : deferHeavy ? null : ElementHistoryReconstruction.Capture(el, reason => captureFailure = reason,
+                    includeDetails: includeRestoration, allowHeavyTerrain: CaptureDetailedDeletedMesh, automaticCapture: true);
+            if (captureCurrentState && recipe != null) deferHeavy = false;
+            if (deferHeavy && captureFailure == null) captureFailure = "État natif récent en attente de préparation en inactivité.";
             var openingRecipe = ElementHistoryOpeningArchive.TryCreateRecipe(el.Document, el);
             if (recipe == null)
             {
                 recipe = openingRecipe;
                 if (recipe != null) captureFailure = null;
             }
-            else if (recipe.Native == null && openingRecipe != null)
+            else if (recipe.Native == null && !recipe.UsesExistingModelDefinitions && openingRecipe != null)
                 recipe.OpeningFallback = openingRecipe.Native;
             BoundingBoxXYZ bounds = null;
-            if (!deferHeavy) try { bounds = el.get_BoundingBox(null); } catch { }
+            if (!deferHeavy && !captureCurrentState) try { bounds = el.get_BoundingBox(null); } catch { }
             var snapshot = new ElementSnapshot
             {
                 DefinitionSession = ElementHistoryDefinitionRevisions.SessionId(el.Document),
@@ -2010,9 +2074,11 @@ namespace Analyse
                 RequiresDetailedCapture = deferHeavy,
                 CapturedUtc = DateTime.UtcNow,
                 CaptureSource = "document_change_or_manual",
+                SourceClass = el.GetType().FullName,
                 SketchDependentUniqueIds = includeRestoration && !deferHeavy ? CaptureSketchDependentUniqueIds(el) : null,
                 UniqueId = el.UniqueId,
                 Category = categoryName,
+                CategoryId = el.Category?.Id.GetIdLongValue() ?? 0,
                 Family = CleanHistoryText(family),
                 TypeName = CleanHistoryText(typeName),
                 TypeId = typeId == null || typeId == ElementId.InvalidElementId ? -1 : typeId.GetIdValue(),
@@ -2021,7 +2087,8 @@ namespace Analyse
                 BBoxMin = bounds?.Min,
                 BBoxMax = bounds?.Max,
                 DetailCaptureAttempted = includeOrientedCorners && !deferHeavy,
-                // Light mode keeps direct recipes; detailed mode adds deferred native/relationship capture.
+                // Edited direct objects already carry their current relations in
+                // both modes; detailed mode only adds preview geometry.
                 Recipe = recipe,
                 CaptureFailure = captureFailure ?? (!includeRestoration && recipe == null
                     ? "Restauration complexe en attente de préparation différée." : null),
@@ -2748,15 +2815,25 @@ namespace Analyse
 
             ElementSnapshot snapshot = null;
             var key = BuildElementSnapshotKey(doc, id);
+            ExcludedElementMetadata exclusion = null;
             lock (SnapshotByElementId)
             {
+                if (!string.IsNullOrWhiteSpace(key) && ExcludedElements.TryGetValue(key, out exclusion)) ExcludedElements.Remove(key);
                 if (!string.IsNullOrWhiteSpace(key)) SnapshotByElementId.TryGetValue(key, out snapshot);
                 if (!string.IsNullOrWhiteSpace(key)) SnapshotByElementId.Remove(key);
             }
 
+            if (snapshot != null && ElementHistoryExternalModels.IsExcludedClass(snapshot.SourceClass))
+            {
+                exclusion = new ExcludedElementMetadata { CapturedWhileAlive = true, SourceElementId = id.GetIdValue(),
+                    SourceUniqueId = snapshot.UniqueId, Category = snapshot.Category, CategoryId = snapshot.CategoryId,
+                    Class = snapshot.SourceClass, Reason = "external_model" };
+                snapshot = null;
+            }
+
             if (snapshot != null && ShouldIgnoreSnapshot(snapshot)) return;
 
-            var openingRecipe = snapshot == null ? ElementHistoryOpeningArchive.TryCreateDeletedRecipe(doc, id) : null;
+            var openingRecipe = snapshot == null && exclusion == null ? ElementHistoryOpeningArchive.TryCreateDeletedRecipe(doc, id) : null;
 
             EnqueueHistoryEvent(new ElementHistoryEvent
             {
@@ -2766,18 +2843,22 @@ namespace Analyse
                 ModelKey = GetDocumentKey(doc),
                 ElementId = id.GetIdValue(),
                 UniqueId = "deleted:" + id.GetIdValue(),
-                Category = snapshot?.Category ?? "Non capturé",
+                Category = snapshot?.Category ?? exclusion?.Category ?? "Non capturé",
                 Family = snapshot?.Family ?? string.Empty,
                 TypeName = snapshot?.TypeName ?? string.Empty,
-                ThumbnailPath = ResolveThumbnailPath(doc, snapshot?.TypeId ?? -1, snapshot?.Family, snapshot?.TypeName),
+                ThumbnailPath = null,
                 Action = "delete",
                 User = user,
                 Tx = tx,
                 DeletionAudit = deletionAudit,
                 Delta = snapshot == null ? new Dictionary<string, object>
                 {
-                    ["recipe"] = openingRecipe,
-                    ["captureFailure"] = openingRecipe == null
+                    ["recipe"] = exclusion == null ? openingRecipe : null,
+                    ["excluded3D"] = exclusion,
+                    ["deletedUniqueId"] = exclusion?.SourceUniqueId,
+                    ["captureFailure"] = exclusion != null
+                        ? "Hors périmètre de restauration : objet exclu identifié avant sa suppression."
+                        : openingRecipe == null
                         ? "Élément supprimé avant sa capture et sans copie initiale exploitable."
                         : null,
                     ["snapshotMissing"] = true
@@ -2845,6 +2926,7 @@ namespace Analyse
         private static bool ShouldIgnoreElement(Element element)
         {
             if (element == null) return true;
+            if (ElementHistoryExternalModels.IsExcluded(element)) return true;
             // History restoration is scoped to the physical 3D model.
             if (element is View || element.ViewSpecific || element is ViewFamilyType
                 || element is DimensionType || element is TextElementType) return true;
@@ -2858,6 +2940,25 @@ namespace Analyse
             }
             if (ShouldIgnoreCategory(element.Category)) return true;
             return false;
+        }
+
+        private static void RememberExcludedElement(Element element)
+        {
+            // Metadata from a live API object is sufficient to acknowledge an
+            // annotation/axis deleted by cascade. Never infer this from a name
+            // after deletion, and never turn an unknown physical object into an
+            // exclusion just because its current recipe is unavailable.
+            string reason = ElementHistoryExternalModels.IsExcluded(element) ? "external_model"
+                : element.ViewSpecific || element is Dimension ? "annotation"
+                : element is Autodesk.Revit.DB.Plumbing.PipeInsulation || element is Autodesk.Revit.DB.Mechanical.DuctInsulation ? "insulation"
+                : !(element is ModelCurve) && IsAxisLineElement(element) ? "axis" : null;
+            if (reason == null) return;
+            var key = BuildElementSnapshotKey(element.Document, element.Id);
+            if (string.IsNullOrWhiteSpace(key)) return;
+            var metadata = new ExcludedElementMetadata { CapturedWhileAlive = true, SourceElementId = element.Id.GetIdValue(),
+                SourceUniqueId = element.UniqueId, Category = element.Category?.Name, CategoryId = element.Category?.Id.GetIdLongValue() ?? 0,
+                ViewSpecific = element.ViewSpecific, Class = element.GetType().FullName, Reason = reason };
+            lock (SnapshotByElementId) ExcludedElements[key] = metadata;
         }
 
         private static bool ShouldKeepSelectionSnapshotSimple(Element element)
@@ -2912,32 +3013,18 @@ namespace Analyse
 
         private static bool IsAxisLineElement(Element element)
         {
-            if (element == null) return false;
-
-            string typeName = null;
-            try
-            {
-                var typeId = element.GetTypeId();
-                if (typeId != null && typeId != ElementId.InvalidElementId)
-                    typeName = (element.Document?.GetElement(typeId) as ElementType)?.Name;
-            }
-            catch
-            {
-            }
-
-            return IsAxisLineText(element.Category?.Name)
-                || IsAxisLineText(element.Name)
-                || IsAxisLineText(typeName);
+            return element != null && element.GetType() == typeof(Element)
+                && IsGeneratedAxisCategory(element.Category?.Id.GetIdLongValue() ?? 0);
         }
 
         private static bool IsAxisLineSnapshot(ElementSnapshot snapshot)
         {
-            return snapshot != null
-                && (IsAxisLineText(snapshot.Category)
-                    || IsAxisLineText(snapshot.Name)
-                    || IsAxisLineText(snapshot.Family)
-                    || IsAxisLineText(snapshot.TypeName));
+            return snapshot != null && IsGeneratedAxisCategory(snapshot.CategoryId);
         }
+
+        private static bool IsGeneratedAxisCategory(long categoryId)
+            => new long[] { -2008214, -2008210, -2008196, -2008141, -2008140, -2008139, -2008136,
+                -2008072, -2008066, -2008051, -2008045, -2008021, -2008001, -2000288 }.Contains(categoryId);
 
         private static bool IsAxisLineText(string text)
         {
@@ -3771,6 +3858,26 @@ namespace Analyse
             if (ElementHistoryHoverInfoService.IsEnabled)
                 LatestElementHistoryIndex.Observe(historyEvent);
             Queue.Enqueue(historyEvent);
+            ScheduleLocalStage();
+        }
+
+        private static void ScheduleLocalStage()
+        {
+            // Wake local IO immediately, independently of slow network transport.
+            // The callback neither serializes a batch nor waits for a disk flush.
+            if (Interlocked.CompareExchange(ref _localStageScheduled, 1, 0) != 0) return;
+            Task.Run(() =>
+            {
+                bool staged = false;
+                try { StagePendingForDurability(); staged = true; }
+                catch (Exception ex) { Trace.WriteLine("History local journal: " + ex); }
+                finally
+                {
+                    Interlocked.Exchange(ref _localStageScheduled, 0);
+                    // Do not spin on disk failures: the regular worker retries.
+                    if (staged && !Queue.IsEmpty) ScheduleLocalStage();
+                }
+            });
         }
 
         private static string GetCurrentHistoryUser(Document document)
@@ -3808,11 +3915,10 @@ namespace Analyse
             }
         }
 
-        private static void Flush()
+        // Only IO workers call this method. No callback synchronously waits for
+        // local fsync or shared-drive delivery.
+        internal static void StagePendingForDurability()
         {
-            // All consumers hold this lock, including explicit history reads/shutdown.
-            // Retain the head until its complete, durable append has succeeded: retries
-            // then preserve event order and cannot silently discard an entire deletion.
             lock (FileSync)
             {
                 int remaining = Queue.Count;
@@ -3820,47 +3926,19 @@ namespace Analyse
                 {
                     var batch = Queue.Take(Math.Min(1000, remaining)).ToList();
                     if (batch.Count == 0) return;
-                    var text = new StringBuilder();
-                    foreach (var ev in batch)
-                        text.AppendLine(JsonConvert.SerializeObject(ev, Formatting.None));
-                    var bytes = new UTF8Encoding(false).GetBytes(text.ToString());
-                    var directory = CollaborativeModelTrackerStore.ActiveDirectory;
-                    Directory.CreateDirectory(directory);
-                    var path = Path.Combine(directory, $"element-history-{DateTime.UtcNow:yyyy-MM-dd}.jsonl");
-                    using (var stream = new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.Read))
-                    {
-                        var originalLength = stream.Length;
-                        try
-                        {
-                            // A previous process/disk failure may have left an incomplete
-                            // last line. Separate it so the retried first event is readable.
-                            if (originalLength > 0)
-                            {
-                                stream.Position = originalLength - 1;
-                                var lastByte = stream.ReadByte();
-                                if (lastByte != '\n' && lastByte != '\r') stream.WriteByte((byte)'\n');
-                            }
-                            stream.Position = stream.Length;
-                            stream.Write(bytes, 0, bytes.Length);
-                            stream.Flush(true);
-                        }
-                        catch
-                        {
-                            // Undo even a partial disk write before retrying the same
-                            // queued events; never leave a truncated JSON line behind.
-                            try { stream.SetLength(originalLength); stream.Flush(true); }
-                            catch (Exception ex) { Trace.WriteLine("History append rollback: " + ex); }
-                            throw;
-                        }
-                    }
-                    // A crash after append is recovered by scanning the journal.
-                    // Failure to persist its outbox retains the same EventIds for
-                    // retry; duplicate journal lines cannot change their identity.
-                    ElementHistoryDurableBridge.EventsPersisted(batch);
+                    ElementHistoryLocalSpool.Default.Stage(CollaborativeModelTrackerStore.ActiveDirectory, batch);
                     for (int index = 0; index < batch.Count; index++) Queue.TryDequeue(out _);
                     remaining -= batch.Count;
                 }
             }
+        }
+
+        private static void Flush()
+        {
+            StagePendingForDurability();
+            // Do not hold FileSync while a network destination is unavailable.
+            ElementHistoryLocalSpool.Default.Drain(CollaborativeModelTrackerStore.ActiveDirectory,
+                ElementHistoryDurableBridge.EventsPersisted);
         }
 
         private static void FlushAudit()
@@ -3887,14 +3965,14 @@ namespace Analyse
         {
             var dir = CollaborativeModelTrackerStore.ActiveDirectory;
             if (!Directory.Exists(dir)) return;
-            lock (FileSync)
+            ElementHistoryLocalSpool.Default.WithTransportLock(dir, () =>
             {
                 foreach (var file in Directory.GetFiles(dir, "element-history-*.jsonl"))
                 {
                     try
                     {
                         var dt = TryGetDailyHistoryDate(file) ?? File.GetLastWriteTimeUtc(file);
-                        if ((DateTime.UtcNow - File.GetLastWriteTimeUtc(file)).TotalDays < 7) continue;
+                        if ((ElementHistoryClock.UtcNow - File.GetLastWriteTimeUtc(file)).TotalDays < 7) continue;
 
                         var archive = GetMonthlyArchivePath(dir, dt);
                         AppendHistoryFileToArchive(file, archive);
@@ -3904,7 +3982,7 @@ namespace Analyse
                 }
 
                 ConsolidateDailyGzipArchives(dir);
-            }
+            });
         }
 
         private static void ConsolidateDailyGzipArchives(string dir)
@@ -3933,25 +4011,41 @@ namespace Analyse
             if (string.IsNullOrWhiteSpace(archivePath)) return;
 
             Directory.CreateDirectory(Path.GetDirectoryName(archivePath));
-            var tempPath = archivePath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            var staging = Path.Combine(Path.GetDirectoryName(archivePath), "history-data", "journal-compaction-staging");
+            Directory.CreateDirectory(staging);
+            var tempPath = Path.Combine(staging, Path.GetFileName(archivePath) + "." + Guid.NewGuid().ToString("N") + ".tmp");
 
             try
             {
+                string expectedDigest;
+                long expectedLines = 0;
+                using (var expectedHash = System.Security.Cryptography.SHA256.Create())
                 using (var dst = File.Create(tempPath))
-                using (var gzip = new GZipStream(dst, CompressionLevel.Optimal))
-                using (var writer = new StreamWriter(gzip, Encoding.UTF8))
                 {
-                    if (File.Exists(archivePath))
+                    using (var gzip = new GZipStream(dst, CompressionLevel.Optimal, true))
+                    using (var writer = new StreamWriter(gzip, new UTF8Encoding(false, true)))
                     {
-                        foreach (var line in ReadHistoryLines(archivePath))
+                        if (File.Exists(archivePath))
+                            foreach (var line in ReadCompactionLines(archivePath, true))
+                            {
+                                writer.WriteLine(line); HashCompactionLine(expectedHash, line); expectedLines++;
+                            }
+                        foreach (var line in ReadCompactionLines(sourcePath, sourcePath.EndsWith(".gz", StringComparison.OrdinalIgnoreCase)))
+                        {
                             writer.WriteLine(line);
+                            HashCompactionLine(expectedHash, line); expectedLines++;
+                        }
                     }
-
-                    foreach (var line in ReadHistoryLines(sourcePath))
-                        writer.WriteLine(line);
+                    // Include the completed GZip footer in the durable flush.
+                    dst.Flush(true);
+                    expectedHash.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+                    expectedDigest = Convert.ToBase64String(expectedHash.Hash);
                 }
-
+                VerifyCompactionArchive(tempPath, expectedDigest, expectedLines);
                 ReplaceFile(tempPath, archivePath);
+                // Source deletion is allowed only after re-reading the published
+                // archive, including its complete line sequence and GZip footer.
+                VerifyCompactionArchive(archivePath, expectedDigest, expectedLines);
             }
             finally
             {
@@ -3960,6 +4054,37 @@ namespace Analyse
                     if (File.Exists(tempPath)) File.Delete(tempPath);
                 }
                 catch { }
+            }
+        }
+
+        private static IEnumerable<string> ReadCompactionLines(string path, bool compressed)
+        {
+            using (var input = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+            using (var gzip = compressed ? new GZipStream(input, CompressionMode.Decompress, true) : null)
+            using (var reader = new StreamReader(gzip ?? (Stream)input, new UTF8Encoding(false, true)))
+            {
+                string line;
+                while ((line = reader.ReadLine()) != null) yield return line;
+            }
+        }
+
+        private static void HashCompactionLine(System.Security.Cryptography.SHA256 hash, string line)
+        {
+            // Canonical newline makes the verification independent of CRLF/LF;
+            // all line contents, order and duplicates remain part of the digest.
+            var bytes = new UTF8Encoding(false, true).GetBytes(line + "\n");
+            hash.TransformBlock(bytes, 0, bytes.Length, bytes, 0);
+        }
+
+        private static void VerifyCompactionArchive(string path, string expectedDigest, long expectedLines)
+        {
+            using (var actual = System.Security.Cryptography.SHA256.Create())
+            {
+                long count = 0;
+                foreach (var line in ReadCompactionLines(path, true)) { HashCompactionLine(actual, line); count++; }
+                actual.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+                if (count != expectedLines || Convert.ToBase64String(actual.Hash) != expectedDigest)
+                    throw new InvalidDataException("La compression de l’historique n’a pas conservé toutes les lignes ; le journal source reste conservé.");
             }
         }
 

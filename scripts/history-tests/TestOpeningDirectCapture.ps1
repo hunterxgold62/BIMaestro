@@ -24,6 +24,7 @@ sealed class Element {
     public Element Root;
     public HistoryRecipe Direct;
     public Exception CoreFailure, EnrichFailure;
+    public bool External;
 }
 sealed class HistoryRecipe {
     public string Kind;
@@ -35,6 +36,7 @@ static class ElementHistoryNativeArchive {
     public static Element OpeningRoot(Element element){return element.Root??element;}
     // No native capture/queue implementation is supplied: the helper may only read.
 }
+static class ElementHistoryExternalModels { internal static bool IsExcluded(Element element){return element!=null&&element.External;} }
 static class Reconstruction {
     public static int CoreReads,EnrichReads;
     static HistoryRecipe CaptureCore(Element element,Action<string> diagnostic,bool includeDetails){
@@ -66,6 +68,8 @@ public static class Checks {
             Check(source.Id==1&&source.Root==null&&source.Direct.Native==null,"The source and its native path must remain untouched");
         }
         int coreReads=Reconstruction.CoreReads,enrichReads=Reconstruction.EnrichReads;
+        Check(Reconstruction.Read(new Element{External=true})==null,"External imports/links must not acquire a direct restore recipe");
+        Check(Reconstruction.CoreReads==coreReads&&Reconstruction.EnrichReads==enrichReads,"Excluded external source must be rejected before any direct data read");
         var aggregate=Supported("family");aggregate.Aggregate=true;
         Check(Reconstruction.Read(aggregate)==null,"An aggregate member must retain its native owner path");
         foreach(var owner in new[]{"group","railing","stairs","host"}){

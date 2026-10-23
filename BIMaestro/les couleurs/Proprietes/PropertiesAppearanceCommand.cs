@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Windows.Interop;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
@@ -27,6 +28,10 @@ namespace BIMaestro.PropertiesAppearance
         }
         internal static void Open(UIApplication app)
         {
+                // The laboratory may opt in only for its disposable Revit 2025 fixture.
+                var lab=AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a=>a.GetName().Name=="BIMaestro.PropertiesCustomGroupProbe");
+                var openLab=lab?.GetType("BIMaestro.PropertiesCustomGroupTests.Probe")?.GetMethod("OpenEditor");
+                if(openLab!=null&&(bool)openLab.Invoke(null,new object[]{app}))return;
                 if (_window != null && _window.IsVisible) { _window.Activate(); return; }
                 if (_event == null) _event = ExternalEvent.Create(_handler);
                 PropertiesAppearanceService.ReloadSaved();

@@ -429,7 +429,8 @@ namespace Analyse
                 // Placement/system built-ins are controlled by the geometry recipe; do
                 // not replay stale offsets over the absolute start/end points.
                 Parameters = ElementHistoryReconstruction.CaptureParameters(element)
-                    .Where(p => p.BuiltIn == 0 || p.BuiltIn == (int)BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS).ToList(),
+                    .Where(p => p.BuiltIn == 0 || p.BuiltIn == (int)BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS
+                        || p.BuiltIn == -1019000).ToList(), // Stored instance identity, independent of geometry offsets.
                 Network = new HistoryNetwork
                 {
                     Kind = kind, SystemType = systemType?.UniqueId,

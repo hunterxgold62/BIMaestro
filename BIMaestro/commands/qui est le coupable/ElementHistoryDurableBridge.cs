@@ -61,6 +61,12 @@ namespace Analyse
         private static readonly Dictionary<string, Session> Sessions = new Dictionary<string, Session>(StringComparer.OrdinalIgnoreCase);
         private static readonly Dictionary<string, ElementHistoryEvent> Pending = new Dictionary<string, ElementHistoryEvent>(StringComparer.Ordinal);
         private static readonly Dictionary<string, string> Errors = new Dictionary<string, string>(StringComparer.Ordinal);
+        private sealed class TransportRetry
+        {
+            internal int Failures;
+            internal DateTime NextUtc;
+        }
+        private static readonly Dictionary<string, TransportRetry> TransportRetries = new Dictionary<string, TransportRetry>(StringComparer.Ordinal);
         private static readonly Dictionary<string, Prepared> PreparedJobs = new Dictionary<string, Prepared>(StringComparer.Ordinal);
         private static ElementHistoryNativeArchive.Sources Sources;
         private static Task Io;
@@ -216,12 +222,6 @@ namespace Analyse
                         used = Sessions.Values.FirstOrDefault(s => string.Equals(Path.GetFileName(s.BridgeFile), Path.GetFileName(receipt.File), StringComparison.OrdinalIgnoreCase));
                         if (used != null && !used.Referenced) { used.Referenced = true; referencedChanged = true; }
                     }
-                else
-                    lock (Sync)
-                    {
-                        used = Sessions.Values.FirstOrDefault(s => string.Equals(s.ModelKey, ev.ModelKey, StringComparison.OrdinalIgnoreCase));
-                        if (used != null && !used.Referenced) { used.Referenced = true; referencedChanged = true; }
-                    }
                 if (referencedChanged) SaveSession(used);
                 if (ElementHistoryDurableStore.HasConversion(ev.EventId)) continue;
                 ElementHistoryDurableStore.WriteJob(ev);
@@ -231,6 +231,10 @@ namespace Analyse
         private static IEnumerable<ElementHistoryEvent> ReadJournal()
         {
             var root = CollaborativeModelTrackerStore.ActiveDirectory;
+            return ElementHistoryLocalSpool.Default.ReadWithTransportLock(root, () => ReadJournalUnderLease(root));
+        }
+        private static IEnumerable<ElementHistoryEvent> ReadJournalUnderLease(string root)
+        {
             if (!Directory.Exists(root)) yield break;
             foreach (var file in Directory.GetFiles(root, "element-history-*").OrderBy(f => f, StringComparer.Ordinal))
             {
@@ -299,7 +303,17 @@ namespace Analyse
         {
             var concise = ex.Message.Split(new[] { '\r', '\n' }, 2)[0];
             if (concise.Length > 700) concise = concise.Substring(0, 700);
-            lock (Sync) Errors[id] = concise;
+            lock (Sync)
+            {
+                Errors[id] = concise;
+                if (ElementHistoryRetryPolicy.IsTransient(ex))
+                {
+                    if (!TransportRetries.TryGetValue(id, out var retry)) TransportRetries[id] = retry = new TransportRetry();
+                    retry.Failures++;
+                    retry.NextUtc = DateTime.UtcNow.Add(ElementHistoryRetryPolicy.Delay(retry.Failures));
+                }
+                else TransportRetries.Remove(id);
+            }
             SetReadiness(id, ReadinessState.Unavailable, concise);
             Trace.WriteLine("History durable " + id + ": " + ex);
             Task.Run(() =>
@@ -314,6 +328,16 @@ namespace Analyse
                 catch { }
             });
         }
+        private static void ReleaseDueTransportFailures(DateTime nowUtc)
+        {
+            List<string> due;
+            lock (Sync)
+            {
+                due = TransportRetries.Where(pair => pair.Value.NextUtc <= nowUtc && Errors.ContainsKey(pair.Key)).Select(pair => pair.Key).ToList();
+                foreach (var id in due) Errors.Remove(id);
+            }
+            foreach (var id in due) SetReadiness(id, ReadinessState.Preparing, "Nouvelle tentative après indisponibilité du stockage…");
+        }
         internal static Status GetStatus()
         {
             lock (Sync)
@@ -324,9 +348,37 @@ namespace Analyse
                 BridgeFiles = relevant.Select(s => s.BridgeFile).Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
                 DeletedBridgeFiles = relevant.Where(s => s.Deleted).Select(s => s.BridgeFile).ToList(),
                 Complete = Loaded && Pending.Count == 0 && Errors.Count == 0 && (Io == null || Io.IsCompleted),
-                Working = Io != null && !Io.IsCompleted, SessionClosed = relevant.Count > 0 && relevant.All(s => s.Closed) };
+                Working = Io != null && !Io.IsCompleted,
+                SessionClosed = (relevant.Count > 0 ? relevant : Sessions.Values.ToList()).All(s => s.Closed) };
             }
         }
+        private static bool HasLiveExclusion(ElementHistoryEvent ev)
+        {
+            if (ev?.Delta == null || !ev.Delta.TryGetValue("excluded3D", out var value) || value == null) return false;
+            var metadata = JObject.FromObject(value);
+            var reason = (string)metadata["Reason"];
+            var kind = (string)metadata["Class"] ?? "";
+            var uid = (string)metadata["SourceUniqueId"];
+            ev.Delta.TryGetValue("deletedUniqueId", out var deletedUid);
+            bool annotation = reason == "annotation" && ((bool?)metadata["ViewSpecific"] == true
+                || kind == "Autodesk.Revit.DB.Dimension" || kind == "Autodesk.Revit.DB.LinearDimension"
+                || kind == "Autodesk.Revit.DB.SpotDimension");
+            bool insulation = reason == "insulation" && (kind == "Autodesk.Revit.DB.Plumbing.PipeInsulation"
+                || kind == "Autodesk.Revit.DB.Mechanical.DuctInsulation");
+            bool externalModel = reason == "external_model" && ElementHistoryExternalModels.IsExcludedClass(kind);
+            // Exact built-in center-line categories; ordinary curves/instances
+            // named "axis" are never acknowledged by a name heuristic.
+            var category = (long?)metadata["CategoryId"] ?? 0;
+            bool axis = reason == "axis" && kind == "Autodesk.Revit.DB.Element"
+                && new long[] { -2008214, -2008210, -2008196, -2008141, -2008140, -2008139, -2008136,
+                    -2008072, -2008066, -2008051, -2008045, -2008021, -2008001, -2000288 }.Contains(category);
+            return (bool?)metadata["CapturedWhileAlive"] == true
+                && (int?)metadata["SourceElementId"] == ev.ElementId
+                && !string.IsNullOrWhiteSpace(uid) && string.Equals(uid, Convert.ToString(deletedUid), StringComparison.Ordinal)
+                && kind.StartsWith("Autodesk.Revit.DB.", StringComparison.Ordinal)
+                && (annotation || axis || insulation || externalModel);
+        }
+
         private static bool QueueExcludedAnnotationAcknowledgements(List<ElementHistoryEvent> jobs)
         {
             const string ackFailurePrefix = "ACK_3D_EXCLUDED: ";
@@ -334,11 +386,12 @@ namespace Analyse
             foreach (var ev in jobs)
             {
                 if (acknowledgements.Count >= 8) break;
-                // Exact historical category only. Unknown physical elements and
-                // insulation are never reclassified from their names.
+                // Only exact category evidence or metadata captured from a live
+                // excluded object. A missing recipe never implies exclusion.
                 var category = ev.Category ?? ev.DeletionAudit?.Category;
                 if (!string.Equals(category, "Cotes automatiques de l'esquisse", StringComparison.OrdinalIgnoreCase)
-                    && !string.Equals(category, "Automatic Sketch Dimensions", StringComparison.OrdinalIgnoreCase)) continue;
+                    && !string.Equals(category, "Automatic Sketch Dimensions", StringComparison.OrdinalIgnoreCase)
+                    && !HasLiveExclusion(ev)) continue;
                 var id = EventId(ev);
                 lock (Sync)
                     if (Errors.TryGetValue(id, out var failure) && failure.StartsWith(ackFailurePrefix, StringComparison.Ordinal)) continue;
@@ -346,7 +399,9 @@ namespace Analyse
                 {
                     var request = ToRequest(ev, resolve: false);
                     request.Recipe = null;
-                    request.CaptureFailure = "Hors périmètre 3D : cotation identifiée par sa catégorie historique exacte.";
+                    request.CaptureFailure = HasLiveExclusion(ev)
+                        ? "Hors périmètre de restauration : objet exclu identifié avant sa suppression (annotation, axe, isolant ou lien/import externe)."
+                        : "Hors périmètre 3D : cotation identifiée par sa catégorie historique exacte.";
                     acknowledgements.Add(new Prepared { Event = ev, Request = request });
                 }
                 catch (Exception ex) { RecordFailure(id, new InvalidDataException(ackFailurePrefix + ex.Message, ex)); }
@@ -371,9 +426,13 @@ namespace Analyse
             if (application == null || HistoryBackgroundWork.Paused && !force) return;
             bool liveSession;
             lock (Sync) liveSession = Live.Count > 0;
+            // Unsaved/cloud projects may have no opening-copy session. They are
+            // still user documents and require the same inactivity protection.
+            liveSession |= application.Documents.Cast<Document>().Any(doc => !ElementHistoryNativeArchive.Owns(doc));
             if (!force && liveSession && !HistoryBackgroundWork.PreparationCanRun()) return;
             if (DateTime.UtcNow < NextPassUtc) return;
             NextPassUtc = DateTime.UtcNow.AddMilliseconds(force ? 50 : 1000);
+            ReleaseDueTransportFailures(DateTime.UtcNow);
             lock (Sync)
             {
                 if (Io != null && !Io.IsCompleted) return;
@@ -382,7 +441,20 @@ namespace Analyse
                     throw new InvalidOperationException("Le dossier historique a changé pendant une conversion.");
                 CurrentStore = store;
                 if (!Loaded)
-                { Io = Task.Run(() => { try { Load(); } catch (Exception ex) { RecordFailure("load", ex); } }); return; }
+                {
+                    if (Errors.ContainsKey("load")) return;
+                    Io = Task.Run(() =>
+                    {
+                        try
+                        {
+                            // Recover locally staged work/torn appends before the
+                            // strict journal scan can classify a crash fragment.
+                            ElementHistoryLocalSpool.Default.Drain(store, EventsPersisted);
+                            Load();
+                        }
+                        catch (Exception ex) { RecordFailure("load", ex); }
+                    }); return;
+                }
             }
             List<ElementHistoryEvent> jobs;
             lock (Sync) jobs = Pending.Values.ToList();
@@ -402,7 +474,7 @@ namespace Analyse
                 processingId = EventId(first);
                 var firstRequest = ToRequest(first, resolve: false);
                 var receipt = SourceArtifact(firstRequest.Recipe);
-                if (receipt == null)
+                if (firstRequest.Recipe?.Native == null && firstRequest.Recipe?.Kind != "native_archive")
                 { ProcessDirectDefinitions(application, jobs, first); return; }
                 if (receipt.WholeModel && !File.Exists(receipt.File)
                     && !File.Exists(Path.Combine(CollaborativeModelTrackerStore.ActiveDirectory, "native-history", Path.GetFileName(receipt.File)))
@@ -416,100 +488,25 @@ namespace Analyse
                 var source = Sources.Open(application, receipt);
                 var sameSource = jobs.Where(e => {
                     var r = ToRequest(e, false).Recipe; var a = SourceArtifact(r);
-                    return a?.WholeModel == true && string.Equals(Path.GetFileName(a.File), Path.GetFileName(receipt.File), StringComparison.OrdinalIgnoreCase);
+                    return r?.Native?.WholeModel == true && a?.WholeModel == true
+                        && string.Equals(Path.GetFileName(a.File), Path.GetFileName(receipt.File), StringComparison.OrdinalIgnoreCase);
                 }).ToList();
-                var acknowledgements = new List<Prepared>();
                 var prepared = new List<Prepared>();
                 var preparation = Stopwatch.StartNew();
-                int rootLimit = force || !liveSession ? 32 : 2;
+                int preparationLimit = force || !liveSession ? 32 : 2;
                 int preparationBudgetMs = force || !liveSession ? 250 : 25;
-                var preparedRoots = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var ev in sameSource)
                 {
-                    // Do not inspect every deleted object before yielding to
-                    // Revit. Metadata preparation has the same small-wave
-                    // discipline as native export; one API call is indivisible.
-                    if ((prepared.Count > 0 || acknowledgements.Count > 0)
-                        && (preparation.ElapsedMilliseconds >= preparationBudgetMs || preparedRoots.Count >= rootLimit)) break;
+                    if (prepared.Count > 0 && (preparation.ElapsedMilliseconds >= preparationBudgetMs || prepared.Count >= preparationLimit)) break;
                     var id = EventId(ev);
-                    if (Errors.ContainsKey(id)) continue;
-                    if (!PreparedJobs.TryGetValue(id, out var item))
-                    {
-                        var request = ToRequest(ev, false);
-                        request.Recipe = JObject.FromObject(request.Recipe).ToObject<HistoryRecipe>();
-                        var artifact = SourceArtifact(request.Recipe);
-                        if (request.Recipe.Native == null && request.Recipe.OpeningFallback == null)
-                        { RecordFailure(id, new InvalidDataException("Une source native imbriquée exige une conversion explicite de son circuit ; la passerelle est conservée.")); continue; }
-                        var element = source.GetElement(ElementIdExtensions.CreateElementId(artifact.SourceElementId));
-                        if (element == null) { RecordFailure(id, new InvalidDataException("Objet absent de la passerelle : " + artifact.SourceElementId)); continue; }
-                        request.SourceUniqueId = element.UniqueId; request.Category = element.Category?.Name ?? request.Category;
-                        if (ElementHistoryRestoration.IsCalorifuge(request.Category, element.Name)
-                            || !(element is MEPSystem) && !ElementHistoryOpeningArchive.IsEligibleElement(element)
-                            || element is SpatialElement || element.GetType().Name == "ConduitRun"
-                            || element is Sketch || element is SketchPlane
-                            || element.Category?.Id.GetIdLongValue() == (long)BuiltInCategory.OST_SketchLines)
-                        {
-                            request.Recipe = null;
-                            request.CaptureFailure = "Événement interne ou objet exclu de la restauration physique ; aucune donnée de passerelle requise.";
-                            acknowledgements.Add(new Prepared { Event = ev, Request = request }); continue;
-                        }
-                        try
-                        {
-                            var root = ElementHistoryNativeArchive.OpeningRoot(element);
-                            if (artifact.ExcludedElementIds?.Count > 0 && ElementHistoryNativeArchive.Aggregate(source, root)
-                                .Any(m => artifact.ExcludedElementIds.Contains(m.Id.GetIdValue())))
-                                throw new InvalidDataException("La passerelle ne représente plus l’état de cet ensemble avant suppression.");
-                            item = new Prepared { Event = ev, Request = request, Root = root.UniqueId };
-                            PreparedJobs[id] = item;
-                        }
-                        catch (Exception ex) { RecordFailure(id, ex); continue; }
-                    }
-                    prepared.Add(item);
-                    preparedRoots.Add(item.Root);
+                    lock (Sync) if (Errors.ContainsKey(id)) continue;
+                    var request = ToRequest(ev, false);
+                    try { PrepareCompactOpeningRequest(source, request); }
+                    catch (InvalidDataException ex) { MakeUnavailable(request, ex.Message); }
+                    prepared.Add(new Prepared { Event = ev, Request = request });
                 }
-                var roots = new HashSet<string>(prepared.Select(p => p.Root).Distinct().Take(rootLimit), StringComparer.Ordinal);
-                var wave = prepared.Where(p => roots.Contains(p.Root)).ToList();
-                var scratch = Path.Combine(Path.GetTempPath(), "BIMaestro", "history-export", "snapshot-capsule-" + Guid.NewGuid().ToString("N") + ".rvt");
-                Dictionary<string, HistoryRecipe> recipes = null;
-                var exportFailures = new Dictionary<string, string>(StringComparer.Ordinal);
-                if (wave.Count > 0)
-                {
-                    Directory.CreateDirectory(Path.GetDirectoryName(scratch));
-                    try
-                    {
-                        string version;
-                        using (var hash = SHA256.Create()) version = BitConverter.ToString(hash.ComputeHash(Encoding.UTF8.GetBytes(Path.GetFileName(receipt.File)))).Replace("-", "").ToLowerInvariant();
-                        recipes = ElementHistoryNativeArchive.ExportDurableBatch(source, wave.Select(p => p.Request), scratch, version, exportFailures);
-                    }
-                    catch (Exception ex) { foreach (var item in wave) RecordFailure(EventId(item.Event), ex); wave.Clear(); }
-                }
-                Io = Task.Run(() =>
-                {
-                    try
-                    {
-                        var payload = recipes != null && File.Exists(scratch) ? ElementHistoryDurableStore.PublishNative(scratch) : null;
-                        foreach (var item in wave)
-                        {
-                            if (recipes == null || !recipes.TryGetValue(item.Request.SourceUniqueId, out var recipe))
-                            {
-                                exportFailures.TryGetValue(item.Request.SourceUniqueId, out var reason);
-                                RecordFailure(EventId(item.Event), new InvalidDataException(reason ?? "La capsule ne contient pas une identité demandée."));
-                                continue;
-                            }
-                            BindPayload(recipe, payload);
-                            item.Request.Recipe = recipe; item.Request.CaptureFailure = null;
-                            Publish(item);
-                        }
-                        foreach (var item in acknowledgements) Publish(item);
-                    }
-                    catch (Exception ex)
-                    { foreach (var item in wave.Concat(acknowledgements)) { var id = EventId(item.Event); lock (Sync) if (Pending.ContainsKey(id)) Errors[id] = ex.Message; } }
-                    finally
-                    {
-                        try { if (File.Exists(scratch)) File.Delete(scratch); } catch { }
-                        try { var backup = Path.ChangeExtension(scratch, ".0001.rvt"); if (File.Exists(backup)) File.Delete(backup); } catch { }
-                    }
-                });
+                if (prepared.Count == 0) throw new InvalidDataException("Aucun objet directement reconstructible dans cette copie d’ouverture.");
+                PublishPreparedAsync(prepared);
             }
             catch (Exception ex) { RecordFailure(processingId ?? "convert", ex); }
         }
@@ -529,9 +526,9 @@ namespace Analyse
             ElementHistoryDurableStore.PublishConversion(id, item.Request);
             if (ElementHistoryDurableStore.ResolveConversion(id) == null) throw new InvalidDataException("Conversion publiée mais non relue.");
             ElementHistoryDurableStore.DeleteJob(id);
-            lock (Sync) { Pending.Remove(id); Errors.Remove(id); Converted++; }
+            lock (Sync) { Pending.Remove(id); Errors.Remove(id); TransportRetries.Remove(id); Converted++; }
             SetReadiness(id, item.Request.Recipe == null ? ReadinessState.Unavailable : ReadinessState.Ready,
-                item.Request.Recipe == null ? item.Request.CaptureFailure : "Archive de restauration prête et vérifiée.");
+                item.Request.Recipe == null ? item.Request.CaptureFailure : ReadyReason(item.Request.Recipe));
         }
         private static void ConvertSmallNative(ElementHistoryEvent ev, HistoryRestoreRequest request)
         {
@@ -551,6 +548,9 @@ namespace Analyse
         }
         private static void CleanupClosedSessions()
         {
+            // A deletion may be safely staged locally while the shared folder is
+            // unavailable. It has not reached ReadJournal yet: keep every bridge.
+            if (ElementHistoryLocalSpool.Default.HasPending(CollaborativeModelTrackerStore.ActiveDirectory)) return;
             List<Session> closed;
             lock (Sync) closed = Sessions.Values.Where(s => s.Closed && !s.Deleted).ToList();
             if (closed.Count == 0) return;

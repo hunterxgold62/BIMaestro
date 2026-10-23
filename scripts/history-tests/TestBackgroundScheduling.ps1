@@ -10,7 +10,7 @@ using System;
 namespace HistoryBackgroundSchedulingTests {
 class Document { }
 class UIDocument { internal Document Document=new Document(); }
-class UIApplication { internal UIDocument ActiveUIDocument=new UIDocument(); }
+class UIApplication { internal UIDocument ActiveUIDocument=new UIDocument(); internal object Application=new object(); }
 // Controlled elapsed API time; no real sleeps, model access or Windows calls.
 class Stopwatch {
     static long Work;
@@ -20,6 +20,10 @@ class Stopwatch {
     internal static void Spend(long ms) { Work+=ms; }
 }
 namespace Analyse {
+static class ElementHistoryDurableBridge {
+    internal static int Calls;
+    internal static void ProcessPending(object application) { Calls++; }
+}
 static class HistoryBackgroundWork {
     internal static bool SelectionRequested, SelectionAllowed, InventoryAllowed, IdleAllowed;
     internal static bool SelectionCanRun() { return SelectionAllowed; }
@@ -28,20 +32,21 @@ static class HistoryBackgroundWork {
 }
 class SelectionPreparationStatus { internal int Pending; }
 static class ElementHistoryTracker {
-    internal static bool PrimeRemaining,LightRemaining;
+    internal static bool PrimeRemaining,LightRemaining,ChangedRemaining;
     internal static int Schedules,PrimeCalls,LightCalls,EnrichmentCalls,SelectionPending,PrimeMs;
     internal static SelectionPreparationStatus GetSelectionPreparationStatus(Document doc) {
         return new SelectionPreparationStatus { Pending=SelectionPending };
     }
     internal static void ScheduleDeferredPrime(Document doc) { Schedules++; }
     internal static bool HasPendingBasicInventory(Document doc) { return PrimeRemaining || LightRemaining; }
+    internal static bool HasChangedRestorationPriority(Document doc) { return ChangedRemaining; }
     internal static void ProcessDeferredPrime(Document doc) { PrimeCalls++; Stopwatch.Spend(PrimeMs); }
     internal static void ProcessDeferredRestorationCapture(Document doc,bool selectionOnly=false,bool inventoryOnly=false) {
         bool allowed=selectionOnly ? HistoryBackgroundWork.SelectionCanRun()
-            : inventoryOnly ? HistoryBackgroundWork.InventoryCanRun() : HistoryBackgroundWork.UserIsIdle();
+            : HistoryBackgroundWork.InventoryCanRun();
         if (!allowed) return;
         if (LightRemaining) { LightCalls++; LightRemaining=false; }
-        if (!inventoryOnly) EnrichmentCalls++;
+        if (!inventoryOnly) { EnrichmentCalls++;ChangedRemaining=false; }
         if (selectionOnly) SelectionPending=0;
     }
 }
@@ -67,6 +72,8 @@ $checks = @'
         Analyse.HistoryBackgroundWork.IdleAllowed=false;
         Analyse.ElementHistoryTracker.PrimeRemaining=false;
         Analyse.ElementHistoryTracker.LightRemaining=false;
+        Analyse.ElementHistoryTracker.ChangedRemaining=false;
+        Analyse.ElementHistoryDurableBridge.Calls=0;
         Analyse.ElementHistoryTracker.Schedules=Analyse.ElementHistoryTracker.PrimeCalls=0;
         Analyse.ElementHistoryTracker.LightCalls=Analyse.ElementHistoryTracker.EnrichmentCalls=0;
         Analyse.ElementHistoryTracker.SelectionPending=Analyse.ElementHistoryTracker.PrimeMs=0;
@@ -76,6 +83,7 @@ $checks = @'
         Reset(); Analyse.HistoryBackgroundWork.SelectionRequested=true;
         new SchedulerChecks().ProcessHistoryBackground(new UIApplication { ActiveUIDocument=null });
         Check(!Analyse.HistoryBackgroundWork.SelectionRequested && Analyse.ElementHistoryTracker.Schedules==0,"Closing the active document must stop stale selection requests.");
+        Check(Analyse.ElementHistoryDurableBridge.Calls==1,"Durable conversion dispatcher remains reachable after the last active document closes.");
 
         Reset(); Analyse.ElementHistoryTracker.PrimeRemaining=true;
         Analyse.HistoryBackgroundWork.InventoryAllowed=false;
@@ -107,9 +115,20 @@ $checks = @'
         new SchedulerChecks().ProcessHistoryBackground(new UIApplication());
         Check(Analyse.ElementHistoryTracker.PrimeCalls==0 && Analyse.ElementHistoryTracker.LightCalls==1,"Explicit selection must precede the general inventory.");
         Check(!Analyse.HistoryBackgroundWork.SelectionRequested,"Completed selection must release its immediate bypass.");
+
+        Reset(); Analyse.ElementHistoryTracker.PrimeRemaining=true;
+        Analyse.ElementHistoryTracker.ChangedRemaining=true;
+        new SchedulerChecks().ProcessHistoryBackground(new UIApplication());
+        Check(Analyse.ElementHistoryTracker.PrimeCalls==0 && Analyse.ElementHistoryTracker.EnrichmentCalls==1,
+            "Changed restoration state must precede the remaining opening inventory.");
+
+        Reset(); Analyse.ElementHistoryTracker.ChangedRemaining=true;
+        Analyse.HistoryBackgroundWork.InventoryAllowed=false;
+        new SchedulerChecks().ProcessHistoryBackground(new UIApplication());
+        Check(Analyse.ElementHistoryTracker.EnrichmentCalls==0,"Stop/input gate must also block changed-state preparation.");
     }
 }}
 '@
 Add-Type -TypeDefinition ($fixtures + $dispatcher + $checks)
 [HistoryBackgroundSchedulingTests.SchedulerChecks]::Run()
-Write-Output 'PASS: dispatcher handles no document/Stop, progresses inventory and deselected light captures, defers heavy work, yields after slow API batches and prioritizes selection.'
+Write-Output 'PASS: dispatcher handles no document/Stop, durable dispatch after closure, inventory/light captures, slow-pass yielding, selection and changed-state priority. This scheduling fixture does not measure native API duration.'

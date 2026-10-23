@@ -84,6 +84,7 @@ namespace BIMaestro.StressTests
             public string WitnessExclusionReason { get; set; }
             public bool AllowPartialDurableRestore { get; set; }
             public bool BusinessWorkflow { get; set; }
+            public bool RapidModifiedDelete { get; set; }
             public long[] DiagnosticPhysicalIds { get; set; } = Array.Empty<long>();
             public bool IsolatedRestoreWorkspace { get; set; }
             public int WorkAfterEditsSeconds { get; set; } = 45;
@@ -219,6 +220,7 @@ namespace BIMaestro.StressTests
         {
             controlled.Idling -= Idle; controlled.ControlledApplication.DocumentOpened -= Opened; controlled.ControlledApplication.DocumentChanged -= Changed;
             cancellation?.Cancel(); try { worker?.Wait(2000); } catch { }
+            ReleaseRapidSources();
             external?.Dispose(); return Result.Succeeded;
         }
         void IdleCore(object sender, IdlingEventArgs args)
@@ -242,6 +244,7 @@ namespace BIMaestro.StressTests
                     originalDetailed = (bool)Read(tracker, "_captureDetailedDeletedMesh");
                     if (config.Scenario == "prepared") tracker.GetField("_captureDetailedDeletedMesh", Flags).SetValue(null, true);
                     if (config.BusinessWorkflow) tracker.GetField("_captureDetailedDeletedMesh", Flags).SetValue(null, false); if (IsDurableRestore) LoadDurableBaseline();
+                    InitializeRapidCycle();
                     cancellation = new CancellationTokenSource(); worker = Task.Run(() => Worker(cancellation.Token)); initialized = true; if (config.BusinessWorkflow && IsDurableCapture) Call(durableBridge, "EnableIsolatedAutomaticPreparation");
                     var ready = new { Pid = Environment.ProcessId, MainWindowHandle = ui.MainWindowHandle.ToInt64(), Product = product.Location, Sha256 = Sha(product.Location), Model = modelPath, HistoryDirectory = historyDirectory, ManualHistoryMode = Environment.GetEnvironmentVariable("BIMAESTRO_HISTORY_MANUAL_TEST"), Config = config, OriginalDetailed = originalDetailed, RuntimeDetailed = Read(tracker, "_captureDetailedDeletedMesh") };
                     Record("ready", ready); Write("ready.json", ready);
@@ -252,7 +255,7 @@ namespace BIMaestro.StressTests
             {
                 try { PartialIdle(); }
                 catch (Exception ex) { partialAwaitingSessionClose = false; phase = "partial-close-error"; Record("partial_close_error", ex.ToString()); Write("partial-error.json", new { AtUtc = DateTime.UtcNow, Error = ex.ToString() }); }
-                DurableIdle(ui); BusinessReadinessIdle();
+                DurableIdle(ui); BusinessReadinessIdle(); RapidIdle();
             }
             if (!initialized || finished || doc == null || !doc.IsValidObject || !IsCopy(doc) || DateTime.UtcNow < nextStateUtc) return;
             nextStateUtc = DateTime.UtcNow.AddMilliseconds(500);
@@ -278,7 +281,8 @@ namespace BIMaestro.StressTests
                 var currentKey = (string)Call(tracker, "GetDocumentKeyForHistory", doc);
                 if (!IsDurableRestore) { openedUtc = DateTime.UtcNow; docKey = currentKey; }
                 Record("document_opened", new { doc.Title, doc.IsModified, State = State(doc), CurrentDocumentKey = currentKey, HistoryDocumentKey = docKey, DurableRestore = IsDurableRestore });
-                if (config.Scenario == "early" || IsDurableCapture && !HasDelayedDeletion && !config.BusinessWorkflow) { deleteQueued = true; actions.Enqueue("delete"); }
+                if (config.RapidModifiedDelete) { actions.Enqueue(IsDurableRestore ? "restore" : "rapid-edit"); }
+                else if (config.Scenario == "early" || IsDurableCapture && !HasDelayedDeletion && !config.BusinessWorkflow) { deleteQueued = true; actions.Enqueue("delete"); }
             }
             else Record("restored_document_opened", new { doc.Title, doc.PathName });
         }
@@ -412,7 +416,7 @@ namespace BIMaestro.StressTests
                 .SelectMany(p => p.Peers).Where(p => p.Domain == networkDomain && p.Type is "End" or "Curve" or "Physical").Select(p => p.SystemTypeUid).Where(uid => uid != null).Distinct().OrderBy(uid => uid).ToList();
             value.Excavations = excavationByUid.TryGetValue(element.UniqueId, out var excavationPairs) ? excavationPairs.ToList() : new List<ExcavationRelation>();
             value.ExcavationQuerySucceeded = excavationProbeErrors.Count == 0;
-            if (excavationProbeErrors.Count > 0) value.ProbeErrors.AddRange(excavationProbeErrors.Select(error => "excavation-unverified:" + error)); if (config.BusinessWorkflow) { var parameters = ReadTypeDefinition(element); value.InstanceParameters = parameters.Parameters; value.InstanceParameterErrors = parameters.Errors; value.Pinned = element.Pinned; }
+            if (excavationProbeErrors.Count > 0) value.ProbeErrors.AddRange(excavationProbeErrors.Select(error => "excavation-unverified:" + error)); if (config.BusinessWorkflow || config.RapidModifiedDelete && (IsDurableRestore || rapidIds.Contains(element.Id.Value))) { var parameters = ReadTypeDefinition(element); value.InstanceParameters = parameters.Parameters; value.InstanceParameterErrors = parameters.Errors; value.Pinned = element.Pinned; }
             return value;
         }
         internal static bool TryPhysicalGroupRoot(Document document, Group root, ISet<long> selectedIds, out LogicalGroupRoot result)
@@ -494,7 +498,7 @@ namespace BIMaestro.StressTests
         void Delete(Document document)
         {
             if (deleted) throw new InvalidOperationException("The one mass deletion already ran.");
-            ValidateDelayedDelete(); ValidateBusinessDelete();
+            ValidateDelayedDelete(); ValidateBusinessDelete(); ValidateRapidDelete();
             if (IsDurableCapture)
             {
                 var archive = OpeningState(document);
@@ -509,7 +513,8 @@ namespace BIMaestro.StressTests
                     throw new InvalidOperationException("No usable opening checkpoint state; the mass deletion was not attempted.");
                 }
             }
-            Inventory(document); phase = "delete"; var before = State(document); var watch = Stopwatch.StartNew(); var failures = new DeleteFailures();
+            if (!config.RapidModifiedDelete) Inventory(document);
+            phase = "delete"; var before = State(document); var watch = Stopwatch.StartNew(); var failures = new DeleteFailures();
             using var tx = new Transaction(document, transactionName); tx.Start(); tx.SetFailureHandlingOptions(tx.GetFailureHandlingOptions().SetFailuresPreprocessor(failures).SetClearAfterRollback(true));
             try
             {
@@ -528,6 +533,7 @@ namespace BIMaestro.StressTests
             deletedPhysicalIds = physicalCandidateIds.Where(id => document.GetElement(new ElementId(id)) == null).ToArray();
             var result = new { Transaction = transactionName, Milliseconds = watch.Elapsed.TotalMilliseconds, Status = "Committed", ReturnedIds = returnedIds, DocumentChangedDeletedIds = changedIds, DocumentChangedModifiedIds = changedModified.OrderBy(id => id).ToArray(), DocumentChangedAddedIds = changedAdded.OrderBy(id => id).ToArray(), ModifiedCatalogRecords = changedModified.Where(catalog.ContainsKey).Select(id => new { Source = catalog[id], Survives = document.GetElement(new ElementId(id)) != null }).ToArray(), SelectedPhysicalIds = selectedPhysicalIds, DeletedPhysicalIds = deletedPhysicalIds, UnselectedPhysicalCascadeIds = deletedPhysicalIds.Except(selectedPhysicalIds).ToArray(), ExplicitlyExcludedPhysicalDeletedIds = explicitlyExcludedPhysicalIds.Intersect(deletedPhysicalIds).ToArray(), SurvivingSelectedPhysicalIds = selectedPhysicalIds.Except(deletedPhysicalIds).ToArray(), RequestedRootIds = selectedRoots, DependentIds = changedIds.Except(selectedPhysicalIds).ToArray(), NonTargetedDeletedModelCatalog = specs.Values.Where(s => !s.Selected && !deletedPhysicalIds.Contains(s.Id) && changedIds.Contains(s.Id)).ToArray(), Failures = failures.Messages, StateBefore = before, StateAfter = State(document), PreparedTimedOut = preparedTimedOut == 1, ActualAfterOpenMilliseconds = (committedUtc - openedUtc).TotalMilliseconds };
             Write("deletion.json", result); Record("mass_delete_returned", new { Milliseconds = watch.Elapsed.TotalMilliseconds, Roots = selectedRoots.Length, SelectedPhysical = selectedPhysicalIds.Length, DeletedPhysical = deletedPhysicalIds.Length, Returned = returnedIds.Length, ChangedDeleted = changedIds.Length }); phase = "journal-wait";
+            CompleteRapidDelete(watch.Elapsed.TotalMilliseconds);
         }
         void Restore(Document document, bool repeat)
         {
@@ -553,8 +559,10 @@ namespace BIMaestro.StressTests
                 }
                 list.Add(request);
             }
-            Write(repeat ? "load-again.json" : "load.json", new { RangeAllCount = range.Count, RangeDeletionCount = events.Count, DisplayableDeletionCount = events.Count(ev => (bool)Call(tracker, "IsDisplayableHistoryEvent", ev)), RecentDeletionCount = recent.Count, RequestsCount = list.Count, FullEventIds = events.Select(ev => Read(ev, "ElementId")).ToArray(), RequestEventIds = events.Select(ev => Read(ev, "ElementId")).ToArray(), DefaultEventIds = recent.Select(ev => Read(ev, "ElementId")).ToArray(), FullDeletionBatchIds = events.Select(ev => Read(Read(ev, "DeletionAudit"), "BatchId")).Distinct().ToArray(), Route = "Actual LoadModelHistoryForLocalRange + actual UI ToRestoreRequest, one request for every persisted deletion in this exact transaction; no default 2000 cap." });
-            ValidateDurableRestoreRequests(list, events); ProbeDiagnosticRequests(list); ProbeDiagnosticDestination(document, "before-restore");
+            ValidateDurableRestoreRequests(list, events);
+            int fullRequestsCount = list.Count; list = SelectRapidRestorationRequests(list, events);
+            Write(repeat ? "load-again.json" : "load.json", new { RangeAllCount = range.Count, RangeDeletionCount = events.Count, DisplayableDeletionCount = events.Count(ev => (bool)Call(tracker, "IsDisplayableHistoryEvent", ev)), RecentDeletionCount = recent.Count, RequestsCount = fullRequestsCount, FullRequestsCount = fullRequestsCount, RestorationRequestsCount = list.Count, FullEventIds = events.Select(ev => Read(ev, "ElementId")).ToArray(), RequestEventIds = events.Select(ev => Read(ev, "ElementId")).ToArray(), DefaultEventIds = recent.Select(ev => Read(ev, "ElementId")).ToArray(), FullDeletionBatchIds = events.Select(ev => Read(Read(ev, "DeletionAudit"), "BatchId")).Distinct().ToArray(), Route = "Actual range loader and actual UI conversion preserve one request per event. Rapid restoration selects all and only independently admissible deleted physical objects after proving the excluded nonphysical records." });
+            ProbeDiagnosticRequests(list); ProbeDiagnosticDestination(document, "before-restore");
             var watch = Stopwatch.StartNew(); restoreChangedAdded = 0; refreshCount = 0; Volatile.Write(ref restoring, 1);
             Record("restore_begin", new { Repeat = repeat, Requests = list.Count });
             try
@@ -565,7 +573,8 @@ namespace BIMaestro.StressTests
                 Record("restore_returned", new { Repeat = repeat, Milliseconds = watch.Elapsed.TotalMilliseconds, Created = Read(lastResult, "Created"), Existing = Read(lastResult, "Existing"), Failed = Read(lastResult, "Failed"), RefreshCount = refreshCount });
             }
             finally { Volatile.Write(ref restoring, 0); }
-            phase = "verification"; Write(repeat ? "verification-again.json" : "verification.json", Verify(document)); phase = "restored";
+            phase = "verification"; var verified = Verify(document); Write(repeat ? "verification-again.json" : "verification.json", verified); phase = "restored";
+            RapidAfterRestore(verified, repeat);
         }
         List<string> Origins(Element element) => ((IEnumerable)Call(restoration, "GetOrigins", element))?.Cast<string>().Where(uid => uid != null).ToList() ?? new List<string>();
         object Verify(Document document)
@@ -660,15 +669,24 @@ namespace BIMaestro.StressTests
                         && Identity(pair.IntersectedUid, current.IntersectedUid) && Identity(pair.IntersectingUid, current.IntersectingUid)
                         && Math.Abs(pair.VolumeCubicFeet - current.VolumeCubicFeet) <= Math.Max(1e-5, Math.Abs(pair.VolumeCubicFeet) * 1e-8)) == 1);
                 bool geometryChecked = expected.Point != null || expected.Curve != null || expected.BBox != null || expected.Transform != null;
-                var instanceEvidence = config.BusinessWorkflow ? CompareBusinessParameters(document, expected, actual) : null; bool instanceParameters = !config.BusinessWorkflow || (bool?)Read(instanceEvidence, "Passed") == true; bool passed = instanceParameters && injective && expected.Class == actual.Class && type && geometry && bbox && dimensions && host && group && joins && wallJoins && connections && system && excavations && geometryChecked && expected.ProbeErrors.Count == 0 && actual.ProbeErrors.Count == 0;
-                var record = new { SourceId = id, SourceUid = expected.Uid, expected.Category, expected.Class, expected.Name, ActualUids = found.Select(e => e.UniqueId).ToArray(), MatchesIdentity = true, IdentityInjective = injective, ClassMatches = expected.Class == actual.Class, TypeMatches = type, TypeUidMatchesSource = expected.TypeUid == actual.TypeUid, HistoricalTypeProvenance = (bool?)Read(typeDefinitionEvidence, "HistoricalTypeProvenance"), TypeDefinitionParametersMatch = (bool?)Read(typeDefinitionEvidence, "TypeDefinitionParametersMatch"), TypeDefinitionEvidence = typeDefinitionEvidence, AllowedInPlaceTypeReplacement = allowedTypeReplacement, GeometryMatches = geometry, GeometryChecked = geometryChecked, BBoxMatches = bbox, DimensionsMatch = dimensions, HostMatches = host, GroupMatches = group, JoinsMatch = joins, WallJoinsMatch = wallJoins, ConnectionsMatch = connections, SystemTypeMatches = system, SystemTypeUidMatchesSource = expected.SystemTypeUid == actual.SystemTypeUid, SystemTypeEvidence = systemTypeEvidence, PortSystemTypesMatch = IsDurableRestore ? (bool?)portSystemTypesMatch : null, PortSystemTypeEvidence = IsDurableRestore ? portSystemTypeEvidence : null, UndefinedSystemNormalized = normalized, SystemTypeAdjustment = adjustment, ExcavationsMatch = excavations, ExpectedExcavations = expected.Excavations, ActualExcavations = actual.Excavations, InstanceParametersMatch = config.BusinessWorkflow ? (bool?)instanceParameters : null, InstanceParameterEvidence = instanceEvidence, Passed = passed, Expected = expected, Actual = actual, ExpectedProbeErrors = expected.ProbeErrors, ActualProbeErrors = actual.ProbeErrors, ActualWhenFailed = passed ? null : actual };
+                bool compareInstance = config.BusinessWorkflow || config.RapidModifiedDelete && selectedPhysicalIds.Contains(id);
+                var instanceEvidence = compareInstance ? CompareBusinessParameters(document, expected, actual) : null; bool instanceParameters = !compareInstance || (bool?)Read(instanceEvidence, "Passed") == true; bool passed = instanceParameters && injective && expected.Class == actual.Class && type && geometry && bbox && dimensions && host && group && joins && wallJoins && connections && system && excavations && geometryChecked && expected.ProbeErrors.Count == 0 && actual.ProbeErrors.Count == 0;
+                var record = new { SourceId = id, SourceUid = expected.Uid, expected.Category, expected.Class, expected.Name, ActualUids = found.Select(e => e.UniqueId).ToArray(), MatchesIdentity = true, IdentityInjective = injective, ClassMatches = expected.Class == actual.Class, TypeMatches = type, TypeUidMatchesSource = expected.TypeUid == actual.TypeUid, FamilyUidMatchesSource = (bool?)Read(typeDefinitionEvidence, "FamilyUidMatchesSource"), UsesExistingModelDefinitions = config.RapidModifiedDelete && rapidRestoreRequests.TryGetValue(expected.Uid, out var actualRequest) && (bool?)Read(Read(actualRequest, "Recipe"), "UsesExistingModelDefinitions") == true, ExistingModelDefinitionsUsed = (bool?)Read(typeDefinitionEvidence, "ExistingModelDefinitionsUsed"), HistoricalTypeProvenance = (bool?)Read(typeDefinitionEvidence, "HistoricalTypeProvenance"), TypeDefinitionParametersMatch = (bool?)Read(typeDefinitionEvidence, "TypeDefinitionParametersMatch"), TypeDefinitionEvidence = typeDefinitionEvidence, AllowedInPlaceTypeReplacement = allowedTypeReplacement, GeometryMatches = geometry, GeometryChecked = geometryChecked, BBoxMatches = bbox, DimensionsMatch = dimensions, HostMatches = host, GroupMatches = group, JoinsMatch = joins, WallJoinsMatch = wallJoins, ConnectionsMatch = connections, SystemTypeMatches = system, SystemTypeUidMatchesSource = expected.SystemTypeUid == actual.SystemTypeUid, SystemTypeEvidence = systemTypeEvidence, PortSystemTypesMatch = IsDurableRestore ? (bool?)portSystemTypesMatch : null, PortSystemTypeEvidence = IsDurableRestore ? portSystemTypeEvidence : null, UndefinedSystemNormalized = normalized, SystemTypeAdjustment = adjustment, ExcavationsMatch = excavations, ExpectedExcavations = expected.Excavations, ActualExcavations = actual.Excavations, InstanceParametersMatch = compareInstance ? (bool?)instanceParameters : null, InstanceParameterEvidence = instanceEvidence, Passed = passed, Expected = expected, Actual = actual, ExpectedProbeErrors = expected.ProbeErrors, ActualProbeErrors = actual.ProbeErrors, ActualWhenFailed = passed ? null : actual };
                 records.Add(record); if (!passed) failed.Add(record);
             }
             var selectedUids = new HashSet<string>(deletedPhysicalIds.Select(id => specs[id].Uid));
-            var unexpected = live.Where(e => !sourceUids.Contains(e.UniqueId) && Safe(() => e.Category?.CategoryType == CategoryType.Model && !e.ViewSpecific) && !Origins(e).Any(selectedUids.Contains))
+            var newModelRecords = live.Where(e => !sourceUids.Contains(e.UniqueId) && Safe(() => e.Category?.CategoryType == CategoryType.Model && !e.ViewSpecific) && !Origins(e).Any(selectedUids.Contains)).ToArray();
+            var generatedCandidates = newModelRecords.Where(IsRapidGeneratedRecord).ToArray();
+            var generated = generatedCandidates.Where(element => generatedCandidates.Count(candidate => candidate.Category.Id.Value == element.Category.Id.Value)
+                <= catalog.Values.Count(baseline => changedIds.Contains(baseline.Id) && baseline.Class == "Element" && baseline.CategoryId == element.Category.Id.Value && baseline.ProtectionReason == "generated-model-category")).ToArray();
+            var generatedUids = new HashSet<string>(generated.Select(element => element.UniqueId), StringComparer.Ordinal);
+            var generatedRecords = generated.Select(element => new { Id = element.Id.Value, Uid = element.UniqueId, Class = element.GetType().FullName,
+                CategoryId = element.Category.Id.Value, ExactNativeElementClass = element.GetType() == typeof(Element), NativeCategoryWhitelisted = ProtectedGeneratedCategories.Contains(element.Category.Id.Value),
+                BaselineDeletedRecords = catalog.Values.Where(baseline => changedIds.Contains(baseline.Id) && baseline.Class == "Element" && baseline.CategoryId == element.Category.Id.Value && baseline.ProtectionReason == "generated-model-category").ToArray() }).ToArray();
+            var unexpected = newModelRecords.Where(element => !generatedUids.Contains(element.UniqueId))
                 .Select(e => new { Id = e.Id.Value, Uid = e.UniqueId, Class = e.GetType().Name, Category = e.Category?.Name, Name = Safe(() => e.Name), Origins = Origins(e), Spec = Capture(e), OwnerViewId = e.OwnerViewId.Value, IsTransient = Safe(() => e.IsTransient) }).ToArray();
             var dependentModel = specs.Values.Where(s => !s.Selected && !deletedPhysicalIds.Contains(s.Id) && changedIds.Contains(s.Id)).Select(s => new { SourceId = s.Id, SourceUid = s.Uid, s.Class, s.Category, s.ProtectionReason, ActualUids = origins.TryGetValue(s.Uid, out var matches) ? matches.Select(e => e.UniqueId).Distinct().ToArray() : Array.Empty<string>(), GeometryVerified = false }).ToArray();
-            var result = new { CapturedUtc = DateTime.UtcNow, Milliseconds = watch.Elapsed.TotalMilliseconds, DeletedPhysicalCount = deletedPhysicalIds.Length, RestoredUniqueCount = records.Count - missing.Count - duplicates.Count, Missing = missing, Duplicates = duplicates, ReverseOriginConflicts = reverseConflicts, Failed = failed, Records = records, NonTargetedDeletedModelAfter = dependentModel, UnexpectedModelObjects = unexpected, CategoryCounts = records.GroupBy(r => (string)Read(r, "Category") ?? "(none)").ToDictionary(g => g.Key, g => new { Expected = g.Count(), Passed = g.Count(r => (bool?)Read(r, "Passed") == true) }), RelationCoverage = "Host, supercomponent, level, group and geometric joins; not all constraints/cuts/sketch semantics. Non-targeted dependent models are catalogued but not geometry-verified.", GeometryCoverage = "Class/type, point or curve endpoints/midpoint, family transform, world bbox and standard MEP section dimensions. No exhaustive solid mesh comparison.", AllDeletedPhysicalVerified = !config.AllowPartialDurableRestore && missing.Count == 0 && duplicates.Count == 0 && failed.Count == 0 && reverseConflicts.Length == 0, LaneOnly = DiagnosticLane, OriginalConvertedSubsetPhysicalIds = diagnosticOriginalSubsetIds, DiagnosticLanePhysicalIds = config.DiagnosticPhysicalIds, LaneSubsetVerified = DiagnosticLane && missing.Count == 0 && duplicates.Count == 0 && failed.Count == 0 && reverseConflicts.Length == 0, SelectedSubsetVerified = config.AllowPartialDurableRestore && !DiagnosticLane && missing.Count == 0 && duplicates.Count == 0 && failed.Count == 0 && reverseConflicts.Length == 0, FullDeletedPhysicalCount = config.AllowPartialDurableRestore ? fullDeletedPhysicalIds.Length : deletedPhysicalIds.Length, VerificationScope = DiagnosticLane ? "isolated diagnostic lane; not the full converted subset or original model" : config.AllowPartialDurableRestore ? "validated converted physical subset; all other failures remain in capture evidence" : "all deleted admissible physical objects" };
+            var result = new { CapturedUtc = DateTime.UtcNow, Milliseconds = watch.Elapsed.TotalMilliseconds, DeletedPhysicalCount = deletedPhysicalIds.Length, RestoredUniqueCount = records.Count - missing.Count - duplicates.Count, Missing = missing, Duplicates = duplicates, ReverseOriginConflicts = reverseConflicts, Failed = failed, Records = records, NonTargetedDeletedModelAfter = dependentModel, GeneratedModelRecords = generatedRecords, UnexpectedModelObjects = unexpected, CategoryCounts = records.GroupBy(r => (string)Read(r, "Category") ?? "(none)").ToDictionary(g => g.Key, g => new { Expected = g.Count(), Passed = g.Count(r => (bool?)Read(r, "Passed") == true) }), RelationCoverage = "Host, supercomponent, level, group and geometric joins; not all constraints/cuts/sketch semantics. Non-targeted dependent models are catalogued but not geometry-verified.", GeometryCoverage = "Class/type, point or curve endpoints/midpoint, family transform, world bbox and standard MEP section dimensions. No exhaustive solid mesh comparison.", AllDeletedPhysicalVerified = !config.AllowPartialDurableRestore && missing.Count == 0 && duplicates.Count == 0 && failed.Count == 0 && reverseConflicts.Length == 0, LaneOnly = DiagnosticLane, OriginalConvertedSubsetPhysicalIds = diagnosticOriginalSubsetIds, DiagnosticLanePhysicalIds = config.DiagnosticPhysicalIds, LaneSubsetVerified = DiagnosticLane && missing.Count == 0 && duplicates.Count == 0 && failed.Count == 0 && reverseConflicts.Length == 0, SelectedSubsetVerified = config.AllowPartialDurableRestore && !DiagnosticLane && missing.Count == 0 && duplicates.Count == 0 && failed.Count == 0 && reverseConflicts.Length == 0, FullDeletedPhysicalCount = config.AllowPartialDurableRestore ? fullDeletedPhysicalIds.Length : deletedPhysicalIds.Length, VerificationScope = DiagnosticLane ? "isolated diagnostic lane; not the full converted subset or original model" : config.AllowPartialDurableRestore ? "validated converted physical subset; all other failures remain in capture evidence" : "all deleted admissible physical objects" };
             if (IsDurableRestore) Write("type-definitions-" + phase + ".json", new { AtUtc = DateTime.UtcNow, Definitions = currentTypeDefinitions.Values.ToArray(), SourceInventory = Path.Combine(evidenceDirectory, "inventory.json"), Note = "Independent live type parameter reads for all present verified targets; source values remain in the capture inventory." });
             Record("verification_complete", new { result.Milliseconds, Expected = deletedPhysicalIds.Length, Missing = missing.Count, Duplicates = duplicates.Count, Failed = failed.Count, Unexpected = unexpected.Length, Passed = result.AllDeletedPhysicalVerified });
             ProbeDiagnosticDestination(document, phase); return result;
@@ -694,10 +712,12 @@ namespace BIMaestro.StressTests
             var persistence = new { Path = restoredPath, SavedRuntimeDocumentId = savedRuntime, ReopenedRuntimeDocumentId = doc.GetHashCode(), Closed = closed, OldDocumentInvalid = invalid, AbsentFromApplicationDocuments = absent, ReopenedDistinctDocument = distinct, FileExists = File.Exists(restoredPath), FileLength = new FileInfo(restoredPath).Length };
             Write("persistence.json", persistence);
             if (!distinct || !doc.IsValidObject || !string.Equals(doc.PathName, restoredPath, StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("Reopening did not return a distinct valid restored-copy document.");
-            phase = "reopened-verification"; Write("reopened-verification.json", Verify(doc)); phase = "reopened-verified";
+            phase = "reopened-verification"; var verified = Verify(doc); Write("reopened-verification.json", verified); phase = "reopened-verified";
+            RapidAfterReopen(verified, persistence);
         }
         void Finish(UIApplication application)
         {
+            ReleaseRapidSources();
             phase = "closing"; tracker.GetField("_captureDetailedDeletedMesh", Flags).SetValue(null, originalDetailed);
             var closing = doc; int closingRuntime = closing.GetHashCode(); ActivateBlank(application);
             bool closed = closing.Close(false); bool invalid = !closing.IsValidObject;
@@ -712,8 +732,12 @@ namespace BIMaestro.StressTests
         public void Execute(UIApplication application)
         {
             if (!actions.TryDequeue(out var action) || finished) return; var diagnosticApiWatch = Stopwatch.StartNew();
+            rapidCallbackSequence++;
             try
             {
+                if (config.RapidModifiedDelete && IsDurableRestore && (action == "open" || action.StartsWith("restore", StringComparison.Ordinal))
+                    && (Volatile.Read(ref rapidTimeSetup) != 2 || rapidFailed))
+                    throw new InvalidOperationException("Rapid J+14 maintenance/source guards must succeed before opening or restoring the deleted-state checkpoint.");
                 if (partialCapturePaused && action != "finalize-subset" && action != "durable-diagnostics") { Record("partial_request_ignored", new { Action = action, Reason = "Source readers and converter are frozen until controlled removal." }); return; }
                 if (action == "finalize-subset") { FinalizeSubset(); return; }
                 if (partialCapturePaused && action == "durable-diagnostics") { DurableDiagnostics(); return; }
@@ -721,6 +745,8 @@ namespace BIMaestro.StressTests
                 if (!IsCopy(application.ActiveUIDocument?.Document)) throw new InvalidOperationException("Active document is not the exact stress copy or its saved restored derivative.");
                 doc = application.ActiveUIDocument.Document;
                 if (action == "delete") Delete(doc);
+                else if (action == "rapid-edit") EditRapidObjects(doc);
+                else if (action == "rapid-purge-refusal") RapidPurgeRefusal(application);
                 else if (action == "business-edit") EditBusinessObjects(doc); else if (action == "delay-edit-plant") EditDelayedPlant(doc);
                 else if (action == "delay-edit-wall") EditDelayedWall(doc);
                 else if (action == "diagnose") Diagnose(application);
@@ -735,7 +761,7 @@ namespace BIMaestro.StressTests
                 else if (action == "finish") Finish(application);
             }
             catch (Exception ex) { if (action.StartsWith("delay-edit-", StringComparison.Ordinal)) delayedTestFailed = true; Record("command_error", new { Action = action, Phase = phase, Error = ex.ToString() }); Write("last-error.json", new { Action = action, Phase = phase, Error = ex.ToString() }); }
-            finally { if (DiagnosticLane) Record("diagnostic_external_event_span", new { Action = action, Phase = phase, Milliseconds = diagnosticApiWatch.Elapsed.TotalMilliseconds }); }
+            finally { if (DiagnosticLane || config.RapidModifiedDelete) Record("diagnostic_external_event_span", new { CallbackSequence = rapidCallbackSequence, Action = action, Phase = phase, Milliseconds = diagnosticApiWatch.Elapsed.TotalMilliseconds }); }
         }
         void PollJournal()
         {
@@ -772,6 +798,7 @@ namespace BIMaestro.StressTests
             {
                 try
                 {
+                    PrepareRapidTimeSimulation();
                     foreach (var name in new[] { "open", "restore", "restore-again", "persist", "finish", "diagnose", "regressions", "probe-unset", "convert", "persist-deleted", "durable-diagnostics", "persist-subset", "finalize-subset" })
                     {
                         var path = Path.Combine(folder, name + ".request"); if (!File.Exists(path)) continue;
@@ -782,6 +809,7 @@ namespace BIMaestro.StressTests
                     }
                     if (!actions.IsEmpty && !finished) external.Raise();
                     PollJournal();
+                    PrepareRapidReadiness();
                     var batch = new List<string>(); while (rows.TryDequeue(out var row)) batch.Add(JsonSerializer.Serialize(row));
                     if (batch.Count > 0) File.AppendAllLines(Path.Combine(folder, "observer.jsonl"), batch);
                     while (exports.TryDequeue(out var export)) File.WriteAllText(Path.Combine(folder, export.Name), JsonSerializer.Serialize(export.Value, new JsonSerializerOptions { WriteIndented = true }));

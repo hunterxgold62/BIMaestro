@@ -1,0 +1,148 @@
+{
+  "scope": "Independent audit of recorded r8 metrics and model snapshots, not end-to-end click latency or complete prototype qualification",
+  "host": {
+    "pid": 18048,
+    "version": "2025",
+    "buildFromSeparateAuditSnapshots": "25.4.41.14"
+  },
+  "window": {
+    "startUtc": "2026-10-23T13:18:14.7886943Z",
+    "endUtc": "2026-10-23T13:19:33.2203941Z",
+    "seconds": 78.4317,
+    "reportedMode": "interactive",
+    "diagnostics": false,
+    "metricsResetRecorded": true,
+    "modelRevisionBefore": 4,
+    "modelRevisionAfter": 4,
+    "rawPacketState": null,
+    "nativeHeaderMetricInPacket": false
+  },
+  "metrics": {
+    "CellReads": 13103,
+    "Timings": {
+      "group.ensure": {
+        "Count": 122,
+        "MeanMs": 2.27,
+        "P95Ms": 3.666,
+        "MaxMs": 37.432
+      },
+      "group.fingerprint.selected-element-and-type": {
+        "Count": 12,
+        "MeanMs": 0.543,
+        "P95Ms": 0.645,
+        "MaxMs": 0.645
+      },
+      "group.native-move": {
+        "Count": 18,
+        "MeanMs": 0.098,
+        "P95Ms": 0.241,
+        "MaxMs": 0.241
+      },
+      "group.reapply.interactive": {
+        "Count": 3,
+        "MeanMs": 17.509,
+        "P95Ms": 18.445,
+        "MaxMs": 18.445
+      }
+    }
+  },
+  "operatorReportedUiActions": {
+    "count": 5,
+    "provenance": "UI operator report; not an instrumented click count in the perf packet"
+  },
+  "modelAudit": {
+    "parameterCount": 18550,
+    "parameterDeltaCount": 0,
+    "schemaCount": 18550,
+    "schemaDeltaCount": 0,
+    "hashBefore": "7A615CD941DD09BA071AD9D65B0DF900981E77D707A8BB8F72B61CED1688F5FD",
+    "hashAfter": "7A615CD941DD09BA071AD9D65B0DF900981E77D707A8BB8F72B61CED1688F5FD",
+    "identityChecks": {
+      "pid": true,
+      "version": true,
+      "build": true,
+      "path": true
+    },
+    "pass": true
+  },
+  "fastBooleanAudit": {
+    "name": "r8-fast-room-bounding",
+    "kind": "boolean",
+    "result": "passed",
+    "errors": [],
+    "deltas": [
+      {
+        "key": "ea1101ca-dc04-4647-97f2-f44b87434b8f-00000ae6|-1001007|Limite de pièce",
+        "before": "1",
+        "after": "0"
+      }
+    ]
+  },
+  "separateNativeGroupCaptures": {
+    "initialRows": 46,
+    "initialNativeHeaderTest": {
+      "row": 2,
+      "result": true,
+      "nativeResult": 1,
+      "error": null
+    },
+    "booleanBeforeRows": 46,
+    "booleanBeforeNativeHeaderTest": {
+      "row": 2,
+      "result": true,
+      "nativeResult": 1,
+      "error": null
+    },
+    "booleanAfterRows": 46,
+    "booleanAfterNativeHeaderTest": {
+      "row": 2,
+      "result": true,
+      "nativeResult": 1,
+      "error": null
+    },
+    "note": "These are outside-window native group observations. They are not fabricated as a group metric in the compact packet."
+  },
+  "limits": [
+    "Only three recorded reapplication batches; their P95 equals the maximum and is not a robust population estimate.",
+    "Internal reapplication duration is not complete UI click latency.",
+    "No directly comparable pre-optimization fast profile.",
+    "Small disposable fixture only.",
+    "The compact packet has state:null and omits build/scenario/fixtureId; host/model context is verified separately.",
+    "Full audit after the perf window is a different current palette context; parameter/schema checks remain document-wide."
+  ],
+  "sources": [
+    {
+      "file": "tmp\\properties-custom-group-tests\\2025-r8\\perf-fast-selection.json",
+      "sha256": "20e23e22142b747b42546154ff7cde05f739ec28e90127f97c2624e166c19521"
+    },
+    {
+      "file": "tmp\\properties-custom-group-tests\\2025-r8\\report-audit-fast.json",
+      "sha256": "e135e8a578570dd12f41326a815e2e3cf30289f8db29a2e93f03f0435d6447d4"
+    },
+    {
+      "file": "tmp\\properties-custom-group-tests\\2025-r8\\performance-baseline.json",
+      "sha256": "963b55e952ddd2798c55700e02ad7fda90989f264da7d931be5e864106d4c5e9"
+    },
+    {
+      "file": "tmp\\properties-custom-group-tests\\2025-r8\\after-performance.json",
+      "sha256": "6d5e554928d74315fe6fcc8fcf2ea5c7d0c1417c98269f59f96f8b9b94b6d403"
+    },
+    {
+      "file": "tmp\\properties-custom-group-tests\\2025-r8\\fast-initial.json",
+      "sha256": "86de12620af4d79a385b09812b18dcb44b7fa4b4f19aea14528db5ca274c55b4"
+    },
+    {
+      "file": "tmp\\properties-custom-group-tests\\2025-r8\\fast-bool-before.json",
+      "sha256": "902937636a93be91a23f2be5b889a58c91e3990095bcfd14dc347cd6901f9a22"
+    },
+    {
+      "file": "tmp\\properties-custom-group-tests\\2025-r8\\fast-bool-after.json",
+      "sha256": "a26d014528e0292d04464fab0776e019f21282d13bf7a8fec6e9a14639193e55"
+    }
+  ],
+  "recordedStops": {
+    "filesPresent": [],
+    "autoGroupAtPerf": true,
+    "limitation": "Absence of recorded error files and autoGroup=true at measurement end; not a claim about all possible uninstrumented events."
+  }
+}

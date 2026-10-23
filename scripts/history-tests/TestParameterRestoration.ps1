@@ -13,7 +13,7 @@ using System.Linq;
 namespace Autodesk.Revit.Exceptions { public class RegenerationFailedException : Exception { } }
 namespace HistoryParameterRestorationTests {
 enum StorageType { None,Double,Integer,String,ElementId }
-enum BuiltInParameter { RBS_FAMILY_CONTENT_DISTRIBUTION_SYSTEM=-1, TestDimension=-200 }
+enum BuiltInParameter { RBS_FAMILY_CONTENT_DISTRIBUTION_SYSTEM=-1, WALL_HEIGHT_TYPE=-1001103, WALL_TOP_OFFSET=-1001109, TestDimension=-200 }
 class ElementId { internal long Value; internal long GetIdLongValue() { return Value; } }
 static class ElementIdExtensions { internal static ElementId CreateElementId(int id) { return new ElementId { Value=id }; } }
 class Definition { internal string Name="Angle de section"; }

@@ -1,0 +1,17 @@
+[
+  {
+    "Algorithm": "SHA256",
+    "Hash": "EBBB3C328B226D723F1227396AEE52F9072C4297F34E593484B19C1C398A7E43",
+    "Path": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\BIMaestro\\les couleurs\\Proprietes\\NativePropertiesGrid.cs"
+  },
+  {
+    "Algorithm": "SHA256",
+    "Hash": "20136ECD169D89C7DA5905D21EE429974EC9ECA2EEA22D986C6B5A3E5D7E414A",
+    "Path": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\BIMaestro\\les couleurs\\Proprietes\\PropertiesPaletteLayout.cs"
+  },
+  {
+    "Algorithm": "SHA256",
+    "Hash": "445BE0015D9FEB640A271EAB99B7B2800AF179347C5B538D313A38DEC1C9780B",
+    "Path": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\BIMaestro\\les couleurs\\Proprietes\\PropertiesAppearanceService.cs"
+  }
+]

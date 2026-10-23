@@ -18,12 +18,20 @@ namespace BIMaestro.PropertiesAppearance
         private Thickness _previousDropThickness;
         private ScrollViewer _previewScroll;
         private DateTime _lastDragScroll;
+        private readonly Dictionary<PropertyPreviewRow,string> _originNumbers = new Dictionary<PropertyPreviewRow,string>();
         private const string DragFormat = "BIMaestro.PropertiesAppearance.Row";
         private AppearanceLayout DraftLayout => AppearanceOrdering.Resolve(new AppearancePreferences { Profiles = _drafts.Values.ToList() }, _context.CategoryKey, _context.TypeKey);
 
         private void RenderComparison()
         {
             _rows.Children.Clear(); if (_context == null) return;
+            // Origin references are assigned before filtering, collapse and drag ordering.
+            _originNumbers.Clear(); int groupNumber=0, parameterNumber=0;
+            foreach(var row in _context.PreviewRows)
+            {
+                if(row.Header){groupNumber++;parameterNumber=0;}else parameterNumber++;
+                _originNumbers[row]=row.Header?groupNumber.ToString():groupNumber+"."+parameterNumber;
+            }
             string query = AppearancePreferences.Normalize(_search.Text);
             Func<IList<PropertyPreviewRow>, List<PropertyPreviewRow>> filter = rows =>
             {

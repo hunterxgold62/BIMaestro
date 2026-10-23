@@ -1,4 +1,4 @@
-using Autodesk.Revit.DB;
+﻿using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Events;
 using Autodesk.Revit.UI;
 using Autodesk.Revit.UI.Events;
@@ -373,6 +373,7 @@ public class BIMaestroApp : IExternalApplication
     {
         try
         {
+            BIMaestro.PropertiesAppearance.PropertiesAppearanceService.NotifyContextChanging();
             _uiApp ??= new UIApplication(args.Document.Application);
             if (Couleur.ProjectBrowserProjectStorage.Activate(args.Document))
             {
@@ -460,6 +461,7 @@ public class BIMaestroApp : IExternalApplication
     {
         try
         {
+            BIMaestro.PropertiesAppearance.PropertiesAppearanceService.NotifyContextChanging();
             var timer = Stopwatch.StartNew();
             var doc = args.GetDocument();
             var selectedIds = args.GetSelectedElements();

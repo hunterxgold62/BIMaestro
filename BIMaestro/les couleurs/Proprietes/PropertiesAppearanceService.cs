@@ -90,28 +90,36 @@ namespace BIMaestro.PropertiesAppearance
             var ui = app.ActiveUIDocument;
             if (ui == null) return result;
             var ids = ui.Selection.GetElementIds();
-            if (ids.Count > 1) { result.Caption = "Sélection multiple : choisissez un seul élément pour personnaliser ses propriétés."; return result; }
-            Element element = ids.Count == 1 ? ui.Document.GetElement(ids.First()) : ui.ActiveView;
+            var selected=ids.Select(ui.Document.GetElement).Where(e=>e!=null).ToArray();
+            if(ids.Count>1 && (selected.Length!=ids.Count || selected.Any(e=>e.Category?.Id!=selected[0].Category?.Id)))
+            {result.Caption="Sélection de catégories différentes : apparence Revit conservée.";return result;}
+            Element element = ids.Count > 0 ? selected.FirstOrDefault() : ui.ActiveView;
             if (element == null) return result;
             result.CategoryKey = "cat:" + (element.Category?.Id.ToString() ?? ((int)BuiltInCategory.OST_Views).ToString());
             result.CategoryName = element.Category?.Name ?? "Vues";
             ElementType type = ui.Document.GetElement(element.GetTypeId()) as ElementType;
-            string typeName = element is View v ? v.ViewType.ToString() : type == null ? null : type.FamilyName + " / " + type.Name;
+            bool sameType=selected.All(e=>e.GetTypeId()==element.GetTypeId());
+            string typeName = !sameType?null:element is View v ? v.ViewType.ToString() : type == null ? null : type.FamilyName + " / " + type.Name;
             result.TypeKey = typeName == null ? null : result.CategoryKey + "/type:" + typeName;
             result.TypeName = element is View ? type?.Name ?? typeName : typeName;
-            result.Caption = result.CategoryName + " · " + element.Name;
-            result.Signature = ui.Document.GetHashCode() + "/" + element.Id + "/" + result.TypeKey;
+            result.Caption = result.CategoryName + " · " + (ids.Count>1?ids.Count+" éléments":element.Name);
+            result.Signature = ui.Document.GetHashCode() + "/" + (ids.Count>1?string.Join(",",ids.Select(id=>id.ToString()).OrderBy(id=>id,StringComparer.Ordinal)):element.Id.ToString()) + "/" + result.TypeKey;
+            var common=selected.Skip(1).Select(e=>e.Parameters.Cast<Parameter>().GroupBy(p=>p.Id.ToString()).Where(g=>g.Count()==1).ToDictionary(g=>g.Key,g=>g.Single())).ToArray();
             var targets = new List<PropertyTarget>();
             foreach (Parameter p in element.Parameters)
             {
                 try
                 {
+                    string nativeId=p.Id.ToString();
+                    if(common.Any(map=>!map.ContainsKey(nativeId)))continue;
                     string group = p.Definition.GetGroupTypeId().TypeId;
                     string label = LabelUtils.GetLabelForGroup(p.Definition.GetGroupTypeId());
                     if (string.IsNullOrWhiteSpace(label)) label = "Autres";
                     if (!result.Groups.Any(g => g.Key == group)) result.Groups.Add(new PropertyTarget { Key = group, Name = label, NativeName = AppearancePreferences.Normalize(label) });
                     string identity = p.IsShared ? "shared:" + p.GUID : p.Id.ToString().StartsWith("-", StringComparison.Ordinal) ? "builtin:" + p.Id : "name:" + p.Definition.Name;
-                    targets.Add(new PropertyTarget { Key = group + "/" + identity, GroupKey = group, Name = label + " · " + p.Definition.Name, NativeName = AppearancePreferences.Normalize(p.Definition.Name), NativeParameterId = long.Parse(p.Id.ToString(), System.Globalization.CultureInfo.InvariantCulture), DisplayValue = displayValues ? DisplayValue(p) : null, ReadOnly = p.IsReadOnly });
+                    string value=displayValues?DisplayValue(p):null;
+                    if(displayValues&&common.Any(map=>DisplayValue(map[nativeId])!=value))value="<multiples>";
+                    targets.Add(new PropertyTarget { Key = group + "/" + identity, GroupKey = group, Name = label + " · " + p.Definition.Name, NativeName = AppearancePreferences.Normalize(p.Definition.Name), NativeParameterId = long.Parse(nativeId, System.Globalization.CultureInfo.InvariantCulture), DisplayValue = value, ReadOnly = p.IsReadOnly||common.Any(map=>map[nativeId].IsReadOnly) });
                 }
                 catch { /* A missing label must not interrupt native selection. */ }
             }
@@ -127,6 +135,33 @@ namespace BIMaestro.PropertiesAppearance
 
     internal static class PropertiesAppearanceService
     {
+#if BIMAESTRO_PROPERTIES_TESTS
+        // The isolated group prototype owns its permutation after normal ordering.
+        // Keep the two native layout writers from moving the same rows independently.
+        internal static Func<NativePropertiesGrid, bool> CustomLayoutOwnsGrid;
+        internal static Func<NativePropertiesGrid, uint, PaletteColors> CustomRowColors;
+        internal static long LastColoredPaint=>_renderer?.LastColoredPaint??0;
+        internal static bool HasCurrentColorPlan=>_renderer?.HasCurrentColorPlan==true;
+#endif
+        private static readonly PalettePresentationGate Presentation=new PalettePresentationGate();
+        private static ExternalEvent _presentationEvent;
+        private sealed class PresentationHandler:IExternalEventHandler
+        {
+            public string GetName()=>"Actualisation atomique de la palette";
+            public void Execute(UIApplication app){_next=DateTime.MinValue;ProcessIdling(app);}
+        }
+        internal static void NotifyContextChanging()
+        {
+            _next=DateTime.MinValue;
+            // Revit can reuse the same native HWND for a different selection.
+            // Never let WM_PAINT reapply a closure captured for the previous owner.
+            if(_renderer!=null)_renderer.BeforePaint=null;
+            _signature=null;
+            var preferences=_preview??_saved;
+            if(preferences==null||!preferences.Enabled)return;
+            try{Presentation.Hold(_cachedGrid);_presentationEvent?.Raise();}
+            catch{Presentation.Release();}
+        }
         private static AppearancePreferences _saved;
         private static AppearancePreferences _preview;
         private static PropertiesPaletteRenderer _renderer;
@@ -163,7 +198,7 @@ namespace BIMaestro.PropertiesAppearance
         internal static void ResetAll() { _saved = AppearanceStore.ResetAll(); _preview = null; Invalidate(); }
         internal static void CancelPreview() { _preview = null; Invalidate(); }
         private static void Invalidate() { _signature = null; _next = DateTime.MinValue; _renderer?.Dispose(); _renderer = null; }
-        internal static void Shutdown() { PropertiesAppearanceCommand.Shutdown(); _preview = null; _renderer?.Dispose(); _renderer = null; }
+        internal static void Shutdown() { Presentation.Dispose();_presentationEvent?.Dispose();_presentationEvent=null; PropertiesAppearanceCommand.Shutdown(); _preview = null; _renderer?.Dispose(); _renderer = null; }
 
         // Only native grid access and plain captured metadata are allowed here.
         // This also runs from WM_PAINT, outside Revit's document API context.
@@ -173,7 +208,11 @@ namespace BIMaestro.PropertiesAppearance
             if (!grid.RefreshIfCurrent()) return 0;
             bool hasColors = preferences.Enabled && preferences.Profiles.Any(p => p.Rules.Count > 0);
             bool hasOrder = preferences.Enabled && preferences.Profiles.Any(p => !p.Layout.IsEmpty);
-            if (hasOrder || PropertiesPaletteLayout.HasApplied)
+            bool customLayout = false;
+#if BIMAESTRO_PROPERTIES_TESTS
+            customLayout = CustomLayoutOwnsGrid?.Invoke(grid) == true;
+#endif
+            if (!customLayout && (hasOrder || PropertiesPaletteLayout.HasApplied))
                 PropertiesPaletteLayout.Apply(grid, context, hasOrder ? preferences : null, version,
                     () => renderer.Update(grid, new List<PropertiesPaletteRenderer.CellPlan>(), false));
             var cells = new List<PropertiesPaletteRenderer.CellPlan>();
@@ -183,6 +222,11 @@ namespace BIMaestro.PropertiesAppearance
                 {
                     string raw = grid.Value(row, 1); if (string.IsNullOrWhiteSpace(raw)) continue;
                     bool header = grid.IsGroupHeader(row);
+#if BIMAESTRO_PROPERTIES_TESTS
+                    var customColors = CustomRowColors?.Invoke(grid,row);
+                    if(customColors!=null && (header || grid.CanStyle(row)))
+                    { cells.Add(new PropertiesPaletteRenderer.CellPlan { Row=row,Label=raw,Header=header,Colors=customColors,Dark=dark });continue; }
+#endif
                     if (header) context.GroupMap.TryGetValue(AppearancePreferences.Normalize(raw), out group);
                     if (group == null) continue;
                     PropertyTarget parameter = null;
@@ -201,6 +245,7 @@ namespace BIMaestro.PropertiesAppearance
             try
             {
                 if (DateTime.UtcNow < _next) return;
+                if(_presentationEvent==null)_presentationEvent=ExternalEvent.Create(new PresentationHandler());
                 _next = DateTime.UtcNow.AddMilliseconds(450);
                 measured = PropertiesAppearanceMetrics.Begin();
                 if (_nativeRefreshError != null)
@@ -284,7 +329,7 @@ namespace BIMaestro.PropertiesAppearance
                 Status = "Palette conservée dans son état Revit : " + ex.Message;
                 _next = DateTime.UtcNow.AddSeconds(5);
             }
-            finally { PropertiesAppearanceMetrics.End("Refresh", measured); }
+            finally { Presentation.Release();PropertiesAppearanceMetrics.End("Refresh", measured); }
         }
     }
 }

@@ -1,6 +1,6 @@
 #Requires -Version 7.0
 <##
-Pure contract for the future direct-recipe conversion path. Inputs must be real
+Pure contract for the direct-recipe conversion path. Inputs must be real
 serialized HistoryRecipe DTOs captured around that conversion. This script does
 not implement conversion or claim that the current Revit pipeline passes.
 SourceRecipeAfterJson is required to detect in-place mutation of the source.
@@ -38,7 +38,20 @@ function Normalize($value, [string] $parent = '') {
     }
     return $value
 }
-function Canonical($value) { return ConvertTo-Json -InputObject $value -Depth 100 -Compress }
+function OrderedValue($value) {
+    if ($value -is [Collections.IDictionary]) {
+        $ordered = [ordered]@{}
+        foreach ($key in @($value.Keys | Sort-Object -CaseSensitive)) { $ordered[$key] = OrderedValue $value[$key] }
+        return $ordered
+    }
+    if ($value -is [Collections.IList]) {
+        $items = [Collections.Generic.List[object]]::new()
+        foreach ($item in $value) { $items.Add((OrderedValue $item)) }
+        return ,$items.ToArray()
+    }
+    return $value
+}
+function Canonical($value) { return ConvertTo-Json -InputObject (OrderedValue $value) -Depth 100 -Compress }
 function ValidateArtifacts($value, [Collections.Generic.List[string]] $errors) {
     if ($value -is [Collections.IDictionary]) {
         foreach ($key in $value.Keys) {
@@ -62,6 +75,8 @@ if ((Canonical $before) -cne (Canonical $after)) { $errors.Add('Conversion mutat
 if ((Canonical (Normalize $before)) -cne (Canonical (Normalize $converted))) { $errors.Add('Direct source geometry, placement, parameters or relations changed during conversion.') }
 if ($converted.OpeningFallback -isnot [Collections.IDictionary] -or $converted.OpeningFallback.DefinitionOnly -ne $true) { $errors.Add('Converted direct recipe has no definition-only capsule.') }
 if ([string]::IsNullOrWhiteSpace($converted.OpeningFallback.TypeVersion)) { $errors.Add('Definition-only capsule has no historical definition version.') }
+if ($converted.OpeningFallback.RootSourceUniqueId -cne $converted.Type -or
+    [string]::IsNullOrWhiteSpace($converted.OpeningFallback.RootUniqueId)) { $errors.Add('Definition-only capsule does not identify the original primary type.') }
 ValidateArtifacts $converted $errors
 $result = [ordered]@{
     Passed = $errors.Count -eq 0

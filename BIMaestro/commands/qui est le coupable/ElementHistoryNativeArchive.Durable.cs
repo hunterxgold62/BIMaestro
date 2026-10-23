@@ -355,12 +355,13 @@ namespace Analyse
                     result.Add(item.Element.UniqueId, recipe);
                 }
                 if (result.Count == 0) return result;
+                Dictionary<string, Element> sourceDefinitions;
                 using (var tx = new Transaction(capsule, "BIMaestro - Versionner définitions historiques"))
                 {
                     tx.Start();
                     ConfigureDurableFailures(tx);
                     stage = "dependency_origins";
-                    var sourceDefinitions = StampDurableDependencyOrigins(source, capsule, templateDefinitions, renamedTemplateIds, version, result.Values, report);
+                    sourceDefinitions = StampDurableDependencyOrigins(source, capsule, templateDefinitions, renamedTemplateIds, version, result.Values, report);
                     foreach (var id in new FilteredElementCollector(capsule).OfClass(typeof(Family)).ToElementIds())
                     {
                         var family = RequireDurableElement(capsule, id) as Family;
@@ -398,9 +399,12 @@ namespace Analyse
                             StampDurableDefinition(material, version);
                         }
                     }
+                    stage = "preserve_frozen_type_identity";
+                    RestoreFrozenTypeIdentities(capsule, sourceDefinitions, templateDefinitions);
                     stage = "commit_definition_versions";
                     CommitDurableTransaction(tx);
                 }
+                ValidateFrozenTypeIdentities(capsule, sourceDefinitions, templateDefinitions);
                 // Detach metadata before annotating it: several live snapshots may
                 // share their connection/placement DTOs with the input requests.
                 foreach (var uid in result.Keys.ToList())
@@ -415,8 +419,10 @@ namespace Analyse
                 using (var options = new SaveAsOptions { Compact = true, MaximumBackups = 1, OverwriteExistingFile = false })
                 {
                     stage = "save_capsule";
+                    RejectExternalModelsInCapsule(capsule);
                     capsule.SaveAs(outputRvt, options);
                 }
+                ValidateFrozenTypeIdentities(capsule, sourceDefinitions, templateDefinitions);
                 saved = true;
                 stage = "close_capsule";
                 if (!capsule.Close(false)) throw new InvalidOperationException("La capsule n’a pas pu être fermée après son enregistrement.");
@@ -492,9 +498,12 @@ namespace Analyse
             if (element == null && saved?.SourceElementId > 0) element = source.GetElement(ElementIdExtensions.CreateElementId(saved.SourceElementId));
             if (element == null || (!ElementHistoryOpeningArchive.IsEligibleElement(element) && !(element is MEPSystem)) || IsCalo(element))
                 throw new InvalidOperationException("L’objet demandé est absent du checkpoint ou exclu de la restauration.");
+            RejectExternalModel(element, "durable_member");
             if (!string.IsNullOrEmpty(saved?.MemberSourceUniqueId) && saved.MemberSourceUniqueId != element.UniqueId)
                 throw new InvalidOperationException("L’identité du membre ne correspond pas au checkpoint.");
             var item = new DurableItem { Request = request, Element = element, Root = Root(element) };
+            RejectExternalModel(item.Root, "durable_root");
+            foreach (var member in Aggregate(source, item.Root)) RejectExternalModel(member, "durable_aggregate");
             if (saved?.ExcludedElementIds?.Count > 0)
             {
                 var excluded = new HashSet<int>(saved.ExcludedElementIds);
@@ -512,6 +521,19 @@ namespace Analyse
                 }
             }
             return item;
+        }
+
+        private static void RejectExternalModel(Element element, string context)
+        {
+            if (ElementHistoryExternalModels.IsExcluded(element))
+                throw new InvalidOperationException("ExternalModelExcluded: " + context + ";Class=" + element.GetType().FullName + ";Uid=" + element.UniqueId);
+        }
+
+        private static void RejectExternalModelsInCapsule(Document capsule)
+        {
+            foreach (var element in new FilteredElementCollector(capsule).WhereElementIsNotElementType().ToElements()
+                .Concat(new FilteredElementCollector(capsule).WhereElementIsElementType().ToElements()))
+                RejectExternalModel(element, "durable_capsule");
         }
 
         private static HistoryNativeArtifact DurableArtifact(DurableItem item, string path, string copiedRoot, string version)
@@ -548,6 +570,87 @@ namespace Analyse
             recipe.RestorationOrigins = (live?.RestorationOrigins ?? new List<string>())
                 .Concat(recipe.RestorationOrigins ?? new List<string>()).Distinct().ToList();
             recipe.NativeFallbackReason = live?.NativeFallbackReason;
+        }
+
+        // CopyElements/LoadFamily may create a fresh IFC identity for a new type.
+        // Callers MUST prove that target was created by this import/export, never
+        // pass an original live definition. Names and instance recipes are intact.
+        internal static void RestoreFrozenTypeIdentity(Element frozen, Element target)
+        {
+            if (!ReadFrozenTypeIdentityParameters(frozen, target, out var source, out var copy)) return;
+            if (source.HasValue == copy.HasValue && string.Equals(source.AsString(), copy.AsString(), StringComparison.Ordinal)) return;
+            if (!target.Document.IsModifiable || copy.IsReadOnly)
+                throw new InvalidOperationException("FrozenTypeIfcGuidNotWritable: " + frozen.UniqueId);
+            // ClearValue cannot clear built-ins: Revit restricts it to hidden
+            // shared parameters. An unrepresentable unset state must fail.
+            var before = "source={" + FrozenTypeIdentityDiagnostic(frozen, source) + "};targetBefore={" + FrozenTypeIdentityDiagnostic(target, copy) + "}";
+            bool set = copy.Set(source.AsString() ?? string.Empty);
+            if (!set)
+                throw new InvalidOperationException("FrozenTypeIfcGuidSetFailed: " + frozen.UniqueId + ";SetResult=false;" + before
+                    + ";targetAfter={" + FrozenTypeIdentityDiagnostic(target, copy) + "}");
+            ValidateFrozenTypeIdentity(frozen, target);
+        }
+
+        internal static void ValidateFrozenTypeIdentity(Element frozen, Element target)
+        {
+            if (!ReadFrozenTypeIdentityParameters(frozen, target, out var source, out var copy)) return;
+            if (source.HasValue != copy.HasValue || !string.Equals(source.AsString(), copy.AsString(), StringComparison.Ordinal))
+                throw new InvalidOperationException("FrozenTypeIfcGuidMismatch: " + frozen.UniqueId + " -> " + target.UniqueId
+                    + ";source={" + FrozenTypeIdentityDiagnostic(frozen, source) + "};target={" + FrozenTypeIdentityDiagnostic(target, copy) + "}");
+        }
+
+        private static string FrozenTypeIdentityDiagnostic(Element element, Parameter parameter)
+        {
+            var listed = element.Parameters.Cast<Parameter>().Any(candidate => candidate.Id.Equals(parameter.Id));
+            return "Class=" + element.GetType().FullName + ";Uid=" + element.UniqueId + ";Listed=" + listed
+                + ";Storage=" + parameter.StorageType + ";HasValue=" + parameter.HasValue + ";ReadOnly=" + parameter.IsReadOnly
+                + ";Text=" + Newtonsoft.Json.JsonConvert.SerializeObject(parameter.AsString());
+        }
+
+        private static bool ReadFrozenTypeIdentityParameters(Element frozen, Element target, out Parameter source, out Parameter copy)
+        {
+            source = null; copy = null;
+            if (frozen == null || target == null) throw new ArgumentNullException(frozen == null ? nameof(frozen) : nameof(target));
+            if (!(frozen is ElementType) && !(target is ElementType)) return false;
+            if (!(frozen is ElementType) || !(target is ElementType) || frozen.GetType() != target.GetType())
+                throw new InvalidOperationException("FrozenTypeIfcGuidClassMismatch: " + frozen.UniqueId);
+            if (SameLiveDocument(frozen.Document, target.Document))
+                throw new InvalidOperationException("FrozenTypeIfcGuidOriginalDefinition: " + frozen.UniqueId);
+            // Some system types expose a computed IFC GUID via get_Parameter
+            // even though no such parameter is stored/enumerated on that type.
+            // Preserve only real stored fields; never write this virtual value.
+            var sourceStored = frozen.Parameters.Cast<Parameter>()
+                .Where(parameter => parameter.Id.GetIdLongValue() == (long)BuiltInParameter.IFC_TYPE_GUID).ToList();
+            var targetStored = target.Parameters.Cast<Parameter>()
+                .Where(parameter => parameter.Id.GetIdLongValue() == (long)BuiltInParameter.IFC_TYPE_GUID).ToList();
+            if (sourceStored.Count == 0 && targetStored.Count == 0) return false;
+            if (sourceStored.Count != 1 || targetStored.Count != 1)
+                throw new InvalidOperationException("FrozenTypeIfcGuidStoredPresenceMismatch: " + frozen.UniqueId
+                    + ";SourceStoredCount=" + sourceStored.Count + ";TargetStoredCount=" + targetStored.Count);
+            source = sourceStored[0]; copy = targetStored[0];
+            if (source.StorageType != StorageType.String || copy.StorageType != StorageType.String)
+                throw new InvalidOperationException("FrozenTypeIfcGuidParameterMissing: " + frozen.UniqueId);
+            return true;
+        }
+
+        private static void RestoreFrozenTypeIdentities(Document capsule, Dictionary<string, Element> originals, HashSet<ElementId> templateIds)
+        {
+            foreach (var pair in originals)
+            {
+                var copy = capsule.GetElement(pair.Key);
+                if (copy is ElementType && !templateIds.Contains(copy.Id)) RestoreFrozenTypeIdentity(pair.Value, copy);
+            }
+            capsule.Regenerate();
+            ValidateFrozenTypeIdentities(capsule, originals, templateIds);
+        }
+
+        private static void ValidateFrozenTypeIdentities(Document capsule, Dictionary<string, Element> originals, HashSet<ElementId> templateIds)
+        {
+            foreach (var pair in originals)
+            {
+                var copy = capsule.GetElement(pair.Key);
+                if (copy is ElementType && !templateIds.Contains(copy.Id)) ValidateFrozenTypeIdentity(pair.Value, copy);
+            }
         }
 
         private static void StampDurableDefinitionPair(Element original, Element copied, string version)
@@ -590,6 +693,7 @@ namespace Analyse
                         if (reference != null && byUid.ContainsKey(reference.UniqueId) && required.Add(reference.UniqueId))
                             pending.Enqueue(reference);
                     }
+            foreach (var uid in required) RejectExternalModel(byUid[uid], "durable_definition_dependency");
             // A fitting copied without its neighbours does not necessarily bring
             // their system types. Persist these small referenced definitions now.
             var existing = DurableDefinitions(capsule).ToList();

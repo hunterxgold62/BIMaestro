@@ -20,7 +20,7 @@ public class Phase:Element {}
 public class Document {public List<Phase> Phases=new List<Phase>();public Dictionary<string,Element> Elements=new Dictionary<string,Element>();public Element GetElement(string uid){Element e;return Elements.TryGetValue(uid,out e)?e:null;}}
 public class HistoryNativeContextDefinition {public string SourceUniqueId,Class,Name;public int Ordinal;}
 public class HistoryParameter {public string Reference,Definition;}
-public class HistoryPlacement {public string LevelSourceUniqueId;public List<HistoryParameter> ElevationParameters;}
+public class HistoryPlacement {public string LevelSourceUniqueId,HostSourceUniqueId;public List<HistoryParameter> ElevationParameters;}
 public class HistoryNetwork {public string SystemType;}
 public class HistoryPort {public string SystemType,SystemVersion;}
 public class HistoryConnection {public HistoryPort Port,PeerPort;}

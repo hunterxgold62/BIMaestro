@@ -29,6 +29,7 @@ $production = @(
     $reconstruction.Substring($dtoStart, $dtoEnd - $dtoStart)
     $network.Substring($networkStart, $networkEnd - $networkStart)
     (ExtractBlock (ReadSource 'ElementHistoryNativeArchive.cs') 'internal sealed class HistoryNativeArtifact')
+    (ExtractBlock (ReadSource 'ElementHistoryNativeArchive.cs') 'internal sealed class HistoryNativeContextDefinition')
     (ExtractBlock (ReadSource 'ElementHistoryRelations.cs') 'internal sealed class HistoryGeometryRelation')
     (ExtractBlock (ReadSource 'ElementHistoryRestoration.cs') 'internal sealed class HistoryRestoreRequest')
     (ExtractBlock (ReadSource 'ElementHistoryTracker.cs') 'internal sealed class ElementHistoryEvent')
@@ -86,6 +87,11 @@ internal static class BridgeReadChecks {
         Check("valid native DTO stays linked to its source",()=> {var r=ElementHistoryDurableBridge.ToRequest(Event(Native()));return r.Recipe.Native.WholeModel&&r.Recipe.Native.SourceElementId==42&&r.SourceUniqueId=="source-uid";});
         Check("request metadata preserved",()=> {var r=ElementHistoryDurableBridge.ToRequest(Event(Direct()),false);return r.Label=="Family Type [42]"&&r.Category=="Category"&&r.SuperComponentUniqueId=="parent-uid"&&r.FamilyTypeUniqueId=="type-uid";});
         Check("typed recipe uses same production validation",()=>ElementHistoryDurableBridge.ToRequest(Event(new HistoryRecipe {Kind="family",Type="t",Level="l"}),false).Recipe.Kind=="family");
+        var compact=Direct();compact["UsesExistingModelDefinitions"]=true;
+        Check("compact definition mode survives strict read",()=>ElementHistoryDurableBridge.ToRequest(Event(compact),false).Recipe.UsesExistingModelDefinitions);
+        Check("legacy missing definition mode remains false",()=>!ElementHistoryDurableBridge.ToRequest(Event(Direct()),false).Recipe.UsesExistingModelDefinitions);
+        Check("compact definition mode round trips in real DTO",()=>JObject.FromObject(ElementHistoryDurableBridge.ToRequest(Event(compact),false).Recipe)["UsesExistingModelDefinitions"].Value<bool>());
+        Check("legacy false definition mode stays omitted",()=>JObject.FromObject(ElementHistoryDurableBridge.ToRequest(Event(Direct()),false).Recipe)["UsesExistingModelDefinitions"]==null);
         foreach(var version in new[]{0,2,99}) {var n=Native();n["Version"]=version;Reject("unknown version "+version+" blocks read and cleanup",()=>ElementHistoryDurableBridge.ToRequest(Event(n),false));}
         var unknown=Native();unknown["Kind"]="future-kind";Reject("unknown kind blocks read",()=>ElementHistoryDurableBridge.ToRequest(Event(unknown),false));
         var badSource=Native();badSource["Native"]["SourceElementId"]="not-an-id";Reject("corrupt native property blocks read",()=>ElementHistoryDurableBridge.ToRequest(Event(badSource),false));

@@ -442,6 +442,10 @@
       <DependentUpon>ViewThumbnailBatchWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="commands\qui est le coupable\ElementHistoryTracker.cs" />
+    <Compile Include="commands\qui est le coupable\ElementHistoryClock.cs" />
+    <Compile Include="commands\qui est le coupable\ElementHistoryExternalModels.cs" />
+    <Compile Include="commands\qui est le coupable\ElementHistoryLocalSpool.cs" />
+    <Compile Include="commands\qui est le coupable\ElementHistoryRetryPolicy.cs" />
     <Compile Include="commands\qui est le coupable\ElementHistoryAudit.cs" />
     <Compile Include="commands\qui est le coupable\ElementHistoryReconstruction.cs" />
     <Compile Include="commands\qui est le coupable\ElementHistoryReconstruction.Extended.cs" />

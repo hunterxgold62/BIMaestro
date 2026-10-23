@@ -168,7 +168,9 @@ namespace BIMaestro.StressTests
 
         void ApplyPhysicalSelection(Document document)
         {
-            physicalCandidateIds = selectedPhysicalIds.ToArray(); if (config.BusinessWorkflow) { ApplyBusinessSelection(document); return; }
+            physicalCandidateIds = selectedPhysicalIds.ToArray();
+            if (config.RapidModifiedDelete) { ApplyRapidSelection(document); return; }
+            if (config.BusinessWorkflow) { ApplyBusinessSelection(document); return; }
             var all = physicalCandidateIds.ToHashSet(); var parents = all.ToDictionary(id => id, id => id);
             long Find(long id) { while (parents[id] != id) { parents[id] = parents[parents[id]]; id = parents[id]; } return id; }
             void Union(long first, long second) { long a = Find(first), b = Find(second); if (a != b) parents[Math.Max(a, b)] = Math.Min(a, b); }

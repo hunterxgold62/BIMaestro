@@ -1,0 +1,57 @@
+{
+  "scope": "Perf packet audit only; no native functionality or release support claim",
+  "windows": [
+    {
+      "file": "tmp\\properties-custom-group-tests\\2025-r8\\perf-fast-selection.json",
+      "sha256": "20e23e22142b747b42546154ff7cde05f739ec28e90127f97c2624e166c19521",
+      "bytes": 872,
+      "pid": 18048,
+      "version": "2025",
+      "build": null,
+      "auditMode": "interactive",
+      "scenario": null,
+      "fixtureId": null,
+      "diagnosticTimerEnabled": false,
+      "reportedModeField": "mode",
+      "reportedDiagnosticsField": "diagnostics",
+      "autoGroup": true,
+      "modelRevision": 4,
+      "reportedState": null,
+      "verifiedNativeGroupAtEnd": false,
+      "counters": {},
+      "timings": {
+        "group.ensure": {
+          "Count": 122,
+          "MeanMs": 2.27,
+          "P95Ms": 3.666,
+          "MaxMs": 37.432
+        },
+        "group.fingerprint.selected-element-and-type": {
+          "Count": 12,
+          "MeanMs": 0.543,
+          "P95Ms": 0.645,
+          "MaxMs": 0.645
+        },
+        "group.native-move": {
+          "Count": 18,
+          "MeanMs": 0.098,
+          "P95Ms": 0.241,
+          "MaxMs": 0.241
+        },
+        "group.reapply.interactive": {
+          "Count": 3,
+          "MeanMs": 17.509,
+          "P95Ms": 18.445,
+          "MaxMs": 18.445
+        }
+      },
+      "warnings": [
+        "missing_context_build",
+        "missing_context_scenario",
+        "missing_context_fixtureId",
+        "native_group_verification_not_in_perf_packet"
+      ],
+      "aggregationLimit": "Reported per-window aggregates; P95 is not recomputed without raw samples and is never averaged across windows."
+    }
+  ]
+}

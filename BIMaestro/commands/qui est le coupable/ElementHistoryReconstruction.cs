@@ -20,6 +20,8 @@ namespace Analyse
         public string Kind { get; set; }
         public HistoryNativeArtifact Native { get; set; }
         public HistoryNativeArtifact OpeningFallback { get; set; }
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public bool UsesExistingModelDefinitions { get; set; }
         public HistoryPlacement HistoricalPlacement { get; set; }
         internal HistoryRecipe CopyWithOpeningFallback(HistoryNativeArtifact fallback)
         {
@@ -199,6 +201,11 @@ namespace Analyse
         internal static HistoryRecipe Capture(Element element, Action<string> diagnostic = null, bool includeDetails = true,
             bool allowHeavyTerrain = true, bool automaticCapture = false)
         {
+            if (ElementHistoryExternalModels.IsExcluded(element))
+            {
+                diagnostic?.Invoke("Lien ou import externe exclu de la sauvegarde des objets.");
+                return null;
+            }
             if (automaticCapture && !ElementHistoryTracker.CaptureDetailedDeletedMesh)
             {
                 if (RequiresDetailedCapture(element))
@@ -233,11 +240,41 @@ namespace Analyse
                 allowHeavyTerrain: allowHeavyTerrain) : recipe;
         }
 
+        // A transaction may be followed immediately by Delete. Keep the supported
+        // object's current recipe and relationships in that transaction callback;
+        // never open/create/copy a Revit archive or triangulate geometry here.
+        // Cost-based opening-inventory deferral must not hide an ordinary plant
+        // or equipment instance's cheap native placement recipe after an edit.
+        internal static HistoryRecipe CaptureDirectForChange(Element element, Action<string> diagnostic = null)
+        {
+            if (element == null || ElementHistoryExternalModels.IsExcluded(element)) return null;
+            try
+            {
+                if (ElementHistoryNativeArchive.RequiresAggregate(element)
+                    || ElementHistoryNativeArchive.OpeningRoot(element).Id != element.Id)
+                {
+                    diagnostic?.Invoke("Le dernier état de cet ensemble nécessite une capture native préalable.");
+                    return null;
+                }
+                var recipe = CaptureCore(element, diagnostic, includeDetails: false);
+                if (recipe == null) return null;
+                if (recipe.Native != null || recipe.Kind == "native_archive")
+                    throw new InvalidOperationException("Une modification ne doit pas déclencher une copie native synchrone.");
+                return Enrich(element, recipe, diagnostic, includeBoundingBox: false);
+            }
+            catch (Autodesk.Revit.Exceptions.RegenerationFailedException) { throw; }
+            catch (Exception ex)
+            {
+                diagnostic?.Invoke("Dernier état direct indisponible : " + ex.Message);
+                return null;
+            }
+        }
+
         // Read a checkpoint during an explicit restore without preparing another
         // native archive. Aggregate members must retain their native owner path.
         internal static HistoryRecipe CaptureDirectForRestore(Element element, Action<string> diagnostic = null)
         {
-            if (element == null) return null;
+            if (element == null || ElementHistoryExternalModels.IsExcluded(element)) return null;
             try
             {
                 if (ElementHistoryNativeArchive.RequiresAggregate(element)
@@ -262,7 +299,7 @@ namespace Analyse
 
         // Enrich the already captured placement/parameters, never recapture them just for joins.
         internal static HistoryRecipe Enrich(Element element, HistoryRecipe recipe, Action<string> diagnostic = null,
-            bool coreHasDetails = false, bool allowHeavyTerrain = true)
+            bool coreHasDetails = false, bool allowHeavyTerrain = true, bool includeBoundingBox = true)
         {
             if (recipe == null || recipe.Kind == "native_archive")
             {
@@ -318,14 +355,24 @@ namespace Analyse
                 if (recipe.GeometryRelations.Count == 0) recipe.GeometryRelations = null;
                 if (warnings.Count > 0) recipe.CaptureWarnings = warnings;
             }
-            CaptureHistoricalPlacement(element, recipe);
+            CaptureHistoricalPlacement(element, recipe, includeBoundingBox);
             return recipe;
         }
 
         private static HistoryRecipe CaptureCore(Element element, Action<string> diagnostic, bool includeDetails = true)
         {
             var recipe = CaptureCoreWithoutPlacement(element, diagnostic, includeDetails);
-            if (recipe != null) CaptureHistoricalPlacement(element, recipe, includeDetails);
+            if (recipe != null)
+            {
+                CaptureHistoricalPlacement(element, recipe, includeDetails);
+                if (recipe.Native == null && recipe.Kind != "native_archive")
+                {
+                    // Keep the instance state, not a second library of family
+                    // definitions. Recovery depends on the exact live type UID.
+                    recipe.UsesExistingModelDefinitions = true;
+                    recipe.OpeningFallback = null;
+                }
+            }
             return recipe;
         }
 
@@ -438,6 +485,8 @@ namespace Analyse
                     recipe.Parameters = CaptureParameters(wall)
                         .Where(value => value.BuiltIn == 0
                             || value.BuiltIn == (int)BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS
+                            || value.BuiltIn == (int)BuiltInParameter.WALL_HEIGHT_TYPE
+                            || value.BuiltIn == (int)BuiltInParameter.WALL_TOP_OFFSET
                             || value.BuiltIn == -1019000).ToList();
                     if (wall.SketchId != ElementId.InvalidElementId)
                     {
@@ -854,7 +903,9 @@ namespace Analyse
         internal static void ApplyParameters(Document doc, Element element, List<HistoryParameter> values)
         {
             foreach (var value in (values ?? new List<HistoryParameter>())
-                .OrderBy(v => v.BuiltIn == (int)BuiltInParameter.RBS_FAMILY_CONTENT_DISTRIBUTION_SYSTEM ? 0 : 1))
+                .OrderBy(v => v.BuiltIn == (int)BuiltInParameter.RBS_FAMILY_CONTENT_DISTRIBUTION_SYSTEM ? 0
+                    : v.BuiltIn == (int)BuiltInParameter.WALL_HEIGHT_TYPE ? 1
+                    : v.BuiltIn == (int)BuiltInParameter.WALL_TOP_OFFSET ? 3 : 2))
             {
                 Parameter parameter = value.Shared != null ? element.get_Parameter(new Guid(value.Shared))
                     : value.BuiltIn < 0 ? element.get_Parameter((BuiltInParameter)value.BuiltIn)
@@ -886,7 +937,8 @@ namespace Analyse
                             if (id == null) throw new InvalidOperationException("Historical parameter reference is missing.");
                             if (parameter.AsElementId() != id && !parameter.Set(id))
                                 throw new InvalidOperationException("Historical reference could not be restored.");
-                            if (value.BuiltIn == (int)BuiltInParameter.RBS_FAMILY_CONTENT_DISTRIBUTION_SYSTEM) doc.Regenerate();
+                            if (value.BuiltIn == (int)BuiltInParameter.RBS_FAMILY_CONTENT_DISTRIBUTION_SYSTEM
+                                || value.BuiltIn == (int)BuiltInParameter.WALL_HEIGHT_TYPE) doc.Regenerate();
                             break;
                     }
                 }

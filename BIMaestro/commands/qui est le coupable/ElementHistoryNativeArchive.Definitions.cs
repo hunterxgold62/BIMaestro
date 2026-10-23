@@ -90,7 +90,8 @@ namespace Analyse
                         new { RecipeSourceIds = copyRecipeIds, Definitions = copyInputs });
                     try
                     {
-                        using (var options = Options()) ElementTransformUtils.CopyElements(source, ids, capsule, Transform.Identity, options);
+                        CopyFrozenDefinitions(source, capsule, required.Values, copyRecipeIds,
+                            (operation, identity) => stage = operation + ":" + identity);
                     }
                     catch (Exception copyFailure)
                     {
@@ -126,8 +127,11 @@ namespace Analyse
                         else if (copy is Material material) material.Name = VersionedDefinitionName(original.Name, sourceVersion, original.UniqueId);
                         StampDurableDefinition(copy, sourceVersion);
                     }
+                    stage = "preserve_frozen_type_identity";
+                    RestoreFrozenTypeIdentities(capsule, mapped, templateDefinitions);
                     CommitDurableTransaction(tx);
                 }
+                ValidateFrozenTypeIdentities(capsule, mapped, templateDefinitions);
                 foreach (var pair in result)
                 {
                     var sourceType = pair.Value.Type;
@@ -144,7 +148,9 @@ namespace Analyse
                 foreach (var pair in result)
                     FrozenDefinitionClosure(source, pair.Value, definitionUnchanged, out _);
                 stage = "save_definition_capsule";
+                RejectExternalModelsInCapsule(capsule);
                 using (var options = new SaveAsOptions { Compact = true, MaximumBackups = 1, OverwriteExistingFile = false }) capsule.SaveAs(outputRvt, options);
+                ValidateFrozenTypeIdentities(capsule, mapped, templateDefinitions);
                 if (!capsule.Close(false)) throw new InvalidOperationException("La capsule de definitions ne peut pas etre fermee.");
                 OwnedArchives.Remove(capsule); capsule = null;
                 return result;
@@ -157,6 +163,48 @@ namespace Analyse
                     try { if (!capsule.IsValidObject || capsule.Close(false)) OwnedArchives.Remove(capsule);
                         else if (!RetiredArchives.Any(d => ReferenceEquals(d, capsule))) RetiredArchives.Add(capsule); }
                     catch { if (!RetiredArchives.Any(d => ReferenceEquals(d, capsule))) RetiredArchives.Add(capsule); }
+                }
+            }
+        }
+
+        // Revit can reject a mixed paste of levels, loadable symbols and MEP
+        // definitions even when those definitions are individually transferable.
+        // Copy context first, then system definitions, and finally physical
+        // types. The source remains read-only and the enclosing transaction
+        // still makes the complete closure atomic.
+        private static void CopyFrozenDefinitions(Document source, Document capsule, IEnumerable<Element> definitions,
+            string[] recipeIds, Action<string, string> report)
+        {
+            var ordered = definitions.Where(element => !(element is Family))
+                .OrderBy(element => element is Level ? 0 : element is Material ? 1 : element is MEPSystemType ? 2 : 3)
+                .ThenBy(element => element.UniqueId, StringComparer.Ordinal).ToList();
+            foreach (var definition in ordered)
+            {
+                RejectExternalModel(definition, "frozen_definition_copy");
+                report("copy_frozen_definition", definition.UniqueId + "|" + definition.GetType().FullName);
+                var timer = System.Diagnostics.Stopwatch.StartNew();
+                using (var copy = new SubTransaction(capsule))
+                {
+                    copy.Start();
+                    try
+                    {
+                        using (var options = Options())
+                            ElementTransformUtils.CopyElements(source, new[] { definition.Id }, capsule, Transform.Identity, options);
+                        capsule.Regenerate();
+                        if (copy.Commit() != TransactionStatus.Committed)
+                            throw new InvalidOperationException("FrozenDefinitionCopyCommit: " + definition.UniqueId);
+                        HistoryPerformanceLog.RecordDetails(source, "definition_export_copy_definition", timer.Elapsed.TotalMilliseconds,
+                            1, 0, true, new { RecipeSourceIds = recipeIds, SourceUid = definition.UniqueId,
+                                Class = definition.GetType().FullName, Name = definition.Name });
+                    }
+                    catch (Exception failure)
+                    {
+                        if (copy.GetStatus() == TransactionStatus.Started) copy.RollBack();
+                        HistoryPerformanceLog.RecordDetails(source, "definition_export_copy_definition", timer.Elapsed.TotalMilliseconds,
+                            1, 0, false, new { RecipeSourceIds = recipeIds, SourceUid = definition.UniqueId,
+                                Class = definition.GetType().FullName, Name = definition.Name, Failure = failure.ToString() });
+                        throw;
+                    }
                 }
             }
         }
@@ -190,6 +238,46 @@ namespace Analyse
                     foreach (var nested in FrozenRecipes(circuit.Recipe)) yield return nested;
         }
 
+        // Only definition dependencies belong in this identity. In particular,
+        // moving an instance must not require another copy of its unchanged
+        // family. Keep the roles aligned with FrozenDefinitionClosure below.
+        internal static string DefinitionDependencyIdentity(HistoryRecipe recipe)
+        {
+            if (recipe == null) throw new ArgumentNullException(nameof(recipe));
+            var dependencies = new HashSet<string>(StringComparer.Ordinal);
+            void Add(string role, string uid) { if (!string.IsNullOrEmpty(uid)) dependencies.Add(role + ":" + uid); }
+            foreach (var nested in FrozenRecipes(recipe))
+            {
+                Add("kind", nested.Kind); Add("type", nested.Type); Add("level", nested.Level);
+                Add("system", nested.Network?.SystemType);
+                Add("placement-level", nested.HistoricalPlacement?.LevelSourceUniqueId);
+                // A placement host may be a Level; retaining other host IDs is
+                // conservative and never turns a physical host into a definition.
+                Add("placement-host", nested.HistoricalPlacement?.HostSourceUniqueId);
+                foreach (var parameter in (nested.Parameters ?? new List<HistoryParameter>())
+                    .Concat(nested.HistoricalPlacement?.ElevationParameters ?? new List<HistoryParameter>()))
+                { Add("parameter-definition", parameter.Definition); Add("parameter-reference", parameter.Reference); }
+                foreach (var port in (nested.Ports ?? new List<HistoryPort>()).Concat((nested.Connections ?? new List<HistoryConnection>())
+                    .SelectMany(connection => new[] { connection.Port, connection.PeerPort })))
+                    if (port != null) Add("system", port.SystemType);
+            }
+            return new JObject { ["PrimaryType"] = recipe.Type,
+                ["Dependencies"] = new JArray(dependencies.OrderBy(value => value, StringComparer.Ordinal)) }
+                .ToString(Newtonsoft.Json.Formatting.None);
+        }
+
+        internal static HistoryRecipe ApplyFrozenDefinitionArtifact(HistoryRecipe recipe, HistoryNativeArtifact artifact)
+        {
+            if (recipe == null || artifact == null || !artifact.DefinitionOnly || artifact.WholeModel
+                || string.IsNullOrEmpty(artifact.PayloadId) || !string.IsNullOrEmpty(artifact.File)
+                || artifact.RootSourceUniqueId != recipe.Type || string.IsNullOrEmpty(artifact.TypeVersion))
+                throw new InvalidOperationException("FrozenDefinitionReuse: capsule de definitions incompatible.");
+            var copy = JObject.FromObject(recipe).ToObject<HistoryRecipe>();
+            copy.OpeningFallback = JObject.FromObject(artifact).ToObject<HistoryNativeArtifact>();
+            StampDurablePortVersions(copy, artifact.TypeVersion);
+            return copy;
+        }
+
         private static List<Element> FrozenDefinitionClosure(Document source, HistoryRecipe recipe,
             Func<string, bool> unchanged, out List<HistoryNativeContextDefinition> contexts)
         {
@@ -203,6 +291,7 @@ namespace Analyse
                 if (string.IsNullOrEmpty(uid) || required.ContainsKey(uid) || contextUids.Contains(uid)) return;
                 var definition = source.GetElement(uid);
                 if (definition == null) throw new InvalidOperationException("FrozenDefinitionAbsent: " + uid);
+                RejectExternalModel(definition, "frozen_definition_closure");
                 if (IsPresentationDefinition(definition)) return;
                 if (!unchanged(uid)) throw new InvalidOperationException("FrozenDefinitionChanged: " + uid);
                 if (definition is Phase phase)

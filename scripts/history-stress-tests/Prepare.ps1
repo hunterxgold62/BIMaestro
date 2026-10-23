@@ -15,6 +15,7 @@ param(
     [string]$WitnessExclusionReason,
     [switch]$AllowPartialDurableRestore,
     [switch]$BusinessWorkflow,
+    [switch]$RapidModifiedDelete,
     [ValidateRange(30,60)][int]$WorkAfterEditsSeconds = 45,
     [ValidateRange(10,30)][int]$BusinessSelectionCount = 16,
     [long[]]$DiagnosticPhysicalIds = @(),
@@ -38,6 +39,7 @@ if($IsolatedRestoreWorkspace -and (!$DurableCaptureRunName -or !$AllowPartialDur
 $durablePhase = if($captureRun) { 'restore' } else { 'capture' }
 if($AllowPartialDurableRestore -and !$captureRun) { throw 'Partial restoration requires an explicit capture run; it cannot be enabled for capture.' }
 if(($BusinessWorkflow -or $DeletionDelaySeconds -gt 0 -or $ApplyDeterministicEdits) -and $Scenario -ne 'durable') { throw 'Delayed capture/edits require Scenario=durable.' }
+if($RapidModifiedDelete -and ($Scenario -ne 'durable' -or $BusinessWorkflow -or $DeletionDelaySeconds -gt 0 -or $ApplyDeterministicEdits -or $AllowPartialDurableRestore -or $DiagnosticPhysicalIds.Count)) { throw 'Rapid modified/delete cycle requires Scenario=durable without delayed/business/partial/diagnostic options.' }
 if($ApplyDeterministicEdits -and $DeletionDelaySeconds -lt 30) { throw 'Deterministic edits require a delay of at least30 seconds.' }
 foreach($category in $SkipPhysicalCategories) { if($category -notmatch '^(?:-?[0-9]+|OST_[A-Za-z0-9_]+)$') { throw ('Invalid explicit category name/ID: '+$category) } }
 if($Scenario -ne 'diagnostic' -and ($ReferenceInventoryFile -or $ReferenceOwnershipFile)) { throw 'Reference diagnostics require Scenario=diagnostic.' }
@@ -77,6 +79,7 @@ if($captureRun) {
     $SkipPhysicalIds=@($captureConfig.SkipPhysicalIds | Where-Object { $null -ne $_ })
     $WitnessExclusionReason=$captureConfig.WitnessExclusionReason
     $BusinessWorkflow=[bool]$captureConfig.BusinessWorkflow
+    $RapidModifiedDelete=[bool]$captureConfig.RapidModifiedDelete
     if($BusinessWorkflow) { $WorkAfterEditsSeconds=[int]$captureConfig.WorkAfterEditsSeconds; $BusinessSelectionCount=[int]$captureConfig.BusinessSelectionCount }
 } else {
     Copy-Item -LiteralPath $source -Destination (Join-Path $output 'Antibes-stress.rvt')
@@ -86,7 +89,7 @@ if($captureRun) {
 }
 $sourceHash | Set-Content -LiteralPath (Join-Path $output 'source-sha256.txt')
 [IO.File]::WriteAllText((Join-Path $output 'source-path.txt'), $source)
-@{ Scenario=$Scenario; RunName=$RunName; PreparedTimeoutSeconds=$PreparedTimeoutSeconds; JournalTimeoutSeconds=$JournalTimeoutSeconds; ReferenceInventoryPath=if($ReferenceInventoryFile){[IO.Path]::GetFullPath($ReferenceInventoryFile)}else{$null}; ReferenceOwnershipPath=if($ReferenceOwnershipFile){[IO.Path]::GetFullPath($ReferenceOwnershipFile)}else{$null}; DurablePhase=$durablePhase; DurableCaptureDirectory=$captureRun; DeletionDelaySeconds=$DeletionDelaySeconds; PhysicalTargetFraction=$PhysicalTargetFraction; ApplyDeterministicEdits=[bool]$ApplyDeterministicEdits; SkipPhysicalCategories=$SkipPhysicalCategories; SkipPhysicalIds=$SkipPhysicalIds; WitnessExclusionReason=$WitnessExclusionReason; AllowPartialDurableRestore=[bool]$AllowPartialDurableRestore; BusinessWorkflow=[bool]$BusinessWorkflow; WorkAfterEditsSeconds=$WorkAfterEditsSeconds; BusinessSelectionCount=$BusinessSelectionCount; DiagnosticPhysicalIds=$DiagnosticPhysicalIds; IsolatedRestoreWorkspace=[bool]$IsolatedRestoreWorkspace } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'config.json') -Encoding UTF8
+@{ Scenario=$Scenario; RunName=$RunName; PreparedTimeoutSeconds=$PreparedTimeoutSeconds; JournalTimeoutSeconds=$JournalTimeoutSeconds; ReferenceInventoryPath=if($ReferenceInventoryFile){[IO.Path]::GetFullPath($ReferenceInventoryFile)}else{$null}; ReferenceOwnershipPath=if($ReferenceOwnershipFile){[IO.Path]::GetFullPath($ReferenceOwnershipFile)}else{$null}; DurablePhase=$durablePhase; DurableCaptureDirectory=$captureRun; DeletionDelaySeconds=$DeletionDelaySeconds; PhysicalTargetFraction=$PhysicalTargetFraction; ApplyDeterministicEdits=[bool]$ApplyDeterministicEdits; SkipPhysicalCategories=$SkipPhysicalCategories; SkipPhysicalIds=$SkipPhysicalIds; WitnessExclusionReason=$WitnessExclusionReason; AllowPartialDurableRestore=[bool]$AllowPartialDurableRestore; BusinessWorkflow=[bool]$BusinessWorkflow; RapidModifiedDelete=[bool]$RapidModifiedDelete; WorkAfterEditsSeconds=$WorkAfterEditsSeconds; BusinessSelectionCount=$BusinessSelectionCount; DiagnosticPhysicalIds=$DiagnosticPhysicalIds; IsolatedRestoreWorkspace=[bool]$IsolatedRestoreWorkspace } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'config.json') -Encoding UTF8
 $buildLog = Join-Path $output 'build.log'
 $frozenSource = Join-Path $output 'frozen-source'
 New-Item -ItemType Directory -Path $frozenSource | Out-Null

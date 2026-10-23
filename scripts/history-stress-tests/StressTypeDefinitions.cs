@@ -74,7 +74,7 @@ namespace BIMaestro.StressTests
                         item.Key = parameter.Id.Value < 0 ? "builtin:" + parameter.Id.Value
                             : parameter.IsShared ? "shared:" + parameter.GUID.ToString("D")
                             : "name:" + item.Name + "|" + item.DataType + "|" + item.Storage;
-                        if (identityNames.Contains(parameter.Id.Value)) item.ExclusionReason = "capsule-version-display-name; identity/provenance checked separately";
+                        if (!config.RapidModifiedDelete && identityNames.Contains(parameter.Id.Value)) item.ExclusionReason = "capsule-version-display-name; identity/provenance checked separately";
                         switch (parameter.StorageType)
                         {
                             case StorageType.Double:
@@ -119,7 +119,7 @@ namespace BIMaestro.StressTests
             {
                 if (expected.ReferenceUid == actual.ReferenceUid) return true;
                 var target = actual.ReferenceUid == null ? null : document.GetElement(actual.ReferenceUid);
-                return target != null && Origins(target).Contains(expected.ReferenceUid);
+                return !config.RapidModifiedDelete && target != null && Origins(target).Contains(expected.ReferenceUid);
             }
             return actual.ReferenceUid == null && expected.ElementId == actual.ElementId;
         }
@@ -130,14 +130,14 @@ namespace BIMaestro.StressTests
             var actualType = actual.TypeUid == null ? null : document.GetElement(actual.TypeUid);
             if (actualType != null && !currentTypeDefinitions.ContainsKey(actual.TypeUid))
                 currentTypeDefinitions[actual.TypeUid] = ReadTypeDefinition(actualType);
-            var current = actual.TypeUid == null ? null : currentTypeDefinitions[actual.TypeUid];
+            var current = actual.TypeUid != null && currentTypeDefinitions.TryGetValue(actual.TypeUid, out var found) ? found : null;
             bool uidMatches = expected.TypeUid == actual.TypeUid;
             bool sourceAvailable = expected.TypeUid == null || source != null;
             bool sameDefinitionClass = sourceAvailable && (source == null && current == null
                 || source != null && current != null && source.Class == current.Class && source.CategoryId == current.CategoryId
                     && source.FamilyClass == current.FamilyClass);
             bool familyIdentity = source?.FamilyUid == current?.FamilyUid;
-            if (!familyIdentity && current?.FamilyUid != null && source?.FamilyUid != null)
+            if (!config.RapidModifiedDelete && !familyIdentity && current?.FamilyUid != null && source?.FamilyUid != null)
             {
                 var family = document.GetElement(current.FamilyUid);
                 familyIdentity = family != null && Origins(family).Contains(source.FamilyUid);
@@ -173,6 +173,26 @@ namespace BIMaestro.StressTests
                 differences.Add("extra-parameter:" + parameter.Key);
             bool parametersMatch = sourceAvailable && sameDefinitionClass && familyIdentity && differences.Count == 0
                 && (source?.Errors.Count ?? 0) == 0 && (current?.Errors.Count ?? 0) == 0;
+            if (config.RapidModifiedDelete)
+            {
+                bool familyUidMatches = source?.FamilyUid == current?.FamilyUid;
+                bool exactDefinitions = uidMatches && familyUidMatches && parametersMatch
+                    && source?.Name == current?.Name && source?.FamilyName == current?.FamilyName
+                    && (expected.TypeUid == null || actualType != null);
+                return new
+                {
+                    UsesExistingModelDefinitions = true, ExistingModelDefinitionsUsed = exactDefinitions,
+                    TypeUidMatchesSource = uidMatches, FamilyUidMatchesSource = familyUidMatches,
+                    TypeDefinitionParametersMatch = parametersMatch, TypeClassAndCategoryMatch = sameDefinitionClass,
+                    SourceDefinitionAvailable = sourceAvailable, ParameterDifferences = differences,
+                    SourceTypeUid = source?.Uid, ActualTypeUid = current?.Uid,
+                    SourceTypeName = source?.Name, ActualTypeName = current?.Name,
+                    SourceFamilyUid = source?.FamilyUid, ActualFamilyUid = current?.FamilyUid,
+                    SourceFamilyName = source?.FamilyName, ActualFamilyName = current?.FamilyName,
+                    Passed = exactDefinitions,
+                    Note = "Existing project definitions require the exact original type and family UIDs, unchanged names and parameters. No historical marker or imported definition can substitute for a missing original definition."
+                };
+            }
             string marker = null, markerError = null;
             try { marker = actualType == null ? null : Call(native, "ReadHistoricalTypeVersion", actualType)?.ToString(); }
             catch (Exception ex) { markerError = ex.GetType().Name + ":" + ex.Message; }

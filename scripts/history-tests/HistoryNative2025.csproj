@@ -22,6 +22,7 @@
     <Compile Include="NativeArchiveStore.cs" />
     <Compile Include="../../BIMaestro/commands/qui est le coupable/ElementHistoryNativeArchive.cs" />
     <Compile Include="../../BIMaestro/commands/qui est le coupable/ElementHistoryOpeningArchive.cs" />
+    <Compile Include="../../BIMaestro/commands/qui est le coupable/ElementHistoryExternalModels.cs" />
     <Compile Include="../../BIMaestro/commands/ElementIdExtensions.cs" />
     <Compile Include="../../BIMaestro/commands/qui est le coupable/ElementHistoryReconstruction.cs" />
     <Compile Include="../../BIMaestro/commands/qui est le coupable/ElementHistoryReconstruction.Extended.cs" />

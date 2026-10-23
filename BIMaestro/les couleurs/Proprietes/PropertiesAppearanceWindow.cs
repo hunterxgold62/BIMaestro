@@ -16,6 +16,7 @@ namespace BIMaestro.PropertiesAppearance
             internal string Key, Label, Explanation;
             public override string ToString() => Label;
         }
+        internal static Action<string> CustomGroupRequested;
         private AppearanceContext _context;
         private readonly Dictionary<string, AppearanceProfile> _drafts = new Dictionary<string, AppearanceProfile>();
         private readonly HashSet<string> _dirty = new HashSet<string>();
@@ -114,6 +115,13 @@ namespace BIMaestro.PropertiesAppearance
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             var title = new StackPanel(); title.Children.Add(Label("Apparence des propriétés", 27, true));
             title.Children.Add(Label("Cliquez pour colorer. Réorganisez l’aperçu avec les poignées et comparez le résultat.", 14, false, true)); root.Children.Add(title);
+            if(CustomGroupRequested!=null)
+            {
+                var groupName=new TextBox { Text="Mes paramètres métier",Width=240,Margin=new Thickness(0,0,8,0),Padding=new Thickness(6) };
+                var tools=new StackPanel { Orientation=Orientation.Horizontal,Margin=new Thickness(0,4,0,8) };
+                tools.Children.Add(groupName);tools.Children.Add(MakeButton("Appliquer le groupe personnalisé",()=>CustomGroupRequested(groupName.Text)));
+                title.Children.Add(tools);title.Children.Add(Label("Prototype Revit 2025 · six paramètres de test · un ou plusieurs murs",12,false,true));
+            }
             var context = new DockPanel(); var refresh = MakeButton("↻  Changer de sélection", RefreshContext); DockPanel.SetDock(refresh, Dock.Right); context.Children.Add(refresh); _enabled.Margin = new Thickness(0, 0, 22, 0); _enabled.VerticalAlignment = VerticalAlignment.Center; DockPanel.SetDock(_enabled, Dock.Right); context.Children.Add(_enabled);
             BindText(_caption, 14, true); _caption.VerticalAlignment = VerticalAlignment.Center; _caption.Margin = new Thickness(0, 0, 14, 0); context.Children.Add(_caption);
             var contextCard = Card(context, 12); contextCard.Margin = new Thickness(0, 8, 0, 18); Grid.SetRow(contextCard, 1); root.Children.Add(contextCard);
@@ -264,6 +272,10 @@ namespace BIMaestro.PropertiesAppearance
                 handleRow.Children.Add(new TextBlock { Text = "⠿", Foreground = new SolidColorBrush(fg), VerticalAlignment = VerticalAlignment.Center, ToolTip = "Glisser pour déplacer" });
                 Grid.SetColumn(grid, 1); handleRow.Children.Add(grid); cellContent = handleRow;
             }
+            var numbered = new DockPanel { LastChildFill=true };
+            var reference = new TextBlock { Text=_originNumbers.TryGetValue(row,out var origin)?origin:"", MinWidth=38, Margin=new Thickness(8,0,0,0), TextAlignment=TextAlignment.Right, VerticalAlignment=VerticalAlignment.Center, FontSize=11, FontWeight=FontWeights.SemiBold, ToolTip="Position dans l’ordre Revit d’origine" };
+            reference.SetResourceReference(TextBlock.ForegroundProperty,"Muted");
+            DockPanel.SetDock(reference,Dock.Right);numbered.Children.Add(reference);numbered.Children.Add(cellContent);cellContent=numbered;
             var button = MakeButton("", () => ClickRow(row)); button.Content = cellContent; button.HorizontalContentAlignment = HorizontalAlignment.Stretch; button.Padding = new Thickness(8, 7, 8, 7); button.Margin = new Thickness(0); button.MinHeight = row.Header ? 34 : 32; button.Background = new SolidColorBrush(bg); button.Foreground = new SolidColorBrush(fg);
             button.ToolTip = row.Label + (row.Header ? " · Tout le groupe" : " : " + row.Value) + (row.ReadOnly ? " · Apparence native conservée" : " · Cliquer pour personnaliser");
             bool selected = ReferenceEquals(row, _selected) && modified; button.BorderBrush = selected ? Brush("#22A875") : new SolidColorBrush(bg); button.BorderThickness = new Thickness(selected ? 2 : 1); if (modified) EnableDragging(button, row); return button;

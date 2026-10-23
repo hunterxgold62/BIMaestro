@@ -15,6 +15,7 @@ $relationsSource = Join-Path $repo 'BIMaestro/commands/qui est le coupable/Eleme
 $auditSource = Join-Path $repo 'BIMaestro/commands/qui est le coupable/ElementHistoryAudit.cs'
 $realModelSource = Join-Path $PSScriptRoot 'RealModelBenchmark.cs'
 $openingSource = Join-Path $repo 'BIMaestro/commands/qui est le coupable/ElementHistoryOpeningArchive.cs'
+$externalModelsSource = Join-Path $repo 'BIMaestro/commands/qui est le coupable/ElementHistoryExternalModels.cs'
 $antibesSource = Join-Path $PSScriptRoot 'AntibesBenchmark.cs'
 if ($RevitVersion -eq '2025') {
     $runtimeConfig = Join-Path $api 'RevitAPI.runtimeconfig.json'
@@ -25,7 +26,7 @@ if ($RevitVersion -eq '2025') {
         & 'C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe' (Join-Path $PSScriptRoot 'HistoryNative2025.csproj') /restore /t:Build "/p:HistoryOutput=$output/" /p:RestoreIgnoreFailedSources=true /verbosity:minimal
     }
 } else {
-& 'C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/Roslyn/csc.exe' /nologo /langversion:9 /target:library @defines "/out:$assembly" "/reference:$api/RevitAPI.dll" "/reference:$api/RevitAPIUI.dll" "/reference:$json" $networkSource $networkGuardSource $extendedSource $nativeSource $openingSource $relationsSource $auditSource $realModelSource $antibesSource (Join-Path $PSScriptRoot 'NativeArchiveStore.cs') (Join-Path $repo 'BIMaestro/commands/ElementIdExtensions.cs') (Join-Path $repo 'BIMaestro/commands/qui est le coupable/ElementHistoryReconstruction.cs') (Join-Path $repo 'BIMaestro/commands/qui est le coupable/ElementHistoryRestoration.cs') (Join-Path $PSScriptRoot 'HistoryNativeTests.cs')
+& 'C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/Roslyn/csc.exe' /nologo /langversion:9 /target:library @defines "/out:$assembly" "/reference:$api/RevitAPI.dll" "/reference:$api/RevitAPIUI.dll" "/reference:$json" $networkSource $networkGuardSource $extendedSource $nativeSource $openingSource $externalModelsSource $relationsSource $auditSource $realModelSource $antibesSource (Join-Path $PSScriptRoot 'NativeArchiveStore.cs') (Join-Path $repo 'BIMaestro/commands/ElementIdExtensions.cs') (Join-Path $repo 'BIMaestro/commands/qui est le coupable/ElementHistoryReconstruction.cs') (Join-Path $repo 'BIMaestro/commands/qui est le coupable/ElementHistoryRestoration.cs') (Join-Path $PSScriptRoot 'HistoryNativeTests.cs')
 }
 if ($LASTEXITCODE -ne 0) { throw 'Compilation du banc historique échouée.' }
 Copy-Item -LiteralPath $json -Destination $output -Force

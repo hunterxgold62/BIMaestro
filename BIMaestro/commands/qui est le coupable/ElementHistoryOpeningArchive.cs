@@ -207,7 +207,7 @@ namespace Analyse
             catch (Exception ex) { Trace.WriteLine("History opening archive eligibility: " + ex.Message); return null; }
         }
 
-        internal static bool IsEligibleElement(Element element) => element != null && !element.ViewSpecific
+        internal static bool IsEligibleElement(Element element) => element != null && !ElementHistoryExternalModels.IsExcluded(element) && !element.ViewSpecific
             && !(element is ElementType || element is Material || element is GraphicsStyle || element is View
                 || element is ProjectInfo || element is Autodesk.Revit.DB.Plumbing.PipeSegment)
             && (element.Category?.CategoryType == CategoryType.Model

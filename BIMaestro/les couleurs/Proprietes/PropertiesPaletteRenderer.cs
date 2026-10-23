@@ -24,6 +24,10 @@ namespace BIMaestro.PropertiesAppearance
         internal IntPtr Window { get; }
         internal string Error { get; private set; }
         internal Action BeforePaint { get; set; }
+#if BIMAESTRO_PROPERTIES_TESTS
+        internal long LastColoredPaint { get; private set; }
+        internal bool HasCurrentColorPlan => !_disposed && Error==null && _cells.Count>0 && PlanIsCurrent();
+#endif
         private delegate IntPtr SubclassProc(IntPtr h, uint m, IntPtr w, IntPtr l, UIntPtr id, UIntPtr data);
         [StructLayout(LayoutKind.Sequential)] private struct Header { public uint Size; public int Width, Height; public ushort Planes, Bits; public uint Compression, ImageSize; public int X, Y; public uint Used, Important; }
         [StructLayout(LayoutKind.Sequential)] private struct Info { public Header Header; public uint Color; }
@@ -111,7 +115,12 @@ namespace BIMaestro.PropertiesAppearance
                     Marshal.Copy(_pixels, 0, _bits, _pixels.Length);
                     int left = Math.Max(0, dirty.Left), top = Math.Max(0, dirty.Top);
                     int right = Math.Min(width, dirty.Right), bottom = Math.Min(height, dirty.Bottom);
-                    if (right > left && bottom > top) BitBlt(dc, left, top, right - left, bottom - top, _dc, left, top, 0x00CC0020);
+                    if (right > left && bottom > top && BitBlt(dc, left, top, right - left, bottom - top, _dc, left, top, 0x00CC0020))
+                    {
+#if BIMAESTRO_PROPERTIES_TESTS
+                        LastColoredPaint=System.Diagnostics.Stopwatch.GetTimestamp();
+#endif
+                    }
                 }
                 finally { ReleaseDC(h, dc); }
             }

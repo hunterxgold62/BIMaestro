@@ -4,6 +4,7 @@ using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 
 namespace Analyse
@@ -160,13 +161,15 @@ namespace Analyse
                     Category = r.Category, CaptureFailure = r.CaptureFailure,
                     SuperComponentUniqueId = r.SuperComponentUniqueId, FamilyTypeUniqueId = r.FamilyTypeUniqueId,
                     DeletionAudit = r.DeletionAudit, ForceNativeOpeningRestore = r.ForceNativeOpeningRestore }).ToList();
+            foreach (var request in selected.Where(request => request.Recipe?.UsesExistingModelDefinitions == true))
+                UseExistingModelDefinitionsOnly(request.Recipe);
             // Events deleted before inventory have only their numeric source ID.
             // Resolve their identities before de-duplication and dependency order.
             // Opening the checkpoint happens only for this explicit user action.
             for (int i = 0; i < selected.Count; i++)
             {
                 var request = selected[i];
-                if (request.Recipe?.Native?.WholeModel != true) continue;
+                if (request.Recipe?.UsesExistingModelDefinitions == true || request.Recipe?.Native?.WholeModel != true) continue;
                 try
                 {
                     var source = nativeSources.Open(doc, request.Recipe.Native);
@@ -191,7 +194,8 @@ namespace Analyse
             selected = OrderByDependencies(selected);
             // Keep one Undo even when an unsuccessful direct recipe needs a
             // second, native attempt after its first transaction group closes.
-            using var completeGroup = selected.Any(r => IsRestorationFallback(r.Recipe?.OpeningFallback))
+            using var completeGroup = selected.Any(r => r.Recipe?.UsesExistingModelDefinitions != true
+                    && IsRestorationFallback(r.Recipe?.OpeningFallback))
                 ? new TransactionGroup(doc, "BIMaestro - Restaurer historique avec secours d’ouverture") : null;
             completeGroup?.Start();
             var generatedSketchOrigins = new HashSet<string>(StringComparer.Ordinal);
@@ -230,6 +234,19 @@ namespace Analyse
                     // Clone before remapping dependencies. The historical payload is immutable.
                     recipe = JObject.FromObject(recipe).ToObject<HistoryRecipe>();
                     recipe.ExistingElectricalSystem = existing;
+                    if (recipe.UsesExistingModelDefinitions)
+                    {
+                        try { ValidateExistingModelDefinitions(doc, recipe, index); }
+                        catch (InvalidOperationException ex)
+                        {
+                            result.Reason = ex.Message.StartsWith("ExistingModelDefinitionMissing:", StringComparison.Ordinal)
+                                ? "definition_missing" : "reference_missing";
+                            result.Detail = ex.Message; continue;
+                        }
+                        // This mode keeps only the instance recipe. Even a stale
+                        // fallback field cannot import or duplicate definitions.
+                        recipe.Native = null; recipe.OpeningFallback = null;
+                    }
                     if (recipe.SystemMembers != null)
                     {
                         if (!networksFinalized)
@@ -287,7 +304,9 @@ namespace Analyse
                             }
                             else
                             {
-                                element = ElementHistoryReconstruction.RestoreNative(doc, recipe);
+                                element = recipe.UsesExistingModelDefinitions
+                                    ? RestoreWithExistingModelDefinitions(doc, recipe, index)
+                                    : ElementHistoryReconstruction.RestoreNative(doc, recipe);
                                 sketchOrigins = MarkSketchOrigins(doc, element, recipe);
                             }
                             var origins = (recipe.RestorationOrigins ?? new List<string>())
@@ -525,7 +544,8 @@ namespace Analyse
                     && !string.IsNullOrWhiteSpace(item.SourceUniqueId))
                 .GroupBy(item => item.SourceUniqueId).ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
             if (failed.Count == 0) return;
-            var backupRequests = selected.Where(request => IsRestorationFallback(request.Recipe?.OpeningFallback)
+            var backupRequests = selected.Where(request => request.Recipe?.UsesExistingModelDefinitions != true
+                    && IsRestorationFallback(request.Recipe?.OpeningFallback)
                     && !string.IsNullOrWhiteSpace(request.SourceUniqueId) && failed.ContainsKey(request.SourceUniqueId))
                 .Select(request => new HistoryRestoreRequest
                 {
@@ -575,6 +595,73 @@ namespace Analyse
         private static bool IsRestorationFallback(HistoryNativeArtifact artifact) => artifact != null && !artifact.DefinitionOnly
             && (artifact.WholeModel || !string.IsNullOrWhiteSpace(artifact.PayloadId));
 
+        private static void UseExistingModelDefinitionsOnly(HistoryRecipe recipe)
+        {
+            recipe.UsesExistingModelDefinitions = true;
+            recipe.Native = null; recipe.OpeningFallback = null;
+            foreach (var circuit in recipe.ElectricalCircuits ?? new List<HistoryCircuit>())
+                if (circuit?.Recipe != null) UseExistingModelDefinitionsOnly(circuit.Recipe);
+        }
+
+        private static void ValidateExistingModelDefinitions(Document doc, HistoryRecipe recipe,
+            Dictionary<string, string> index)
+        {
+            if (recipe?.UsesExistingModelDefinitions != true || recipe.Kind == "native_archive")
+                throw new InvalidOperationException("ExistingModelReferenceMissing: recette directe incompatible.");
+            Element Exact(string uid) => ElementHistoryReconstruction.FindOriginal(doc, uid);
+            Element RequireReference(string uid, string role, Func<Element, bool> accepts, bool allowRestored = false)
+            {
+                var resolved = allowRestored ? Resolve(doc, index, uid) : uid;
+                var element = Exact(resolved);
+                if (string.IsNullOrWhiteSpace(uid) || element == null || !element.IsValidObject
+                    || element.UniqueId != resolved || ElementHistoryExternalModels.IsExcluded(element) || !accepts(element))
+                    throw new InvalidOperationException("ExistingModelReferenceMissing: role=" + role + "; UID=" + uid
+                        + "; reference requise absente du modele courant.");
+                return element;
+            }
+            if (recipe.Kind != "electrical_system")
+            {
+                var type = Exact(recipe.Type);
+                if (type == null || !type.IsValidObject || type.UniqueId != recipe.Type
+                    || ElementHistoryExternalModels.IsExcluded(type)
+                    || !(type is ElementType || (recipe.Kind == "model_curve" && type is GraphicsStyle))
+                    || (recipe.Kind == "family" && (!(type is FamilySymbol symbol)
+                        || symbol.Family == null || !symbol.Family.IsValidObject)))
+                    throw new InvalidOperationException("ExistingModelDefinitionMissing: UID=" + recipe.Type
+                        + "; famille/type supprimé ou purgé du modele courant.");
+            }
+            if (!string.IsNullOrWhiteSpace(recipe.Level) || recipe.SystemMembers == null)
+                RequireReference(recipe.Level, "niveau", element => element is Level);
+            if (!string.IsNullOrWhiteSpace(recipe.HistoricalPlacement?.LevelSourceUniqueId))
+                RequireReference(recipe.HistoricalPlacement.LevelSourceUniqueId, "niveau du placement", element => element is Level);
+            if (!string.IsNullOrWhiteSpace(recipe.Host))
+                RequireReference(recipe.Host, "hote", element => !(element is ElementType), allowRestored: true);
+            if (!string.IsNullOrWhiteSpace(recipe.HistoricalPlacement?.HostSourceUniqueId))
+                RequireReference(recipe.HistoricalPlacement.HostSourceUniqueId, "hote du placement",
+                    element => !(element is ElementType), allowRestored: true);
+            if (!string.IsNullOrWhiteSpace(recipe.Network?.SystemType))
+                RequireReference(recipe.Network.SystemType, "type de systeme", element => element is MEPSystemType);
+            foreach (var port in (recipe.Ports ?? new List<HistoryPort>()).Concat(
+                (recipe.Connections ?? new List<HistoryConnection>()).SelectMany(link => new[] { link.Port, link.PeerPort })))
+                if (!string.IsNullOrWhiteSpace(port?.SystemType))
+                    RequireReference(port.SystemType, "type de systeme du connecteur", element => element is MEPSystemType);
+            foreach (var parameter in (recipe.Parameters ?? new List<HistoryParameter>())
+                .Concat(recipe.HistoricalPlacement?.ElevationParameters ?? new List<HistoryParameter>()))
+            {
+                if (!string.IsNullOrWhiteSpace(parameter.Reference))
+                    RequireReference(parameter.Reference, "parametre " + parameter.Name, element => true, allowRestored: true);
+                if (!string.IsNullOrWhiteSpace(parameter.Definition))
+                    RequireReference(parameter.Definition, "definition du parametre " + parameter.Name, element => element is ParameterElement);
+            }
+        }
+
+        private static Element RestoreWithExistingModelDefinitions(Document doc, HistoryRecipe recipe,
+            Dictionary<string, string> index)
+        {
+            ValidateExistingModelDefinitions(doc, recipe, index);
+            return ElementHistoryReconstruction.RestoreNative(doc, recipe);
+        }
+
         private static void ImportDurableDefinition(Document doc, HistoryRecipe recipe,
             ElementHistoryNativeArchive.Sources sources, Dictionary<string, string> index)
         {
@@ -601,6 +688,8 @@ namespace Analyse
             LogPhase(phase, phaseTimer.Elapsed.TotalMilliseconds, true, new { PayloadId = artifact.PayloadId, artifact.RootUniqueId });
             phase = "definition_import_source_map"; phaseTimer.Restart();
             var principal = source.GetElement(artifact.RootUniqueId) as ElementType;
+            if (ElementHistoryExternalModels.IsExcluded(principal))
+                throw new InvalidOperationException("La definition historique appartient a une maquette liee ou importee exclue de la restauration.");
             if (principal == null || ElementHistoryNativeArchive.IsPresentationDefinition(principal) || ElementHistoryNativeArchive.ReadHistoricalTypeVersion(principal) != artifact.TypeVersion
                 || ElementHistoryNativeArchive.ReadHistoricalDefinitionSource(principal) != recipe.Type)
                 throw new InvalidOperationException("La definition principale n’est pas prouvee par sa capsule.");
@@ -610,6 +699,8 @@ namespace Analyse
                 .Concat(new FilteredElementCollector(source).OfClass(typeof(Material)).ToElements())
                 .Where(element => !ElementHistoryNativeArchive.IsPresentationDefinition(element) && ElementHistoryNativeArchive.ReadHistoricalTypeVersion(element) == artifact.TypeVersion
                     && ElementHistoryNativeArchive.ReadHistoricalDefinitionSource(element) != null).ToList();
+            if (definitions.Any(ElementHistoryExternalModels.IsExcluded))
+                throw new InvalidOperationException("La fermeture historique contient une definition de maquette liee ou importee exclue de la restauration.");
             // Stock system-family containers can be present and stamped in the
             // capsule without a copyable symbol. They are not imported dependencies.
             // Every physical symbol and its loadable family still require proof.
@@ -625,6 +716,7 @@ namespace Analyse
                 .Concat(new FilteredElementCollector(doc).OfClass(typeof(Level)).ToElements())
                 .Concat(new FilteredElementCollector(doc).OfClass(typeof(Material)).ToElements()).ToList();
             var destinationDefinitions = ReadDestinationDefinitions();
+            var definitionUidsBeforeImport = new HashSet<string>(destinationDefinitions.Select(definition => definition.UniqueId), StringComparer.Ordinal);
             var familyUidsBeforeImport = new HashSet<string>(destinationDefinitions.OfType<Family>()
                 .Select(family => family.UniqueId), StringComparer.Ordinal);
             List<Element> Matches(Element definition)
@@ -634,9 +726,8 @@ namespace Analyse
                     && originalLevel.GetType() == definition.GetType()
                     && Math.Abs(originalLevel.ProjectElevation - expectedLevel.ProjectElevation) <= 1e-8)
                     return new List<Element> { originalLevel };
-                return destinationDefinitions.Where(element => element.GetType() == definition.GetType()
-                    && ElementHistoryNativeArchive.ReadHistoricalTypeVersion(element) == artifact.TypeVersion
-                    && (GetOrigins(element) ?? new List<string>()).Contains(sourceIds[definition.UniqueId])).ToList();
+                return destinationDefinitions.Where(element => HasHistoricalDefinitionProof(definition, element,
+                    sourceIds[definition.UniqueId], artifact.TypeVersion)).ToList();
             }
             string MappingFailure(Element definition, int count)
             {
@@ -658,6 +749,24 @@ namespace Analyse
             using (var atomic = new TransactionGroup(doc, "BIMaestro - Importer fermeture historique"))
             {
                 atomic.Start();
+                phase = "definition_import_families"; phaseTimer.Restart();
+                foreach (var historicalFamily in definitions.OfType<Family>())
+                {
+                    activeDefinition = sourceIds[historicalFamily.UniqueId];
+                    var existing = Matches(historicalFamily);
+                    if (existing.Count > 1) throw new InvalidOperationException(MappingFailure(historicalFamily, existing.Count));
+                    if (existing.Count == 0)
+                    {
+                        var familyTimer = Stopwatch.StartNew();
+                        ImportNewHistoricalFamily(source, doc, historicalFamily,
+                            definitions.OfType<FamilySymbol>().Where(symbol => symbol.Family.Id == historicalFamily.Id).ToList(),
+                            artifact.TypeVersion, familyUidsBeforeImport, definitionUidsBeforeImport);
+                        destinationDefinitions = ReadDestinationDefinitions();
+                        LogPhase("definition_import_family_load", familyTimer.Elapsed.TotalMilliseconds, true,
+                            new { SourceUid = activeDefinition, FamilyName = historicalFamily.Name, Version = artifact.TypeVersion });
+                    }
+                }
+                phase = "definition_import_preflight"; phaseTimer.Restart();
                 var missing = new List<ElementId>();
                 foreach (var definition in definitions)
                 {
@@ -675,7 +784,9 @@ namespace Analyse
                     {
                         transaction.Start(); options.SetDuplicateTypeNamesHandler(new ReuseProvenDefinitionCollision());
                         var apiTimer = Stopwatch.StartNew();
+                        var externalBefore = ElementHistoryNativeArchive.SnapshotExternalModelIds(doc);
                         var importedIds = ElementTransformUtils.CopyElements(source, missing, doc, Transform.Identity, options);
+                        ElementHistoryNativeArchive.ValidateNoExternalModelsAdded(doc, externalBefore);
                         LogPhase("definition_import_copy_api", apiTimer.Elapsed.TotalMilliseconds, true, new { Requested = missing.Count, Returned = importedIds.Count });
                         apiTimer.Restart();
                         if (transaction.Commit() != TransactionStatus.Committed)
@@ -683,8 +794,32 @@ namespace Analyse
                         LogPhase("definition_import_copy_commit", apiTimer.Elapsed.TotalMilliseconds, true, new { Requested = missing.Count });
                     }
                 LogPhase(phase, phaseTimer.Elapsed.TotalMilliseconds, true, new { Requested = copyCount });
+                phase = "definition_import_type_identity"; phaseTimer.Restart();
+                destinationDefinitions = ReadDestinationDefinitions();
+                using (var identity = new Transaction(doc, "BIMaestro - Conserver identite des nouveaux types historiques"))
+                {
+                    identity.Start();
+                    foreach (var historical in definitions.OfType<ElementType>())
+                    {
+                        var actual = Matches(historical);
+                        if (actual.Count != 1) throw new InvalidOperationException(MappingFailure(historical, actual.Count));
+                        if (!definitionUidsBeforeImport.Contains(actual[0].UniqueId))
+                            ElementHistoryNativeArchive.RestoreFrozenTypeIdentity(historical, actual[0]);
+                    }
+                    if (identity.Commit() != TransactionStatus.Committed)
+                        throw new InvalidOperationException("L’identite des nouveaux types historiques n’a pas ete validee.");
+                }
                 phase = "definition_import_verify"; phaseTimer.Restart();
                 destinationDefinitions = ReadDestinationDefinitions();
+                foreach (var actualSymbol in destinationDefinitions.OfType<FamilySymbol>()
+                    .Where(symbol => !definitionUidsBeforeImport.Contains(symbol.UniqueId)
+                        && ElementHistoryNativeArchive.ReadHistoricalTypeVersion(symbol) == artifact.TypeVersion))
+                {
+                    var sourceUid = ElementHistoryNativeArchive.ReadHistoricalDefinitionSource(actualSymbol);
+                    var historical = definitions.OfType<FamilySymbol>().SingleOrDefault(symbol => sourceIds[symbol.UniqueId] == sourceUid);
+                    if (historical != null && !HasHistoricalDefinitionProof(historical, actualSymbol, sourceUid, artifact.TypeVersion))
+                        throw new InvalidOperationException("FrozenFamilyLoad: une copie de symbole a reutilise une famille actuelle non prouvee.");
+                }
                 foreach (var historicalFamily in definitions.OfType<Family>())
                 {
                     var links = definitions.OfType<FamilySymbol>()
@@ -722,6 +857,8 @@ namespace Analyse
                     if (definition is Level expected && (!(existing[0] is Level actual)
                         || Math.Abs(expected.ProjectElevation - actual.ProjectElevation) > 1e-8))
                         throw new InvalidOperationException("Le niveau historique importe differe de la capsule.");
+                    if (definition is ElementType && !definitionUidsBeforeImport.Contains(existing[0].UniqueId))
+                        ElementHistoryNativeArchive.ValidateFrozenTypeIdentity(definition, existing[0]);
                     remap.Add(sourceIds[definition.UniqueId], existing[0].UniqueId);
                     mappedCount = remap.Count;
                     LogPhase("definition_import_mapping", 0, true, new { SourceUid = activeDefinition,
@@ -754,6 +891,112 @@ namespace Analyse
                 LogPhase("definition_import_total", totalTimer.Elapsed.TotalMilliseconds, importSucceeded,
                     new { RecipeType = originalType, Definitions = definitionCount, RequestedCopies = copyCount, Mapped = mappedCount });
             }        }
+
+        private static bool HasHistoricalDefinitionProof(Element historical, Element actual, string sourceUid, string version)
+        {
+            if (historical == null || actual == null || string.IsNullOrEmpty(sourceUid) || string.IsNullOrEmpty(version)
+                || historical.GetType() != actual.GetType()
+                || ElementHistoryNativeArchive.ReadHistoricalTypeVersion(actual) != version
+                || ElementHistoryNativeArchive.ReadHistoricalDefinitionSource(actual) != sourceUid
+                || !(GetOrigins(actual) ?? new List<string>()).Contains(sourceUid)) return false;
+            if (historical is FamilySymbol expected)
+            {
+                var symbol = (FamilySymbol)actual;
+                return HasHistoricalDefinitionProof(expected.Family, symbol.Family,
+                    ElementHistoryNativeArchive.ReadHistoricalDefinitionSource(expected.Family), version);
+            }
+            return true;
+        }
+
+        private sealed class RejectHistoricalFamilyOverwrite : IFamilyLoadOptions
+        {
+            public bool OnFamilyFound(bool familyInUse, out bool overwriteParameterValues)
+            { overwriteParameterValues = false; return false; }
+            public bool OnSharedFamilyFound(Family sharedFamily, bool familyInUse, out FamilySource source, out bool overwriteParameterValues)
+            { source = FamilySource.Project; overwriteParameterValues = false; return false; }
+        }
+
+        private static void ImportNewHistoricalFamily(Document source, Document destination, Family historical,
+            List<FamilySymbol> historicalSymbols, string version, HashSet<string> existingFamilies, HashSet<string> existingDefinitions)
+        {
+            if (historical.IsInPlace || !historical.IsEditable || historicalSymbols.Count == 0)
+                throw new InvalidOperationException("FrozenFamilyLoad: la famille historique ne peut pas etre chargee independamment.");
+            if (historical.Name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+                throw new InvalidOperationException("FrozenFamilyLoad: le nom historique ne peut pas etre conserve dans un fichier famille.");
+            if (new FilteredElementCollector(destination).OfClass(typeof(Family)).Cast<Family>()
+                .Any(family => string.Equals(family.Name, historical.Name, StringComparison.OrdinalIgnoreCase)))
+                throw new InvalidOperationException("FrozenFamilyLoad: une famille homonyme non prouvee existe deja.");
+            var directory = Path.Combine(Path.GetTempPath(), "BIMaestro", "history-family-import", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(directory);
+            var path = Path.Combine(directory, historical.Name + ".rfa");
+            Document familyDocument = null;
+            try
+            {
+                // EditFamily is an independent copy. Saving under the historical
+                // versioned name makes a new loadable family instead of pasting
+                // symbols into the user's original family container.
+                using (ElementHistoryNativeArchive.BeginHistoricalScope(source.Application))
+                    familyDocument = source.EditFamily(historical);
+                if (ElementHistoryNativeArchive.SnapshotExternalModelIds(familyDocument).Count > 0)
+                    throw new InvalidOperationException("La famille historique contient un objet de maquette liee ou importee exclu de la restauration.");
+                using (var options = new SaveAsOptions { Compact = true, MaximumBackups = 1, OverwriteExistingFile = false })
+                    familyDocument.SaveAs(path, options);
+                if (!familyDocument.Close(false)) throw new InvalidOperationException("FrozenFamilyLoad: fermeture de la famille temporaire refusee.");
+                familyDocument = null;
+                using (var transaction = new Transaction(destination, "BIMaestro - Charger famille historique independante"))
+                {
+                    transaction.Start();
+                    var externalBefore = ElementHistoryNativeArchive.SnapshotExternalModelIds(destination);
+                    if (!destination.LoadFamily(path, new RejectHistoricalFamilyOverwrite(), out var loaded) || loaded == null)
+                        throw new InvalidOperationException("FrozenFamilyLoad: Revit a refuse le chargement sans ecrasement.");
+                    ElementHistoryNativeArchive.ValidateNoExternalModelsAdded(destination, externalBefore);
+                    StampNewHistoricalFamily(historical, loaded, historicalSymbols, destination, version, existingFamilies, existingDefinitions);
+                    if (transaction.Commit() != TransactionStatus.Committed)
+                        throw new InvalidOperationException("FrozenFamilyLoad: chargement historique non valide.");
+                }
+            }
+            finally
+            {
+                if (familyDocument != null)
+                    try { if (!familyDocument.IsValidObject || familyDocument.Close(false)) familyDocument = null; } catch { }
+                if (familyDocument == null)
+                {
+                    try { if (File.Exists(path)) File.Delete(path); } catch { }
+                    try { var backup = Path.ChangeExtension(path, ".0001.rfa"); if (File.Exists(backup)) File.Delete(backup); } catch { }
+                    try { Directory.Delete(directory, false); } catch { }
+                }
+            }
+        }
+
+        private static void StampNewHistoricalFamily(Family historical, Family loaded, List<FamilySymbol> historicalSymbols,
+            Document destination, string version, HashSet<string> existingFamilies, HashSet<string> existingDefinitions)
+        {
+            if (ElementHistoryNativeArchive.ReadHistoricalTypeVersion(historical) != version
+                || string.IsNullOrEmpty(ElementHistoryNativeArchive.ReadHistoricalDefinitionSource(historical))
+                || loaded == null || existingFamilies.Contains(loaded.UniqueId) || loaded.Name != historical.Name
+                || loaded.IsInPlace || loaded.FamilyCategory?.Id != historical.FamilyCategory?.Id
+                || loaded.FamilyPlacementType != historical.FamilyPlacementType
+                || loaded.get_Parameter(BuiltInParameter.FAMILY_SHARED)?.AsInteger()
+                    != historical.get_Parameter(BuiltInParameter.FAMILY_SHARED)?.AsInteger())
+                throw new InvalidOperationException("FrozenFamilyLoad: Revit n’a pas cree une nouvelle famille historique independante.");
+            var symbols = loaded.GetFamilySymbolIds().Select(destination.GetElement).OfType<FamilySymbol>().ToList();
+            var pairs = new List<KeyValuePair<FamilySymbol, FamilySymbol>>();
+            foreach (var expected in historicalSymbols)
+            {
+                if (ElementHistoryNativeArchive.ReadHistoricalTypeVersion(expected) != version
+                    || string.IsNullOrEmpty(ElementHistoryNativeArchive.ReadHistoricalDefinitionSource(expected)))
+                    throw new InvalidOperationException("FrozenFamilyLoad: symbole historique sans provenance.");
+                var candidates = symbols.Where(symbol => symbol.GetType() == expected.GetType() && symbol.Name == expected.Name).ToList();
+                if (candidates.Count != 1 || existingDefinitions.Contains(candidates[0].UniqueId)
+                    || candidates[0].Family.Id != loaded.Id)
+                    throw new InvalidOperationException("FrozenFamilyLoad: le symbole charge ne provient pas de la nouvelle famille.");
+                pairs.Add(new KeyValuePair<FamilySymbol, FamilySymbol>(expected, candidates[0]));
+            }
+            // Only objects created by the direct load above receive proof from
+            // the exact immutable source. Existing user families are never stamped.
+            SetOrigins(loaded, GetOrigins(historical));
+            foreach (var pair in pairs) SetOrigins(pair.Value, GetOrigins(pair.Key));
+        }
 
         private static void RemapDurableDefinitionReferences(HistoryRecipe recipe, Dictionary<string, string> remap)
         {

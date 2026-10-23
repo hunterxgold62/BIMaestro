@@ -161,7 +161,7 @@ namespace BIMaestro.StressTests
                 Write("durable-conversion.json", new { AtUtc = DateTime.UtcNow, Pid = Environment.ProcessId, Complete = true, ExpectedEvents = persisted.Count, Status = status, Waves = durableWaves, BridgeFiles = durableBridgePaths.ToArray(), Note = "Conversion completed while the project session was open; bridge removal is checked only after actual closure." });
                 Record("durable_conversion_complete", status); return true;
             }
-            if ((bool?)Read(status, "SessionClosed") == true && durableBridgePaths.Count > 0
+            if ((bool?)Read(status, "SessionClosed") == true && (durableBridgePaths.Count > 0 || config.RapidModifiedDelete)
                 && durableBridgePaths.All(path => !File.Exists(path)) && durableBridgePaths.All(durableDeletedBridgePaths.Contains))
             { CompleteDurableCapture(status); return true; }
             return false;
@@ -264,6 +264,7 @@ namespace BIMaestro.StressTests
                 ExpectedDeletionEvents = persisted.Count, Waves = durableWaves,
                 Note = "Capture phase only. Close this process before starting the distinct restore phase; no restoration or persistence fidelity is asserted here."
             };
+            if (config.RapidModifiedDelete) MeasureRapidArchive("rapid-storage-capture.json");
             Write("durable-session-closed.json", proof); Record("durable_session_closed", proof);
             tracker.GetField("_captureDetailedDeletedMesh", Flags).SetValue(null, originalDetailed);
             durableAwaitingCloseCleanup = false; phase = "durable-capture-finished"; finished = true;
@@ -301,7 +302,7 @@ namespace BIMaestro.StressTests
                 || Read(artifact, "File") is string path && durableBridgePaths.Contains(path)).ToArray();
             bool coverage = eventIds.Length == persisted.Count && eventIds.Distinct().Count() == persisted.Count
                 && !persisted.Keys.Except(eventIds).Any() && requestsToRestore.Count == eventIds.Length;
-            bool absent = durableBridgePaths.Count > 0 && durableBridgePaths.All(path => !File.Exists(path));
+            bool absent = (durableBridgePaths.Count > 0 || config.RapidModifiedDelete) && durableBridgePaths.All(path => !File.Exists(path));
             Write("durable-restoration-inputs.json", new
             {
                 AtUtc = DateTime.UtcNow, CaptureDirectory = evidenceDirectory, RestorePid = Environment.ProcessId,
@@ -316,6 +317,7 @@ namespace BIMaestro.StressTests
             });
             if (!coverage || !absent || bridgeReferences.Length != 0)
                 throw new InvalidOperationException("Durable inputs are incomplete or still depend on a temporary opening bridge; Restore was not called.");
+            ValidateRapidExistingDefinitionInputs(requestsToRestore);
         }
     }
 }
