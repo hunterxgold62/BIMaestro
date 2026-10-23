@@ -32,6 +32,8 @@ public class BIMaestroApp : IExternalApplication
     private DateTime _nextHistoryCaptureUtc = DateTime.MinValue;
     private System.Windows.Threading.DispatcherTimer _historyWakeTimer;
     private ExternalEvent _historyWakeEvent;
+    private readonly System.Collections.Generic.Dictionary<int, Tuple<Document, string, string>> _historyClosingDocuments =
+        new System.Collections.Generic.Dictionary<int, Tuple<Document, string, string>>();
     private sealed class HistoryWakeHandler : IExternalEventHandler
     {
         private readonly BIMaestroApp _owner;
@@ -46,6 +48,9 @@ public class BIMaestroApp : IExternalApplication
 
     private void ProcessHistoryBackground(UIApplication app)
     {
+        // Conversion and final cleanup also run after the last project closes.
+        // They use their own read-only source, never the user's active document.
+        Analyse.ElementHistoryDurableBridge.ProcessPending(app?.Application);
         var doc = app?.ActiveUIDocument?.Document;
         if (doc == null)
         {
@@ -57,17 +62,24 @@ public class BIMaestroApp : IExternalApplication
         Analyse.ElementHistoryTracker.ScheduleDeferredPrime(doc);
         var selection = Analyse.ElementHistoryTracker.GetSelectionPreparationStatus(doc);
         var immediateSelection = Analyse.HistoryBackgroundWork.SelectionRequested && selection?.Pending > 0;
+        var inventoryPending = Analyse.ElementHistoryTracker.HasPendingBasicInventory(doc);
+        var changedPending = Analyse.ElementHistoryTracker.HasChangedRestorationPriority(doc);
         if (DateTime.UtcNow < _nextHistoryCaptureUtc
-            || !(immediateSelection ? Analyse.HistoryBackgroundWork.SelectionCanRun() : Analyse.HistoryBackgroundWork.UserIsIdle())) return;
+            || !(immediateSelection ? Analyse.HistoryBackgroundWork.SelectionCanRun()
+                : inventoryPending || changedPending ? Analyse.HistoryBackgroundWork.InventoryCanRun()
+                : Analyse.HistoryBackgroundWork.UserIsIdle())) return;
         var timer = Stopwatch.StartNew();
-        var passBudgetMs = immediateSelection ? 25 : 200;
+        const int passBudgetMs = 25;
         if (immediateSelection)
             Analyse.ElementHistoryTracker.ProcessDeferredRestorationCapture(doc, selectionOnly: true);
         else
         {
-            Analyse.ElementHistoryTracker.ProcessDeferredPrime(doc);
+            if (changedPending) Analyse.ElementHistoryTracker.ProcessDeferredRestorationCapture(doc);
+            else Analyse.ElementHistoryTracker.ProcessDeferredPrime(doc);
             if (timer.ElapsedMilliseconds < passBudgetMs)
-                Analyse.ElementHistoryTracker.ProcessDeferredRestorationCapture(doc);
+                Analyse.ElementHistoryTracker.ProcessDeferredRestorationCapture(doc,
+                    inventoryOnly: Analyse.ElementHistoryTracker.HasPendingBasicInventory(doc)
+                        && !Analyse.ElementHistoryTracker.HasChangedRestorationPriority(doc));
         }
         Analyse.ElementHistoryNativeArchive.GetPriorityAudit(doc, out var priorityRoots, out _);
         if (timer.ElapsedMilliseconds < passBudgetMs && (priorityRoots > 0 || !Analyse.ElementHistoryTracker.HasPendingBasicInventory(doc)))
@@ -75,7 +87,8 @@ public class BIMaestroApp : IExternalApplication
         if (Analyse.ElementHistoryTracker.GetSelectionPreparationStatus(doc)?.Pending == 0)
             Analyse.HistoryBackgroundWork.SelectionRequested = false;
         _nextHistoryCaptureUtc = DateTime.UtcNow.AddMilliseconds(
-            immediateSelection && Analyse.HistoryBackgroundWork.SelectionRequested ? 100 : 1000);
+            immediateSelection && Analyse.HistoryBackgroundWork.SelectionRequested ? 100
+                : Analyse.ElementHistoryTracker.HasPendingBasicInventory(doc) ? 50 : 1000);
     }
     private DateTime _lastRibbonApplyUtc = DateTime.MinValue;
     private int _pendingProjectBrowserViewRefreshes;
@@ -177,19 +190,25 @@ public class BIMaestroApp : IExternalApplication
             Analyse.ElementHistoryTracker.Start();
             application.ControlledApplication.DocumentCreated += OnDocumentCreatedSafe;
             application.ControlledApplication.DocumentOpened += OnDocumentOpenedSafe;
+            application.ControlledApplication.DocumentSaving += (sender, args) => Analyse.ElementHistoryOpeningArchive.BeginSave(args.Document);
+            application.ControlledApplication.DocumentSavingAs += (sender, args) => Analyse.ElementHistoryOpeningArchive.BeginSave(args.Document);
+            application.ControlledApplication.DocumentSynchronizingWithCentral += (sender, args) => Analyse.ElementHistoryOpeningArchive.BeginSave(args.Document);
             application.ControlledApplication.DocumentClosing += OnDocumentClosingSafe;
+            application.ControlledApplication.DocumentClosed += OnDocumentClosedSafe;
             application.ViewActivated += OnViewActivatedSafe;
             application.SelectionChanged += OnSelectionChangedSafe;
             application.Idling += OnIdlingSafe;
             _historyWakeEvent = ExternalEvent.Create(new HistoryWakeHandler(this));
             _historyWakeTimer = new System.Windows.Threading.DispatcherTimer
             {
-                Interval = TimeSpan.FromMilliseconds(250)
+                Interval = TimeSpan.FromMilliseconds(50)
             };
             _historyWakeTimer.Tick += (sender, args) =>
             {
                 // No model access from a timer: Revit grants the API context through Execute.
-                if (Analyse.HistoryBackgroundWork.SelectionCanRun() || Analyse.HistoryBackgroundWork.UserIsIdle()) _historyWakeEvent?.Raise();
+                if (DateTime.UtcNow >= _nextHistoryCaptureUtc
+                    && (Analyse.HistoryBackgroundWork.SelectionCanRun() || Analyse.HistoryBackgroundWork.InventoryCanRun()))
+                    _historyWakeEvent?.Raise();
             };
             _historyWakeTimer.Start();
 
@@ -225,6 +244,7 @@ public class BIMaestroApp : IExternalApplication
     {
         BIMaestro.Home.HomeAppearanceService.Shutdown(application);
         _historyWakeTimer?.Stop();
+        Analyse.ElementHistoryOpeningArchive.Shutdown();
 
         _historyWakeEvent?.Dispose();
         _historyWakeEvent = null;
@@ -246,6 +266,7 @@ public class BIMaestroApp : IExternalApplication
             Page.SecretGifShortcutManager.Shutdown();
             BIMaestro.UI.RadialGlobalHotkeyService.Shutdown();
             Analyse.ElementHistoryTracker.Stop();
+            Analyse.ElementHistoryDurableBridge.Shutdown();
             Analyse.ElementHistoryNativeArchive.Shutdown();
             ExcelLogger.Shutdown();
             WpfApp?.Shutdown();
@@ -478,6 +499,7 @@ public class BIMaestroApp : IExternalApplication
         try
         {
             _uiApp ??= new UIApplication(e.Document.Application);
+            Analyse.ElementHistoryOpeningArchive.Schedule(e.Document);
             BIMaestro.Tutorials.DemoTrainingInvitation.OnDocumentOpened(e.Document);
             Analyse.ElementHistoryTracker.ScheduleDeferredPrime(e.Document);
             Analyse.ElementHistoryHoverInfoService.OnDocumentOpened(e.Document);
@@ -513,8 +535,9 @@ public class BIMaestroApp : IExternalApplication
     private void OnDocumentClosingSafe(object sender, DocumentClosingEventArgs e)
     {
         if (Analyse.ElementHistoryNativeArchive.Owns(e.Document)) return;
-        Analyse.ElementHistoryTracker.ForgetAudit(e.Document);
-        Analyse.ElementHistoryNativeArchive.Forget(e.Document);
+        _historyClosingDocuments[e.DocumentId] = Tuple.Create(e.Document,
+            Analyse.ElementHistoryTracker.GetDocumentKeyForHistory(e.Document),
+            Analyse.ElementHistoryDurableBridge.GetSessionId(e.Document));
         try
         {
             _uiApp ??= new UIApplication(e.Document.Application);
@@ -534,6 +557,24 @@ public class BIMaestroApp : IExternalApplication
         {
             TaskDialog.Show(UiLanguage.T("Erreur DocumentClosing", "DocumentClosing Error"), ex.ToString());
         }
+    }
+
+    private void OnDocumentClosedSafe(object sender, DocumentClosedEventArgs e)
+    {
+        if (!_historyClosingDocuments.TryGetValue(e.DocumentId, out var closing)) return;
+        _historyClosingDocuments.Remove(e.DocumentId);
+        // Another add-in can cancel DocumentClosing. Preserve all protection
+        // until Revit confirms that the document actually closed.
+        if (e.Status != RevitAPIEventStatus.Succeeded) return;
+        try
+        {
+            Analyse.ElementHistoryDurableBridge.CloseSession(closing.Item3);
+            Analyse.ElementHistoryTracker.ForgetAuditForKey(closing.Item1, closing.Item2);
+            Analyse.ElementHistoryOpeningArchive.Forget(closing.Item1);
+            Analyse.ElementHistoryOpeningArchive.ForgetBySession(closing.Item3);
+            Analyse.ElementHistoryNativeArchive.Forget(closing.Item1);
+        }
+        catch (Exception ex) { AppendLog("History document closed: " + ex); }
     }
 
     private void OnDocumentChangedSafe(object sender, DocumentChangedEventArgs e)

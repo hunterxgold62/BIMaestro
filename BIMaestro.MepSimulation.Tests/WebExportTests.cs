@@ -16,6 +16,7 @@ namespace BIMaestro.VideoGames
             var scene = new GameSceneData();
             scene.MepGraph.Elements.Add(new GameMepElementData { Key = "pipe" });
             scene.MepGraph.Connectors.Add(new GameMepConnectorData { ElementKey = "pipe" });
+            scene.MepGraph.Systems.Add(new GameMepSystemData { Key = "heating", Color = Colors.Orange });
             var mesh = new GameMeshData { HasCompleteNormals = false };
             // Two distant triangles must become separate spatial zones.
             foreach (int x in new[] { 0, 100 })
@@ -42,6 +43,27 @@ namespace BIMaestro.VideoGames
             if ((int)manifest["schemaVersion"] != 2 || manifest["tiles"][0]["bytes"] != null || (long)manifest["tiles"][0]["size"] <= 0) throw new Exception("Invalid manifest");
             using var archive = new ZipArchive(new MemoryStream(package.Bytes), ZipArchiveMode.Read);
             if (archive.GetEntry("model.glb") != null || archive.GetEntry("mep.json") == null) throw new Exception("Invalid metadata package");
+            string localZip = Path.Combine(Path.GetTempPath(), "BIMaestro-export-" + Guid.NewGuid().ToString("N") + ".zip");
+            try
+            {
+                GameMepWebPackage.WriteLocalTilesZip(scene, localZip, "Diagnostic", System.Threading.CancellationToken.None);
+                using var localStream = File.OpenRead(localZip);
+                using var localArchive = new ZipArchive(localStream, ZipArchiveMode.Read);
+                if (localArchive.GetEntry("properties.json") == null ||
+                    scene.WebTiles.Any(tile => localArchive.GetEntry(Path.GetFileNameWithoutExtension(tile.Name)) == null))
+                    throw new Exception("Local diagnostic archive must retain geometry and properties");
+                using var replayReader = new StreamReader(localArchive.GetEntry("mep.json")?.Open()
+                    ?? throw new Exception("Local GLB archive must include the complete MEP replay"));
+                var localReplay = JObject.Parse(replayReader.ReadToEnd());
+                var diagnostic = localReplay.ToObject<GameMepReplaySnapshot>();
+                if (diagnostic.Graph.Systems.Single().Color != Colors.Orange)
+                    throw new Exception("Local MEP diagnostic colors must round-trip in the native replay format");
+                if (localReplay["Graph"]?["Connectors"]?.Count() != scene.MepGraph.Connectors.Count ||
+                    localReplay["Graph"]?["Elements"]?.Count() != scene.MepGraph.Elements.Count ||
+                    localReplay["CapturedPathStates"] == null)
+                    throw new Exception("Local MEP replay lost topology or captured states");
+            }
+            finally { if (File.Exists(localZip)) File.Delete(localZip); }
             if (archive.GetEntry("overview.glb") == null || manifest["files"]["overview.glb"] == null) throw new Exception("Missing whole-model overview");
             var overviewJson = JObject.Parse(System.Text.Encoding.UTF8.GetString(scene.WebOverviewGlb, 20, BitConverter.ToInt32(scene.WebOverviewGlb, 12)));
             var overviewTiles = overviewJson["nodes"].Select(node => (string)node["extras"]["lodTileName"]).Distinct().ToArray();

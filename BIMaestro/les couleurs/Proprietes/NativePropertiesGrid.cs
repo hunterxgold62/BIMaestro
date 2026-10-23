@@ -15,6 +15,7 @@ namespace BIMaestro.PropertiesAppearance
         internal IntPtr Window, Core;
         private IntPtr _object, _coreVtable, _elementGrid, _elementVtable;
         private int _revitVersion;
+        private int _drawingDepth;
         internal uint RowCount;
         private static IntPtr _og, _mfc, _desktop;
         private static bool _checked;
@@ -48,6 +49,26 @@ namespace BIMaestro.PropertiesAppearance
         [DllImport("user32.dll")] private static extern IntPtr GetFocus();
         [DllImport("user32.dll")] private static extern bool IsChild(IntPtr parent, IntPtr child);
         [DllImport("user32.dll")] private static extern bool RedrawWindow(IntPtr window, IntPtr rect, IntPtr region, uint flags);
+        [DllImport("user32.dll")] private static extern IntPtr SendMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
+        private sealed class DrawingScope : IDisposable
+        {
+            private NativePropertiesGrid _grid;
+            internal DrawingScope(NativePropertiesGrid grid)
+            {
+                _grid = grid;
+                if (grid._drawingDepth++ == 0) SendMessage(grid.Window, 0xB, IntPtr.Zero, IntPtr.Zero);
+            }
+            public void Dispose()
+            {
+                var grid = _grid; _grid = null;
+                if (grid == null || --grid._drawingDepth != 0) return;
+                SendMessage(grid.Window, 0xB, new IntPtr(1), IntPtr.Zero);
+                // Invalidate without a nested synchronous WM_PAINT. The complete
+                // permutation and color plan are ready before the next drawing.
+                RedrawWindow(grid.Window, IntPtr.Zero, IntPtr.Zero, 0x5);
+            }
+        }
+        internal IDisposable DeferDrawing() => new DrawingScope(this);
         internal bool HasInputFocus
         {
             get { IntPtr focus = GetFocus(); return focus == Window || IsChild(Window, focus); }
@@ -190,7 +211,27 @@ namespace BIMaestro.PropertiesAppearance
         internal bool IsCurrent() => _from(Window) == _object && Ptr(Core) == _coreVtable;
         internal bool RefreshIfCurrent()
         {
-            if (!IsWindowVisible(Window) || !IsCurrent()) return false;
+            if (!IsWindowVisible(Window)) return false;
+            bool current = false;
+            try { current = IsCurrent(); } catch (NotSupportedException) { }
+            if (!current)
+            {
+                // Revit can replace the native grid object behind the same HWND
+                // after committing a value. Rebind through verified RTTI here so
+                // the before-paint path need not wait for an API Idling callback.
+                var className = new StringBuilder(100); GetClassName(Window, className, className.Capacity);
+                if (className.ToString() != "GXWND") return false;
+                var obj = _from(Window); if (obj == IntPtr.Zero) return false;
+                IntPtr elementGrid;
+                var core = GetCore(obj, out elementGrid);
+                var vtable = Ptr(core);
+                var elementVtable = elementGrid == IntPtr.Zero ? IntPtr.Zero : Ptr(elementGrid);
+                uint rows = _rows(core), reboundColumns = _columns(core);
+                if (rows > 2000 || reboundColumns < 3 || reboundColumns > 10) return false;
+                _object = obj; Core = core; _coreVtable = vtable;
+                _elementGrid = elementGrid; _elementVtable = elementVtable; RowCount = rows;
+                return true;
+            }
             RowCount = _rows(Core); uint columns = _columns(Core);
             return RowCount <= 2000 && columns >= 3 && columns <= 10;
         }

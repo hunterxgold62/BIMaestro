@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <RevitApiDirectory Condition="'$(RevitApiDirectory)' == ''">C:/Program Files/Autodesk/Revit 2025</RevitApiDirectory>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="RevitAPI"><HintPath>$(RevitApiDirectory)/RevitAPI.dll</HintPath><Private>false</Private></Reference>
+    <Compile Include="RouteCompileStubs.cs" />
+    <Compile Include="../../BIMaestro/commands/MEP Booster/MotorRouteGeometry.cs" Link="MotorRouteGeometry.cs" />
+    <Compile Include="../../BIMaestro/commands/MEP Booster/MotorMeshCollision.cs" Link="MotorMeshCollision.cs" />
+    <Compile Include="../../BIMaestro/commands/MEP Booster/MotorDoorPortal.cs" Link="MotorDoorPortal.cs" />
+  </ItemGroup>
+</Project>

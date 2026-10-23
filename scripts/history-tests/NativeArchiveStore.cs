@@ -3,6 +3,8 @@ namespace Analyse
     // The isolated history harness has no UI selection pipeline.
     internal static class ElementHistoryTracker
     {
+        // Harness captures are explicit diagnostics, including the detailed native cases.
+        internal static bool CaptureDetailedDeletedMesh => true;
         internal static string GetDocumentKeyForHistory(Autodesk.Revit.DB.Document doc)
             => string.IsNullOrEmpty(doc.PathName) ? doc.GetHashCode().ToString() : doc.PathName;
         internal static bool GetLatestSelectionForNativePriority(Autodesk.Revit.DB.Document doc,

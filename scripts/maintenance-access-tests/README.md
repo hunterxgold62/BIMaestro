@@ -1,0 +1,26 @@
+Run with `dotnet run --project scripts/maintenance-access-tests/MaintenanceAccess.Tests.csproj --configuration Release`.
+
+Run recognition independently with `dotnet run --project scripts/maintenance-access-tests/features-only/FeatureRecognition.Tests.csproj --configuration Release`.
+
+These tests execute the production maintenance profile, scene builder and IK maths with small, explicit XYZ/rigid-transform substitutes. They verify continuous lever bounds (including negative rotations, vertical/mirrored frames), the whole translated part, intermediate arm and hand trajectories, physical arm lengths at keyframes, fixed/following operators, floor contact tolerance, chain movement and invalid input handling.
+
+They do not load Revit and do not validate native solid extraction or Boolean intersections. Those require a Revit-hosted integration test. `MaintenanceAccessScanner` uses the native API for those operations and treats mesh-only geometry, unloaded/nested links and failed Boolean operations as unknown.
+
+Chain operation warns when the wheel axis is not horizontal or the two branches extend outside the represented wheel diameter. These are consistency checks for the simplified chain model, not regulatory dimensions. Callback/cancellation tests verify that UI callback failures propagate unchanged and cannot become a misleading geometric result.
+
+Production API is internal to `BIMaestro.MepBooster`:
+
+- `MaintenanceAccessProfile.For(operation)`: editable starting assumptions. `Frame` orients the command, `Center` is local to that frame, `WorldCenter` is computed. `OperatorOrigin`/`BodyFootWorld` is a world-space floor point. `RemovalDirection`, `RemovalCenterOffset` and `RemovalSize` are local to `Frame`; all lengths use Revit feet.
+- `MaintenanceAccessGeometry.Build(profile, phase = 0)`: visible scene plus conservative collision boxes covering the complete operation. `Pose(profile, phase)` returns the same animated mechanism/human without rebuilding swept volumes.
+- `MaintenanceAccessScanner.Run(document, sourceFamilyInstance, scene, Action<string> progress = null, Func<bool> canceled = null)`: geometry report grouped by element, role and functional volume label. Cancellation raises `OperationCanceledException`; native Boolean calls cannot be interrupted mid-call.
+- `report.Complete` only means no geometric unknown was recorded. The caller must separately account for `scene.OperatorPlaced`, `scene.Reachable`, warnings and assumptions.
+
+Feature suggestions use `MaintenanceFeatureDetection.Detect(document, instance, preferredOperation)`. The generic manual-valve entry may become a chainwheel or a lever when the observed geometry supports it. Actuator removal is an explicit separate intervention and cannot replace a manual operation, including through correction memory. A recognized motor without a reliable manual control produces an explanation rather than an invented wheel. Circular faces/arcs and revolved rims supply actual centres/axes; piping connectors penalize flange candidates. An ambiguous result retains ranked candidates and does not set a command point. A terminal strainer cap supplies its external axis without inventing a cartridge or withdrawal stroke. A lever length may be proposed while its pivot remains manual.
+
+The recorded regression fixture `fixtures/filter-1014886.json` contains 266 detached circular observations in family-local feet from a native Revit 2025 inspection. Construction circles at the hydraulic intersection previously earned a terminal-cover bonus in an arbitrary inward direction, making a real external cover appear ambiguous. That bonus now requires measured separation from the hydraulic junction; two actual external covers still remain ambiguous.
+
+For a wheel, `Radius` is the rim centreline when a principal family radius is corroborated or a revolved annular section is measurable. `HandleThickness`/`HasHandleThickness` reports the represented section diameter. If only an outer radius is identifiable, the suggestion explicitly uses a 2mm visual trace rather than adding another default tube thickness. Multiple outline edges belonging to one chain branch are regrouped before calculating branch-centre spacing.
+
+Non-shared nested components are inspected in a separate family document, with the selected type and editable instance values applied temporarily. The transaction is rolled back and the family is closed without saving. Detached observations are cached per document/type/version/instance parameter values. Family model parameters never imply a manufacturer maintenance notice. Native integration still needs to verify document-wrapper identity, family geometry extraction and real project fixtures.
+
+Operator clearance includes the selected family and its descendants. Manipulation/extraction/arm volumes exclude that whole family, as arbitrary family geometry does not identify intended contact surfaces or internal separation. Consequently internal dismantling, contact against the selected housing, tools, torque, clothing, lifting, access routes and regulatory compliance remain outside this check. The animated arms interpolate between explicit IK keyframes; collision boxes continuously enclose that simplified motion. No default dimensions are presented as standard requirements.

@@ -20,11 +20,11 @@ namespace BIMaestro.PropertiesOrderTests
 {
  public class Probe : IExternalApplication
  {
-  string dir; DateTime next; bool active, exitAfterClose;
+  string dir; DateTime next; bool active, exitAfterClose, appearanceIsolated;
   NativePropertiesGrid diagnosticGrid; DispatcherTimer diagnosticTimer;
-  sealed class WriteExpectation { public string Parameter="ALL_MODEL_INSTANCE_COMMENTS"; public string Value; public double Tolerance=1e-9; public List<string> AllowedDependentParameters=new List<string>(); }
+  sealed class WriteExpectation { public string Target="wall"; public string Parameter="ALL_MODEL_INSTANCE_COMMENTS"; public string Value; public double Tolerance=1e-9; public List<string> AllowedDependentParameters=new List<string>(); }
   string FixturePath => Path.Combine(dir,"PropertiesOrderFixture.rvt");
-  public Result OnStartup(UIControlledApplication app) { dir=Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location); File.WriteAllText(Path.Combine(dir,"started-"+Process.GetCurrentProcess().Id+".txt"),app.ControlledApplication.VersionNumber); app.Idling+=Idle; return Result.Succeeded; }
+  public Result OnStartup(UIControlledApplication app) { dir=Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location); PropertiesAppearanceMetrics.Enabled=true; File.WriteAllText(Path.Combine(dir,"started-"+Process.GetCurrentProcess().Id+".txt"),app.ControlledApplication.VersionNumber); app.Idling+=Idle; return Result.Succeeded; }
   public Result OnShutdown(UIControlledApplication app) { app.Idling-=Idle;if(diagnosticTimer!=null){diagnosticTimer.Stop();diagnosticTimer.Tick-=DiagnosticTick;}diagnosticGrid=null;PropertiesAppearanceService.Shutdown(); return Result.Succeeded; }
   void Idle(object sender, IdlingEventArgs args)
   {
@@ -47,14 +47,17 @@ namespace BIMaestro.PropertiesOrderTests
   {
    if(command=="fixture") { Fixture(app); Write("fixture.json",new {path=FixturePath,pid=Process.GetCurrentProcess().Id});return; }
    RequireFixture(app);
+   IsolateInstalledAppearance(app);
    if(command=="show-properties") {var pane=app.GetDockablePane(DockablePanes.BuiltInDockablePanes.PropertiesPalette);if(!pane.IsShown()){var show=RevitCommandId.LookupPostableCommandId(PostableCommand.TogglePropertiesPalette);if(app.CanPostCommand(show))app.PostCommand(show);}}
    else if(command=="shutdown-fixture") {active=false;PropertiesAppearanceService.Shutdown();exitAfterClose=app.Application.Documents.Size==1;var close=RevitCommandId.LookupPostableCommandId(PostableCommand.Close);if(app.CanPostCommand(close))app.PostCommand(close);Write("shutdown-requested.json",new{exitAfterClose,note="Close posted through native UI; discard fixture changes in native save prompt."});return;}
    else if(command=="select-wall") { var wall=Walls(app).First();app.ActiveUIDocument.Selection.SetElementIds(new[]{wall.Id}); }
    else if(command=="select-wall2") {var wall=Walls(app).Skip(1).First();app.ActiveUIDocument.Selection.SetElementIds(new[]{wall.Id});}
    else if(command=="select-multiple")app.ActiveUIDocument.Selection.SetElementIds(Walls(app).Take(2).Select(w=>w.Id).ToArray());
    else if(command=="select-view")app.ActiveUIDocument.Selection.SetElementIds(new ElementId[0]);
+   else if(command=="select-3d") {var doc=app.ActiveUIDocument.Document;var view=new FilteredElementCollector(doc).OfClass(typeof(View3D)).Cast<View3D>().FirstOrDefault(v=>!v.IsTemplate);if(view==null){using(var tx=new Transaction(doc,"Disposable 3D view")){tx.Start();var type=new FilteredElementCollector(doc).OfClass(typeof(ViewFamilyType)).Cast<ViewFamilyType>().First(v=>v.ViewFamily==ViewFamily.ThreeDimensional);view=View3D.CreateIsometric(doc,type.Id);view.Name="ORDER_3D_VIEW";tx.Commit();}}app.ActiveUIDocument.Selection.SetElementIds(new ElementId[0]);app.ActiveUIDocument.RequestViewChange(view);}
    else if(command=="baseline")Write("baseline.json",Snapshot(app));
-   else if(command=="move" || command=="configure") { Configure(app);active=true;PropertiesAppearanceService.ProcessIdling(app); }
+   else if(command=="rebuild-view") {var doc=app.ActiveUIDocument.Document;var p=app.ActiveUIDocument.ActiveView.get_Parameter(BuiltInParameter.VIEW_DETAIL_LEVEL);using(var tx=new Transaction(doc,"Disposable palette rebuild")){tx.Start();p.Set(p.AsInteger()==3?1:3);tx.Commit();}}
+   else if(command=="move" || command=="configure" || command=="move-view-group") { Configure(app,command=="move-view-group");active=true;PropertiesAppearanceService.ProcessIdling(app); }
    else if(command=="raw-move")RawMove(app);
    else if(command=="restore") {active=false;PropertiesAppearanceService.ResetAll();PropertiesAppearanceService.ProcessIdling(app);}
    else if(command=="verify-write")VerifyWrite(app);
@@ -62,6 +65,18 @@ namespace BIMaestro.PropertiesOrderTests
    else if(command=="inspect"||command=="report"||command=="native-state"){}
    else throw new InvalidOperationException("Unknown command "+command);
    Report(app,command);
+  }
+  void IsolateInstalledAppearance(UIApplication app)
+  {
+   if(appearanceIsolated)return;
+   // A production add-in may be loaded in the laboratory too. Suspend only its
+   // in-memory preview so two independent layout services cannot fight over the
+   // same native grid. Never write or reset the user's saved preferences.
+   var production=AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a=>a.GetName().Name=="BIMaestro");
+   var service=production?.GetType("BIMaestro.PropertiesAppearance.PropertiesAppearanceService");
+   var preferences=production?.GetType("BIMaestro.PropertiesAppearance.AppearancePreferences");
+   if(service!=null&&preferences!=null){var flags=BindingFlags.Static|BindingFlags.NonPublic;service.GetField("_preview",flags).SetValue(null,Activator.CreateInstance(preferences));service.GetField("_next",flags).SetValue(null,DateTime.MinValue);service.GetMethod("ProcessIdling",flags).Invoke(null,new object[]{app});}
+   appearanceIsolated=true;
   }
   IEnumerable<Autodesk.Revit.DB.Wall> Walls(UIApplication app) => new FilteredElementCollector(app.ActiveUIDocument.Document).OfClass(typeof(Autodesk.Revit.DB.Wall)).Cast<Autodesk.Revit.DB.Wall>();
   Autodesk.Revit.DB.Wall Wall(UIApplication app) {var selection=app.ActiveUIDocument.Selection.GetElementIds();return selection.Count==1?app.ActiveUIDocument.Document.GetElement(selection.First()) as Autodesk.Revit.DB.Wall??Walls(app).First():Walls(app).First();}
@@ -71,12 +86,12 @@ namespace BIMaestro.PropertiesOrderTests
    var doc=app.Application.NewProjectDocument(UnitSystem.Metric);
    try { using(var tx=new Transaction(doc,"Disposable order fixture")) {tx.Start();var level=new FilteredElementCollector(doc).OfClass(typeof(Level)).Cast<Level>().First();var second=Level.Create(doc,level.Elevation+15);second.Name="ORDER_LEVEL_2";var type=new FilteredElementCollector(doc).OfClass(typeof(WallType)).Cast<WallType>().First();var wall=Autodesk.Revit.DB.Wall.Create(doc,Line.CreateBound(XYZ.Zero,new XYZ(20,0,0)),type.Id,level.Id,10,0,false,false);wall.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS).Set("ORDER_BASELINE");var wall2=Autodesk.Revit.DB.Wall.Create(doc,Line.CreateBound(new XYZ(0,10,0),new XYZ(20,10,0)),type.Id,level.Id,8,0,false,false);wall2.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS).Set("ORDER_SECOND_WALL");tx.Commit();}doc.SaveAs(FixturePath,new SaveAsOptions{OverwriteExistingFile=true});}finally{doc.Close(false);}app.OpenAndActivateDocument(FixturePath);
   }
-  void Configure(UIApplication app)
+  void Configure(UIApplication app,bool groupOnly=false)
   {
    var context=AppearanceContext.ForEditor(app);var comment=TargetParameter(app);
    var target=context.Parameters.Single(p=>p.NativeName==AppearancePreferences.Normalize(comment.Definition.Name));
    var rows=context.PreviewRows;var row=rows.Single(r=>r.ParameterKey==target.Key);
-   var profile=new AppearanceProfile {Key=context.CategoryKey};profile.Layout.Groups.Add(target.GroupKey);profile.Layout.Parameters[target.GroupKey]=new List<string>{row.OrderKey};
+   var profile=new AppearanceProfile {Key=context.CategoryKey};profile.Layout.Groups.Add(target.GroupKey);if(!groupOnly)profile.Layout.Parameters[target.GroupKey]=new List<string>{row.OrderKey};
    PropertiesAppearanceService.Commit(new[]{profile},true);Write("configured.json",new {group=target.GroupKey,parameter=target.Key,label=row.Label});
   }
   void RawMove(UIApplication app)
@@ -97,7 +112,7 @@ namespace BIMaestro.PropertiesOrderTests
   }
   void VerifyWrite(UIApplication app)
   {
-   var baseline=JsonConvert.DeserializeObject<Dictionary<string,string>>(File.ReadAllText(Path.Combine(dir,"baseline.json")));var after=Snapshot(app);var config=Expectation();var expected=config.Value??File.ReadAllText(Path.Combine(dir,"expected-value.txt")).TrimEnd('\r','\n');var wall=Wall(app);var comment=TargetParameter(app);string key=wall.UniqueId+"|"+comment.Id+"|"+comment.Definition.Name;
+   var baseline=JsonConvert.DeserializeObject<Dictionary<string,string>>(File.ReadAllText(Path.Combine(dir,"baseline.json")));var after=Snapshot(app);var config=Expectation();var expected=config.Value??File.ReadAllText(Path.Combine(dir,"expected-value.txt")).TrimEnd('\r','\n');var wall=TargetElement(app);var comment=TargetParameter(app);string key=wall.UniqueId+"|"+comment.Id+"|"+comment.Definition.Name;
    var deltas=baseline.Keys.Union(after.Keys).Where(k=>!baseline.ContainsKey(k)||!after.ContainsKey(k)||baseline[k]!=after[k]).Select(k=>new {key=k,before=baseline.ContainsKey(k)?baseline[k]:null,after=after.ContainsKey(k)?after[k]:null}).ToArray();
    bool expectedMatches=after.ContainsKey(key)&&after[key]==expected;
    if(comment.StorageType==StorageType.Double){double number;expectedMatches=double.TryParse(expected,NumberStyles.Float,CultureInfo.InvariantCulture,out number)&&Math.Abs(comment.AsDouble()-number)<=config.Tolerance;}
@@ -106,7 +121,8 @@ namespace BIMaestro.PropertiesOrderTests
    bool pass=expectedMatches&&deltas.Any(d=>d.key==key)&&deltas.All(d=>d.key==key||allowed.Contains(d.key));Write("verify-write.json",new {pass,parameter=config.Parameter,storage=comment.StorageType.ToString(),expected,actual=after.ContainsKey(key)?after[key]:null,allowedDependentKeys=allowed,deltas});if(!pass)throw new Exception("Native write verification failed; see verify-write.json");
   }
   WriteExpectation Expectation(){var file=Path.Combine(dir,"expected-write.json");return File.Exists(file)?JsonConvert.DeserializeObject<WriteExpectation>(File.ReadAllText(file)):new WriteExpectation();}
-  Parameter TargetParameter(UIApplication app){var config=Expectation();var p=Wall(app).get_Parameter((BuiltInParameter)Enum.Parse(typeof(BuiltInParameter),config.Parameter));return p??throw new Exception("Missing target parameter "+config.Parameter);}
+  Element TargetElement(UIApplication app)=>Expectation().Target=="view"?(Element)app.ActiveUIDocument.ActiveView:Wall(app);
+  Parameter TargetParameter(UIApplication app){var config=Expectation();var p=TargetElement(app).get_Parameter((BuiltInParameter)Enum.Parse(typeof(BuiltInParameter),config.Parameter));return p??throw new Exception("Missing target parameter "+config.Parameter);}
   void VerifyUnchanged(UIApplication app)
   {
    var baseline=JsonConvert.DeserializeObject<Dictionary<string,string>>(File.ReadAllText(Path.Combine(dir,"baseline.json")));var after=Snapshot(app);
@@ -129,7 +145,7 @@ namespace BIMaestro.PropertiesOrderTests
    }
    var snapshot=Snapshot(app);var json=JsonConvert.SerializeObject(snapshot.OrderBy(p=>p.Key));string hash;using(var sha=SHA256.Create())hash=BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(json))).Replace("-","");
    var nativeState=NativeState(grid);
-   Write("report.json",new {command,time=DateTime.UtcNow,pid=Process.GetCurrentProcess().Id,version=app.Application.VersionNumber,build=app.Application.VersionBuild,path=FixturePath,status=PropertiesAppearanceService.Status,layoutStatus=PropertiesPaletteLayout.Status,hasApplied=PropertiesPaletteLayout.HasApplied,hwnd=grid?.Window.ToInt64(),nativeState,rows,mappings,hash,parameters=snapshot});
+   Write("report.json",new {command,time=DateTime.UtcNow,pid=Process.GetCurrentProcess().Id,version=app.Application.VersionNumber,build=app.Application.VersionBuild,path=FixturePath,status=PropertiesAppearanceService.Status,layoutStatus=PropertiesPaletteLayout.Status,hasApplied=PropertiesPaletteLayout.HasApplied,hwnd=grid?.Window.ToInt64(),nativeState,rows,mappings,hash,metrics=PropertiesAppearanceMetrics.Snapshot(),parameters=snapshot});
    File.Copy(Path.Combine(dir,"report.json"),Path.Combine(dir,"report-"+command+".json"),true);
   }
   [UnmanagedFunctionPointer(CallingConvention.Cdecl)] delegate int NativeFlag(IntPtr instance);

@@ -296,6 +296,12 @@ namespace BIMaestro.VideoGames
                 }
                 if (scene.WebOverviewGlb.Length > 0) WriteFile("overview.glb", scene.WebOverviewGlb);
                 WriteFile("properties.json", Encoding.UTF8.GetBytes(scene.WebPropertiesJson ?? "[]"));
+                var replay = scene.MepGraph.HasData
+                    ? GameMepReplayStore.Capture(scene.MepGraph, preserveElementPersistentIds: true)
+                    : new GameMepReplaySnapshot { DocumentLabel = scene.MepGraph.DocumentTitle, Graph = scene.MepGraph };
+                // Keep the local diagnostic readable by GameMepReplayStore,
+                // including WPF colors in its native string representation.
+                WriteFile("mep.json", Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(replay, Formatting.Indented)));
                 WriteFile("manifest.json", Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new
                 {
                     name, documentTitle = scene.MepGraph.DocumentTitle, viewName = scene.ViewName,

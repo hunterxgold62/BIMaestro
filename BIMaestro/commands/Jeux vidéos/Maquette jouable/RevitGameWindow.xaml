@@ -627,9 +627,13 @@
                                 Padding="8,5"
                                 Click="MepResetButton_Click"/>
                     </WrapPanel>
+                    <StackPanel Grid.Row="3">
+                    <Button Style="{StaticResource GlassButton}"
+                            Content="Exporter les GLB et données MEP…"
+                            Padding="8,6" Margin="0,7,0,0"
+                            ToolTip="Ouvre les options d’export local en ZIP avec la géométrie et le graphe MEP complet"
+                            Click="MepShareWebButton_Click"/>
                     <Button x:Name="MepExportReplayButton"
-                            Grid.Row="3"
-                            Visibility="Collapsed"
                             Style="{StaticResource GlassButton}"
                             Content="Exporter le cas MEP"
                             HorizontalAlignment="Stretch"
@@ -637,6 +641,7 @@
                             Margin="0,7,0,0"
                             ToolTip="Exporte uniquement le graphe MEP nécessaire pour reproduire le calcul hors Revit"
                             Click="MepExportReplayButton_Click"/>
+                    </StackPanel>
                     <Button Grid.Row="4"
                             Content="Importer les réservations web"
                             Margin="0,6,0,0"

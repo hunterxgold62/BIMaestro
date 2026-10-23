@@ -39,6 +39,7 @@ namespace BIMaestro.HistoryTests
             {
                 Check(ui.Application.Documents.Size == 0, "Requires an empty test process");
                 var results = File.Exists(Path.Combine(Output,"tracker-regression-only.txt")) ? RunTrackerRegression(ui)
+                    : File.Exists(Path.Combine(Output,"opening-benchmark.txt")) ? RunOpeningBenchmark(ui)
                     : File.Exists(Path.Combine(Output,"real-model-source.rvt")) ? RunRealModelBenchmark(ui)
                     : File.Exists(Path.Combine(Output,"group-copy-source.rvt")) ? RunGroupCopyBenchmark(ui)
                     : File.Exists(Path.Combine(Output,"CML-source.rvt")) ? RunCml(ui) : Run(ui);

@@ -18,6 +18,8 @@ namespace Analyse
         public string SuperComponentUniqueId { get; set; }
         public string FamilyTypeUniqueId { get; set; }
         public HistoryDeletionElementAudit DeletionAudit { get; set; }
+        // Runtime-only: a native retry must not choose the direct recipe again.
+        internal bool ForceNativeOpeningRestore { get; set; }
     }
 
     internal sealed class HistoryRestoreItem
@@ -33,6 +35,8 @@ namespace Analyse
         public string SourceUniqueId { get; set; }
         public string Category { get; set; }
         public string RecipeKind { get; set; }
+        public string OpeningFallbackTrigger { get; set; }
+        public HistorySystemTypeAdjustment SystemTypeAdjustment { get; set; }
         public string NativeRootSourceUniqueId { get; set; }
         public string HostSourceUniqueId { get; set; }
         public string SuperComponentSourceUniqueId { get; set; }
@@ -40,6 +44,22 @@ namespace Analyse
         public HistoryDeletionElementAudit DeletionAudit { get; set; }
         public string ParentSourceUniqueId { get; set; }
         public string ParentOutcome { get; set; }
+    }
+
+    internal sealed class HistorySystemTypeAdjustment
+    {
+        public bool SourceDefined { get; set; }
+        public string SourceTypeUniqueId { get; set; }
+        public string SourceTypeName { get; set; }
+        public bool ActualDefined { get; set; }
+        public string ActualTypeUniqueId { get; set; }
+        public string ActualTypeName { get; set; }
+        public List<string> SourceConnectedPeerTypeUniqueIds { get; set; }
+        public List<string> ConnectedPeerTypeUniqueIds { get; set; }
+        public bool MatchesUniqueConnectedPeerType { get; set; }
+        public bool RevitAssignedPreviouslyUndefinedType { get; set; }
+        public bool ClassificationPreserved { get; set; }
+        public string Note { get; set; }
     }
 
     internal sealed class HistoryRestoreBatch
@@ -132,8 +152,31 @@ namespace Analyse
             var batch = new HistoryRestoreBatch();
             var display = new RestoreDisplay(refreshView);
             var index = ReadIndex(doc);
+            using var nativeSources = new ElementHistoryNativeArchive.Sources();
+            var openingFailures = new Dictionary<HistoryRestoreRequest, string>();
             var selected = (requests ?? Enumerable.Empty<HistoryRestoreRequest>()).Where(r => r != null)
-                .GroupBy(r => r.SourceUniqueId ?? r.Label ?? string.Empty).Select(g => g.First())
+                .Select(r => new HistoryRestoreRequest { SourceUniqueId = r.SourceUniqueId, Label = r.Label,
+                    Recipe = r.Recipe == null ? null : JObject.FromObject(r.Recipe).ToObject<HistoryRecipe>(),
+                    Category = r.Category, CaptureFailure = r.CaptureFailure,
+                    SuperComponentUniqueId = r.SuperComponentUniqueId, FamilyTypeUniqueId = r.FamilyTypeUniqueId,
+                    DeletionAudit = r.DeletionAudit, ForceNativeOpeningRestore = r.ForceNativeOpeningRestore }).ToList();
+            // Events deleted before inventory have only their numeric source ID.
+            // Resolve their identities before de-duplication and dependency order.
+            // Opening the checkpoint happens only for this explicit user action.
+            for (int i = 0; i < selected.Count; i++)
+            {
+                var request = selected[i];
+                if (request.Recipe?.Native?.WholeModel != true) continue;
+                try
+                {
+                    var source = nativeSources.Open(doc, request.Recipe.Native);
+                    selected[i] = ElementHistoryNativeArchive.HydrateOpeningRequest(source, request);
+                }
+                catch (Exception ex) { openingFailures[request] = ex.Message; }
+            }
+            selected = selected.GroupBy(r => !string.IsNullOrWhiteSpace(r.SourceUniqueId) ? r.SourceUniqueId
+                    : r.Recipe?.Native?.WholeModel == true ? "opening:" + r.Recipe.Native.File + ":" + r.Recipe.Native.SourceElementId
+                    : r.Label ?? string.Empty).Select(g => g.First())
                 .Where(r => !IsCalorifuge(r.Category, r.Label))
                 .OrderBy(r => r.Recipe?.Kind == "family" ? 1 : 0).ToList();
             selected = OrderByDependencies(selected);
@@ -146,9 +189,13 @@ namespace Analyse
                 .Select(c => new HistoryRestoreRequest { SourceUniqueId = c.SourceUniqueId, Label = "Circuit électrique", Recipe = c.Recipe }).ToList();
             selected.AddRange(companionCircuits);
             selected = OrderByDependencies(selected);
+            // Keep one Undo even when an unsuccessful direct recipe needs a
+            // second, native attempt after its first transaction group closes.
+            using var completeGroup = selected.Any(r => IsRestorationFallback(r.Recipe?.OpeningFallback))
+                ? new TransactionGroup(doc, "BIMaestro - Restaurer historique avec secours d’ouverture") : null;
+            completeGroup?.Start();
             var generatedSketchOrigins = new HashSet<string>(StringComparer.Ordinal);
             var networksFinalized = false;
-            using (var nativeSources = new ElementHistoryNativeArchive.Sources())
             using (var group = new TransactionGroup(doc, "BIMaestro - Restaurer éléments supprimés"))
             {
                 group.Start();
@@ -166,6 +213,8 @@ namespace Analyse
                         DeletionAudit = request.DeletionAudit
                     };
                     batch.Items.Add(result);
+                    if (openingFailures.TryGetValue(request, out var openingFailure))
+                    { result.Reason = "archive"; result.Detail = openingFailure; continue; }
                     foreach (var warning in request.Recipe?.CaptureWarnings ?? new List<string>())
                         batch.CaptureWarnings.Add(request.Label + " : " + warning);
                     if (string.IsNullOrEmpty(request.SourceUniqueId)) { result.Reason = "identity"; continue; }
@@ -203,6 +252,11 @@ namespace Analyse
                         }
                         catch (Exception ex) { result.Reason = "archive"; result.Detail = ex.Message; continue; }
                     }
+                    if (recipe.OpeningFallback?.DefinitionOnly == true)
+                    {
+                        try { ImportDurableDefinition(doc, recipe, nativeSources, index); }
+                        catch (Exception ex) { result.Reason = "definition"; result.Detail = ex.Message; continue; }
+                    }
                     if (recipe.Native == null && recipe.Kind != "electrical_system" && ElementHistoryReconstruction.FindOriginal(doc, recipe.Type) == null) { result.Reason = "type"; continue; }
                     if (recipe.Native == null && recipe.SystemMembers == null && !(ElementHistoryReconstruction.FindOriginal(doc, recipe.Level) is Level)) { result.Reason = "level"; continue; }
                     if (!string.IsNullOrEmpty(recipe.Host))
@@ -214,8 +268,10 @@ namespace Analyse
                         if (!string.IsNullOrEmpty(parameter.Reference))
                             parameter.Reference = Resolve(doc, index, parameter.Reference) ?? parameter.Reference;
 
+                    using (var creationGroup = new TransactionGroup(doc, "BIMaestro - Vérifier création historique"))
                     using (var transaction = new Transaction(doc, "BIMaestro - Restaurer élément supprimé"))
                     {
+                        creationGroup.Start();
                         transaction.Start();
                         var failures = new RestoreFailures();
                         transaction.SetFailureHandlingOptions(transaction.GetFailureHandlingOptions()
@@ -225,7 +281,10 @@ namespace Analyse
                             Dictionary<string, string> sketchOrigins;
                             Element element;
                             if (nativeSource != null)
+                            {
                                 element = ElementHistoryNativeArchive.Restore(doc, recipe, nativeSource, nativeParent, out sketchOrigins);
+                                ElementHistoryReconstruction.RestoreNativeMetadata(doc, element, recipe);
+                            }
                             else
                             {
                                 element = ElementHistoryReconstruction.RestoreNative(doc, recipe);
@@ -250,6 +309,11 @@ namespace Analyse
                                 }
                                 else
                                 {
+                                    if (!ElementHistoryReconstruction.VerifyHistoricalPlacement(doc.GetElement(uid), recipe,
+                                        out var placementFailure))
+                                        throw new InvalidOperationException("Placement après validation : " + placementFailure);
+                                    if (creationGroup.Assimilate() != TransactionStatus.Committed)
+                                        throw new InvalidOperationException("La création historique n’a pas pu être validée.");
                                     result.Created = existing == null; result.Existing = existing != null;
                                     result.Repaired = existing != null && recipe.ElectricalChanged;
                                     result.UniqueId = uid; result.Detail = failures.Message;
@@ -268,6 +332,7 @@ namespace Analyse
                         catch (Exception ex)
                         {
                             if (transaction.GetStatus() == TransactionStatus.Started) transaction.RollBack();
+                            if (creationGroup.GetStatus() == TransactionStatus.Started) creationGroup.RollBack();
                             result.Reason = "creation"; result.Detail = ex.Message;
                         }
                     }
@@ -305,7 +370,9 @@ namespace Analyse
                     RepairRestoredFittings(doc, selected, index, batch);
                     Reconnect(doc, selected, index, batch);
                 }
+                RestoreUndefinedSystems(doc, selected, batch);
                 ElementHistoryRelations.Restore(doc, selected, index, batch);
+                VerifyFinalPlacements(doc, selected, batch);
                 if (batch.Created > 0 || batch.ConnectionsRestored > 0 || batch.Repaired > 0 || batch.RelationsRestored > 0)
                 {
                     if (group.Assimilate() != TransactionStatus.Committed)
@@ -314,6 +381,11 @@ namespace Analyse
                 else group.RollBack();
             }
             ElementHistoryRelations.Invalidate(doc);
+            ObserveSystemTypeAdjustments(doc, selected, batch);
+            // Dispose is idempotent. A primary mixed batch may already have opened
+            // this checkpoint; close it before the fallback batch opens it once.
+            nativeSources.Dispose();
+            RetryOpeningFailures(doc, selected, batch, refreshView);
             var bySource = batch.Items.Where(i => !string.IsNullOrWhiteSpace(i.SourceUniqueId))
                 .GroupBy(i => i.SourceUniqueId).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
             foreach (var item in batch.Items)
@@ -330,7 +402,386 @@ namespace Analyse
                 else item.ParentOutcome = "not_in_restore_request";
             }
             display.Flush(force: batch.ConnectionsRestored > 0 || batch.Repaired > 0 || batch.RelationsRestored > 0);
+            if (completeGroup != null)
+            {
+                if (batch.Created > 0 || batch.ConnectionsRestored > 0 || batch.Repaired > 0 || batch.RelationsRestored > 0)
+                {
+                    if (completeGroup.Assimilate() != TransactionStatus.Committed)
+                        throw new InvalidOperationException("Restoration fallback could not be committed.");
+                }
+                else completeGroup.RollBack();
+            }
             return batch;
+        }
+
+        private static void ObserveSystemTypeAdjustments(Document doc, List<HistoryRestoreRequest> selected,
+            HistoryRestoreBatch batch)
+        {
+            var bySource = batch.Items.Where(item => !string.IsNullOrWhiteSpace(item.SourceUniqueId))
+                .GroupBy(item => item.SourceUniqueId).ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+            foreach (var request in selected.Where(request => SystemSource(request.Recipe)?.SourceSystemTypeDefined != null))
+            {
+                if (!bySource.TryGetValue(request.SourceUniqueId ?? string.Empty, out var result)
+                    || !result.Created || string.IsNullOrWhiteSpace(result.UniqueId)) continue;
+                var actual = ElementHistoryReconstruction.FindOriginal(doc, result.UniqueId);
+                if (!ElementHistoryNativeArchive.HasMepSystemType(actual)) continue;
+                var source = SystemSource(request.Recipe);
+                var type = ElementHistoryNativeArchive.ReadMepSystemType(actual);
+                var peerTypes = ElementHistoryNativeArchive.ReadConnectedPeerSystemTypes(actual);
+                var sourcePeers = source.SourceConnectedPeerTypeUniqueIds;
+                bool sourceDefined = source.SourceSystemTypeDefined.Value;
+                bool actualDefined = type != null;
+                bool peersMatch = actualDefined && peerTypes.Count == 1 && peerTypes[0] == type.UniqueId
+                    && (sourcePeers == null || sourcePeers.Count == 0
+                        || (sourcePeers.Count == 1 && sourcePeers[0] == type.UniqueId));
+                var adjustment = new HistorySystemTypeAdjustment
+                {
+                    SourceDefined = sourceDefined, SourceTypeUniqueId = source.SourceSystemTypeUniqueId,
+                    SourceTypeName = source.SourceSystemTypeName, ActualDefined = actualDefined,
+                    ActualTypeUniqueId = type?.UniqueId, ActualTypeName = type?.Name,
+                    SourceConnectedPeerTypeUniqueIds = sourcePeers, ConnectedPeerTypeUniqueIds = peerTypes,
+                    MatchesUniqueConnectedPeerType = peersMatch,
+                    RevitAssignedPreviouslyUndefinedType = !sourceDefined && actualDefined,
+                    ClassificationPreserved = sourceDefined == actualDefined
+                        && (!sourceDefined || ElementHistoryNetwork.HistoricalSystemTypeMatches(type, source.SourceSystemTypeUniqueId, source.TypeVersion))
+                };
+                result.SystemTypeAdjustment = adjustment;
+                if (adjustment.ClassificationPreserved) continue;
+                if (!sourceDefined && actualDefined && peersMatch)
+                {
+                    var name = actual is Autodesk.Revit.DB.Plumbing.Pipe || actual is Autodesk.Revit.DB.Plumbing.FlexPipe
+                        ? "cette canalisation" : "cette gaine";
+                    adjustment.Note = "Revit a rattaché " + name
+                        + " au système des voisins reconnectés ; aucun système n’était défini dans l’historique.";
+                }
+                else if (!sourceDefined && actualDefined)
+                    adjustment.Note = "Revit a attribué un type de système pendant la restauration ; l’état initial sans système n’a pas été conservé. Le système des voisins ne permet pas de confirmer cette attribution.";
+                else adjustment.Note = "Le type de système restauré diffère du type historique ; sa classification n’a pas été conservée.";
+                result.Detail = string.IsNullOrWhiteSpace(result.Detail) ? adjustment.Note : result.Detail + " " + adjustment.Note;
+            }
+        }
+
+        private static HistoryNativeArtifact SystemSource(HistoryRecipe recipe) => recipe?.Native ?? recipe?.OpeningFallback;
+
+        private static void RestoreUndefinedSystems(Document doc, List<HistoryRestoreRequest> selected,
+            HistoryRestoreBatch batch)
+        {
+            var restored = batch.Items.Where(item => item.Created && item.UniqueId != null)
+                .GroupBy(item => item.SourceUniqueId).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+            foreach (var request in selected.Where(r => SystemSource(r.Recipe)?.SourceSystemTypeDefined == false))
+            {
+                if (request.SourceUniqueId == null || !restored.TryGetValue(request.SourceUniqueId, out var item)) continue;
+                var element = doc.GetElement(item.UniqueId);
+                if (ElementHistoryNativeArchive.ReadMepSystemType(element) == null) continue;
+                using (var attempt = new TransactionGroup(doc, "BIMaestro - Vérifier système historique indéfini"))
+                {
+                    attempt.Start();
+                    try
+                    {
+                        var guard = ElementHistoryNetwork.CaptureConnectionGuard(doc, element, null, request.Recipe);
+                        using (var tx = new Transaction(doc, "BIMaestro - Rétablir système historique indéfini"))
+                        {
+                            tx.Start();
+                            var failures = new RestoreFailures();
+                            tx.SetFailureHandlingOptions(tx.GetFailureHandlingOptions().SetFailuresPreprocessor(failures).SetClearAfterRollback(true));
+                            if (!ElementHistoryNetwork.RestoreUndefinedSystemType(doc, element, request.Recipe, out var failure))
+                                throw new InvalidOperationException(failure);
+                            if (tx.Commit() != TransactionStatus.Committed)
+                                throw new InvalidOperationException(failures.Message ?? "Système historique refusé par Revit.");
+                        }
+                        element = doc.GetElement(item.UniqueId);
+                        if (ElementHistoryNativeArchive.ReadMepSystemType(element) != null)
+                            throw new InvalidOperationException("Revit a réattribué un système lors de la validation.");
+                        ElementHistoryNetwork.VerifyConnectionGuard(doc, guard);
+                        if (attempt.Assimilate() != TransactionStatus.Committed)
+                            throw new InvalidOperationException("Le système historique indéfini n’a pas pu être validé.");
+                    }
+                    catch (Autodesk.Revit.Exceptions.RegenerationFailedException) { throw; }
+                    catch (Exception ex)
+                    {
+                        if (attempt.GetStatus() == TransactionStatus.Started) attempt.RollBack();
+                        batch.RepairFailures.Add(request.Label + " : " + ex.Message);
+                    }
+                }
+            }
+        }
+
+        private static void VerifyFinalPlacements(Document doc, List<HistoryRestoreRequest> selected, HistoryRestoreBatch batch)
+        {
+            var recipes = selected.Where(r => r.SourceUniqueId != null).GroupBy(r => r.SourceUniqueId)
+                .ToDictionary(g => g.Key, g => g.First().Recipe, StringComparer.Ordinal);
+            foreach (var item in batch.Items.Where(i => i.Created || i.IncludedInParent))
+                if (item.UniqueId != null && recipes.TryGetValue(item.SourceUniqueId ?? "", out var recipe)
+                    && !(doc.GetElement(item.UniqueId) is Group)
+                    && !ElementHistoryReconstruction.VerifyHistoricalPlacement(doc.GetElement(item.UniqueId), recipe,
+                        out var failure, includeBoundingBox: true))
+                    batch.RepairFailures.Add(item.Label + " : placement après rétablissement des relations : " + failure);
+        }
+
+        private static void RetryOpeningFailures(Document doc, List<HistoryRestoreRequest> selected,
+            HistoryRestoreBatch batch, Action refreshView)
+        {
+            var failed = batch.Items.Where(item => !item.Created && !item.Existing && !item.IncludedInParent
+                    && !string.IsNullOrWhiteSpace(item.SourceUniqueId))
+                .GroupBy(item => item.SourceUniqueId).ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+            if (failed.Count == 0) return;
+            var backupRequests = selected.Where(request => IsRestorationFallback(request.Recipe?.OpeningFallback)
+                    && !string.IsNullOrWhiteSpace(request.SourceUniqueId) && failed.ContainsKey(request.SourceUniqueId))
+                .Select(request => new HistoryRestoreRequest
+                {
+                    SourceUniqueId = request.SourceUniqueId, Label = request.Label, Category = request.Category,
+                    ForceNativeOpeningRestore = true,
+                    SuperComponentUniqueId = request.SuperComponentUniqueId, FamilyTypeUniqueId = request.FamilyTypeUniqueId,
+                    DeletionAudit = request.DeletionAudit,
+                    Recipe = new HistoryRecipe
+                    {
+                        Kind = "native_archive", Native = request.Recipe.OpeningFallback,
+                        HistoricalPlacement = request.Recipe.HistoricalPlacement,
+                        Connections = request.Recipe.Connections,
+                        GeometryRelations = request.Recipe.GeometryRelations,
+                        Parameters = request.Recipe.Parameters,
+                        NativeFallbackReason = "La recette directe a échoué : "
+                            + (failed[request.SourceUniqueId].Detail ?? failed[request.SourceUniqueId].Reason)
+                    }
+                }).ToList();
+            if (backupRequests.Count == 0) return;
+            // These fresh native recipes have no OpeningFallback, so recursion is
+            // bounded to one retry. Successful direct recipes never open an RVT.
+            var backup = Restore(doc, backupRequests, refreshView);
+            var replacements = backup.Items.Where(item => !string.IsNullOrWhiteSpace(item.SourceUniqueId))
+                .GroupBy(item => item.SourceUniqueId).ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+            for (int i = 0; i < batch.Items.Count; i++)
+            {
+                var original = batch.Items[i];
+                if (string.IsNullOrWhiteSpace(original.SourceUniqueId) || !failed.ContainsKey(original.SourceUniqueId)
+                    || !replacements.TryGetValue(original.SourceUniqueId, out var replacement)) continue;
+                replacement.OpeningFallbackTrigger = original.Detail ?? original.Reason;
+                if (!replacement.Created && !replacement.Existing && !replacement.IncludedInParent)
+                    replacement.Detail = "Recette directe : " + (original.Detail ?? original.Reason)
+                    + " ; copie d’ouverture : " + (replacement.Detail ?? replacement.Reason);
+                batch.Items[i] = replacement;
+            }
+            batch.ConnectionsRestored += backup.ConnectionsRestored;
+            batch.ConnectionsExisting += backup.ConnectionsExisting;
+            batch.RelationsRestored += backup.RelationsRestored;
+            batch.RelationsExisting += backup.RelationsExisting;
+            batch.RelationFailures.AddRange(backup.RelationFailures);
+            batch.RelationAudit.AddRange(backup.RelationAudit);
+            batch.ConnectionFailures.AddRange(backup.ConnectionFailures);
+            batch.CaptureWarnings.AddRange(backup.CaptureWarnings);
+            batch.RepairFailures.AddRange(backup.RepairFailures);
+        }
+
+        private static bool IsRestorationFallback(HistoryNativeArtifact artifact) => artifact != null && !artifact.DefinitionOnly
+            && (artifact.WholeModel || !string.IsNullOrWhiteSpace(artifact.PayloadId));
+
+        private static void ImportDurableDefinition(Document doc, HistoryRecipe recipe,
+            ElementHistoryNativeArchive.Sources sources, Dictionary<string, string> index)
+        {
+            var totalTimer = Stopwatch.StartNew();
+            var phaseTimer = Stopwatch.StartNew();
+            var phase = "definition_import_context";
+            var definitionCount = 0; var copyCount = 0; var mappedCount = 0;
+            var importSucceeded = false;
+            string activeDefinition = null;
+            var originalType = recipe.Type;
+            void LogPhase(string name, double elapsed, bool success, object details)
+            {
+                try { HistoryPerformanceLog.RecordDetails(doc, name, elapsed, mappedCount,
+                    Math.Max(0, definitionCount - mappedCount), success, details); }
+                catch (Exception loggingFailure) { Trace.WriteLine("Definition import logging: " + loggingFailure.Message); }
+            }
+            try
+            {
+            var artifact = recipe.OpeningFallback;
+            ElementHistoryNativeArchive.ValidateHistoricalContext(doc, artifact.ContextDefinitions);
+            LogPhase("definition_import_context", phaseTimer.Elapsed.TotalMilliseconds, true, new { ContextCount = artifact.ContextDefinitions?.Count ?? 0 });
+            phase = "definition_import_source"; phaseTimer.Restart();
+            var source = sources.Open(doc, artifact);
+            LogPhase(phase, phaseTimer.Elapsed.TotalMilliseconds, true, new { PayloadId = artifact.PayloadId, artifact.RootUniqueId });
+            phase = "definition_import_source_map"; phaseTimer.Restart();
+            var principal = source.GetElement(artifact.RootUniqueId) as ElementType;
+            if (principal == null || ElementHistoryNativeArchive.IsPresentationDefinition(principal) || ElementHistoryNativeArchive.ReadHistoricalTypeVersion(principal) != artifact.TypeVersion
+                || ElementHistoryNativeArchive.ReadHistoricalDefinitionSource(principal) != recipe.Type)
+                throw new InvalidOperationException("La definition principale n’est pas prouvee par sa capsule.");
+            var definitions = new FilteredElementCollector(source).WhereElementIsElementType().ToElements()
+                .Concat(new FilteredElementCollector(source).OfClass(typeof(Family)).ToElements())
+                .Concat(new FilteredElementCollector(source).OfClass(typeof(Level)).ToElements())
+                .Concat(new FilteredElementCollector(source).OfClass(typeof(Material)).ToElements())
+                .Where(element => !ElementHistoryNativeArchive.IsPresentationDefinition(element) && ElementHistoryNativeArchive.ReadHistoricalTypeVersion(element) == artifact.TypeVersion
+                    && ElementHistoryNativeArchive.ReadHistoricalDefinitionSource(element) != null).ToList();
+            // Stock system-family containers can be present and stamped in the
+            // capsule without a copyable symbol. They are not imported dependencies.
+            // Every physical symbol and its loadable family still require proof.
+            var symbolFamilies = new HashSet<ElementId>(definitions.OfType<FamilySymbol>()
+                .Select(symbol => symbol.Family.Id));
+            int ignoredFamilies = definitions.RemoveAll(definition => definition is Family
+                && !symbolFamilies.Contains(definition.Id));
+            var sourceIds = definitions.ToDictionary(element => element.UniqueId,
+                ElementHistoryNativeArchive.ReadHistoricalDefinitionSource, StringComparer.Ordinal);
+            var remap = new Dictionary<string, string>(StringComparer.Ordinal);
+            List<Element> ReadDestinationDefinitions() => new FilteredElementCollector(doc).WhereElementIsElementType().ToElements()
+                .Concat(new FilteredElementCollector(doc).OfClass(typeof(Family)).ToElements())
+                .Concat(new FilteredElementCollector(doc).OfClass(typeof(Level)).ToElements())
+                .Concat(new FilteredElementCollector(doc).OfClass(typeof(Material)).ToElements()).ToList();
+            var destinationDefinitions = ReadDestinationDefinitions();
+            var familyUidsBeforeImport = new HashSet<string>(destinationDefinitions.OfType<Family>()
+                .Select(family => family.UniqueId), StringComparer.Ordinal);
+            List<Element> Matches(Element definition)
+            {
+                // Original project UID and historical elevation prove Level context.
+                if (definition is Level expectedLevel && doc.GetElement(sourceIds[definition.UniqueId]) is Level originalLevel
+                    && originalLevel.GetType() == definition.GetType()
+                    && Math.Abs(originalLevel.ProjectElevation - expectedLevel.ProjectElevation) <= 1e-8)
+                    return new List<Element> { originalLevel };
+                return destinationDefinitions.Where(element => element.GetType() == definition.GetType()
+                    && ElementHistoryNativeArchive.ReadHistoricalTypeVersion(element) == artifact.TypeVersion
+                    && (GetOrigins(element) ?? new List<string>()).Contains(sourceIds[definition.UniqueId])).ToList();
+            }
+            string MappingFailure(Element definition, int count)
+            {
+                var original = sourceIds[definition.UniqueId];
+                var candidates = destinationDefinitions.Where(element => element.GetType() == definition.GetType()
+                    && (element.UniqueId == original || element.Name == definition.Name || (GetOrigins(element) ?? new List<string>()).Contains(original)))
+                    .Take(12).Select(element => element.UniqueId + "/" + element.Name
+                        + "/version=" + ElementHistoryNativeArchive.ReadHistoricalTypeVersion(element)
+                        + "/origins=" + string.Join(",", GetOrigins(element) ?? new List<string>())
+                        + (element is Level level ? "/elevation=" + level.ProjectElevation.ToString("R", System.Globalization.CultureInfo.InvariantCulture) : ""));
+                return "FrozenDefinitionMapping: matches=" + count + "; class=" + definition.GetType().FullName
+                    + "; name=" + definition.Name + "; sourceUID=" + original + "; capsuleUID=" + definition.UniqueId
+                    + "; expectedVersion=" + artifact.TypeVersion + "; candidates=[" + string.Join("; ", candidates) + "]";
+            }
+            definitionCount = definitions.Count;
+            LogPhase(phase, phaseTimer.Elapsed.TotalMilliseconds, true, new { Definitions = definitionCount, DestinationDefinitions = destinationDefinitions.Count, UnreferencedFamiliesIgnored = ignoredFamilies });
+            phase = "definition_import_preflight"; phaseTimer.Restart();
+            ElementHistoryNativeArchive.ValidateDurableTypeCompatibility(source, doc, artifact.TypeVersion);
+            using (var atomic = new TransactionGroup(doc, "BIMaestro - Importer fermeture historique"))
+            {
+                atomic.Start();
+                var missing = new List<ElementId>();
+                foreach (var definition in definitions)
+                {
+                    activeDefinition = sourceIds[definition.UniqueId];
+                    var existing = Matches(definition);
+                    if (existing.Count > 1) throw new InvalidOperationException(MappingFailure(definition, existing.Count));
+                    if (existing.Count == 0 && !(definition is Family)) missing.Add(definition.Id);
+                }
+                copyCount = missing.Count;
+                LogPhase(phase, phaseTimer.Elapsed.TotalMilliseconds, true, new { Definitions = definitionCount, Missing = copyCount });
+                phase = "definition_import_copy"; phaseTimer.Restart();
+                if (missing.Count > 0)
+                    using (var transaction = new Transaction(doc, "BIMaestro - Importer definitions historiques"))
+                    using (var options = new CopyPasteOptions())
+                    {
+                        transaction.Start(); options.SetDuplicateTypeNamesHandler(new ReuseProvenDefinitionCollision());
+                        var apiTimer = Stopwatch.StartNew();
+                        var importedIds = ElementTransformUtils.CopyElements(source, missing, doc, Transform.Identity, options);
+                        LogPhase("definition_import_copy_api", apiTimer.Elapsed.TotalMilliseconds, true, new { Requested = missing.Count, Returned = importedIds.Count });
+                        apiTimer.Restart();
+                        if (transaction.Commit() != TransactionStatus.Committed)
+                            throw new InvalidOperationException("Import de fermeture historique refuse par Revit.");
+                        LogPhase("definition_import_copy_commit", apiTimer.Elapsed.TotalMilliseconds, true, new { Requested = missing.Count });
+                    }
+                LogPhase(phase, phaseTimer.Elapsed.TotalMilliseconds, true, new { Requested = copyCount });
+                phase = "definition_import_verify"; phaseTimer.Restart();
+                destinationDefinitions = ReadDestinationDefinitions();
+                foreach (var historicalFamily in definitions.OfType<Family>())
+                {
+                    var links = definitions.OfType<FamilySymbol>()
+                        .Where(symbol => symbol.Family.Id == historicalFamily.Id)
+                        .Select(symbol => new {
+                            SourceSymbolUid = sourceIds[symbol.UniqueId], CapsuleSymbolUid = symbol.UniqueId,
+                            SymbolName = symbol.Name,
+                            Targets = Matches(symbol).OfType<FamilySymbol>().Select(actual => new {
+                                SymbolUid = actual.UniqueId, SymbolName = actual.Name,
+                                SymbolVersion = ElementHistoryNativeArchive.ReadHistoricalTypeVersion(actual),
+                                ParentUid = actual.Family.UniqueId, ParentName = actual.Family.Name,
+                                WasPresentBeforeImport = familyUidsBeforeImport.Contains(actual.Family.UniqueId),
+                                ParentVersion = ElementHistoryNativeArchive.ReadHistoricalTypeVersion(actual.Family),
+                                ParentOrigins = (GetOrigins(actual.Family) ?? new List<string>()).ToArray(),
+                                CategoryId = actual.Family.FamilyCategory?.Id.GetIdLongValue(),
+                                Placement = actual.Family.FamilyPlacementType.ToString(),
+                                Shared = actual.Family.get_Parameter(BuiltInParameter.FAMILY_SHARED)?.AsInteger(), actual.Family.IsInPlace
+                            }).ToArray()
+                        }).ToArray();
+                    LogPhase("definition_import_family_parents", 0, true, new {
+                        SourceFamilyUid = sourceIds[historicalFamily.UniqueId],
+                        CapsuleFamilyUid = historicalFamily.UniqueId, FamilyName = historicalFamily.Name,
+                        ExpectedVersion = artifact.TypeVersion,
+                        SourceCategoryId = historicalFamily.FamilyCategory?.Id.GetIdLongValue(),
+                        SourcePlacement = historicalFamily.FamilyPlacementType.ToString(),
+                        SourceShared = historicalFamily.get_Parameter(BuiltInParameter.FAMILY_SHARED)?.AsInteger(), SourceInPlace = historicalFamily.IsInPlace,
+                        Symbols = links
+                    });
+                }
+                foreach (var definition in definitions)
+                {
+                    activeDefinition = sourceIds[definition.UniqueId];
+                    var existing = Matches(definition);
+                    if (existing.Count != 1) throw new InvalidOperationException(MappingFailure(definition, existing.Count));
+                    if (definition is Level expected && (!(existing[0] is Level actual)
+                        || Math.Abs(expected.ProjectElevation - actual.ProjectElevation) > 1e-8))
+                        throw new InvalidOperationException("Le niveau historique importe differe de la capsule.");
+                    remap.Add(sourceIds[definition.UniqueId], existing[0].UniqueId);
+                    mappedCount = remap.Count;
+                    LogPhase("definition_import_mapping", 0, true, new { SourceUid = activeDefinition,
+                        CapsuleUid = definition.UniqueId, Class = definition.GetType().FullName, Name = definition.Name,
+                        TargetUid = existing[0].UniqueId, Version = ElementHistoryNativeArchive.ReadHistoricalTypeVersion(existing[0]),
+                        OriginalProjectContext = existing[0].UniqueId == activeDefinition });
+                }
+                if (!remap.ContainsKey(recipe.Type)) throw new InvalidOperationException("Le type principal historique est absent.");
+                if (atomic.Assimilate() != TransactionStatus.Committed)
+                    throw new InvalidOperationException("Import historique non valide.");
+            }
+            LogPhase(phase, phaseTimer.Elapsed.TotalMilliseconds, true, new { Mapped = mappedCount });
+            phase = "definition_import_remap"; phaseTimer.Restart();
+            foreach (var pair in remap) index[pair.Key] = pair.Value;
+            RemapDurableDefinitionReferences(recipe, remap);
+            LogPhase(phase, phaseTimer.Elapsed.TotalMilliseconds, true, new { Mapped = mappedCount });
+            importSucceeded = true;
+            }
+            catch (Exception failure)
+            {
+                LogPhase(phase + "_failed", phaseTimer.Elapsed.TotalMilliseconds, false, new {
+                    SourceUid = activeDefinition, RecipeType = originalType,
+                    PayloadId = recipe.OpeningFallback?.PayloadId, Version = recipe.OpeningFallback?.TypeVersion,
+                    Definitions = definitionCount, RequestedCopies = copyCount, Mapped = mappedCount, Error = failure.ToString() });
+                throw new InvalidOperationException("DefinitionImport [phase=" + phase + "; sourceUID=" + activeDefinition
+                    + "; type=" + originalType + "]: " + failure.Message, failure);
+            }
+            finally
+            {
+                LogPhase("definition_import_total", totalTimer.Elapsed.TotalMilliseconds, importSucceeded,
+                    new { RecipeType = originalType, Definitions = definitionCount, RequestedCopies = copyCount, Mapped = mappedCount });
+            }        }
+
+        private static void RemapDurableDefinitionReferences(HistoryRecipe recipe, Dictionary<string, string> remap)
+        {
+            string Map(string uid) => uid != null && remap.TryGetValue(uid, out var actual) ? actual : uid;
+            recipe.Type = Map(recipe.Type); recipe.Level = Map(recipe.Level);
+            if (recipe.HistoricalPlacement != null)
+            {
+                recipe.HistoricalPlacement.LevelSourceUniqueId = Map(recipe.HistoricalPlacement.LevelSourceUniqueId);
+                recipe.HistoricalPlacement.HostSourceUniqueId = Map(recipe.HistoricalPlacement.HostSourceUniqueId);
+            }
+            if (recipe.Network != null) recipe.Network.SystemType = Map(recipe.Network.SystemType);
+            foreach (var parameter in (recipe.Parameters ?? new List<HistoryParameter>())
+                .Concat(recipe.HistoricalPlacement?.ElevationParameters ?? new List<HistoryParameter>()))
+            { parameter.Reference = Map(parameter.Reference); parameter.Definition = Map(parameter.Definition); }
+            foreach (var port in (recipe.Ports ?? new List<HistoryPort>())
+                .Concat((recipe.Connections ?? new List<HistoryConnection>()).SelectMany(connection => new[] { connection.Port, connection.PeerPort })))
+                if (port != null) port.SystemType = Map(port.SystemType);
+            foreach (var circuit in recipe.ElectricalCircuits ?? new List<HistoryCircuit>())
+                if (circuit?.Recipe != null) RemapDurableDefinitionReferences(circuit.Recipe, remap);
+        }
+
+        private sealed class ReuseProvenDefinitionCollision : IDuplicateTypeNamesHandler
+        {
+            public DuplicateTypeAction OnDuplicateTypeNamesFound(DuplicateTypeNamesHandlerArgs args) => DuplicateTypeAction.UseDestinationTypes;
+        }
+        private sealed class RejectDefinitionCollision : IDuplicateTypeNamesHandler
+        {
+            public DuplicateTypeAction OnDuplicateTypeNamesFound(DuplicateTypeNamesHandlerArgs args) => DuplicateTypeAction.Abort;
         }
 
         private static List<HistoryRestoreRequest> OrderByDependencies(List<HistoryRestoreRequest> selected)
@@ -491,6 +942,8 @@ namespace Analyse
             Dictionary<string, string> index, HistoryRestoreBatch batch)
         {
             var visited = new HashSet<string>(StringComparer.Ordinal);
+            var recipes = selected.Where(r => r.SourceUniqueId != null).GroupBy(r => r.SourceUniqueId)
+                .ToDictionary(g => g.Key, g => g.First().Recipe, StringComparer.Ordinal);
             foreach (var request in selected)
             {
                 var uid = Resolve(doc, index, request.SourceUniqueId);
@@ -523,16 +976,27 @@ namespace Analyse
                                 if (a == null || b == null) throw new InvalidOperationException("Connecteur déplacé ou introuvable : "
                                     + (a == null ? "source [" + ElementHistoryNetwork.DescribeMismatch(doc.GetElement(uid), link.Port) + "] " : "")
                                     + (b == null ? "voisin [" + ElementHistoryNetwork.DescribeMismatch(doc.GetElement(peerUid), link.PeerPort) + "]" : ""));
-                                if (a.IsConnectedTo(b)) { tx.RollBack(); batch.ConnectionsExisting++; continue; }
+                                recipes.TryGetValue(link.Peer ?? "", out var peerRecipe);
+                                recipes.TryGetValue(sourceMember ?? "", out var memberRecipe);
+                                var connectionGuard = ElementHistoryNetwork.CaptureConnectionGuard(doc,
+                                    doc.GetElement(uid), doc.GetElement(peerUid), memberRecipe, peerRecipe,
+                                    link.Port, link.PeerPort);
+                                if (a.IsConnectedTo(b))
+                                {
+                                    ElementHistoryNetwork.VerifyConnectionGuard(doc, connectionGuard);
+                                    tx.RollBack(); batch.ConnectionsExisting++; continue;
+                                }
                                 if (a.IsConnected || b.IsConnected) throw new InvalidOperationException("Connecteur déjà utilisé par une autre connexion.");
                                 if (a.Origin.DistanceTo(b.Origin) > 1e-4) throw new InvalidOperationException("Les connecteurs ne coïncident plus.");
                                 a.ConnectTo(b);
                                 doc.Regenerate();
+                                ElementHistoryNetwork.VerifyConnectionGuard(doc, connectionGuard);
                                 // A direct historical edge must not silently become an extra fitting.
                                 a = ElementHistoryNetwork.Match(doc.GetElement(uid), link.Port);
                                 b = ElementHistoryNetwork.Match(doc.GetElement(peerUid), link.PeerPort);
                                 if (a == null || b == null || !a.IsConnectedTo(b)) throw new InvalidOperationException("Connexion directe non rétablie.");
                                 if (tx.Commit() != TransactionStatus.Committed) throw new InvalidOperationException(failures.Message ?? "Connexion refusée par Revit.");
+                                ElementHistoryNetwork.VerifyConnectionGuard(doc, connectionGuard);
                                 a = ElementHistoryNetwork.Match(ElementHistoryReconstruction.FindOriginal(doc, uid), link.Port);
                                 b = ElementHistoryNetwork.Match(ElementHistoryReconstruction.FindOriginal(doc, peerUid), link.PeerPort);
                                 if (a == null || b == null || !a.IsConnectedTo(b))

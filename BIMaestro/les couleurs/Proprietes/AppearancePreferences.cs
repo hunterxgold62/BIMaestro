@@ -92,13 +92,10 @@ namespace BIMaestro.PropertiesAppearance
         public static Color ReadableText(PaletteColors colors, bool dark)
         {
             // An explicit choice must match the picker in both the preview and Revit.
-            // Automatic contrast is only a fallback when no text color was chosen.
+            // Keep black ink by default when only a background is chosen.
             var chosen = Parse(colors.Text);
             if (chosen.HasValue) return chosen.Value;
-            var bg = Parse(colors.Background) ?? (dark ? Color.FromRgb(59, 68, 83) : Colors.White);
-            var fg = Parse(colors.Text) ?? (dark ? Colors.White : Color.FromRgb(25, 25, 25));
-            if (Contrast(fg, bg) >= 4.5) return fg;
-            return Contrast(Colors.Black, bg) >= Contrast(Colors.White, bg) ? Colors.Black : Colors.White;
+            return Colors.Black;
         }
     }
 

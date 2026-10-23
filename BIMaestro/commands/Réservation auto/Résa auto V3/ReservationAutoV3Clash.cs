@@ -75,27 +75,7 @@ namespace Modification
                 var created = FindInstances(doc, symbol.Id).Where(f => !before.Contains(f.UniqueId)).ToList();
                 if (created.Count != 1) throw new InvalidOperationException("Aucune réservation unique n'a été créée. La modification a été annulée.");
                 var instance = created[0];
-                if (!rect && objectType == ReservationAutoV3Window.ObjectType.Autre)
-                {
-                    var points = new System.Collections.Generic.List<XYZ>();
-                    foreach (var a in GetElementSolidsInCurrentDocument(host, transform))
-                    foreach (var b in GetElementSolidsInCurrentDocument(source, Transform.Identity))
-                    {
-                        try
-                        {
-                            var intersection = BooleanOperationsUtils.ExecuteBooleanOperation(a, b, BooleanOperationsType.Intersect);
-                            if (intersection?.Volume > 1e-9) CollectSolidPoints(intersection, points);
-                        }
-                        catch { /* Other physical solids can still yield a usable footprint. */ }
-                    }
-                    if (points.Count == 0) throw new InvalidOperationException("La forme circulaire ne peut pas être dimensionnée sur cette géométrie. Aucune réservation conservée.");
-                    var axisX = wall ? GetWallDirectionXY((Wall)host, transform) : XYZ.BasisX;
-                    var axisY = wall ? XYZ.BasisZ : XYZ.BasisY;
-                    double diameter = 2 * points.Max(p => { var delta = p - center;
-                        double x = delta.DotProduct(axisX), y = delta.DotProduct(axisY); return Math.Sqrt(x*x + y*y); });
-                    if (config.DefaultNormeEnabled) diameter = RoundUpToNext50mm(diameter);
-                    TrySet(instance, profile.ParamDiameter, diameter);
-                }
+                // Generic circular footprints are sized by ApplySizing, shared with Autoréservation.
                 var dimensions = rect ? (wall ? new[]
                     {
                         new[] { profile.ParamLength, "Longueur", "COM_Longueur", "Largeur", "COM_Largeur", "Length", "Width" },

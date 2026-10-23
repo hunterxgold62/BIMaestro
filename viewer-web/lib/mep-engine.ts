@@ -1,6 +1,6 @@
 import type { MepGraph, MepSourceOverride, MepAnalysisSettings, MepAnalysisReference } from './mep-contract';
 
-export const MEP_ENGINE_VERSION = 'mep-topology-2.0.1';
+export const MEP_ENGINE_VERSION = 'mep-topology-2.0.4';
 export type CalculationResult = { graph: MepGraph; reportText: string };
 export type CalculationRequest = { graph: MepGraph; valves?: Record<string, boolean>; sources?: Record<string, MepSourceOverride>; reference?: MepAnalysisReference; setReference?: boolean } & MepAnalysisSettings;
 let frame: HTMLIFrameElement | null = null;
@@ -12,7 +12,7 @@ function start(): Promise<void> {
   if (startup) return startup;
   startup = new Promise<void>((resolve, reject) => {
     const iframe = document.createElement('iframe');
-    frame = iframe; iframe.hidden = true; iframe.title = 'Calcul local du réseau MEP'; iframe.src = '/mep-engine/index.html';
+    frame = iframe; iframe.hidden = true; iframe.title = 'Calcul local du réseau MEP'; iframe.src = `/mep-engine/index.html?v=${MEP_ENGINE_VERSION}`;
     const timeout = setTimeout(() => fail(new Error('Le moteur MEP ne répond pas. Rechargez pour réessayer.')), 90000);
     const fail = (error: Error) => {
       clearTimeout(timeout); window.removeEventListener('message', onMessage); iframe.remove(); frame = null; startup = null;

@@ -101,12 +101,162 @@ namespace BIMaestro.VideoGames
             new GameMepSimulationEngine(multi.Graph).Recalculate();
             Assert(multi.Graph.FindElement("end").ConnectedToInlet, "A unique connected In/Out pair remains traversable despite unused auxiliary ports.");
             Assert(!multi.Graph.FindElement("equipment").Paths.Any(p => p.StartConnector == multi.Graph.FindElement("equipment").ConnectorIndices[2] && p.HasCirculation), "An auxiliary port is not a new consumer.");
+            multi.Graph.Systems.Add(new GameMepSystemData { Key = "supply", Abbreviation = "PRI.A", Classification = "SupplyHydronic" });
+            multi.Graph.Systems.Add(new GameMepSystemData { Key = "return", Abbreviation = "PRI.R", Classification = "ReturnHydronic" });
+            foreach (var connector in multi.Graph.Connectors)
+                connector.SystemKey = connector.ElementKey == "inlet" ? "supply" : "return";
+            multi.Graph.RebuildIndexes();
+            new GameMepSimulationEngine(multi.Graph).Recalculate();
+            Assert(multi.Graph.FindElement("end").ConnectedToInlet,
+                "A native equipment port reporting return must remain attached to its physical hydronic supply pipe.");
+            multi.Graph.Systems.Single(s => s.Key == "supply").Classification = "DomesticColdWater";
+            new GameMepSimulationEngine(multi.Graph).Recalculate();
+            Assert(!multi.Graph.FindElement("end").ConnectedToInlet,
+                "Recognized equipment ports must not bridge domestic water and hydronic circuits.");
+            multi.Graph.Systems.Single(s => s.Key == "supply").Classification = "SupplyHydronic";
+            multi.AddElement("third-circuit", 1);
+            multi.Connect("equipment", 2, "third-circuit", 0);
+            new GameMepSimulationEngine(multi.Graph).Recalculate();
+            Assert(!multi.Graph.FindElement("end").ConnectedToInlet,
+                "Equipment with three connected ports must keep its unresolved internal circuits separate.");
+        }
+
+        private static void BidirectionalHydronicEquipmentIsPassiveAndReversible()
+        {
+            var fixture = new GraphFixture();
+            fixture.AddSystem("supply", "PRI.A", "SupplyHydronic");
+            fixture.AddSystem("return", "PRI.R", "ReturnHydronic");
+            fixture.AddSystem("domestic", "EF", "DomesticColdWater");
+            fixture.AddElement("inlet", 1, source: true);
+            fixture.AddElement("equipment", 2);
+            fixture.AddElement("valve", 2, valve: true);
+            fixture.AddElement("outlet", 1);
+            fixture.SetElementSystem("inlet", "supply");
+            fixture.SetElementSystem("equipment", "supply");
+            fixture.SetConnectorSystem("equipment", 1, "return");
+            fixture.SetElementSystem("valve", "return");
+            fixture.SetElementSystem("outlet", "return");
+            fixture.SetConnectorFlowDirection("equipment", 0, "Bidirectional");
+            fixture.SetConnectorFlowDirection("equipment", 1, "Bidirectional");
+            fixture.Connect("inlet", 0, "equipment", 0);
+            fixture.Connect("equipment", 1, "valve", 0);
+            fixture.Connect("valve", 1, "outlet", 0);
+            var graph = fixture.Graph;
+            var engine = new GameMepSimulationEngine(graph);
+            engine.Recalculate();
+            Assert(fixture.Path("equipment").HasCirculation && fixture.Path("equipment").FlowForward,
+                "Two connected bidirectional equipment ports bridge hydronic supply and return.");
+            Assert(graph.Sources.Count == 1 && graph.DirectionConstraints.Count == 0 &&
+                graph.Connectors.Where(c=>c.ElementKey=="equipment").All(c=>c.FlowDirection=="Bidirectional"),
+                "A passive passage must not create a source, impose a direction or rewrite native ports.");
+            graph.Sources.Single().IsActive = false;
+            graph.Sources.Add(new GameMepSourceData { ElementKey="outlet", SystemKey="return", IsActive=true });
+            engine.Recalculate();
+            Assert(fixture.Path("equipment").HasCirculation && !fixture.Path("equipment").FlowForward,
+                "The bidirectional passage follows reversed network boundaries.");
+            fixture.CloseValve("valve"); engine.Recalculate();
+            Assert(!fixture.Path("equipment").HasCirculation, "A passive hydronic passage cannot bypass a closed valve.");
+            graph.FindValve("valve").IsClosed = false;
+            var equipment = graph.FindElement("equipment");
+            var edge = graph.Connections.Single(c=>c.IsInternal && c.ElementKey==equipment.Key);
+            fixture.SetConnectorSystem("equipment", 1, "domestic");
+            Assert(!GameMepSystemTraversalPolicy.CanTraverse(graph, edge), "Bidirectional ports must not mix domestic and hydronic water.");
+            fixture.SetConnectorSystem("equipment", 1, "return");
+            fixture.SetConnectorFlowDirection("equipment", 0, "");
+            Assert(!GameMepSystemTraversalPolicy.CanTraverse(graph, edge), "Missing native directions do not establish a bidirectional pair.");
+            fixture.SetConnectorFlowDirection("equipment", 0, "Bidirectional");
+            graph.Connectors[equipment.ConnectorIndices[0]].IsConnected = false;
+            Assert(!GameMepSystemTraversalPolicy.CanTraverse(graph, edge), "The hydronic exception requires both physical attachments.");
+            graph.Connectors[equipment.ConnectorIndices[0]].IsConnected = true;
+            equipment.IsPipeCurve = true;
+            Assert(!GameMepSystemTraversalPolicy.CanTraverse(graph, edge), "A pipe is not a bidirectional equipment passage.");
+            equipment.IsPipeCurve = false; equipment.IsPipeFitting = true;
+            Assert(!GameMepSystemTraversalPolicy.CanTraverse(graph, edge), "A fitting does not qualify for the equipment exception.");
+            equipment.IsPipeFitting = false;
+            equipment.Category = "Accessoire de canalisation";
+            Assert(!GameMepSystemTraversalPolicy.CanTraverse(graph, edge), "A hydronic equipment exception must not reclassify a pipe accessory.");
+            equipment.Category = "Pipe Accessories";
+            Assert(!GameMepSystemTraversalPolicy.CanTraverse(graph, edge), "Pipe accessories remain protected in English Revit exports too.");
+            equipment.Category = "Equipement de génie climatique";
+            fixture.SetConnectorSystem("equipment", 0, "return");
+            engine.Recalculate();
+            Assert(fixture.Path("equipment").HasCirculation,
+                "Bidirectional equipment remains physically attached when its supply-side port reports return metadata.");
+            fixture.SetConnectorSystem("equipment", 0, "supply");
+            int auxiliary = graph.Connectors.Count;
+            graph.Connectors.Add(new GameMepConnectorData { Index=auxiliary, ElementKey=equipment.Key, SystemKey="return", FlowDirection="Bidirectional" });
+            equipment.ConnectorIndices.Add(auxiliary); equipment.RequiresPassageValidation = true;
+            Assert(!GameMepSystemTraversalPolicy.CanTraverse(graph, edge),
+                "A third equipment connector keeps unresolved circuits protected, even when unused.");
         }
 
         private static int Main(string[] args)
         {
             try
             {
+                if (args.Length == 4 && args[0] == "--audit-equipment")
+                    return EquipmentAudit.Run(args[1], args[2], args[3]);
+                if (args.Length == 3 && args[0] == "--verify-antibes-economizers")
+                {
+                    var state = Newtonsoft.Json.Linq.JObject.Parse(File.ReadAllText(args[2]))["scenario"]["state"];
+                    var request = new GameMepCalculationRequest { Graph=GameMepReplayStore.Load(args[1]).Graph };
+                    request.Valves=state["valves"]?.ToObject<Dictionary<string,bool>>() ?? new Dictionary<string,bool>();
+                    request.Sources=state["sources"]?.ToObject<Dictionary<string,string>>() ?? new Dictionary<string,string>();
+                    var graph=GameMepCalculation.Run(request);
+                    foreach (long id in new long[]{697532,877579})
+                    {
+                        var equipment=graph.FindElement(id);
+                        Assert(equipment.ConnectorIndices.Count==2 && equipment.ConnectorIndices.All(i=>graph.Connectors[i].FlowDirection=="Bidirectional"),
+                            "Keep the original two bidirectional economizer ports: "+id);
+                        Assert(equipment.Paths.Single().HasCirculation,"Economizer must circulate: "+id);
+                        Assert(graph.Connections.Where(c=>c.IsInternal && c.ElementKey==equipment.Key).All(c=>GameMepSystemTraversalPolicy.CanTraverse(graph,c)),
+                            "Economizer must have an allowed internal passage: "+id);
+                        foreach(var edge in graph.Connections.Where(c=>!c.IsInternal && (equipment.ConnectorIndices.Contains(c.ConnectorA)||equipment.ConnectorIndices.Contains(c.ConnectorB))))
+                        {
+                            bool? Out(int index) {
+                                var owner=graph.FindElement(graph.Connectors[index].ElementKey);
+                                var path=owner.Paths.FirstOrDefault(p=>p.HasCirculation && (p.StartConnector==index||p.EndConnector==index));
+                                return path==null?(bool?)null:path.StartConnector==index?!path.FlowForward:path.FlowForward;
+                            }
+                            Assert(Out(edge.ConnectorA).HasValue && Out(edge.ConnectorB).HasValue && Out(edge.ConnectorA)!=Out(edge.ConnectorB),
+                                "Economizer arrows must stay continuous across its physical attachments: "+id);
+                        }
+                    }
+                    foreach(long id in new long[]{877393,958942})
+                        Assert(graph.FindElement(id).Paths.Single().HasCirculation,"Associated pump must circulate: "+id);
+                    var engine=new GameMepSimulationEngine(graph);
+                    string first=Newtonsoft.Json.JsonConvert.SerializeObject(GameMepParity.Summary(graph));
+                    engine.Recalculate();
+                    Assert(first==Newtonsoft.Json.JsonConvert.SerializeObject(GameMepParity.Summary(graph)),"Economizer result must be stable across recalculations.");
+                    Console.WriteLine("Antibes economizers: "+_assertions+" assertions passed.");
+                    return 0;
+                }
+                if (args.Length == 2 && args[0] == "--verify-antibes-boiler")
+                {
+                    var graph = GameMepReplayStore.Load(args[1]).Graph;
+                    var engine = new GameMepSimulationEngine(graph);
+                    engine.Recalculate();
+                    var boiler = graph.FindElement(750783);
+                    Assert(boiler.ConnectorIndices.Count == 5, "Keep every original boiler connector.");
+                    Assert(GameMepEquipmentDirectionPolicy.TryGetNativeFlowDirection(graph, boiler, out int entry, out int exit)
+                        && entry == 21 && exit == 19, "Recognize the original connected boiler In/Out pair.");
+                    Assert(boiler.Paths.Single(p => p.StartConnector == entry).HasCirculation &&
+                        boiler.Paths.Single(p => p.StartConnector == entry).FlowForward,
+                        "The inlet pipe must feed the boiler despite its mismatched Revit system label.");
+                    Assert(boiler.Paths.Single(p => p.StartConnector == exit).HasCirculation &&
+                        !boiler.Paths.Single(p => p.StartConnector == exit).FlowForward,
+                        "The boiler must supply its outlet pipe.");
+                    Assert(boiler.Paths.Where(p => p.StartConnector != entry && p.StartConnector != exit).All(p => !p.HasCirculation),
+                        "Unused boiler ports must remain stagnant.");
+                    Assert(graph.FindElement(810046).Paths.Count(p => p.HasCirculation) == 2,
+                        "The filter must retain only its two circulating main ports.");
+                    string first = Newtonsoft.Json.JsonConvert.SerializeObject(GameMepParity.Summary(graph));
+                    engine.Recalculate();
+                    Assert(first == Newtonsoft.Json.JsonConvert.SerializeObject(GameMepParity.Summary(graph)),
+                        "Boiler circulation must remain stable across recalculations.");
+                    Console.WriteLine("Antibes boiler: " + _assertions + " assertions passed.");
+                    return 0;
+                }
                 if (args.Length == 2 && args[0] == "--verify-flow-follow")
                 {
                     var graph = GameMepReplayStore.Load(args[1]).Graph;
@@ -234,6 +384,7 @@ namespace BIMaestro.VideoGames
                 WebExportTests.Run();
                 SectionPlaneClipsPickingAndFlowSegments();
                 MilestonesOneAndTwo();
+                BidirectionalHydronicEquipmentIsPassiveAndReversible();
                 StraightValveCutsOnlyPath();
                 TeeSuppliesBothBranches();
                 SmallInletFeedsLargeHeaderWithoutReversingIt();
@@ -248,6 +399,7 @@ namespace BIMaestro.VideoGames
                 NativePumpSuctionOverridesSmallDnTeeInference();
                 NativePumpSuctionCrossesPassiveChainToFirstTee();
                 LateralPumpSuctionReceivesBothCollinearArms();
+                SecondaryPumpBypassDoesNotReverseMainHeader();
                 ParallelNativePumpDischargesDoNotReverseEachOther();
                 ConflictingPumpVotesDoNotUsePumpCountAsFlowRate();
                 OpeningValvePreservesEstablishedPumpConsensus();
@@ -1398,8 +1550,54 @@ namespace BIMaestro.VideoGames
                 !fixture.JunctionPath("junction", 2).FlowForward,
                 "Native pump suction must cross pipes and passive accessories up to the first tee.");
             Assert(fixture.Path("suction").DirectionReason.IndexOf(
-                    "Aspiration propagée", StringComparison.Ordinal) >= 0,
+                    "Continuité vers le port d'entrée", StringComparison.Ordinal) >= 0,
                 "The suction pipe must explain that its direction comes from the native pump inlet.");
+        }
+
+        private static void SecondaryPumpBypassDoesNotReverseMainHeader()
+        {
+            var f = new GraphFixture();
+            f.AddElement("source", 1, source: true);
+            f.AddElement("return", 1);
+            foreach (var key in new[] { "upstream", "main", "downstream", "suction", "economizer" }) f.AddElement(key, 2, valve: key == "suction");
+            f.AddElement("pump", 2);
+            f.AddElement("takeoff", 3); f.AddElement("reinjection", 3);
+            f.Connect("source", 0, "upstream", 0);
+            f.Connect("upstream", 1, "takeoff", 0);
+            f.Connect("takeoff", 1, "main", 0);
+            f.Connect("main", 1, "reinjection", 0);
+            f.Connect("reinjection", 1, "downstream", 0);
+            f.Connect("downstream", 1, "return", 0);
+            f.Connect("takeoff", 2, "suction", 0);
+            f.Connect("suction", 1, "pump", 0);
+            f.Connect("pump", 1, "economizer", 0);
+            f.Connect("economizer", 1, "reinjection", 2);
+            f.AddBoundary("return", GameMepBoundaryKind.Outlet);
+            f.SetElementIdentity("pump", "Pompe secondaire", "Pompe secondaire");
+            f.SetConnectorFlowDirection("pump", 0, "In");
+            f.SetConnectorFlowDirection("pump", 1, "Out");
+            foreach (var key in new[] { "upstream", "main", "downstream" }) { f.SetPipeDiameter(key, 200); f.SetPathLength(key, 5); }
+            foreach (var key in new[] { "suction", "economizer" }) f.SetPipeDiameter(key, 80);
+            f.SetPortDiameter("pump", 0, 80); f.SetPortDiameter("pump", 1, 80);
+            foreach (var key in new[] { "takeoff", "reinjection" })
+            {
+                f.SetElementClassification(key, "ReturnHydronic");
+                f.SetPortDirection(key, 0, -1, 0, 0); f.SetPortDirection(key, 1, 1, 0, 0); f.SetPortDirection(key, 2, 0, 1, 0);
+                f.SetPortDiameter(key, 0, 200); f.SetPortDiameter(key, 1, 200); f.SetPortDiameter(key, 2, 80);
+                f.AddJunctionPaths(key);
+            }
+            var engine = new GameMepSimulationEngine(f.Graph);
+            engine.Recalculate();
+            Assert(f.Path("main").HasCirculation && f.Path("main").FlowForward, "A takeoff/reinjection pump loop must not reverse the primary pipe between its tees. " + f.Path("main").HasCirculation + "/" + f.Path("main").DirectionReason);
+            Assert(f.Path("pump").FlowForward && f.Path("economizer").FlowForward, "The secondary loop must retain its native pump direction.");
+            engine.Recalculate();
+            Assert(f.Path("main").FlowForward, "Secondary bypass header direction must remain stable on recalculation.");
+            f.CloseValve("suction"); engine.Recalculate();
+            Assert(f.Path("main").HasCirculation && f.Path("main").FlowForward && !f.Path("suction").HasCirculation,
+                "Closing the secondary loop must preserve the primary flow and stop the isolated branch.");
+            f.Graph.FindValve("suction").IsClosed = false; engine.Recalculate();
+            Assert(f.Path("main").FlowForward && f.Path("suction").HasCirculation,
+                "Reopening a secondary loop must not reverse the primary flow.");
         }
 
         private static void LateralPumpSuctionReceivesBothCollinearArms()

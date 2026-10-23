@@ -33,9 +33,20 @@ public static class IdleGateChecks {
         HistoryBackgroundWork.CanRun(uint.MaxValue-1000, 0, false, 2000);
         Check(!HistoryBackgroundWork.CanRun(uint.MaxValue-1000, uint.MaxValue-3000, true, 2000), "Rollover initial delay");
         Check(HistoryBackgroundWork.CanRun(1000, uint.MaxValue-3000, true, 2000), "Tick counter rollover");
+        Check(!HistoryBackgroundWork.CanRunInventory(1000,1000,true,false), "Inventory yields to current foreground input");
+        Check(!HistoryBackgroundWork.CanRunInventory(1149,1000,true,false), "Inventory does not start before its 150ms input pause");
+        Check(HistoryBackgroundWork.CanRunInventory(1150,1000,true,false), "Short inventory resumes at the 150ms boundary");
+        Check(HistoryBackgroundWork.CanRunInventory(1000,1000,false,false), "Opening protection progresses while another app receives input");
+        Check(!HistoryBackgroundWork.CanRunInventory(1000,0,false,true), "Stop also blocks inventory outside Revit");
+        Check(!HistoryBackgroundWork.CanRunInventory(1000,0,true,true), "Stop blocks foreground inventory");
+        Check(!HistoryBackgroundWork.CanRunInventory(49,uint.MaxValue-99,true,false), "Inventory threshold remains accurate across tick rollover");
+        Check(HistoryBackgroundWork.CanRunInventory(50,uint.MaxValue-99,true,false), "Inventory resumes after 150ms across tick rollover");
+        HistoryBackgroundWork.Paused=true;
+        Check(!HistoryBackgroundWork.InventoryCanRun(), "Paused inventory exits before touching native input APIs");
+        HistoryBackgroundWork.Paused=false;
     }
 }
 '@
 Add-Type -TypeDefinition ("using System; using System.Diagnostics; using System.Runtime.InteropServices;`n" + $gate + $checks)
 [IdleGateChecks]::Run()
-Write-Output 'PASS: immediate selection, Stop, background suspension, return delay, input interruption and tick rollover.'
+Write-Output 'PASS: selection, Stop, heavy foreground suspension, return delay, input interruption, light inventory in background, 150ms threshold and tick rollover.'

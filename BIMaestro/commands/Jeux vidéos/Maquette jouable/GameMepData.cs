@@ -550,6 +550,15 @@ namespace BIMaestro.VideoGames
                 string.Empty;
             string second = graph.Connectors[edge.ConnectorB].SystemKey ??
                 string.Empty;
+            GameMepElementData? internalOwner = edge.IsInternal
+                ? graph.FindElement(edge.ElementKey) : null;
+            if (IsBidirectionalHydronicEquipment(graph, internalOwner) &&
+                MatchesPair(edge, internalOwner!.ConnectorIndices[0], internalOwner.ConnectorIndices[1]))
+            {
+                // Exactly two connected bidirectional ports define one passive
+                // hydronic passage. Supply/return labels do not split its fluid.
+                return true;
+            }
             if (edge.IsInternal && graph.FindElement(edge.ElementKey)?.RequiresPassageValidation == true)
             {
                 // Only an explicit pair may cross an unresolved multichannel component.
@@ -575,6 +584,18 @@ namespace BIMaestro.VideoGames
                 {
                     // Une liaison physique avec un té/piquage est précisément
                     // le point où deux systèmes Revit peuvent se mélanger.
+                    return true;
+                }
+                // A family can report the return system on both native ports,
+                // including the port physically connected to the supply pipe.
+                // Honor that attachment only at a recognized In/Out port or a
+                // two-port bidirectional equipment, within a hydronic circuit.
+                if (IsHydronicSystem(graph, first) && IsHydronicSystem(graph, second) &&
+                    (IsNativeEquipmentPort(graph, firstOwner, edge.ConnectorA) ||
+                     IsNativeEquipmentPort(graph, secondOwner, edge.ConnectorB) ||
+                     IsBidirectionalHydronicEquipment(graph, firstOwner) ||
+                     IsBidirectionalHydronicEquipment(graph, secondOwner)))
+                {
                     return true;
                 }
                 return HaveSameFunctionalType(graph, first, second);
@@ -619,6 +640,38 @@ namespace BIMaestro.VideoGames
                     out int nativeEntry,
                     out int nativeExit) &&
                 MatchesPair(edge, nativeEntry, nativeExit);
+        }
+
+        internal static bool IsBidirectionalHydronicEquipment(
+            GameMepGraphData graph, GameMepElementData? owner)
+        {
+            if (owner == null || owner.IsPipeCurve || owner.IsPipeFitting || owner.IsPipeJunction ||
+                owner.ConnectorIndices.Count != 2 || owner.ConnectorIndices[0] == owner.ConnectorIndices[1])
+                return false;
+            string category = owner.Category ?? string.Empty;
+            if (category.IndexOf("Accessoire de canalisation", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                category.IndexOf("Pipe Accessor", StringComparison.OrdinalIgnoreCase) >= 0)
+                return false;
+            return owner.ConnectorIndices.All(index => index >= 0 && index < graph.Connectors.Count &&
+                graph.Connectors[index].IsConnected &&
+                string.Equals(graph.Connectors[index].FlowDirection, "Bidirectional", StringComparison.OrdinalIgnoreCase) &&
+                IsHydronicSystem(graph, graph.Connectors[index].SystemKey));
+        }
+
+        private static bool IsNativeEquipmentPort(
+            GameMepGraphData graph, GameMepElementData? owner, int connector)
+        {
+            return owner != null && !owner.IsPipeCurve && !owner.IsPipeFitting &&
+                GameMepEquipmentDirectionPolicy.TryGetNativeFlowDirection(
+                    graph, owner, out int entry, out int exit) &&
+                (connector == entry || connector == exit);
+        }
+
+        private static bool IsHydronicSystem(GameMepGraphData graph, string key)
+        {
+            string classification = graph.FindSystem(key)?.Classification?.Trim() ?? string.Empty;
+            return string.Equals(classification, "SupplyHydronic", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(classification, "ReturnHydronic", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool HaveSameFunctionalType(
@@ -675,9 +728,9 @@ namespace BIMaestro.VideoGames
         private const string PipeJunctionContinuityReason =
             "Continuité avec les canalisations autour du té";
         private const string NativePumpSuctionContinuityReason =
-            "Aspiration propagée depuis le port d'entrée de la pompe";
+            "Continuité vers le port d'entrée de l'équipement";
         private const string NativePumpDischargeContinuityReason =
-            "Refoulement propagé depuis le port de sortie de la pompe";
+            "Continuité depuis le port de sortie de l'équipement";
         private const string DirectionalNetworkConsensusReason =
             "Consensus des sens In/Out à travers les branches parallèles";
         private const string SuppliedManifoldBranchReason =
@@ -1091,14 +1144,16 @@ namespace BIMaestro.VideoGames
                 item.Scope == GameMepDirectionConstraintScope.EquipmentPressureRise &&
                 string.Equals(item.ElementKey, path.ElementKey, StringComparison.Ordinal));
             if (!hasManualEquipmentDirection &&
-                GameMepEquipmentDirectionPolicy.TryGetNativePumpDirection(
+                GameMepEquipmentDirectionPolicy.TryGetNativeFlowDirection(
                     _graph,
                     owner,
                     out int nativeEntry,
                     out int nativeExit) &&
                 TryMatchDirection(path, nativeEntry, nativeExit, out forward))
             {
-                reason = "Sens natif de la pompe : aspiration puis refoulement";
+                reason = GameMepEquipmentDirectionPolicy.TryGetNativePumpDirection(_graph, owner, out _, out _)
+                    ? "Sens natif de la pompe : aspiration puis refoulement"
+                    : "Sens natif des connecteurs : entrée puis sortie";
                 return true;
             }
             forward = path.FlowForward;
@@ -1120,6 +1175,11 @@ namespace BIMaestro.VideoGames
             if (path.StartConnector == exit && path.EndConnector == entry)
             {
                 forward = false;
+                return true;
+            }
+            if (path.EndConnector < 0 && (path.StartConnector == entry || path.StartConnector == exit))
+            {
+                forward = path.StartConnector == entry;
                 return true;
             }
             forward = path.FlowForward;
@@ -1445,6 +1505,7 @@ namespace BIMaestro.VideoGames
             var geometricProtectedJunctionPorts = new HashSet<int>();
             var lateralSuctionElementKeys = new HashSet<string>(StringComparer.Ordinal);
             var lateralSuctionJunctionPorts = new HashSet<int>();
+            var secondaryPumpLoopKeys = new HashSet<string>(StringComparer.Ordinal);
             var inferredInletCandidates = new HashSet<int>();
             var suppliedManifoldBranchDirections =
                 new Dictionary<GameMepPathData, bool>();
@@ -1816,12 +1877,24 @@ namespace BIMaestro.VideoGames
                     continue;
                 }
 
-                if (arms.Values.Any(arm => arm.Any(pumpDischargeAnchorSeeds.Contains))) continue;
+                bool secondaryPumpLoop = junction.ConnectorIndices.Any(port => !headerPorts.Contains(port) &&
+                    arms.TryGetValue(port, out var sideArm) &&
+                    (sideArm.Overlaps(pumpSuctionAnchorSeeds) || sideArm.Overlaps(pumpDischargeAnchorSeeds)) &&
+                    PumpBranchReturnsToHeader(junction, headerPorts, port));
+                if (secondaryPumpLoop)
+                    foreach (int port in junction.ConnectorIndices.Where(port => !headerPorts.Contains(port)))
+                        foreach (int anchor in arms[port].Where(index => pumpSuctionAnchorSeeds.Contains(index) || pumpDischargeAnchorSeeds.Contains(index)))
+                            secondaryPumpLoopKeys.Add(_graph.Connectors[anchor].ElementKey);
+                if (!secondaryPumpLoop && arms.Values.Any(arm => arm.Any(pumpDischargeAnchorSeeds.Contains))) continue;
                 Dictionary<int, bool>? headerDirections = null;
                 bool lateralSuction = HasLateralPumpSuction(junction, headerPorts, arms) &&
                     pumpSuctionDistance[headerPorts[0]] >= 0 &&
                     pumpSuctionDistance[headerPorts[0]] == pumpSuctionDistance[headerPorts[1]];
-                if (lateralSuction)
+                if (secondaryPumpLoop && TryBuildHeaderDirectionsFromBoundary(headerPorts, declaredReturnDistance, out var primaryDirections))
+                {
+                    headerDirections = primaryDirections;
+                }
+                else if (lateralSuction)
                 {
                     headerDirections = headerPorts.ToDictionary(port => port, port => true);
                 }
@@ -2419,7 +2492,23 @@ namespace BIMaestro.VideoGames
 
             AlignTwoPortPipeFittings(hydraulicallyRetainedPaths);
             AlignPipeJunctions(hydraulicallyRetainedPaths);
-            AlignNativeDirectionalBranches(establishedCirculatingDirections);
+            AlignNativeDirectionalBranches(establishedCirculatingDirections, secondaryPumpLoopKeys);
+            AlignTwoPortPipeFittings(hydraulicallyRetainedPaths);
+            var passiveContinuity = new HashSet<GameMepPathData>();
+            foreach (var equipment in _graph.Elements.Where(e =>
+                GameMepSystemTraversalPolicy.IsBidirectionalHydronicEquipment(_graph, e)))
+            {
+                var path = equipment.Paths.FirstOrDefault(p => p.EndConnector >= 0 && p.HasCirculation);
+                if (path == null || IsClosedIsolationValve(equipment.Key)) continue;
+                PropagateNativeFlowPort(equipment.Key, path.StartConnector, path.FlowForward,
+                    "Continuité du passage hydronique bidirectionnel", true, passiveContinuity, hydraulicallyRetainedPaths);
+                PropagateNativeFlowPort(equipment.Key, path.EndConnector, !path.FlowForward,
+                    "Continuité du passage hydronique bidirectionnel", true, passiveContinuity, hydraulicallyRetainedPaths);
+            }
+            // A newly active passive passage can complete a pump's serial arm.
+            // Reapply native anchors across that arm before the final fitting alignment.
+            AlignNativeDirectionalBranches(establishedCirculatingDirections, secondaryPumpLoopKeys);
+            AlignTwoPortPipeFittings(hydraulicallyRetainedPaths);
             if (establishedCirculatingDirections.Count > 0)
             {
                 foreach (KeyValuePair<GameMepPathData, bool> established in
@@ -2769,7 +2858,48 @@ namespace BIMaestro.VideoGames
                 return junction.ConnectorIndices.Any(port =>
                     !headerPorts.Contains(port) &&
                     arms.TryGetValue(port, out HashSet<int> arm) &&
-                    arm.Overlaps(pumpSuctionAnchorSeeds));
+                    arm.Overlaps(pumpSuctionAnchorSeeds) &&
+                    !PumpBranchReturnsToHeader(junction, headerPorts, port));
+            }
+
+            bool PumpBranchReturnsToHeader(GameMepElementData junction, int[] headerPorts, int sidePort)
+            {
+                // A pump in a parallel take-off/reinjection circuit establishes
+                // its own branch direction, not convergence of both main arms.
+                // Require an actual open return to a neighbouring header tee;
+                // diameter alone says nothing about pump head or relative flow.
+                if (!junctionTerminalJunctions.TryGetValue(junction.Key, out var terminals)) return false;
+                var headerNeighbors = new HashSet<string>(headerPorts.Where(terminals.ContainsKey)
+                    .Select(port => terminals[port]).Where(key => !string.IsNullOrWhiteSpace(key)), StringComparer.Ordinal);
+                if (headerNeighbors.Count == 0) return false;
+                var visited = new HashSet<int> { sidePort };
+                var queue = new Queue<int>(); queue.Enqueue(sidePort);
+                while (queue.Count > 0)
+                {
+                    int current = queue.Dequeue();
+                    foreach (int edgeIndex in _adjacentEdges[current])
+                    {
+                        if (!allowed[edgeIndex]) continue;
+                        var edge = _graph.Connections[edgeIndex];
+                        if (edge.IsInternal && edge.ElementKey == junction.Key) continue;
+                        int next = edge.ConnectorA == current ? edge.ConnectorB : edge.ConnectorA;
+                        if (next < 0 || next >= connectorCount || !visited.Add(next)) continue;
+                        var owner = _graph.FindElement(_graph.Connectors[next].ElementKey);
+                        if (owner == null || owner.Key == junction.Key) continue;
+                        if (owner.IsPipeJunction)
+                        {
+                            if (headerNeighbors.Contains(owner.Key) &&
+                                TrySelectCollinearHeaderPorts(owner, out int[] targetHeader) &&
+                                !targetHeader.Contains(next)) return true;
+                            continue;
+                        }
+                        // Stay on one serial branch; multi-circuit equipment and
+                        // declared network boundaries are not a bypass shortcut.
+                        if (owner.ConnectorIndices.Count != 2 || _graph.Sources.Any(source => source.IsActive && source.ElementKey == owner.Key)) continue;
+                        queue.Enqueue(next);
+                    }
+                }
+                return false;
             }
 
             static bool TryBuildHeaderDirectionsFromBoundary(
@@ -3383,7 +3513,8 @@ namespace BIMaestro.VideoGames
 
         private void AlignNativeDirectionalBranches(
             IReadOnlyDictionary<GameMepPathData, bool>
-                establishedCirculatingDirections)
+                establishedCirculatingDirections,
+            ISet<string> secondaryPumpLoopKeys)
         {
             if (_adjacentEdges == null)
                 return;
@@ -3416,16 +3547,16 @@ namespace BIMaestro.VideoGames
                     entryConnector,
                     towardEquipment: true,
                     NativePumpSuctionContinuityReason,
-                    applyDirection: isPump,
+                    applyDirection: true,
                     locallyProtectedPaths);
                 PropagateNativeFlowPort(
                     equipment.Key,
                     exitConnector,
                     towardEquipment: false,
                     NativePumpDischargeContinuityReason,
-                    applyDirection: isPump,
+                    applyDirection: true,
                     locallyProtectedPaths);
-                if (isPump)
+                if (isPump && !secondaryPumpLoopKeys.Contains(equipment.Key))
                 {
                     downstreamAnchors.Add(Tuple.Create(
                         equipment.Key,
@@ -3471,7 +3602,8 @@ namespace BIMaestro.VideoGames
             bool towardEquipment,
             string reason,
             bool applyDirection,
-            ISet<GameMepPathData> locallyProtectedPaths)
+            ISet<GameMepPathData> locallyProtectedPaths,
+            ISet<GameMepPathData>? continuousPaths = null)
         {
             if (_adjacentEdges == null || equipmentConnector < 0 ||
                 equipmentConnector >= _graph.Connectors.Count)
@@ -3510,7 +3642,7 @@ namespace BIMaestro.VideoGames
                             item.EndConnector < 0);
                     if (junctionPath == null ||
                         junctionPath.FlowState != GameMepFlowState.Supplied ||
-                        !junctionPath.HasCirculation ||
+                        (!junctionPath.HasCirculation && continuousPaths?.Contains(junctionPath) != true) ||
                         TryGetImposedDirection(junctionPath, out _, out _))
                     {
                         return;
@@ -3521,6 +3653,7 @@ namespace BIMaestro.VideoGames
                     // Cette décision locale reste protégée du consensus global.
                     if (applyDirection)
                     {
+                        junctionPath.HasCirculation = true;
                         junctionPath.FlowForward = !towardEquipment;
                         junctionPath.DirectionState =
                             GameMepDirectionState.Resolved;
@@ -3538,7 +3671,7 @@ namespace BIMaestro.VideoGames
                      item.EndConnector == neighborConnector));
                 if (!canPropagate || path == null ||
                     path.FlowState != GameMepFlowState.Supplied ||
-                    !path.HasCirculation ||
+                    (!path.HasCirculation && continuousPaths?.Contains(path) != true) ||
                     IsClosedIsolationValve(neighbor.Key) ||
                     TryGetImposedDirection(path, out _, out _))
                 {
@@ -3549,6 +3682,7 @@ namespace BIMaestro.VideoGames
                     path.StartConnector == neighborConnector;
                 if (applyDirection)
                 {
+                    path.HasCirculation = true;
                     path.FlowForward = towardEquipment
                         ? !nearEquipmentIsStart
                         : nearEquipmentIsStart;
@@ -3810,7 +3944,7 @@ namespace BIMaestro.VideoGames
             return found;
         }
 
-        private static bool IsPassiveTwoPortComponent(
+        private bool IsPassiveTwoPortComponent(
             GameMepElementData? element)
         {
             if (element == null || element.IsPipeJunction ||
@@ -3834,7 +3968,8 @@ namespace BIMaestro.VideoGames
                 category.IndexOf(
                     "Pipe Accessor",
                     StringComparison.OrdinalIgnoreCase) >= 0;
-            return isPipeAccessory;
+            return isPipeAccessory ||
+                GameMepSystemTraversalPolicy.IsBidirectionalHydronicEquipment(_graph, element);
         }
 
         private bool IsClosedIsolationValve(string elementKey)

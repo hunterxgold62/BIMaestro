@@ -604,7 +604,7 @@
                                                     Cursor="Hand"
                                                     MouseEnter="OnObjOtherHover"
                                                     MouseLeftButtonUp="OnObjOtherClick"
-                                                    ToolTip="Autre">
+                                                    ToolTip="Tout autre objet 3D : équipement, chemin de câbles, famille, etc.">
                                                 <Grid Margin="8">
                                                     <Grid.RowDefinitions>
                                                         <RowDefinition Height="*"/>
@@ -622,7 +622,7 @@
                                                                    Stretch="Uniform"
                                                                    RenderOptions.BitmapScalingMode="HighQuality"/>
                                                             <TextBlock x:Name="txtObjOtherFallback"
-                                                                       Text="Autre"
+                                                                       Text="Objet 3D"
                                                                        FontWeight="SemiBold"
                                                                        HorizontalAlignment="Center"
                                                                        VerticalAlignment="Center"/>
@@ -630,7 +630,7 @@
                                                     </Border>
 
                                                     <TextBlock Grid.Row="1"
-                                                               Text="Autre"
+                                                               Text="Autre objet 3D"
                                                                FontWeight="SemiBold"
                                                                FontSize="11"
                                                                HorizontalAlignment="Center"
@@ -673,7 +673,7 @@
                                                    VerticalAlignment="Center"/>
 
                                         <StackPanel Grid.Column="1">
-                                            <TextBlock Text="Canalisation / gaine"
+                                            <TextBlock Text="Éléments accessibles"
                                                        Style="{StaticResource Label}"/>
                                             <ComboBox x:Name="comboPipeSource"
                                                       Height="34"
@@ -685,11 +685,15 @@
 
                                             <CheckBox x:Name="chkDoubleLink"
                                                       Content="Double lien"
+                                                      ToolTip="L’objet et le support doivent appartenir au même lien ou à deux liens différents, IFC ou RVT."
                                                       Checked="OnModeChanged"
                                                       Unchecked="OnModeChanged"
                                                       Margin="0,8,0,0"/>
 
-                                            <TextBlock Text="Lien IFC/RVT : clique soit une cana/gaine locale, soit une cana/gaine du lien. Le mur à sélectionner sera automatiquement de l'autre maquette. Double lien limite les deux sélections aux liens ; le même lien peut contenir les deux éléments."
+                                            <TextBlock Text="Choisis « Autre objet 3D » pour les équipements et les autres catégories. Maquette : objet et support locaux. Lien IFC/RVT : maquette et liens du type choisi."
+                                                       Style="{StaticResource Hint}"
+                                                       Margin="0,6,0,0"/>
+                                            <TextBlock Text="Famille sans hôte : clique l’objet et le mur ou le sol dans l’ordre voulu. Une famille avec hôte nécessite un support local. Double lien impose deux éléments liés ; ils peuvent appartenir au même lien."
                                                        Style="{StaticResource Hint}"
                                                        Margin="0,6,0,0"/>
                                         </StackPanel>
@@ -704,7 +708,7 @@
                                         Padding="14">
                                     <StackPanel>
                                         <CheckBox x:Name="chkAutomatique"
-                                                  Content="Mode automatique (scan – mur uniquement)"
+                                                  Content="Mode automatique (scan local – mur uniquement)"
                                                   Checked="OnModeChanged"
                                                   Unchecked="OnModeChanged"
                                                   Margin="0,0,0,6"/>

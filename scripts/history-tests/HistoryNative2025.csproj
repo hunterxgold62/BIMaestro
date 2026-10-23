@@ -18,13 +18,16 @@
     <Reference Include="Newtonsoft.Json"><HintPath>../../BIMaestro/bin/Debug/Newtonsoft.Json.dll</HintPath></Reference>
     <Compile Include="HistoryNativeTests.cs" />
     <Compile Include="RealModelBenchmark.cs" />
+    <Compile Include="AntibesBenchmark.cs" />
     <Compile Include="NativeArchiveStore.cs" />
     <Compile Include="../../BIMaestro/commands/qui est le coupable/ElementHistoryNativeArchive.cs" />
+    <Compile Include="../../BIMaestro/commands/qui est le coupable/ElementHistoryOpeningArchive.cs" />
     <Compile Include="../../BIMaestro/commands/ElementIdExtensions.cs" />
     <Compile Include="../../BIMaestro/commands/qui est le coupable/ElementHistoryReconstruction.cs" />
     <Compile Include="../../BIMaestro/commands/qui est le coupable/ElementHistoryReconstruction.Extended.cs" />
     <Compile Include="../../BIMaestro/commands/qui est le coupable/ElementHistoryRestoration.cs" />
     <Compile Include="../../BIMaestro/commands/qui est le coupable/ElementHistoryNetwork.cs" />
+    <Compile Include="../../BIMaestro/commands/qui est le coupable/ElementHistoryNetwork.Guard.cs" />
     <Compile Include="../../BIMaestro/commands/qui est le coupable/ElementHistoryRelations.cs" />
     <Compile Include="../../BIMaestro/commands/qui est le coupable/ElementHistoryAudit.cs" />
   </ItemGroup>

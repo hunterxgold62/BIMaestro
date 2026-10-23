@@ -18,6 +18,8 @@ namespace Analyse
 {
     internal sealed class ElementHistoryEvent
     {
+        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+        public string EventId { get; set; }
         public DateTime Ts { get; set; }
         public string Project { get; set; }
         public string ModelGuid { get; set; }
@@ -51,6 +53,8 @@ namespace Analyse
             public List<XYZ> ObbCorners { get; set; }
             public GhostMeshSnapshot GhostMesh { get; set; }
             public HistoryRecipe Recipe { get; set; }
+            public string DefinitionSession { get; set; }
+            public long DefinitionRevision { get; set; }
             public string CaptureFailure { get; set; }
             public string SuperComponentUniqueId { get; set; }
             public string FamilyTypeUniqueId { get; set; }
@@ -244,6 +248,7 @@ namespace Analyse
             new Dictionary<string, ElementSnapshot>(StringComparer.OrdinalIgnoreCase);
         private static readonly HashSet<string> PrimedDocumentKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private static readonly HashSet<string> FamilyParameterPrimedDocumentKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<Document, HashSet<string>> DocumentCaptureKeys = new Dictionary<Document, HashSet<string>>(ElementHistoryDurableBridge.DocumentReferenceComparer.Instance);
         private static readonly Dictionary<string, DeferredPrimeState> DeferredPrimeByDocumentKey =
             new Dictionary<string, DeferredPrimeState>(StringComparer.OrdinalIgnoreCase);
         private sealed class RestorationCaptureState
@@ -251,6 +256,7 @@ namespace Analyse
             internal readonly Dictionary<int, ElementSnapshot> Pending = new Dictionary<int, ElementSnapshot>();
             internal readonly HashSet<int> LightPending = new HashSet<int>();
             internal readonly HashSet<int> CostDeferredIds = new HashSet<int>();
+            internal readonly HashSet<int> ChangedPriorityIds = new HashSet<int>();
             internal HashSet<int> VisibleIds = new HashSet<int>();
             internal int VisibleViewId = -1;
             internal DateTime NotBeforeUtc;
@@ -259,13 +265,22 @@ namespace Analyse
             new Dictionary<string, RestorationCaptureState>(StringComparer.OrdinalIgnoreCase);
         // Plain parameter values only; cache survives idle batches, invalidated on every model change.
         private static readonly Dictionary<Document, Dictionary<int, Dictionary<string, string>>> TypeParameterCaches =
-            new Dictionary<Document, Dictionary<int, Dictionary<string, string>>>();
+            new Dictionary<Document, Dictionary<int, Dictionary<string, string>>>(ElementHistoryDurableBridge.DocumentReferenceComparer.Instance);
         private static readonly Dictionary<Document, Dictionary<Tuple<int,string,int,string>, string>> ParameterDisplayCaches =
-            new Dictionary<Document, Dictionary<Tuple<int,string,int,string>, string>>();
+            new Dictionary<Document, Dictionary<Tuple<int,string,int,string>, string>>(ElementHistoryDurableBridge.DocumentReferenceComparer.Instance);
+
+        private static bool TryDocumentValue<T>(Dictionary<Document, T> values, Document doc, out T value)
+        {
+            if (values.TryGetValue(doc, out value)) return true;
+            if (doc.IsValidObject)
+                foreach (var pair in values)
+                    if (pair.Key.IsValidObject && pair.Key.Equals(doc)) { value = pair.Value; return true; }
+            return false;
+        }
 
         private static Dictionary<int, Dictionary<string, string>> GetTypeParameterCache(Document doc)
         {
-            if (!TypeParameterCaches.TryGetValue(doc, out var cache))
+            if (!TryDocumentValue(TypeParameterCaches, doc, out var cache))
                 TypeParameterCaches[doc] = cache = new Dictionary<int, Dictionary<string, string>>();
             return cache;
         }
@@ -273,8 +288,10 @@ namespace Analyse
         internal static void InvalidateCaptureCaches(Document doc)
         {
             if (doc == null) return;
-            TypeParameterCaches.Remove(doc);
-            ParameterDisplayCaches.Remove(doc);
+            bool SameOrClosed(Document key) => ReferenceEquals(key, doc) || !key.IsValidObject
+                || doc.IsValidObject && key.Equals(doc);
+            foreach (var key in TypeParameterCaches.Keys.Where(SameOrClosed).ToList()) TypeParameterCaches.Remove(key);
+            foreach (var key in ParameterDisplayCaches.Keys.Where(SameOrClosed).ToList()) ParameterDisplayCaches.Remove(key);
         }
         private static readonly Dictionary<string, HistoryPreloadAudit> PreloadAuditByDocumentKey =
             new Dictionary<string, HistoryPreloadAudit>(StringComparer.OrdinalIgnoreCase);
@@ -288,18 +305,19 @@ namespace Analyse
         private static CancellationTokenSource _cts;
         private static Task _worker;
         private const double MinMoveFeet = 0.00656168; // ~2 mm
-        private const int DefaultElementHistoryTake = 2000;
-        private const int DefaultModelHistoryTake = 2000;
-        private const int DefaultDeletedHistoryTake = 2000;
+        internal const int DefaultHistoryEventLimit = 10000;
+        private const int DefaultElementHistoryTake = DefaultHistoryEventLimit;
+        private const int DefaultModelHistoryTake = DefaultHistoryEventLimit;
+        private const int DefaultDeletedHistoryTake = DefaultHistoryEventLimit;
         private const int MaxIndexedImageFiles = 12000;
         private const int MaxGhostPreviewFaces = 2400;
         private const int MaxGhostPreviewVertices = 3600;
         private const int MaxGhostCandidateFaces = 12000;
         private const int GhostCoordinateDecimals = 5;
         private const int DeferredPrimeBatchSize = 100;
-        private const int DeferredPrimeTimeBudgetMs = 500;
+        private const int DeferredPrimeTimeBudgetMs = 20;
         private const int MaxSelectionSnapshotCount = 25;
-        private const int SelectionSnapshotTimeBudgetMs = 80;
+        private const int SelectionSnapshotTimeBudgetMs = 20;
         private const int MaxChangedElementSnapshotsPerTransaction = 250;
         private const int DocumentChangedTimeBudgetMs = 300;
         private const int SelectionDetailedGeometryTimeoutMs = 500;
@@ -329,9 +347,10 @@ namespace Analyse
             LoadDeletedMeshModePreference();
             lock (StartSync)
             {
-                if (_worker != null) return;
+                if (_worker != null && !_worker.IsCompleted) return;
                 _cts = new CancellationTokenSource();
-                _worker = Task.Run(() => WorkerLoop(_cts.Token));
+                var token = _cts.Token;
+                _worker = Task.Run(() => WorkerLoop(token));
             }
         }
 
@@ -393,8 +412,8 @@ namespace Analyse
                 if (_worker == null) return;
                 _cts.Cancel();
                 try { _worker.Wait(1500); } catch { }
-                Flush();
-                FlushAudit();
+                try { Flush(); FlushAudit(); }
+                catch (Exception ex) { Trace.WriteLine("History shutdown flush: " + ex); }
                 _worker = null;
             }
         }
@@ -405,17 +424,42 @@ namespace Analyse
             catch { }
         }
 
+        // Used by the bridge's IO worker before declaring a session closed.
+        // Unlike a UI refresh, failure here must prevent bridge deletion.
+        internal static void FlushPendingForDurability() => Flush();
+
         internal static void ForgetAudit(Document doc)
+            => ForgetAuditForKey(doc, GetDocumentKey(doc));
+
+        // Closing documents can no longer be queried. The successful close
+        // callback supplies the model key captured while it was still valid.
+        internal static void ForgetAuditForKey(Document doc, string documentKey)
         {
+            // Resolve the canonical cache key by its already captured model key;
+            // the close callback's API wrapper may now be invalid and distinct.
+            if (!string.IsNullOrWhiteSpace(documentKey))
+                doc = DocumentCaptureKeys.FirstOrDefault(p => p.Value.Contains(documentKey)).Key ?? doc;
             InvalidateCaptureCaches(doc);
-            var key = GetDocumentKey(doc);
-            if (string.IsNullOrWhiteSpace(key)) return;
+            var keys = TryDocumentValue(DocumentCaptureKeys, doc, out var capturedKeys)
+                ? capturedKeys : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (!string.IsNullOrWhiteSpace(documentKey)) keys.Add(documentKey);
+            DocumentCaptureKeys.Remove(doc);
             lock (SnapshotByElementId)
+            foreach (var key in keys)
             {
+                PrimedDocumentKeys.Remove(key);
+                FamilyParameterPrimedDocumentKeys.Remove(key);
+                DeferredPrimeByDocumentKey.Remove(key);
                 PreloadAuditByDocumentKey.Remove(key);
                 SelectionAuditByDocumentKey.Remove(key);
                 LastSelectionIdsByDocumentKey.Remove(key);
                 RestorationCaptureByDocumentKey.Remove(key);
+                foreach (var snapshotKey in SnapshotByElementId.Keys
+                    .Where(value => value.StartsWith(key + "|element|", StringComparison.OrdinalIgnoreCase)).ToList())
+                    SnapshotByElementId.Remove(snapshotKey);
+                foreach (var typeKey in FamilyTypeSnapshotByKey.Keys
+                    .Where(value => value.StartsWith(key + "|", StringComparison.OrdinalIgnoreCase)).ToList())
+                    FamilyTypeSnapshotByKey.Remove(typeKey);
                 foreach (var ownerKey in SketchOwnerByCurveUniqueId.Keys
                     .Where(value => value.StartsWith(key + "|", StringComparison.Ordinal)).ToList())
                     SketchOwnerByCurveUniqueId.Remove(ownerKey);
@@ -433,6 +477,9 @@ namespace Analyse
 
             lock (SnapshotByElementId)
             {
+                if (!TryDocumentValue(DocumentCaptureKeys, doc, out var keys))
+                    DocumentCaptureKeys[doc] = keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                keys.Add(key);
                 if (PrimedDocumentKeys.Contains(key)) return;
                 if (DeferredPrimeByDocumentKey.ContainsKey(key)) return;
 
@@ -473,7 +520,7 @@ namespace Analyse
 
             if (DateTime.UtcNow < state.NotBeforeUtc)
                 return;
-            if (!HistoryBackgroundWork.UserIsIdle()) return;
+            if (!HistoryBackgroundWork.InventoryCanRun()) return;
 
             var primeStartedUtc = DateTime.UtcNow;
             int batchVisited = 0;
@@ -483,9 +530,14 @@ namespace Analyse
             try
             {
                 if (audit != null && !audit.StartedUtc.HasValue) audit.StartedUtc = primeStartedUtc;
+                if (audit != null) audit.Error = null;
                 if (!state.ElementIdsLoaded)
+                {
                     LoadDeferredPrimeElementIds(doc, state, audit);
-                PrioritizeActiveView(doc, state);
+                    // The native catalog is itself an uninterruptible API call.
+                    // Yield before snapshots instead of stacking work after it.
+                    return;
+                }
 
                 if (audit != null && audit.TotalCandidates == 0)
                     audit.TotalCandidates = state.PendingElementIds.Count;
@@ -496,7 +548,7 @@ namespace Analyse
                 while (processed < DeferredPrimeBatchSize
                        && state.PendingElementIds.Count > 0
                        && DateTime.UtcNow < deadlineUtc
-                       && HistoryBackgroundWork.UserIsIdle())
+                       && HistoryBackgroundWork.InventoryCanRun())
                 {
                     var id = state.PendingElementIds.Dequeue();
                     var element = doc.GetElement(id);
@@ -543,7 +595,7 @@ namespace Analyse
 
                 if (DateTime.UtcNow >= deadlineUtc)
                     return;
-                if (!HistoryBackgroundWork.UserIsIdle()) return;
+                if (!HistoryBackgroundWork.InventoryCanRun()) return;
 
                 PrimeFamilyDocumentTypes(doc);
                 if (audit != null) { audit.Complete = true; audit.CompletedUtc = DateTime.UtcNow; }
@@ -557,10 +609,8 @@ namespace Analyse
             catch (Exception ex)
             {
                 if (audit != null) audit.Error = ex.ToString();
-                lock (SnapshotByElementId)
-                {
-                    DeferredPrimeByDocumentKey.Remove(key);
-                }
+                // Keep partial coverage and retry after a transient API failure;
+                // rescheduling would erase both progress and its audit.
             }
             finally
             {
@@ -568,13 +618,13 @@ namespace Analyse
                 if (audit != null) audit.ActiveMilliseconds += elapsedMs;
                 HistoryPerformanceLog.Record(doc, "preload", elapsedMs, batchVisited,
                     state.PendingElementIds.Count, audit?.Complete == true);
-                state.NotBeforeUtc = DateTime.UtcNow.AddMilliseconds(25);
+                state.NotBeforeUtc = DateTime.UtcNow.AddMilliseconds(audit?.Error == null ? 25 : 1000);
             }
         }
 
         internal static bool ShouldContinueDeferredPrime(Document doc)
         {
-            if (doc == null || ElementHistoryNativeArchive.Owns(doc) || !HistoryBackgroundWork.UserIsIdle()) return false;
+            if (doc == null || ElementHistoryNativeArchive.Owns(doc) || !HistoryBackgroundWork.InventoryCanRun()) return false;
             var key = GetDocumentKey(doc);
             lock (SnapshotByElementId) return DeferredPrimeByDocumentKey.ContainsKey(key)
                 || (RestorationCaptureByDocumentKey.TryGetValue(key, out var restoration)
@@ -589,7 +639,14 @@ namespace Analyse
                 || (RestorationCaptureByDocumentKey.TryGetValue(key, out var state) && state.LightPending.Count > 0);
         }
 
-        private static void QueueRestorationCapture(Document doc, ElementId id, ElementSnapshot snapshot, Element element = null)
+        internal static bool HasChangedRestorationPriority(Document doc)
+        {
+            if (doc == null) return false;
+            return RestorationCaptureByDocumentKey.TryGetValue(GetDocumentKey(doc), out var state)
+                && state.ChangedPriorityIds.Any(state.Pending.ContainsKey);
+        }
+
+        private static void QueueRestorationCapture(Document doc, ElementId id, ElementSnapshot snapshot, Element element = null, bool changedPriority = false)
         {
             // Metadata is tracked for history, but cannot benefit from geometric/native enrichment.
             element = element ?? doc.GetElement(id);
@@ -599,17 +656,21 @@ namespace Analyse
             if (!RestorationCaptureByDocumentKey.TryGetValue(key, out var state))
                 RestorationCaptureByDocumentKey[key] = state = new RestorationCaptureState();
             state.Pending[id.GetIdValue()] = snapshot;
+            if (changedPriority) state.ChangedPriorityIds.Add(id.GetIdValue());
         }
 
-        internal static void ProcessDeferredRestorationCapture(Document doc, bool selectionOnly = false)
+        internal static void ProcessDeferredRestorationCapture(Document doc, bool selectionOnly = false, bool inventoryOnly = false)
         {
+            bool CanRun() => selectionOnly ? HistoryBackgroundWork.SelectionCanRun()
+                : HistoryBackgroundWork.InventoryCanRun();
             if (doc == null || ElementHistoryNativeArchive.Owns(doc)
-                || !(selectionOnly ? HistoryBackgroundWork.SelectionCanRun() : HistoryBackgroundWork.UserIsIdle())) return;
+                || !CanRun()) return;
             var key = GetDocumentKey(doc);
             if (!RestorationCaptureByDocumentKey.TryGetValue(key, out var state)
                 || (state.Pending.Count == 0 && state.LightPending.Count == 0) || DateTime.UtcNow < state.NotBeforeUtc) return;
             var timer = Stopwatch.StartNew();
             int processed = 0;
+            state.ChangedPriorityIds.IntersectWith(state.Pending.Keys);
             LastSelectionIdsByDocumentKey.TryGetValue(key, out var selected);
             try
             {
@@ -619,7 +680,7 @@ namespace Analyse
                     .ThenBy(id => state.CostDeferredIds.Contains(id))
                     .Where(id => !selectionOnly || selected?.Contains(id) == true).Take(25).ToList())
                 {
-                    if (!(selectionOnly ? HistoryBackgroundWork.SelectionCanRun() : HistoryBackgroundWork.UserIsIdle()) || timer.ElapsedMilliseconds >= 25) break;
+                    if (!CanRun() || timer.ElapsedMilliseconds >= 20) break;
                     state.LightPending.Remove(idValue);
                     var id = ElementIdExtensions.CreateElementId(idValue);
                     if (HasSnapshot(BuildElementSnapshotKey(doc, id))) continue;
@@ -643,10 +704,10 @@ namespace Analyse
                 if (lightProcessed > 0)
                     HistoryPerformanceLog.Record(doc, "selection_capture", timer.Elapsed.TotalMilliseconds,
                         lightProcessed, state.LightPending.Count, state.LightPending.Count == 0);
+                if (inventoryOnly) return;
                 // Finish baseline restoration coverage before joins, circuits, and native fallback.
                 if (selectionOnly && state.LightPending.Any(id => selected?.Contains(id) == true)) return;
-                if (!CaptureDetailedDeletedMesh) return;
-                if (!selectionOnly && HasPendingBasicInventory(doc)) return;
+                if (!selectionOnly && HasPendingBasicInventory(doc) && state.ChangedPriorityIds.Count == 0) return;
                 // Selection first; remaining order was established by the visible-first inventory.
                 var activeView = doc.ActiveView;
                 if (!selectionOnly && activeView != null && state.VisibleViewId != activeView.Id.GetIdValue()
@@ -660,7 +721,10 @@ namespace Analyse
                 var candidates = selectedPending.Concat(selectionOnly ? Enumerable.Empty<int>()
                     : state.Pending.Keys.Where(id => selected?.Contains(id) != true))
                     .Where(id => !selectionOnly || !state.Pending[id].RequiresDetailedCapture)
-                    .OrderByDescending(id => selected?.Contains(id) == true)
+                    .Where(id => CaptureDetailedDeletedMesh || !state.Pending[id].RequiresDetailedCapture)
+                    .Where(id => !HasPendingBasicInventory(doc) || state.ChangedPriorityIds.Contains(id))
+                    .OrderByDescending(id => state.ChangedPriorityIds.Contains(id))
+                    .ThenByDescending(id => selected?.Contains(id) == true)
                     .ThenByDescending(id => state.VisibleIds.Contains(id))
                     .ThenBy(id => state.Pending[id].RequiresDetailedCapture)
                     .ThenBy(id => HistoryCaptureCosts.Estimate(state.Pending[id].CaptureCostKey,
@@ -668,13 +732,31 @@ namespace Analyse
                     .Take(10).ToList();
                 foreach (var idValue in candidates)
                 {
-                    if (!(selectionOnly ? HistoryBackgroundWork.SelectionCanRun() : HistoryBackgroundWork.UserIsIdle()) || timer.ElapsedMilliseconds >= 25) break;
+                    if (!CanRun() || timer.ElapsedMilliseconds >= 25) break;
                     var expected = state.Pending[idValue];
                     state.Pending.Remove(idValue);
+                    state.ChangedPriorityIds.Remove(idValue);
                     var id = ElementIdExtensions.CreateElementId(idValue);
                     var element = doc.GetElement(id);
                     if (element == null || !SnapshotByElementId.TryGetValue(BuildElementSnapshotKey(doc, id), out var current)
                         || !ReferenceEquals(current, expected)) continue;
+                    // During this session the local bridge protects unchanged
+                    // objects. Actual deletions are converted by the durable
+                    // outbox before this temporary bridge can be removed.
+                    if (current.Recipe?.Native?.WholeModel == true
+                        && ElementHistoryOpeningArchive.FreezeForDeletion(doc, current.Recipe, id) != null)
+                    {
+                        if (current.Recipe.Native.Ready)
+                        {
+                            current.DetailCaptureAttempted = true;
+                            continue;
+                        }
+                        if (current.Recipe.Native.Failure == null)
+                        {
+                            state.Pending[idValue] = current;
+                            continue;
+                        }
+                    }
                     var elementTimer = Stopwatch.StartNew();
                     try
                     {
@@ -831,7 +913,7 @@ namespace Analyse
                     includeRestoration: source != "preload", typeParameterCache: typeParameterCache);
                 snapshot.CaptureSource = source;
                 StoreSnapshot(el.Document, el.Id, snapshot);
-                if (source == "preload") QueueRestorationCapture(el.Document, el.Id, snapshot, el);
+                QueueRestorationCapture(el.Document, el.Id, snapshot, el, changedPriority: source != "preload");
                 return 1;
             }
             catch
@@ -1046,10 +1128,15 @@ namespace Analyse
             InvalidateCaptureCaches(doc);
             var user = GetCurrentHistoryUser(doc);
             var tx = e.GetTransactionNames()?.FirstOrDefault() ?? "Transaction";
-            if (IsIgnoredTransaction(tx)) return;
             var addedIds = e.GetAddedElementIds().ToList();
             var modifiedIds = e.GetModifiedElementIds().ToList();
             var deletedIds = e.GetDeletedElementIds().ToList();
+            ElementHistoryDefinitionRevisions.Changed(doc, addedIds.Concat(modifiedIds), deletedIds);
+            if (IsIgnoredTransaction(tx))
+            {
+                ElementHistoryOpeningArchive.Invalidate(doc, addedIds.Concat(modifiedIds));
+                return;
+            }
             HistoryDeletionBatchAudit deletionAudit = null;
             if (deletedIds.Count > 0)
             {
@@ -1081,6 +1168,10 @@ namespace Analyse
                 EnqueueDeleted(doc, id, user, tx, itemAudit);
             }
 
+            // Freeze deletion receipts against the state BEFORE this transaction.
+            // Deleting a hosted object itself modifies its surviving host; that
+            // post-deletion change must not invalidate the preceding snapshot.
+            ElementHistoryOpeningArchive.Invalidate(doc, addedIds.Concat(modifiedIds));
             ElementHistoryNativeArchive.Invalidate(doc, addedIds.Concat(modifiedIds));
             ElementHistoryRelations.Invalidate(doc, addedIds.Concat(modifiedIds).Concat(deletedIds));
 
@@ -1191,7 +1282,9 @@ namespace Analyse
                 {
                     SnapshotByElementId.TryGetValue(modelKey + "|element|" +
                         id.GetIdValue().ToString(CultureInfo.InvariantCulture), out var snapshot);
-                    var recipe = snapshot?.Recipe;
+                    var recipe = snapshot?.Recipe ?? (snapshot == null
+                        ? ElementHistoryOpeningArchive.TryCreateDeletedRecipe(doc, id) : null);
+                    recipe = FreezeDeletionRecipe(doc, recipe);
                     var native = recipe?.Native;
                     var item = new HistoryDeletionElementAudit
                     {
@@ -1506,6 +1599,7 @@ namespace Analyse
         private static string BuildHistoryEventIdentity(ElementHistoryEvent ev)
         {
             if (ev == null) return Guid.NewGuid().ToString("N");
+            if (!string.IsNullOrWhiteSpace(ev.EventId)) return ev.EventId;
             return string.Join("|", new[]
             {
                 ev.ModelKey ?? string.Empty,
@@ -1591,7 +1685,9 @@ namespace Analyse
             if (!isCreate && !(el is FamilySymbol))
                 relatedTypeParameterDelta = CaptureRelatedFamilyTypeParameterDelta(doc, el, relatedTypeParameterDeltaCache);
 
-            var current = BuildSnapshot(el, includeOrientedCorners: CaptureDetailedDeletedMesh);
+            // Preserve the changed values immediately. Triangle/OBB previews
+            // belong to deferred selection work, never an unbounded transaction callback.
+            var current = BuildSnapshot(el, includeOrientedCorners: false);
             ElementSnapshot previous;
             lock (SnapshotByElementId)
             {
@@ -1612,14 +1708,14 @@ namespace Analyse
             if (!isCreate && (suppressSecondaryModification || action == "modify_skip" || IsLowValueParameterChange(action, delta)))
             {
                 StoreSnapshot(doc, id, current);
-                QueueRestorationCapture(doc, id, current, el);
+                QueueRestorationCapture(doc, id, current, el, changedPriority: true);
                 return true;
             }
 
             if (!isCreate && IsNoisy3DViewChange(action, current, delta))
             {
                 StoreSnapshot(doc, id, current);
-                QueueRestorationCapture(doc, id, current, el);
+                QueueRestorationCapture(doc, id, current, el, changedPriority: true);
                 return true;
             }
 
@@ -1642,7 +1738,7 @@ namespace Analyse
             });
 
             StoreSnapshot(doc, id, current);
-            QueueRestorationCapture(doc, id, current, el);
+            QueueRestorationCapture(doc, id, current, el, changedPriority: true);
             return true;
         }
 
@@ -1887,6 +1983,8 @@ namespace Analyse
             }
 
             var deferHeavy = ElementHistoryReconstruction.RequiresDetailedCapture(el);
+            ElementHistoryDefinitionRevisions.Remember(el.Document, typeId);
+            ElementHistoryDefinitionRevisions.Remember(el.Document, el.LevelId);
             var parameters = CaptureWritableParameters(el);
             AddTypeParametersToSnapshot(el, parameters, typeParameterCache);
 
@@ -1894,10 +1992,20 @@ namespace Analyse
             var recipe = deferHeavy ? null : ElementHistoryReconstruction.Capture(el, reason => captureFailure = reason,
                 includeDetails: includeRestoration, allowHeavyTerrain: CaptureDetailedDeletedMesh, automaticCapture: true);
             if (deferHeavy) captureFailure = "Préparation réservée au mode détaillé en inactivité.";
+            var openingRecipe = ElementHistoryOpeningArchive.TryCreateRecipe(el.Document, el);
+            if (recipe == null)
+            {
+                recipe = openingRecipe;
+                if (recipe != null) captureFailure = null;
+            }
+            else if (recipe.Native == null && openingRecipe != null)
+                recipe.OpeningFallback = openingRecipe.Native;
             BoundingBoxXYZ bounds = null;
             if (!deferHeavy) try { bounds = el.get_BoundingBox(null); } catch { }
             var snapshot = new ElementSnapshot
             {
+                DefinitionSession = ElementHistoryDefinitionRevisions.SessionId(el.Document),
+                DefinitionRevision = ElementHistoryDefinitionRevisions.Revision(el.Document),
                 CaptureCostKey = HistoryCaptureCosts.Key(el), CaptureClass = el.GetType().Name,
                 RequiresDetailedCapture = deferHeavy,
                 CapturedUtc = DateTime.UtcNow,
@@ -2077,7 +2185,7 @@ namespace Analyse
             int typeKey = -1;
             if (useDisplayCache)
             {
-                if (!ParameterDisplayCaches.TryGetValue(el.Document, out displayCache))
+                if (!TryDocumentValue(ParameterDisplayCaches, el.Document, out displayCache))
                     ParameterDisplayCaches[el.Document] = displayCache = new Dictionary<Tuple<int,string,int,string>, string>();
                 typeKey = (el is ElementType ? el.Id : el.GetTypeId()).GetIdValue();
             }
@@ -2648,6 +2756,8 @@ namespace Analyse
 
             if (snapshot != null && ShouldIgnoreSnapshot(snapshot)) return;
 
+            var openingRecipe = snapshot == null ? ElementHistoryOpeningArchive.TryCreateDeletedRecipe(doc, id) : null;
+
             EnqueueHistoryEvent(new ElementHistoryEvent
             {
                 Ts = DateTime.UtcNow,
@@ -2666,7 +2776,10 @@ namespace Analyse
                 DeletionAudit = deletionAudit,
                 Delta = snapshot == null ? new Dictionary<string, object>
                 {
-                    ["captureFailure"] = "Élément supprimé avant sa capture : restauration indisponible.",
+                    ["recipe"] = openingRecipe,
+                    ["captureFailure"] = openingRecipe == null
+                        ? "Élément supprimé avant sa capture et sans copie initiale exploitable."
+                        : null,
                     ["snapshotMissing"] = true
                 } : BuildDeleteDelta(doc, snapshot)
             });
@@ -2675,16 +2788,37 @@ namespace Analyse
 
 
 
+        private static HistoryRecipe FreezeDeletionRecipe(Document doc, HistoryRecipe recipe)
+        {
+            if (recipe?.Native?.WholeModel == true)
+                return ElementHistoryOpeningArchive.FreezeForDeletion(doc, recipe,
+                    ElementIdExtensions.CreateElementId(recipe.Native.SourceElementId));
+            if (recipe?.OpeningFallback?.WholeModel == true)
+            {
+                var fallback = ElementHistoryOpeningArchive.FreezeForDeletion(doc,
+                    new HistoryRecipe { Kind = "native_archive", Native = recipe.OpeningFallback },
+                    ElementIdExtensions.CreateElementId(recipe.OpeningFallback.SourceElementId));
+                return recipe.CopyWithOpeningFallback(fallback?.Native);
+            }
+            return recipe;
+        }
+
         private static Dictionary<string, object> BuildDeleteDelta(Document doc, ElementSnapshot snapshot)
         {
             if (snapshot == null) return null;
 
             var includeDetailedMesh = CaptureDetailedDeletedMesh;
+            var recipe = FreezeDeletionRecipe(doc, snapshot.Recipe ?? ElementHistoryNativeArchive.Find(doc, snapshot.UniqueId));
+            if (recipe != null) recipe = JObject.FromObject(recipe).ToObject<HistoryRecipe>();
             var delta = new Dictionary<string, object>
             {
                 ["deletedUniqueId"] = snapshot.UniqueId,
-                ["recipe"] = snapshot.Recipe ?? ElementHistoryNativeArchive.Find(doc, snapshot.UniqueId),
-                ["captureFailure"] = snapshot.CaptureFailure,
+                ["definitionSession"] = snapshot.DefinitionSession,
+                ["definitionRevision"] = snapshot.DefinitionRevision,
+                ["recipe"] = recipe,
+                ["captureFailure"] = recipe == null && snapshot.Recipe?.Native?.WholeModel == true
+                    ? "La copie initiale ne représente plus cet élément après modification."
+                    : snapshot.CaptureFailure,
                 ["superComponentUniqueId"] = snapshot.SuperComponentUniqueId,
                 ["familyTypeUniqueId"] = snapshot.FamilyTypeUniqueId,
                 ["lastKnown"] = snapshot.Location == null ? null : new { x = snapshot.Location.X, y = snapshot.Location.Y, z = snapshot.Location.Z },
@@ -2711,6 +2845,9 @@ namespace Analyse
         private static bool ShouldIgnoreElement(Element element)
         {
             if (element == null) return true;
+            // History restoration is scoped to the physical 3D model.
+            if (element is View || element.ViewSpecific || element is ViewFamilyType
+                || element is DimensionType || element is TextElementType) return true;
             if (element is Autodesk.Revit.DB.Plumbing.PipeInsulation || element is Autodesk.Revit.DB.Mechanical.DuctInsulation) return true;
             if (IsBIMaestroPreviewElement(element)) return true;
             if (!(element is ModelCurve) && IsAxisLineElement(element)) return true;
@@ -2851,6 +2988,9 @@ namespace Analyse
             if (string.IsNullOrWhiteSpace(categoryName)) return true;
             var name = categoryName.Trim();
             return name.Equals("Sheets", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("Feuilles", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("Views", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("Vues", StringComparison.OrdinalIgnoreCase)
                 || name.Equals("Schedules", StringComparison.OrdinalIgnoreCase)
                 || name.Equals("Viewports", StringComparison.OrdinalIgnoreCase)
                 || name.Equals("Materials", StringComparison.OrdinalIgnoreCase)
@@ -3627,6 +3767,7 @@ namespace Analyse
             ElementHistoryEvent historyEvent)
         {
             if (historyEvent == null) return;
+            if (string.IsNullOrWhiteSpace(historyEvent.EventId)) historyEvent.EventId = Guid.NewGuid().ToString("N");
             if (ElementHistoryHoverInfoService.IsEnabled)
                 LatestElementHistoryIndex.Observe(historyEvent);
             Queue.Enqueue(historyEvent);
@@ -3651,33 +3792,73 @@ namespace Analyse
 
             while (!token.IsCancellationRequested)
             {
-                Flush();
-                FlushAudit();
+                // An unavailable shared folder must not permanently stop the logger.
+                try { Flush(); FlushAudit(); }
+                catch (Exception ex) { Trace.WriteLine("History logger: " + ex); }
 
                 if (DateTime.UtcNow >= nextMaintenanceUtc)
                 {
-                    CompressOldFiles();
+                    try { CompressOldFiles(); }
+                    catch (Exception ex) { Trace.WriteLine("History maintenance: " + ex); }
                     nextMaintenanceUtc = DateTime.UtcNow.Add(HistoryMaintenanceInterval);
                 }
 
-                await Task.Delay(2000, token).ConfigureAwait(false);
+                try { await Task.Delay(250, token).ConfigureAwait(false); }
+                catch (OperationCanceledException) when (token.IsCancellationRequested) { break; }
             }
         }
 
         private static void Flush()
         {
-            if (Queue.IsEmpty) return;
-            var batch = new List<ElementHistoryEvent>();
-            while (batch.Count < 200 && Queue.TryDequeue(out var ev)) batch.Add(ev);
-            if (batch.Count == 0) return;
-            var path = Path.Combine(CollaborativeModelTrackerStore.ActiveDirectory, $"element-history-{DateTime.UtcNow:yyyy-MM-dd}.jsonl");
+            // All consumers hold this lock, including explicit history reads/shutdown.
+            // Retain the head until its complete, durable append has succeeded: retries
+            // then preserve event order and cannot silently discard an entire deletion.
             lock (FileSync)
             {
-                Directory.CreateDirectory(CollaborativeModelTrackerStore.ActiveDirectory);
-                using (var sw = new StreamWriter(path, true, Encoding.UTF8))
+                int remaining = Queue.Count;
+                while (remaining > 0)
                 {
+                    var batch = Queue.Take(Math.Min(1000, remaining)).ToList();
+                    if (batch.Count == 0) return;
+                    var text = new StringBuilder();
                     foreach (var ev in batch)
-                        sw.WriteLine(JsonConvert.SerializeObject(ev, Formatting.None));
+                        text.AppendLine(JsonConvert.SerializeObject(ev, Formatting.None));
+                    var bytes = new UTF8Encoding(false).GetBytes(text.ToString());
+                    var directory = CollaborativeModelTrackerStore.ActiveDirectory;
+                    Directory.CreateDirectory(directory);
+                    var path = Path.Combine(directory, $"element-history-{DateTime.UtcNow:yyyy-MM-dd}.jsonl");
+                    using (var stream = new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.Read))
+                    {
+                        var originalLength = stream.Length;
+                        try
+                        {
+                            // A previous process/disk failure may have left an incomplete
+                            // last line. Separate it so the retried first event is readable.
+                            if (originalLength > 0)
+                            {
+                                stream.Position = originalLength - 1;
+                                var lastByte = stream.ReadByte();
+                                if (lastByte != '\n' && lastByte != '\r') stream.WriteByte((byte)'\n');
+                            }
+                            stream.Position = stream.Length;
+                            stream.Write(bytes, 0, bytes.Length);
+                            stream.Flush(true);
+                        }
+                        catch
+                        {
+                            // Undo even a partial disk write before retrying the same
+                            // queued events; never leave a truncated JSON line behind.
+                            try { stream.SetLength(originalLength); stream.Flush(true); }
+                            catch (Exception ex) { Trace.WriteLine("History append rollback: " + ex); }
+                            throw;
+                        }
+                    }
+                    // A crash after append is recovered by scanning the journal.
+                    // Failure to persist its outbox retains the same EventIds for
+                    // retry; duplicate journal lines cannot change their identity.
+                    ElementHistoryDurableBridge.EventsPersisted(batch);
+                    for (int index = 0; index < batch.Count; index++) Queue.TryDequeue(out _);
+                    remaining -= batch.Count;
                 }
             }
         }

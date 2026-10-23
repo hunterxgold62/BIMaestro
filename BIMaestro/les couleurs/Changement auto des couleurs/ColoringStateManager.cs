@@ -12,6 +12,7 @@ using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -218,11 +219,46 @@ namespace Couleur
         }
     }
 
+    internal sealed class AppearanceValueTracker
+    {
+        private readonly Dictionary<DependencyObject, Dictionary<DependencyProperty, object>> _originals =
+            new Dictionary<DependencyObject, Dictionary<DependencyProperty, object>>();
+
+        internal void Set(DependencyObject target, DependencyProperty property, object value)
+        {
+            BindingBase binding = BindingOperations.GetBindingBase(target, property);
+            // Dynamic resources belong to Revit; a local override would destroy them.
+            if (binding == null && DependencyPropertyHelper.GetValueSource(target, property).IsExpression) return;
+            if (!_originals.TryGetValue(target, out var properties))
+                _originals[target] = properties = new Dictionary<DependencyProperty, object>();
+            if (!properties.ContainsKey(property)) properties[property] = (object)binding ?? target.ReadLocalValue(property);
+            try { target.SetValue(property, value); }
+            catch { /* Some native surfaces expose read-only properties. */ }
+        }
+
+        internal void Restore()
+        {
+            foreach (var target in _originals.ToList())
+                foreach (var property in target.Value)
+                    try
+                    {
+                        if (property.Value == DependencyProperty.UnsetValue) target.Key.ClearValue(property.Key);
+                        else if (property.Value is BindingBase binding) BindingOperations.SetBinding(target.Key, property.Key, binding);
+                        else target.Key.SetValue(property.Key, property.Value);
+                    }
+                    catch { /* Virtualized Revit controls may already have disappeared. */ }
+            _originals.Clear();
+        }
+    }
+
     // -----------------------------------------------------------------------
     //   2) Coloration Complète : TabItems + BIMaestro (watcher) + "Papanoel"
     // -----------------------------------------------------------------------
     public static class CombinedColoringApplication
     {
+        private static readonly AppearanceValueTracker TabValues = new AppearanceValueTracker();
+        private static readonly AppearanceValueTracker PanelValues = new AppearanceValueTracker();
+        private static readonly AppearanceValueTracker BimValues = new AppearanceValueTracker();
         private static Dictionary<string, SolidColorBrush> _projectTabColors = new Dictionary<string, SolidColorBrush>();
         private static readonly Random _random = new Random();
 
@@ -273,12 +309,12 @@ namespace Couleur
                 if (string.IsNullOrEmpty(proj)) continue;
 
                 var brush = GetFlashyProjectColor(proj, out var borderBrush);
-                tab.Background = brush;
-                tab.BorderBrush = borderBrush;
+                TabValues.Set(tab, TabItem.BackgroundProperty, brush);
+                TabValues.Set(tab, TabItem.BorderBrushProperty, borderBrush);
                 // Revit may rebuild the header visuals after a view closes.
                 // Keep the contrast on the tab so newly created text inherits it.
-                tab.Foreground = Brushes.Black;
-                ColorTextBlocks(tab, Brushes.Black);
+                TabValues.Set(tab, TabItem.ForegroundProperty, Brushes.Black);
+                ColorTextBlocks(tab, Brushes.Black, TabValues);
             }
 
             // 2) BIMaestro : repérage + démarrage du watcher
@@ -291,8 +327,8 @@ namespace Couleur
                     _bimBorders = FindChildrenByType<Border>(_bimButton);
                     // d’emblée, fond pastel
                     foreach (var b in _bimBorders)
-                        b.Background = _pastelBrush;
-                    ColorTextBlocks(_bimButton, Brushes.Black);
+                        BimValues.Set(b, Border.BackgroundProperty, _pastelBrush);
+                    ColorTextBlocks(_bimButton, Brushes.Black, BimValues);
 
 
                     // timer WPF sur le même thread UI
@@ -328,22 +364,14 @@ namespace Couleur
                 target = _pastelBrush;
 
             foreach (var b in _bimBorders)
-                b.Background = target;
-            ColorTextBlocks(_bimButton, Brushes.Black);
+                BimValues.Set(b, Border.BackgroundProperty, target);
+            ColorTextBlocks(_bimButton, Brushes.Black, BimValues);
 
         }
 
         private static void ResetTabItemColoring(IntPtr mainWindowHandle)
         {
-            var wnd = GetMainWindow(mainWindowHandle);
-            if (wnd == null) return;
-            foreach (var t in FindChildrenByType<TabItem>(wnd))
-            {
-                t.ClearValue(TabItem.BackgroundProperty);
-                t.ClearValue(TabItem.BorderBrushProperty);
-                t.ClearValue(TabItem.ForegroundProperty);
-                ClearTextBlocks(t);
-            }
+            TabValues.Restore();
         }
 
         private static void ResetBIMaestroTab()
@@ -353,13 +381,7 @@ namespace Couleur
                 _bimWatcher.Stop();
                 _bimWatcher = null;
             }
-            if (_bimBorders != null)
-            {
-                foreach (var b in _bimBorders)
-                    b.ClearValue(Border.BackgroundProperty);
-            }
-            if (_bimButton != null)
-                ClearTextBlocks(_bimButton);
+            BimValues.Restore();
             _bimButton = null;
             _bimBorders = null;
         }
@@ -420,10 +442,9 @@ namespace Couleur
                         totalWidth);
                 }
 
-                target.Border.Background = background;
-                target.Border.BorderBrush =
-                    DarkenBackgroundBrush(background, target.Scheme.BackgroundColor);
-                target.Border.BorderThickness = new Thickness(1);
+                PanelValues.Set(target.Border, Border.BackgroundProperty, background);
+                PanelValues.Set(target.Border, Border.BorderBrushProperty, DarkenBackgroundBrush(background, target.Scheme.BackgroundColor));
+                PanelValues.Set(target.Border, Border.BorderThicknessProperty, new Thickness(1));
                 if (hasContinuousRange &&
                     target.Scheme.BackgroundPattern ==
                     RibbonBackgroundPattern.FrenchFlagContinuous)
@@ -445,15 +466,7 @@ namespace Couleur
 
         private static void ResetPapanoelColoring(IntPtr mainWindowHandle)
         {
-            var wnd = GetMainWindow(mainWindowHandle);
-            if (wnd == null) return;
-            foreach (var b in FindChildrenByType<Border>(wnd))
-            {
-                b.ClearValue(Border.BackgroundProperty);
-                b.ClearValue(Border.BorderBrushProperty);
-                b.ClearValue(Border.BorderThicknessProperty);
-                ClearTextBlocks(b);
-            }
+            PanelValues.Restore();
         }
 
         // —— utilitaires ——
@@ -565,10 +578,10 @@ namespace Couleur
             }
         }
 
-        private static void ColorTextBlocks(DependencyObject parent, Brush color)
+        private static void ColorTextBlocks(DependencyObject parent, Brush color, AppearanceValueTracker tracker = null)
         {
             foreach (var tb in FindChildrenByType<TextBlock>(parent))
-                tb.Foreground = color;
+                (tracker ?? PanelValues).Set(tb, TextBlock.ForegroundProperty, color);
         }
 
         private static void ColorContinuousFlagTextBlocks(
@@ -587,17 +600,11 @@ namespace Couleur
                     continue;
 
                 double center = ((left + right) / 2 - ribbonLeft) / totalWidth;
-                textBlock.Foreground =
+                PanelValues.Set(textBlock, TextBlock.ForegroundProperty,
                     center < 1.0 / 3.0 || center >= 2.0 / 3.0
                         ? Brushes.White
-                        : Brushes.Black;
+                        : Brushes.Black);
             }
-        }
-
-        private static void ClearTextBlocks(DependencyObject parent)
-        {
-            foreach (var tb in FindChildrenByType<TextBlock>(parent))
-                tb.ClearValue(TextBlock.ForegroundProperty);
         }
 
         private static SolidColorBrush DarkenColor(Color c, double f) =>
@@ -632,6 +639,7 @@ namespace Couleur
     // -----------------------------------------------------------------------
     public static class PartialColoringHelper
     {
+        private static readonly AppearanceValueTracker Values = new AppearanceValueTracker();
         public static void ApplyPartialColoring(IntPtr mainWindowHandle)
         {
             if (!ColoringStateManager.IsColoringActive || ColoringStateManager.IsFullMode) return;
@@ -690,10 +698,9 @@ namespace Couleur
                         totalWidth);
                 }
 
-                target.Border.Background = background;
-                target.Border.BorderBrush =
-                    DarkenBackgroundBrush(background, target.Scheme.BackgroundColor);
-                target.Border.BorderThickness = new Thickness(1);
+                Values.Set(target.Border, Border.BackgroundProperty, background);
+                Values.Set(target.Border, Border.BorderBrushProperty, DarkenBackgroundBrush(background, target.Scheme.BackgroundColor));
+                Values.Set(target.Border, Border.BorderThicknessProperty, new Thickness(1));
                 if (hasContinuousRange &&
                     target.Scheme.BackgroundPattern ==
                     RibbonBackgroundPattern.FrenchFlagContinuous)
@@ -715,26 +722,7 @@ namespace Couleur
 
         public static void ResetPartialColoring(IntPtr mainWindowHandle)
         {
-            var wnd = GetMainWindow(mainWindowHandle);
-            if (wnd == null) return;
-            var panels = FindVisualByTypeName(wnd, "PanelTitleBar");
-            foreach (var ptb in panels)
-            {
-                var prop = ptb.GetType().GetProperty("Title");
-                if (prop == null) continue;
-                var title = prop.GetValue(ptb)?.ToString();
-                if (title != null && RibbonColorPreferences.IsKnownPanel(title))
-                {
-                    var b = FindChildrenByType<Border>(ptb).FirstOrDefault() as Border ?? (ptb as Border);
-                    if (b != null)
-                    {
-                        b.ClearValue(Border.BackgroundProperty);
-                        b.ClearValue(Border.BorderBrushProperty);
-                        b.ClearValue(Border.BorderThicknessProperty);
-                        ClearTextBlocks(b);
-                    }
-                }
-            }
+            Values.Restore();
         }
 
         // utilitaires...
@@ -799,7 +787,7 @@ namespace Couleur
         private static void ColorTextBlocks(DependencyObject p, Brush color)
         {
             foreach (var tb in FindChildrenByType<TextBlock>(p))
-                tb.Foreground = color;
+                Values.Set(tb, TextBlock.ForegroundProperty, color);
         }
 
         private static void ColorContinuousFlagTextBlocks(
@@ -818,17 +806,11 @@ namespace Couleur
                     continue;
 
                 double center = ((left + right) / 2 - ribbonLeft) / totalWidth;
-                textBlock.Foreground =
+                Values.Set(textBlock, TextBlock.ForegroundProperty,
                     center < 1.0 / 3.0 || center >= 2.0 / 3.0
                         ? Brushes.White
-                        : Brushes.Black;
+                        : Brushes.Black);
             }
-        }
-
-        private static void ClearTextBlocks(DependencyObject p)
-        {
-            foreach (var tb in FindChildrenByType<TextBlock>(p))
-                tb.ClearValue(TextBlock.ForegroundProperty);
         }
 
         private static SolidColorBrush DarkenColor(Color c, double f) =>
@@ -952,12 +934,7 @@ namespace Couleur
         private const uint NoActivateWindowPosition = 0x0010;
         private const uint ShowWindowPosition = 0x0040;
 
-        private static readonly Dictionary<
-            DependencyObject,
-            Dictionary<DependencyProperty, object>> OriginalValues =
-            new Dictionary<
-                DependencyObject,
-                Dictionary<DependencyProperty, object>>();
+        private static readonly AppearanceValueTracker Values = new AppearanceValueTracker();
 
         private static FrameworkElement _projectBrowserRoot;
         private static object _chromiumBrowser;
@@ -966,6 +943,7 @@ namespace Couleur
         private static DispatcherTimer _refreshTimer;
         private static DispatcherTimer _viewHoverPollTimer;
         private static bool _viewHoverPollPending;
+        private static long _viewHoverPollGeneration;
         private static System.Windows.Controls.Primitives.Popup
             _viewHoverPopup;
         private static System.Windows.Controls.Image _viewHoverImage;
@@ -1058,6 +1036,7 @@ namespace Couleur
 
         public static void Reset()
         {
+            _viewHoverPollGeneration++;
             if (_chromiumBrowser != null)
             {
                 ExecuteBrowserScript(_chromiumBrowser, ProjectBrowserIcons.DisposeScript);
@@ -1125,34 +1104,17 @@ namespace Couleur
             HideViewHoverPopup();
             _viewHoverPollPending = false;
 
-            foreach (KeyValuePair<
-                         DependencyObject,
-                         Dictionary<DependencyProperty, object>> target
-                     in OriginalValues.ToList())
-            {
-                foreach (KeyValuePair<DependencyProperty, object> property
-                         in target.Value)
-                {
-                    try
-                    {
-                        if (property.Value == DependencyProperty.UnsetValue)
-                            target.Key.ClearValue(property.Key);
-                        else
-                            target.Key.SetValue(property.Key, property.Value);
-                    }
-                    catch
-                    {
-                        // Un contrôle virtualisé peut avoir disparu entre-temps.
-                    }
-                }
-            }
-
-            OriginalValues.Clear();
+            RestoreTrackedValues();
             _projectBrowserRoot = null;
             _chromiumBrowser = null;
             _viewHoverPreviewBrowser = null;
             _browserInjectionSucceeded = false;
             _legacyNativeProjectBrowser = false;
+        }
+
+        private static void RestoreTrackedValues()
+        {
+            Values.Restore();
         }
 
         public static void SetViewHoverPreview(
@@ -1761,7 +1723,7 @@ namespace Couleur
             string script = @"
 (()=>{
   const key='__bimaestroProjectBrowserTheme';
-  const version=29;
+  const version=30;
   // Revit owns geometry and updates inline heights while documents switch.
   // Restore only appearance properties, never an old complete style attribute.
   const restoreAppearance=target=>{
@@ -2416,8 +2378,12 @@ __BIMAESTRO_ATMOSPHERE_CSS__
           if(!hadViewText)return;
           if(theme.appearanceEnabled)
             element.style.setProperty('color',theme.text,'important');
-          else
-            element.style.removeProperty('color');
+          else{
+            const saved=originals.get(element);
+            const color=saved&&saved.color;
+            if(color&&color.value)element.style.setProperty('color',color.value,color.priority);
+            else element.style.removeProperty('color');
+          }
         });
       document.querySelectorAll('[data-bimaestro-view-kind],[data-bimaestro-category-effects]')
         .forEach(element=>{
@@ -2464,6 +2430,7 @@ __BIMAESTRO_ATMOSPHERE_CSS__
         row.wrap.setAttribute('data-bimaestro-selected','1');
       row.wrap.style.setProperty('--bimaestro-view-color',color);
       if(theme.viewColorTarget==='text'&&row.label){
+        remember(row.label,'color');
         row.label.setAttribute('data-bimaestro-view-text','1');
         const selected=row.wrap.hasAttribute('data-bimaestro-selected');
         row.label.style.setProperty(
@@ -2529,6 +2496,7 @@ __BIMAESTRO_ATMOSPHERE_CSS__
             row.wrap.setAttribute('data-bimaestro-color-target','background');
           }
           if(effect==='Texte'&&row.label){
+            remember(row.label,'color');
             row.label.setAttribute('data-bimaestro-view-text','1');
             row.label.style.setProperty('color',rule.color,'important');
           }
@@ -2548,6 +2516,7 @@ __BIMAESTRO_ATMOSPHERE_CSS__
         if(row.label){
           row.label.setAttribute('data-bimaestro-category-label','1');
           if(['Souligné','Gras','Italique','Barré'].includes(effect)){
+            remember(row.label,'color');
             row.label.setAttribute('data-bimaestro-view-text','1');
             row.label.style.setProperty('color',rule.color,'important');
           }
@@ -3405,24 +3374,29 @@ __BIMAESTRO_ATMOSPHERE_CSS__
             }
 
             _viewHoverPollPending = true;
+            long generation = _viewHoverPollGeneration;
+            long activeViewGeneration = _activeViewGeneration;
+            object browser = _chromiumBrowser;
+            FrameworkElement root = _projectBrowserRoot;
+            Dispatcher dispatcher = root.Dispatcher;
             if (!EvaluateBrowserScriptAsync(
-                    _chromiumBrowser,
+                    browser,
                     "window.__bimaestroViewHoverPreview" +
                     "?window.__bimaestroViewHoverPreview.getActiveKey()" +
                     ":'';",
                     value =>
                     {
-                        FrameworkElement root = _projectBrowserRoot;
-                        Dispatcher dispatcher = root?.Dispatcher;
-                        if (dispatcher == null)
-                        {
-                            _viewHoverPollPending = false;
-                            return;
-                        }
-
                         dispatcher.BeginInvoke(new Action(() =>
                         {
+                            // A reset can start a new poll before this one completes.
+                            // Its result must neither reopen an old popup nor clear
+                            // the pending flag belonging to the replacement request.
+                            if (generation != _viewHoverPollGeneration) return;
                             _viewHoverPollPending = false;
+                            if (activeViewGeneration != _activeViewGeneration ||
+                                !ReferenceEquals(browser, _chromiumBrowser) ||
+                                !ReferenceEquals(root, _projectBrowserRoot) ||
+                                !IsAttachedToWindow(root)) return;
                             ApplyViewHoverResult(value);
                         }));
                     }))
@@ -3504,8 +3478,17 @@ __BIMAESTRO_ATMOSPHERE_CSS__
                     return;
                 }
 
-                const double popupWidth = 316;
-                const double popupHeight = 260;
+                double previewScale = BIMaestro.ViewHover.ViewHoverPreviewPreferences.BrowserSizePercent / 100.0;
+                // Keep the image proportions and reserve the original space for the caption and border.
+                previewScale = Math.Min(previewScale, Math.Min(
+                    Math.Max(1, (workArea.Right - workArea.Left) / scaleX - 28) / 300,
+                    Math.Max(1, (workArea.Bottom - workArea.Top) / scaleY - 52) / 220));
+                double popupWidth = 300 * previewScale + 16;
+                double popupHeight = 220 * previewScale + 40;
+                _viewHoverImage.Width = 300 * previewScale;
+                _viewHoverImage.MaxHeight = 220 * previewScale;
+                _viewHoverBorder.Width = popupWidth;
+                _viewHoverBorder.MaxHeight = popupHeight;
                 const double gap = 12;
                 int popupWidthPixels = (int)Math.Ceiling(
                     popupWidth * scaleX);
@@ -4433,25 +4416,7 @@ __BIMAESTRO_ATMOSPHERE_CSS__
             DependencyProperty property,
             object value)
         {
-            if (!OriginalValues.TryGetValue(
-                    target,
-                    out Dictionary<DependencyProperty, object> properties))
-            {
-                properties = new Dictionary<DependencyProperty, object>();
-                OriginalValues[target] = properties;
-            }
-
-            if (!properties.ContainsKey(property))
-                properties[property] = target.ReadLocalValue(property);
-
-            try
-            {
-                target.SetValue(property, value);
-            }
-            catch
-            {
-                // Certaines surfaces Revit exposent la propriété en lecture seule.
-            }
+            Values.Set(target, property, value);
         }
 
         private static List<T> FindChildrenByType<T>(

@@ -1,0 +1,128 @@
+{
+  "scenario": "Pinned empty grid filler and native refresh before paint after parameter edits",
+  "version": "2024",
+  "build": "24.3.40.26",
+  "run": "2024-stable-layout-final",
+  "pid": 19304,
+  "qualification": "Production module sources in probe with test-only category bypass. Production category/version gate tested separately (4/4).",
+  "rebuilds": [
+    {
+      "trigger": "API transaction: detail level 2 -> 3",
+      "layout": {
+        "time": "2026-10-23T08:14:32.5269685Z",
+        "applied": true,
+        "firstGroups": [
+          "Phase de construction",
+          "Graphismes",
+          "Données d'identification"
+        ],
+        "gapAfterPhasePixels": 0,
+        "visibleEmptyRows": [],
+        "mismatchedParameterMappings": 0,
+        "verifiedParameterMappings": 30
+      },
+      "parameterDeltas": [
+        {
+          "key": "c72f3b20-4753-470e-9734-51911dd0bde7-00000abd|-1011002|Niveau de détail",
+          "before": "2",
+          "after": "3"
+        },
+        {
+          "key": "c72f3b20-4753-470e-9734-51911dd0bde7-00000abf|-1011002|Niveau de détail",
+          "before": "2",
+          "after": "3"
+        }
+      ]
+    },
+    {
+      "trigger": "API transaction: detail level 3 -> 1",
+      "layout": {
+        "time": "2026-10-23T08:14:52.2036854Z",
+        "applied": true,
+        "firstGroups": [
+          "Phase de construction",
+          "Graphismes",
+          "Données d'identification"
+        ],
+        "gapAfterPhasePixels": 0,
+        "visibleEmptyRows": [],
+        "mismatchedParameterMappings": 0,
+        "verifiedParameterMappings": 30
+      },
+      "parameterDeltas": [
+        {
+          "key": "c72f3b20-4753-470e-9734-51911dd0bde7-00000abd|-1011002|Niveau de détail",
+          "before": "3",
+          "after": "1"
+        },
+        {
+          "key": "c72f3b20-4753-470e-9734-51911dd0bde7-00000abf|-1011002|Niveau de détail",
+          "before": "3",
+          "after": "1"
+        }
+      ]
+    }
+  ],
+  "nativeEditor": {
+    "trigger": "Native Properties palette: type 1 : 200 in view scale, commit and leave editor",
+    "layout": {
+      "time": "2026-10-23T08:20:02.8890762Z",
+      "applied": true,
+      "firstGroups": [
+        "Phase de construction",
+        "Graphismes",
+        "Données d'identification"
+      ],
+      "gapAfterPhasePixels": 0,
+      "visibleEmptyRows": [],
+      "mismatchedParameterMappings": 0,
+      "verifiedParameterMappings": 30
+    },
+    "parameterDeltas": [
+      {
+        "key": "c72f3b20-4753-470e-9734-51911dd0bde7-00000abd|-1005151|Echelle de la vue",
+        "before": "100",
+        "after": "200"
+      },
+      {
+        "key": "c72f3b20-4753-470e-9734-51911dd0bde7-00000abd|-1005150|Valeur de l'échelle    1:",
+        "before": "100",
+        "after": "200"
+      },
+      {
+        "key": "c72f3b20-4753-470e-9734-51911dd0bde7-00000abf|-1005151|Echelle de la vue",
+        "before": "100",
+        "after": "200"
+      },
+      {
+        "key": "c72f3b20-4753-470e-9734-51911dd0bde7-00000abf|-1005150|Valeur de l'échelle    1:",
+        "before": "100",
+        "after": "200"
+      }
+    ],
+    "onlyScaleAndDerivedValuesChanged": true,
+    "editingAfter": false
+  },
+  "beforePaintTimings": {
+    "Count": 294,
+    "MeanMs": 1.897,
+    "P95Ms": 4.988,
+    "MaxMs": 10.846
+  },
+  "automatedChecks": {
+    "layout": 15,
+    "productionQualification": 4,
+    "wpfAndRenderer": 20,
+    "allPassed": true
+  },
+  "compilation": {
+    "probes": "2023, 2024, 2025, 2026, 2027 (-stable-layout-verified)",
+    "fullPlugin": "Release2024",
+    "installedSha256": "2FBC6B413D0CF385194E90996A8E9CEFEB6BAA114C43823F8BF6A411178588E8"
+  },
+  "limitations": [
+    "Screenshots show observed states, not frame-by-frame proof that every transient native paint is eliminated.",
+    "RTTI rebinding of a replacement native object behind the same HWND was added after this probe loaded; compiled with all five APIs and the full plugin, not exercised by this session.",
+    "This session started with Phase de construction already first from the installed production add-in. Native original-order restoration is therefore not qualified again here; baseline replacement/restoration is covered by the unit suite and the separate earlier native-view-layout-2024 evidence."
+  ]
+}

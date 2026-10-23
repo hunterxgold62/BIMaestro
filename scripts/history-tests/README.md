@@ -145,6 +145,57 @@ Il nécessite les gabarits de familles anglais installés. Résultats dans
 `tmp/codex-native-validation/2024-history-validation/result.json` ou `error.txt`.
 Utiliser un nouveau RunName pour relancer.
 
+### Ouverture et maquette Antibes sans rapport utilisateur préalable
+
+Le mode `opening-benchmark.txt` travaille uniquement sur le fichier
+`real-model-source.rvt` placé dans son dossier de run. Le fichier
+`production-dll.txt` doit contenir le chemin absolu de la DLL BIMaestro compilée
+pour la même version de Revit. Aucun `user-deletion-audit.json` n'est requis.
+
+Avant tout scan des éléments, le banc programme la copie d'ouverture en tâche
+fichier, contrôle son SHA256, puis supprime et restaure jusqu'à cinq racines
+ordinaires de classes/catégories différentes. Il vérifie aussi une recette
+sérialisée avec `Ready=false`, la recherche par ID après suppression,
+l'immuabilité de l'archive et le refus des identifiants/types modifiés ou ajoutés.
+Chaque suppression/restauration est annulée par un groupe de transactions.
+Un lot de trois suppressions passe aussi par les véritables `EnqueueDeleted`
+et `ToRestoreRequest` de production, avec aller-retour JSON et identités absentes
+avant hydratation. Le banc vérifie que ces identités ne se confondent pas et que
+le document source reste reconnu comme archive pendant son ouverture/fermeture.
+
+Le banc mesure ensuite `BuildSnapshot` de production sur les catégories de modèle
+et types de famille admissibles : durées, recettes disponibles, classes,
+catégories, captures les plus lentes et erreurs exhaustives. Jusqu'à trente
+recettes directes représentatives passent par JSON, suppression réelle et
+restauration avec contrôle de classe, type et placement avant rollback.
+La baseline planifiée de production est également exécutée par passages espacés
+de 50 ms pendant au plus 300 secondes ; le rapport conserve son temps total,
+sa couverture, ses audits, le maximum et le P95 des appels. Cette cadence est
+reproduite dans un contexte de test isolé, sans prétendre mesurer la fluidité
+d'une navigation utilisateur simultanée.
+Le modèle se ferme sans sauvegarde et son SHA256 est revérifié.
+
+`opening-benchmark.json` contient les mesures et diagnostics détaillés ;
+`result.json` donne le bilan des contrôles. Le temps de capture API ne représente
+pas le débit du scheduler pendant la navigation dans Revit. La copie de fichier
+est mesurée séparément et sa publication ne dépend pas de la fin du scan.
+
+Exemple pour un dossier de run neuf :
+
+```powershell
+./scripts/history-tests/Build.ps1 -RevitVersion 2025 -RunName history-antibes-opening-v1
+# Placer les trois fichiers de configuration et la copie RVT décrits ci-dessus.
+./scripts/codex-tests/StartNativeHarness.ps1 -RevitVersion 2025 -RunName history-antibes-opening-v1
+```
+
+Pour ne rejouer que les deux occurrences Antibes connues et la panne volontaire
+de recette, ajouter `targeted-regressions-only.txt`. La validation du 22 octobre
+combine le parcours complet v6 et les diagnostics v7, sans modifier la production
+entre les runs ; voir `VALIDATION-ANTIBES-2026-10-22.md`.
+`ValidateRecordedSystemEvidence.ps1` relit les preuves v7 hors Revit, contrôle
+uniquement les ports HVAC des vrais voisins physiques, et écrit un résultat
+séparé `recorded-system-validation.json`. Les rapports bruts restent inchangés.
+
 Cas : mur droit avec décalage et ligne de justification, mur courbe, sol troué,
 famille tournée avec dimension d'instance, famille hébergée sur mur, références
 manquantes, recette invalide, recherche de l'original. Les tests vérifient le passage

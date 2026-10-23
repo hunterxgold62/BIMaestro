@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RevitVersion Condition="'$(RevitVersion)' == ''">2025</RevitVersion>
+    <TargetFramework Condition="'$(RevitVersion)' == '2023' Or '$(RevitVersion)' == '2024'">net48</TargetFramework>
+    <TargetFramework Condition="'$(RevitVersion)' == '2025' Or '$(RevitVersion)' == '2026'">net8.0-windows</TargetFramework>
+    <TargetFramework Condition="'$(RevitVersion)' == '2027'">net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <EnableDefaultItems>false</EnableDefaultItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <AutomaticallyUseReferenceAssemblyPackages>false</AutomaticallyUseReferenceAssemblyPackages>
+    <LangVersion>9.0</LangVersion>
+    <PlatformTarget>x64</PlatformTarget>
+    <AssemblyName>BIMaestro.ReservationProbe$(RevitVersion)</AssemblyName>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <OutputPath>../../tmp/reservation-tests/$(RevitVersion)/</OutputPath>
+    <RevitInstallDir>C:/Program Files/Autodesk/Revit $(RevitVersion)</RevitInstallDir>
+    <NuGetAudit>false</NuGetAudit>
+    <DefineConstants Condition="'$(RevitVersion)' == '2024'">$(DefineConstants);REVIT2024</DefineConstants>
+    <DefineConstants Condition="'$(RevitVersion)' == '2025' Or '$(RevitVersion)' == '2026' Or '$(RevitVersion)' == '2027'">$(DefineConstants);REVIT2025_OR_GREATER</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="RevitAPI"><HintPath>$(RevitInstallDir)/RevitAPI.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="RevitAPIUI"><HintPath>$(RevitInstallDir)/RevitAPIUI.dll</HintPath><Private>false</Private></Reference>
+    <Compile Include="CompileStubs.cs" />
+    <Compile Include="NativeReservationProbe.cs" />
+    <Compile Include="NativeHeightMappingProbe.cs" />
+    <Compile Include="../../BIMaestro/commands/ElementIdExtensions.cs" Link="ElementIdExtensions.cs" />
+    <Compile Include="../../BIMaestro/commands/Réservation auto/Résa auto V3/ReservationAutoV3Command.cs" Link="ReservationAutoV3Command.cs" />
+    <Compile Include="../../BIMaestro/commands/Réservation auto/Résa auto V3/ReservationAutoV3Clash.cs" Link="ReservationAutoV3Clash.cs" />
+    <Compile Include="../../BIMaestro/commands/Réservation auto/Résa auto V3/ReservationAutoV3Config.cs" Link="ReservationAutoV3Config.cs" />
+    <Compile Include="../../BIMaestro/commands/Réservation auto/Résa auto V3/ReservationV3Window.xaml.cs" Link="ReservationV3Window.xaml.cs" />
+    <Page Include="../../BIMaestro/commands/Réservation auto/Résa auto V3/ReservationV3Window.xaml" Link="ReservationV3Window.xaml" />
+    <Page Include="../../BIMaestro/Themes/BIMaestroTheme.xaml" Link="Themes/BIMaestroTheme.xaml" />
+    <Reference Include="System.Runtime.Serialization" Condition="'$(TargetFramework)' == 'net48'" />
+    <Reference Include="System.Drawing" Condition="'$(TargetFramework)' == 'net48'" />
+  </ItemGroup>
+</Project>

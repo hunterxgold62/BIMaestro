@@ -8,6 +8,198 @@ namespace Analyse
 {
     internal static partial class ElementHistoryReconstruction
     {
+        // These values are cheap enough for the opening checkpoint's light inventory.
+        // Never enumerate all parameters or geometry for this placement-only capture.
+        internal static void CaptureHistoricalPlacement(Element element, HistoryRecipe recipe, bool includeBoundingBox = true)
+        {
+            // NewGroup may choose another logical origin even when all member
+            // coordinates are identical. Members carry the physical placement.
+            if (element == null || recipe == null || element is Group) return;
+            if (recipe.HistoricalPlacement == null)
+            {
+                recipe.HistoricalPlacement = ReadHistoricalPlacement(element, includeBoundingBox);
+                if (element is FamilyInstance)
+                {
+                    var elevations = new List<HistoryParameter>();
+                    foreach (var name in new[] { "INSTANCE_ELEVATION_PARAM", "INSTANCE_FREE_HOST_OFFSET_PARAM",
+                        "FAMILY_BASE_LEVEL_OFFSET_PARAM", "FAMILY_TOP_LEVEL_OFFSET_PARAM" })
+                    {
+                        if (!Enum.TryParse(name, out BuiltInParameter builtIn)) continue;
+                        var parameter = element.get_Parameter(builtIn);
+                        if (parameter?.HasValue == true && parameter.StorageType == StorageType.Double)
+                            elevations.Add(new HistoryParameter { BuiltIn = (int)builtIn,
+                                Storage = (int)StorageType.Double, Number = parameter.AsDouble() });
+                    }
+                    if (elevations.Count > 0) recipe.HistoricalPlacement.ElevationParameters = elevations;
+                }
+            }
+            else if (includeBoundingBox && recipe.HistoricalPlacement.BBox == null)
+            {
+                var box = element.get_BoundingBox(null);
+                if (box != null) recipe.HistoricalPlacement.BBox = new List<double[]> { Pack(box.Min), Pack(box.Max) };
+            }
+        }
+
+        private static HistoryPlacement ReadHistoricalPlacement(Element element, bool includeBoundingBox)
+        {
+            var placement = new HistoryPlacement { LevelSourceUniqueId = FindLevel(element)?.UniqueId,
+                HostSourceUniqueId = (element as FamilyInstance)?.Host?.UniqueId };
+            if (element.Location is LocationPoint point) placement.Point = Pack(point.Point);
+            else if (element.Location is LocationCurve curve) placement.Curve = CaptureCurve(curve.Curve);
+            if (element is FamilyInstance family)
+            {
+                var frame = family.GetTransform();
+                placement.Origin = Pack(frame.Origin); placement.BasisX = Pack(frame.BasisX);
+                placement.BasisY = Pack(frame.BasisY); placement.BasisZ = Pack(frame.BasisZ);
+                placement.HandFlipped = family.HandFlipped; placement.FacingFlipped = family.FacingFlipped;
+                placement.Mirrored = family.Mirrored;
+            }
+            if (includeBoundingBox)
+            {
+                var box = element.get_BoundingBox(null);
+                if (box != null) placement.BBox = new List<double[]> { Pack(box.Min), Pack(box.Max) };
+            }
+            return placement;
+        }
+
+        private static HistoryPlacement SavedHistoricalPlacement(HistoryRecipe recipe)
+        {
+            if (recipe?.HistoricalPlacement != null) return recipe.HistoricalPlacement;
+            // Old persisted recipes still carry their family point and two frame axes.
+            return recipe?.Kind == "family" ? new HistoryPlacement { Point = recipe.Point,
+                BasisX = recipe.BasisX, BasisZ = recipe.BasisZ, Mirrored = recipe.Mirrored,
+                HandFlipped = recipe.HandFlipped, FacingFlipped = recipe.FacingFlipped } : null;
+        }
+
+        internal static bool VerifyHistoricalPlacement(Element element, HistoryRecipe recipe, out string failure,
+            bool includeBoundingBox = false)
+        {
+            failure = null;
+            if (element is Group) return true;
+            var saved = SavedHistoricalPlacement(recipe);
+            if (saved == null) return true;
+            if (element == null || !element.IsValidObject) { failure = "L’objet restauré est absent."; return false; }
+            if (!string.IsNullOrEmpty(saved.LevelSourceUniqueId) && !NativeReferenceMatches(element.Document, saved.LevelSourceUniqueId, FindLevel(element)))
+            { failure = "Le niveau historique de l’objet n’a pas été rétabli."; return false; }
+            if (!string.IsNullOrEmpty(saved.HostSourceUniqueId) && (!(element is FamilyInstance hosted) || !NativeReferenceMatches(element.Document, saved.HostSourceUniqueId, hosted.Host)))
+            { failure = "L’hôte historique de l’objet n’a pas été rétabli."; return false; }
+            failure = saved.Difference(ReadHistoricalPlacement(element, includeBoundingBox), includeBoundingBox);
+            return failure == null;
+        }
+
+        // Caller must restrict this helper to objects created by this restoration and
+        // own an atomic transaction/group. It must not move a retained original neighbor.
+        internal static void RestoreHistoricalPlacement(Document doc, Element element, HistoryRecipe recipe)
+        {
+            if (!(element is FamilyInstance instance))
+            {
+                var plain = SavedHistoricalPlacement(recipe);
+                if (plain == null || element is Group) return;
+                if (!doc.IsModifiable) throw new InvalidOperationException("Le recalage historique nécessite une transaction.");
+                if (VerifyHistoricalPlacement(element, recipe, out _, true)) return;
+                if (ElementHistoryNetwork.Ports(element).Any(port => port.IsConnected))
+                    throw new InvalidOperationException("Le recalage déplacerait un objet déjà connecté ; opération annulée.");
+                if (element.Location is LocationCurve locationCurve && plain.Curve != null)
+                    locationCurve.Curve = RestoreCurve(plain.Curve);
+                else if (element.Location is LocationPoint locationPoint && plain.Point != null)
+                    ElementTransformUtils.MoveElement(doc, element.Id, Unpack(plain.Point) - locationPoint.Point);
+                else throw new InvalidOperationException("Le placement historique de cet objet natif ne peut pas être recalé.");
+                doc.Regenerate();
+                if (!VerifyHistoricalPlacement(element, recipe, out var plainFailure, true)) throw new InvalidOperationException(plainFailure);
+                return;
+            }
+            var saved = SavedHistoricalPlacement(recipe);
+            if (saved == null) return;
+            if (!doc.IsModifiable) throw new InvalidOperationException("Le recalage historique nécessite une transaction.");
+            ReapplyHistoricalDimensions(doc, instance, recipe);
+            if (VerifyHistoricalPlacement(instance, recipe, out _)
+                && (saved.ElevationParameters ?? new List<HistoryParameter>()).All(value =>
+                {
+                    var parameter = instance.get_Parameter((BuiltInParameter)value.BuiltIn);
+                    return parameter?.StorageType == StorageType.Double && Math.Abs(parameter.AsDouble() - value.Number) <= 1e-7;
+                })) return;
+            if (instance.GroupId != ElementId.InvalidElementId || instance.SuperComponent != null)
+                throw new InvalidOperationException("Un composant généré ne peut pas être recalé indépendamment de son ensemble.");
+            if (ElementHistoryNetwork.Ports(instance).Any(port => port.IsConnected))
+                throw new InvalidOperationException("Le recalage déplacerait une famille déjà connectée ; opération annulée.");
+            foreach (var elevation in saved.ElevationParameters ?? new List<HistoryParameter>())
+            {
+                var parameter = instance.get_Parameter((BuiltInParameter)elevation.BuiltIn);
+                if (parameter?.StorageType == StorageType.Double && !parameter.IsReadOnly
+                    && Math.Abs(parameter.AsDouble() - elevation.Number) > 1e-9) parameter.Set(elevation.Number);
+            }
+            doc.Regenerate();
+            if (saved.HandFlipped.HasValue && instance.HandFlipped != saved.HandFlipped.Value)
+            {
+                if (!instance.CanFlipHand || !instance.flipHand()) throw new InvalidOperationException("Inversion de main historique impossible.");
+            }
+            if (saved.FacingFlipped.HasValue && instance.FacingFlipped != saved.FacingFlipped.Value)
+            {
+                if (!instance.CanFlipFacing || !instance.flipFacing()) throw new InvalidOperationException("Inversion de face historique impossible.");
+            }
+            doc.Regenerate();
+            if (saved.Mirrored.HasValue && instance.Mirrored != saved.Mirrored.Value)
+            {
+                var origin = (instance.Location as LocationPoint)?.Point ?? instance.GetTransform().Origin;
+                ElementTransformUtils.MirrorElements(doc, new[] { instance.Id }, Plane.CreateByNormalAndOrigin(XYZ.BasisX, origin), false);
+                doc.Regenerate();
+            }
+            if (instance.Location is LocationPoint location)
+            {
+                if (saved.BasisX != null && saved.BasisZ != null)
+                    ElementHistoryNetwork.Orient(doc, instance, Unpack(saved.BasisX), Unpack(saved.BasisZ));
+                if (saved.Point != null)
+                {
+                    var delta = Unpack(saved.Point) - ((LocationPoint)instance.Location).Point;
+                    if (delta.GetLength() > 1e-9) ElementTransformUtils.MoveElement(doc, instance.Id, delta);
+                }
+            }
+            else if (instance.Location is LocationCurve curve && saved.Curve != null)
+                curve.Curve = RestoreCurve(saved.Curve);
+            doc.Regenerate();
+            if (!VerifyHistoricalPlacement(instance, recipe, out var failure)) throw new InvalidOperationException(failure);
+        }
+
+        private static Parameter HistoricalParameter(Document doc, Element element, HistoryParameter value)
+        {
+            var parameter = value.Shared != null ? element.get_Parameter(new Guid(value.Shared))
+                : value.BuiltIn < 0 ? element.get_Parameter((BuiltInParameter)value.BuiltIn)
+                : (!string.IsNullOrEmpty(value.Definition) && doc.GetElement(value.Definition) is ParameterElement definition
+                    ? element.get_Parameter(definition.GetDefinition()) : null);
+            return parameter ?? (value.Name == null ? null : element.GetParameters(value.Name).SingleOrDefault());
+        }
+
+        private static void ReapplyHistoricalDimensions(Document doc, FamilyInstance instance, HistoryRecipe recipe)
+        {
+            // Connected MEP fittings have a dedicated port-sizing solver. For other
+            // families, replay dimensions after metadata/formula updates, which can
+            // otherwise overwrite an earlier length/height on a new instance.
+            if (instance.MEPModel != null || recipe.Parameters == null) return;
+            var dimensions = recipe.Parameters.Where(value => value.Storage == (int)StorageType.Double)
+                .Where(value => { var parameter = HistoricalParameter(doc, instance, value);
+                    return parameter != null && IsGeometricParameter(parameter); }).ToList();
+            if (dimensions.Count == 0) return;
+            bool MatchesDimensions() => dimensions.All(value =>
+            {
+                var parameter = HistoricalParameter(doc, instance, value);
+                return parameter != null && Math.Abs(parameter.AsDouble() - value.Number) <= 1e-7;
+            });
+            if (MatchesDimensions()) return;
+            for (int pass = 0; pass < 2; pass++)
+            {
+                ApplyParameters(doc, instance, dimensions);
+                doc.Regenerate();
+                if (MatchesDimensions()) break;
+            }
+            foreach (var value in dimensions)
+            {
+                var parameter = HistoricalParameter(doc, instance, value);
+                if (parameter == null || Math.Abs(parameter.AsDouble() - value.Number) > 1e-7)
+                    throw new InvalidOperationException("Dimension historique non conservée après régénération : "
+                        + (value.Name ?? parameter?.Definition.Name ?? value.Definition ?? value.Shared) + ".");
+            }
+        }
+
         private static readonly System.Reflection.MethodInfo ShapeAddPoint =
             typeof(SlabShapeEditor).GetMethod("AddPoint", new[] { typeof(XYZ) })
             ?? typeof(SlabShapeEditor).GetMethod("DrawPoint", new[] { typeof(XYZ) });
@@ -224,6 +416,7 @@ namespace Analyse
                 var curve = CaptureCurve(curveLocation.Curve);
                 if (curve == null) return null;
                 recipe.Loops = new List<List<HistoryCurve>> { new List<HistoryCurve> { curve } };
+                recipe.Parameters = ParametersForCurveDrivenFamily(recipe);
             }
             else if (instance.Location is LocationPoint pointLocation && placement == FamilyPlacementType.TwoLevelsBased)
                 recipe.Point = Pack(pointLocation.Point);
@@ -245,6 +438,33 @@ namespace Analyse
             recipe.Connections = ElementHistoryNetwork.CaptureConnections(instance, recipe.CaptureWarnings);
             recipe.Ports = ElementHistoryNetwork.CaptureFamilyPorts(instance);
             return recipe;
+        }
+
+        private static List<HistoryParameter> ParametersForCurveDrivenFamily(HistoryRecipe recipe)
+        {
+            if (recipe.Placement != FamilyPlacementType.CurveDrivenStructural.ToString() || recipe.Loops == null)
+                return recipe.Parameters;
+            // The absolute axis already determines both end elevations. Replaying
+            // their level offsets can be rejected by Revit's structural placement
+            // solver on a newly created beam. Keep every other historical value.
+            return (recipe.Parameters ?? new List<HistoryParameter>())
+                .Where(parameter => parameter.BuiltIn != (int)BuiltInParameter.STRUCTURAL_BEAM_END0_ELEVATION
+                    && parameter.BuiltIn != (int)BuiltInParameter.STRUCTURAL_BEAM_END1_ELEVATION).ToList();
+        }
+
+        private static void VerifyCurveDrivenFamilyPlacement(Document doc, FamilyInstance instance, HistoryRecipe recipe)
+        {
+            if (recipe.Placement != FamilyPlacementType.CurveDrivenStructural.ToString() || recipe.Loops == null) return;
+            doc.Regenerate();
+            var expected = RestoreCurve(recipe.Loops.Single().Single());
+            var actual = (instance.Location as LocationCurve)?.Curve;
+            const double tolerance = 1e-5;
+            bool SameEnd(int actualEnd, int expectedEnd) => actual.GetEndPoint(actualEnd)
+                .DistanceTo(expected.GetEndPoint(expectedEnd)) < tolerance;
+            if (actual == null || !actual.IsBound
+                || !((SameEnd(0, 0) && SameEnd(1, 1)) || (SameEnd(0, 1) && SameEnd(1, 0)))
+                || actual.Evaluate(0.5, true).DistanceTo(expected.Evaluate(0.5, true)) >= tolerance)
+                throw new InvalidOperationException("La courbe historique de la poutre n’a pas pu être rétablie exactement.");
         }
 
         private static FamilyInstance CreateExtendedFamily(Document doc, FamilySymbol symbol, Level level, HistoryRecipe recipe)
@@ -271,7 +491,9 @@ namespace Analyse
                 instance = doc.Create.NewFamilyInstance(RestoreCurve(recipe.Loops.Single().Single()), symbol, level, (StructuralType)recipe.StructuralType);
             else
                 instance = doc.Create.NewFamilyInstance(Unpack(recipe.Point), symbol, level, (StructuralType)recipe.StructuralType);
-            ApplyParameters(doc, instance, recipe.Parameters);
+            // Also handle historical recipes captured before the endpoint-offset
+            // exclusion was introduced, without mutating their persisted payload.
+            ApplyParameters(doc, instance, ParametersForCurveDrivenFamily(recipe));
             doc.Regenerate();
             if (instance.HandFlipped != recipe.HandFlipped && instance.CanFlipHand) instance.flipHand();
             if (instance.FacingFlipped != recipe.FacingFlipped && instance.CanFlipFacing) instance.flipFacing();
@@ -288,6 +510,7 @@ namespace Analyse
             if (recipe.Placement != FamilyPlacementType.Adaptive.ToString() && instance.Mirrored != recipe.Mirrored)
                 throw new InvalidOperationException("Le miroir de cette famille n’a pas pu être rétabli.");
             ElementHistoryNetwork.RestoreFamilyPorts(doc, instance, recipe);
+            VerifyCurveDrivenFamilyPlacement(doc, instance, recipe);
             return instance;
         }
 

@@ -17,11 +17,13 @@ namespace BIMaestro.PropertiesAppearance
         private List<CellPlan> _cells = new List<CellPlan>();
         private string _key;
         private bool _disposed;
+        private bool _refreshing;
         private IntPtr _dc, _bitmap, _old, _bits;
         private byte[] _pixels;
         private int _width, _height;
         internal IntPtr Window { get; }
         internal string Error { get; private set; }
+        internal Action BeforePaint { get; set; }
         private delegate IntPtr SubclassProc(IntPtr h, uint m, IntPtr w, IntPtr l, UIntPtr id, UIntPtr data);
         [StructLayout(LayoutKind.Sequential)] private struct Header { public uint Size; public int Width, Height; public ushort Planes, Bits; public uint Compression, ImageSize; public int X, Y; public uint Used, Important; }
         [StructLayout(LayoutKind.Sequential)] private struct Info { public Header Header; public uint Color; }
@@ -33,8 +35,6 @@ namespace BIMaestro.PropertiesAppearance
         [DllImport("user32.dll")] private static extern bool RedrawWindow(IntPtr h, IntPtr r, IntPtr region, uint flags);
         [DllImport("user32.dll")] private static extern IntPtr GetDC(IntPtr h);
         [DllImport("user32.dll")] private static extern int ReleaseDC(IntPtr h, IntPtr dc);
-        [DllImport("user32.dll")] private static extern IntPtr GetFocus();
-        [DllImport("user32.dll")] private static extern bool IsChild(IntPtr h, IntPtr child);
         [DllImport("gdi32.dll")] private static extern IntPtr CreateCompatibleDC(IntPtr dc);
         [DllImport("gdi32.dll")] private static extern IntPtr CreateDIBSection(IntPtr dc, ref Info i, uint usage, out IntPtr bits, IntPtr section, uint offset);
         [DllImport("gdi32.dll")] private static extern IntPtr SelectObject(IntPtr dc, IntPtr obj);
@@ -48,16 +48,35 @@ namespace BIMaestro.PropertiesAppearance
             _grid = grid; Window = grid.Window; _callback = Paint;
             if (!SetWindowSubclass(Window, _callback, new UIntPtr(HookId), UIntPtr.Zero)) throw new InvalidOperationException("Habillage de palette indisponible.");
         }
-        internal void Update(NativePropertiesGrid grid, List<CellPlan> cells)
+        internal void Update(NativePropertiesGrid grid, List<CellPlan> cells, bool redraw = true)
         {
             _grid = grid;
             string key = string.Join("\n", cells.Select(c => c.Row + "|" + c.Label + "|" + c.Dark + "|" + c.Colors.Text + "|" + c.Colors.Background));
             _cells = cells;
             if (_key == key) return;
-            _key = key; RedrawWindow(Window, IntPtr.Zero, IntPtr.Zero, 0x105);
+            _key = key; if (redraw) RedrawWindow(Window, IntPtr.Zero, IntPtr.Zero, 0x5);
+        }
+        internal void RefreshBeforePaint()
+        {
+            if (_disposed || _refreshing || BeforePaint == null) return;
+            _refreshing = true;
+            try { BeforePaint(); }
+            finally { _refreshing = false; }
+        }
+        private bool PlanIsCurrent()
+        {
+            // Native rows can disappear between Idling and WM_PAINT. Validate the
+            // whole range before calling any native cell accessor with a saved index.
+            return _grid.RefreshIfCurrent() &&
+                _cells.All(c => c.Row >= 1 && c.Row <= _grid.RowCount) &&
+                _cells.All(c => _grid.Value(c.Row, 1) == c.Label && _grid.IsGroupHeader(c.Row) == c.Header);
         }
         private IntPtr Paint(IntPtr h, uint message, IntPtr w, IntPtr l, UIntPtr id, UIntPtr data)
         {
+            // Native value edits rebuild the palette independently of Idling.
+            // Reconcile cached native layout metadata before Revit paints that
+            // rebuild, without touching the document API from a window callback.
+            if (message == 0xF) RefreshBeforePaint();
             NativePropertiesGrid.Rect dirty = new NativePropertiesGrid.Rect();
             bool paint = message == 0xF && GetUpdateRect(h, out dirty, false);
             IntPtr result = DefSubclassProc(h, message, w, l);
@@ -66,10 +85,9 @@ namespace BIMaestro.PropertiesAppearance
             long measured = PropertiesAppearanceMetrics.Begin();
             try
             {
-                if (!_grid.IsCurrent()) return result;
                 // A rebuild must never reuse a rule for another row that happens to
                 // occupy the same index. Idling will rebuild the semantic plan.
-                if (_cells.Any(c => _grid.Value(c.Row, 1) != c.Label)) return result;
+                if (!PlanIsCurrent()) return result;
                 NativePropertiesGrid.Rect bounds; GetClientRect(h, out bounds);
                 int width = bounds.Right, height = bounds.Bottom;
                 if (width < 10 || height < 10 || (long)width * height > 16000000) return result;
@@ -79,7 +97,7 @@ namespace BIMaestro.PropertiesAppearance
                     EnsureBitmap(dc, width, height);
                     BitBlt(_dc, 0, 0, width, height, dc, 0, 0, 0x00CC0020); GdiFlush();
                     Marshal.Copy(_bits, _pixels, 0, _pixels.Length);
-                    bool editing = IsChild(h, GetFocus());
+                    bool editing = _grid.IsEditing;
                     foreach (var cell in _cells)
                     {
                         if (!cell.Header && !_grid.CanStyle(cell.Row)) continue;
@@ -122,7 +140,7 @@ namespace BIMaestro.PropertiesAppearance
             double dr = fr - br, dg = fg - bgc, db = fb - bb, length = dr * dr + dg * dg + db * db;
             if (length < 100) return;
             Color desiredBg = AppearancePreferences.Parse(plan.Colors.Background) ?? Color.FromRgb((byte)br, (byte)bgc, (byte)bb);
-            var effective = new PaletteColors { Text = plan.Colors.Text ?? Color.FromRgb((byte)fr, (byte)fg, (byte)fb).ToString(), Background = desiredBg.ToString() };
+            var effective = new PaletteColors { Text = plan.Colors.Text, Background = desiredBg.ToString() };
             Color desiredFg = AppearancePreferences.ReadableText(effective, plan.Dark);
             for (int y = Math.Max(t, dirty.Top); y < Math.Min(b, dirty.Bottom); y++)
                 for (int x = Math.Max(l, dirty.Left); x < Math.Min(r, dirty.Right); x++)
@@ -172,6 +190,7 @@ namespace BIMaestro.PropertiesAppearance
         public void Dispose()
         {
             if (_disposed) return; _disposed = true;
+            BeforePaint = null;
             RemoveWindowSubclass(Window, _callback, new UIntPtr(HookId)); FreeBitmap();
             RedrawWindow(Window, IntPtr.Zero, IntPtr.Zero, 0x105);
         }

@@ -85,7 +85,11 @@ namespace Modification
                 using (var t = new Transaction(doc, "Réservations Auto V3"))
                 {
                     t.Start();
-                    if (!reservationSymbol.IsActive) reservationSymbol.Activate();
+                    if (!reservationSymbol.IsActive)
+                    {
+                        reservationSymbol.Activate();
+                        doc.Regenerate();
+                    }
 
                     if (!win.AutomatiqueEnabled)
                         RunManual(uiDoc, doc, win, cfg, prof, reservationSymbol, guided);
@@ -362,10 +366,22 @@ namespace Modification
                 ? UiLanguage.T(" Les deux éléments doivent appartenir à un lien.", " Both elements must belong to a linked model.")
                 : "";
             string hostLabel = isWall ? UiLanguage.T("mur", "wall") : UiLanguage.T("sol", "floor");
+            bool flexibleOrder = CanCreateReservationWithoutHost(reservationSymbol)
+                                 && !guided && !(win.MultiEnabled && isRect);
             if (!guided)
-                TaskDialog.Show("BIMaestro", UiLanguage.T(
-                    $"Mode manuel : sélectionne l’objet, puis le {hostLabel}.{linkScope}\nECHAP pour arrêter.",
-                    $"Manual mode: select the object, then the {hostLabel}.{linkScope}\nPress ESC to stop."));
+                TaskDialog.Show("BIMaestro", flexibleOrder
+                    ? UiLanguage.T(
+                        $"Famille sans hôte : sélectionne l’objet et le {hostLabel} dans l’ordre de ton choix.{linkScope}\nECHAP pour arrêter.",
+                        $"Unhosted family: select the object and the {hostLabel} in either order.{linkScope}\nPress ESC to stop.")
+                    : UiLanguage.T(
+                        $"Mode manuel : sélectionne l’objet, puis le {hostLabel}.{linkScope}\nECHAP pour arrêter.",
+                        $"Manual mode: select the object, then the {hostLabel}.{linkScope}\nPress ESC to stop."));
+
+            if (flexibleOrder)
+            {
+                RunUnhostedManual(uiDoc, doc, win, cfg, prof, reservationSymbol);
+                return;
+            }
 
             while (true)
             {
@@ -411,6 +427,14 @@ namespace Modification
                         allowAnyLink: win.DoubleLinkEnabled);
                     if (linkedHost == null)
                         break;
+
+                    if (picked.Any(p => IsSameTransformedElement(p, linkedHost)))
+                    {
+                        TaskDialog.Show("BIMaestro", UiLanguage.T(
+                            "L’objet traversant et le mur ou sol doivent être distincts.",
+                            "The crossing object and the wall or floor must be different elements."));
+                        continue;
+                    }
 
                     if (picked.Count > 1 && isRect)
                     {
@@ -491,6 +515,14 @@ namespace Modification
                     break;
                 }
                 if (host == null) break;
+
+                if (picked.Any(p => !p.IsLinked && p.Element.Id.Equals(host.Id)))
+                {
+                    TaskDialog.Show("BIMaestro", UiLanguage.T(
+                        "L’objet traversant et le mur ou sol doivent être distincts.",
+                        "The crossing object and the wall or floor must be different elements."));
+                    continue;
+                }
 
                 if (isWall && host is not Wall)
                 {
@@ -614,8 +646,16 @@ namespace Modification
                     var bbInt = IntersectBoundingBoxes(bbWall, bbEl);
                     if (bbInt == null) continue;
 
-                    XYZ center = (bbInt.Min + bbInt.Max) * 0.5;
+                    ObjectOpeningFootprint footprint = null;
+                    if (win.SelectedObject != ReservationAutoV3Window.ObjectType.Canalisation
+                        && win.SelectedObject != ReservationAutoV3Window.ObjectType.Gaine)
+                        footprint = GetObjectOpeningFootprint(wall.Element, wall.TransformToCurrentDocument,
+                            el, Transform.Identity, true, wall.AxisX, bbInt);
+                    XYZ center = footprint?.Center ?? (bbInt.Min + bbInt.Max) * 0.5;
                     center = ProjectPointOntoWallPlane(wall, center);
+                    if (footprint == null && win.SelectedShape == ReservationAutoV3Window.ShapeTarget.Rectangulaire)
+                        footprint = GetWallSizingFootprint(wall.Element, wall.TransformToCurrentDocument,
+                            el, Transform.Identity, win.SelectedObject, wall.AxisX);
 
                     var level = wall.CanHost
                         ? doc.GetElement(((Wall)wall.Element).LevelId) as Level
@@ -626,7 +666,8 @@ namespace Modification
                         .Cast<Level>()
                         .FirstOrDefault();
 
-                    FamilyInstance fi = wall.CanHost
+                    bool createHosted = wall.CanHost && !CanCreateReservationWithoutHost(reservationSymbol);
+                    FamilyInstance fi = createHosted
                         ? doc.Create.NewFamilyInstance(
                             center,
                             reservationSymbol,
@@ -655,9 +696,13 @@ namespace Modification
                         win.SelectedShape == ReservationAutoV3Window.ShapeTarget.Rectangulaire,
                         win.NormeEnabled,
                         wall.AxisX,
-                        wall.DepthFt);
+                        wall.DepthFt,
+                        footprintOverride: footprint);
 
-                    ApplyVerticalPlacementCorrection(
+                    if (!createHosted)
+                        CenterUnhostedReservationOnPoint(doc, fi, center, prof.VerticalPlacementOffsetMm);
+                    else
+                        ApplyVerticalPlacementCorrection(
                         doc,
                         fi,
                         reservationSymbol,
@@ -698,6 +743,129 @@ namespace Modification
             public Element Element { get; set; }
             public Transform TransformToCurrentDocument { get; set; } = Transform.Identity;
             public bool IsLinked { get; set; }
+            public XYZ PickPointInCurrentDocument { get; set; }
+        }
+
+        private enum PairSelectionRole { Either, Source, Host }
+
+        private void RunUnhostedManual(UIDocument uiDoc, Document doc, ReservationAutoV3Window win,
+            ReservationAutoV3Config cfg, ProfileConfig profile, FamilySymbol symbol)
+        {
+            bool isWall = win.SelectedHost == ReservationAutoV3Window.HostTarget.Mur;
+            while (true)
+            {
+                MepSelection first, second;
+                bool hostFirst;
+                try
+                {
+                    first = PickUnhostedPairMember(uiDoc, win, PairSelectionRole.Either);
+                    if (first == null) return;
+                    hostFirst = IsPairHost(first.Element, first.IsLinked, win.SelectedHost);
+                    second = PickUnhostedPairMember(uiDoc, win,
+                        hostFirst ? PairSelectionRole.Source : PairSelectionRole.Host);
+                    if (second == null) return;
+                }
+                catch (Autodesk.Revit.Exceptions.OperationCanceledException) { return; }
+
+                var source = hostFirst ? second : first;
+                var support = hostFirst ? first : second;
+                var host = CreateHostCandidate(support, win.SelectedHost, forceUnhosted: true);
+                if (host == null) continue;
+                if (IsSameTransformedElement(source, host))
+                {
+                    TaskDialog.Show("BIMaestro", UiLanguage.T(
+                        "L’objet traversant et le mur ou sol doivent être distincts.",
+                        "The crossing object and the wall or floor must be different elements."));
+                    continue;
+                }
+
+                using (var placement = new SubTransaction(doc))
+                {
+                    placement.Start();
+                    try
+                    {
+                        CreateReservation_SingleAgainstCandidate(doc, host, symbol, win.SelectedObject,
+                            source, cfg, profile, isWall,
+                            win.SelectedShape == ReservationAutoV3Window.ShapeTarget.Rectangulaire, win.NormeEnabled);
+                        placement.Commit();
+                    }
+                    catch (InvalidOperationException ex)
+                    {
+                        placement.RollBack();
+                        TaskDialog.Show("BIMaestro", ex.Message);
+                        continue;
+                    }
+                }
+
+                var again = new TaskDialog("BIMaestro")
+                {
+                    MainInstruction = UiLanguage.T("Créer une autre réservation ?", "Create Another Opening?"),
+                    CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No
+                };
+                if (again.Show() != TaskDialogResult.Yes) return;
+            }
+        }
+
+        private static bool IsPairHost(Element element, bool linked, ReservationAutoV3Window.HostTarget target)
+        {
+            if (element == null || element is ElementType) return false;
+            bool wall = target == ReservationAutoV3Window.HostTarget.Mur;
+            if (wall ? element is Wall : element is Floor) return true;
+            if (!linked) return false;
+            if (HasCategory(element, wall ? BuiltInCategory.OST_Walls : BuiltInCategory.OST_Floors)) return true;
+            // Equipment names such as "wall mounted fan" or "console" do not define a support.
+            // IFC model objects may expose their entity class instead of a native Revit host type.
+            if (!HasCategory(element, BuiltInCategory.OST_GenericModel) && !(element is DirectShape)) return false;
+            string text = GetElementSearchText(element);
+            return wall ? TextContainsAny(text, "ifcwall") : TextContainsAny(text, "ifcslab", "ifcfloor");
+        }
+
+        private static MepSelection PickUnhostedPairMember(UIDocument uiDoc,
+            ReservationAutoV3Window win, PairSelectionRole role)
+        {
+            bool withLinks = win.DoubleLinkEnabled || IsLinkSource(win.SelectedPipeSource);
+            string host = win.SelectedHost == ReservationAutoV3Window.HostTarget.Mur
+                ? UiLanguage.T("le mur", "wall") : UiLanguage.T("le sol", "floor");
+            string prompt = role == PairSelectionRole.Either
+                ? UiLanguage.T($"Sélectionne l’objet ou {host} en premier (ESC pour annuler)",
+                    $"Select the object or {host} first (press ESC to cancel)")
+                : role == PairSelectionRole.Host
+                    ? UiLanguage.T($"Sélectionne maintenant {host} (ESC pour annuler)",
+                        $"Now select the {host} (press ESC to cancel)")
+                    : UiLanguage.T("Sélectionne maintenant l’objet traversant (ESC pour annuler)",
+                        "Now select the crossing object (press ESC to cancel)");
+            var reference = uiDoc.Selection.PickObject(withLinks ? ObjectType.PointOnElement : ObjectType.Element,
+                new UnhostedPairSelectionFilter(uiDoc.Document, win.SelectedPipeSource,
+                    win.SelectedObject, win.SelectedHost, role, win.DoubleLinkEnabled), prompt);
+            if (!TryResolveReference(uiDoc, reference, out var element, out var transform, out bool linked))
+                return null;
+            var bounds = GetBoundingBoxInHostCoordinates(element, transform);
+            return new MepSelection
+            {
+                Element = element, TransformToCurrentDocument = transform, IsLinked = linked,
+                PickPointInCurrentDocument = linked
+                    ? NormalizeLinkedReferencePoint(reference.GlobalPoint, transform, bounds) : reference.GlobalPoint
+            };
+        }
+
+        private static WallScanCandidate CreateHostCandidate(MepSelection selection,
+            ReservationAutoV3Window.HostTarget target, bool forceUnhosted)
+        {
+            var element = selection?.Element;
+            if (element == null) return null;
+            var bounds = GetBoundingBoxInHostCoordinates(element, selection.TransformToCurrentDocument);
+            if (bounds == null) return null;
+            return new WallScanCandidate
+            {
+                Element = element, BoundingBoxInCurrentDocument = bounds,
+                TransformToCurrentDocument = selection.TransformToCurrentDocument,
+                IsLinked = selection.IsLinked, ForceUnhosted = forceUnhosted,
+                IsFloorLike = target == ReservationAutoV3Window.HostTarget.Sol,
+                AxisX = element is Wall wall
+                    ? GetWallDirectionXY(wall, selection.TransformToCurrentDocument) : EstimateWallAxisXY(bounds),
+                DepthFt = element is Wall || element is Floor ? GetHostDepth(element) : EstimateWallDepth(bounds),
+                PickPointInCurrentDocument = selection.PickPointInCurrentDocument
+            };
         }
 
         private static List<MepSelection> PickGuidedPipe(UIDocument uiDoc, Document doc)
@@ -751,19 +919,12 @@ namespace Modification
                 return PickGuidedPipe(uiDoc, doc);
             if (!multi)
             {
-                Reference r;
-                if (win.SelectedObject == ReservationAutoV3Window.ObjectType.Canalisation
-                    || win.SelectedObject == ReservationAutoV3Window.ObjectType.Gaine)
-                    r = PickSingleMepCurveBySource(
+                Reference r = PickSingleObjectBySource(
                         uiDoc,
                         doc,
                         win.SelectedPipeSource,
                         win.SelectedObject,
                         win.DoubleLinkEnabled);
-                else
-                    r = uiDoc.Selection.PickObject(
-                        ObjectType.Element,
-                        UiLanguage.T("Sélectionne l’objet (ESC pour annuler)", "Select the object (press ESC to cancel)"));
 
                 if (!TryResolveReference(uiDoc, r, out var el, out var tr, out bool isLinked))
                     return new List<MepSelection>();
@@ -780,7 +941,7 @@ namespace Modification
             }
             else
             {
-                IList<Reference> refs = GetMepCurveReferencesBySource(
+                IList<Reference> refs = GetObjectReferencesBySource(
                     uiDoc,
                     doc,
                     win.SelectedPipeSource,
@@ -817,6 +978,19 @@ namespace Modification
             public bool IsFloorLike { get; set; }
 
             public bool CanHost => !ForceUnhosted && !IsLinked && Element is Wall;
+        }
+
+        private static bool IsSameTransformedElement(MepSelection source, WallScanCandidate host)
+        {
+            if (!source.Element.Document.Equals(host.Element.Document) || !source.Element.Id.Equals(host.Element.Id))
+                return false;
+
+            var a = source.TransformToCurrentDocument ?? Transform.Identity;
+            var b = host.TransformToCurrentDocument ?? Transform.Identity;
+            return a.Origin.IsAlmostEqualTo(b.Origin)
+                && a.BasisX.IsAlmostEqualTo(b.BasisX)
+                && a.BasisY.IsAlmostEqualTo(b.BasisY)
+                && a.BasisZ.IsAlmostEqualTo(b.BasisZ);
         }
 
         private List<WallScanCandidate> GetAutomaticWallCandidates(Document doc)
@@ -973,11 +1147,12 @@ namespace Modification
                 ElementTransformUtils.MoveElement(doc, fi.Id, delta);
         }
 
-        private static void CenterUnhostedReservationOnPoint(Document doc, FamilyInstance fi, XYZ target)
+        private static void CenterUnhostedReservationOnPoint(Document doc, FamilyInstance fi, XYZ target, double verticalOffsetMm = 0)
         {
             if (doc == null || fi == null || target == null)
                 return;
 
+            target += XYZ.BasisZ * MmToFt(verticalOffsetMm);
             try
             {
                 doc.Regenerate();
@@ -1019,6 +1194,16 @@ namespace Modification
             ReservationAutoV3Config cfg, ProfileConfig prof,
             bool isWall, bool isRect, bool normeEnabled)
         {
+            if (CanCreateReservationWithoutHost(sym))
+            {
+                var candidate = CreateHostCandidate(new MepSelection { Element = host },
+                    isWall ? ReservationAutoV3Window.HostTarget.Mur : ReservationAutoV3Window.HostTarget.Sol, true);
+                CreateReservation_SingleAgainstCandidate(doc, candidate, sym, objType,
+                    new MepSelection { Element = el, TransformToCurrentDocument = trToHost },
+                    cfg, prof, isWall, isRect, normeEnabled);
+                return;
+            }
+
             var bbHost = host.get_BoundingBox(null);
             var bbEl = GetBoundingBoxInHostCoordinates(el, trToHost);
             if (bbHost == null || bbEl == null) return;
@@ -1029,8 +1214,15 @@ namespace Modification
             XYZ center = (bbInt.Min + bbInt.Max) * 0.5;
             bool isMepCurve = objType == ReservationAutoV3Window.ObjectType.Canalisation
                               || objType == ReservationAutoV3Window.ObjectType.Gaine;
+            ObjectOpeningFootprint footprint = null;
 
-            if (isMepCurve && TryGetElementHostIntersectionCenter(
+            if (!isMepCurve)
+            {
+                footprint = GetObjectOpeningFootprint(host, Transform.Identity, el, trToHost,
+                    isWall, isWall ? GetWallDirectionXY(host as Wall) : XYZ.BasisX, bbInt);
+                center = footprint.Center;
+            }
+            else if (TryGetElementHostIntersectionCenter(
                     el,
                     trToHost,
                     host,
@@ -1045,14 +1237,18 @@ namespace Modification
             else if (!isWall && host is Floor f)
                 center = GetPlacementPointOnFloor(f, center);
 
+            if (isMepCurve && isRect && isWall)
+                footprint = GetWallSizingFootprint(host, Transform.Identity, el, trToHost, objType, GetWallDirectionXY(host as Wall));
+
             var fi = doc.Create.NewFamilyInstance(
                 center, sym, host, level,
                 Autodesk.Revit.DB.Structure.StructuralType.NonStructural);
 
             AlignReservationOrientationIfNeeded(doc, fi, sym, host, center,
-                isWall ? GetWallDirectionXY(host as Wall) : objType == ReservationAutoV3Window.ObjectType.Autre ? XYZ.BasisX : GetElementDirectionXY(el, trToHost));
+                isWall ? GetWallDirectionXY(host as Wall) : !isMepCurve ? XYZ.BasisX : GetElementDirectionXY(el, trToHost));
 
-            ApplySizing(fi, host, bbInt, cfg, prof, objType, el, trToHost, isRect, normeEnabled);
+            ApplySizing(fi, host, bbInt, cfg, prof, objType, el, trToHost, isRect, normeEnabled,
+                footprintOverride: footprint);
 
             ApplyVerticalPlacementCorrection(doc, fi, sym, host, prof, bbInt, cfg, objType, el, isRect, normeEnabled);
 
@@ -1080,8 +1276,21 @@ namespace Modification
             var bbInt = IntersectBoundingBoxes(bbHost, bbEl);
             if (bbInt == null) return;
 
+            bool isMepCurve = objType == ReservationAutoV3Window.ObjectType.Canalisation
+                              || objType == ReservationAutoV3Window.ObjectType.Gaine;
+            ObjectOpeningFootprint footprint = null;
             XYZ center;
-            if (!TryGetLinkedHostPlacementPoint(selected, host, out center))
+            if (!isMepCurve)
+            {
+                footprint = GetObjectOpeningFootprint(host.Element, host.TransformToCurrentDocument,
+                    selected.Element, selected.TransformToCurrentDocument,
+                    isWall, isWall ? host.AxisX : XYZ.BasisX, bbInt);
+                center = footprint.Center;
+                center = isWall
+                    ? ProjectPointOntoWallPlane(host, center)
+                    : ProjectPointOntoFloorPlane(host, center);
+            }
+            else if (!TryGetLinkedHostPlacementPoint(selected, host, out center))
             {
                 center = (bbInt.Min + bbInt.Max) * 0.5;
                 center = isWall
@@ -1089,13 +1298,18 @@ namespace Modification
                     : ProjectPointOntoFloorPlane(host, center);
             }
 
+            if (isMepCurve && isRect && isWall)
+                footprint = GetWallSizingFootprint(host.Element, host.TransformToCurrentDocument,
+                    selected.Element, selected.TransformToCurrentDocument, objType, host.AxisX);
+
             var level = GetNearestLevel(doc, center.Z)
                         ?? new FilteredElementCollector(doc)
                             .OfClass(typeof(Level))
                             .Cast<Level>()
                             .FirstOrDefault();
 
-            FamilyInstance fi = host.CanHost
+            bool createHosted = host.CanHost && !CanCreateReservationWithoutHost(sym);
+            FamilyInstance fi = createHosted
                 ? doc.Create.NewFamilyInstance(
                     center,
                     sym,
@@ -1115,7 +1329,7 @@ namespace Modification
             }
 
             AlignReservationOrientationIfNeeded(doc, fi, sym, host.Element, center,
-                isWall ? host.AxisX : objType == ReservationAutoV3Window.ObjectType.Autre ? XYZ.BasisX : GetElementDirectionXY(selected.Element, selected.TransformToCurrentDocument));
+                isWall ? host.AxisX : !isMepCurve ? XYZ.BasisX : GetElementDirectionXY(selected.Element, selected.TransformToCurrentDocument));
 
             ApplySizing(
                 fi,
@@ -1131,9 +1345,10 @@ namespace Modification
                 isWall ? host.AxisX : null,
                 host.DepthFt,
                 floorOverride: !isWall,
-                hostTransformToCurrentDocument: host.TransformToCurrentDocument);
+                hostTransformToCurrentDocument: host.TransformToCurrentDocument,
+                footprintOverride: footprint);
 
-            if (host.CanHost)
+            if (createHosted)
             {
                 ApplyVerticalPlacementCorrection(
                     doc,
@@ -1152,7 +1367,9 @@ namespace Modification
             }
             else
             {
-                CenterUnhostedReservationOnPoint(doc, fi, center);
+                CenterUnhostedReservationOnPoint(doc, fi, center, prof.VerticalPlacementOffsetMm);
+                if (!host.IsLinked)
+                    ForceVoidCutSafe(doc, host.Element, fi);
             }
         }
 
@@ -1163,6 +1380,19 @@ namespace Modification
             ReservationAutoV3Config cfg, ProfileConfig prof,
             bool isWall, bool normeEnabled)
         {
+            if (CanCreateReservationWithoutHost(sym))
+            {
+                var candidate = CreateHostCandidate(new MepSelection { Element = host },
+                    isWall ? ReservationAutoV3Window.HostTarget.Mur : ReservationAutoV3Window.HostTarget.Sol, true);
+                var selected = elems.Select(e => new MepSelection
+                    { Element = e.el, TransformToCurrentDocument = e.tr }).ToList();
+                if (isWall)
+                    CreateRectReservation_MultiAgainstCandidate(doc, candidate, sym, objType, selected, cfg, prof, normeEnabled);
+                else
+                    CreateRectReservation_MultiAgainstFloorCandidate(doc, candidate, sym, objType, selected, cfg, prof, normeEnabled);
+                return;
+            }
+
             var bbHost = host.get_BoundingBox(null);
             if (bbHost == null) return;
 
@@ -1256,7 +1486,8 @@ namespace Modification
                             .Cast<Level>()
                             .FirstOrDefault();
 
-            FamilyInstance fi = host.CanHost
+            bool createHosted = host.CanHost && !CanCreateReservationWithoutHost(sym);
+            FamilyInstance fi = createHosted
                 ? doc.Create.NewFamilyInstance(
                     center,
                     sym,
@@ -1288,14 +1519,16 @@ namespace Modification
                 host.AxisX,
                 host.DepthFt);
 
-            if (host.CanHost)
+            if (createHosted)
             {
                 ApplyVerticalPlacementCorrection(doc, fi, sym, host.Element, prof, unionInt, cfg, objType, null, true, normeEnabled);
                 ForceVoidCutSafe(doc, host.Element, fi);
             }
             else
             {
-                CenterUnhostedReservationOnPoint(doc, fi, center);
+                CenterUnhostedReservationOnPoint(doc, fi, center, prof.VerticalPlacementOffsetMm);
+                if (!host.IsLinked)
+                    ForceVoidCutSafe(doc, host.Element, fi);
             }
         }
 
@@ -1393,7 +1626,9 @@ namespace Modification
                 depthOverrideFt: host.DepthFt,
                 floorOverride: true);
 
-            CenterUnhostedReservationOnPoint(doc, fi, center);
+            CenterUnhostedReservationOnPoint(doc, fi, center, prof.VerticalPlacementOffsetMm);
+            if (!host.IsLinked)
+                ForceVoidCutSafe(doc, host.Element, fi);
         }
 
         // =========================
@@ -1409,7 +1644,8 @@ namespace Modification
             XYZ wallAxisOverride = null,
             double? depthOverrideFt = null,
             bool floorOverride = false,
-            Transform hostTransformToCurrentDocument = null)
+            Transform hostTransformToCurrentDocument = null,
+            ObjectOpeningFootprint footprintOverride = null)
         {
             if (fi == null || host == null || bbIntersect == null) return;
 
@@ -1423,6 +1659,19 @@ namespace Modification
             var world = ToWorldBoundingBox(bbIntersect);
             if (world == null) return;
 
+            if (!isPipeOrDuct)
+            {
+                bool isWall = !(host is Floor || floorOverride);
+                var footprint = footprintOverride ?? GetObjectOpeningFootprint(host, hostTransformToCurrentDocument,
+                    intersecting, trToHost, isWall,
+                    isWall ? wallAxisOverride ?? GetWallDirectionXY(host as Wall) : XYZ.BasisX, world);
+                double length = normeEnabled ? RoundUpToNext50mm(footprint.Length) : footprint.Length;
+                double height = normeEnabled ? RoundUpToNext50mm(footprint.Height) : footprint.Height;
+                double diameter = normeEnabled ? RoundUpToNext50mm(footprint.Diameter) : footprint.Diameter;
+                SetOpeningDimensions(fi, prof, isRect, isWall, length, height, diameter, depthFt);
+                return;
+            }
+
             if (!isRect)
             {
                 double diamFt = CalculateDiameterForElement(intersecting, objType, oversizeFt);
@@ -1433,8 +1682,7 @@ namespace Modification
 
                 if (normeEnabled) diamFt = RoundUpToNext50mm(diamFt);
 
-                TrySet(fi, prof.ParamDiameter, diamFt, "Diamètre", "COM_Diamètre", "Diameter");
-                TrySet(fi, prof.ParamDepth, depthFt, "Profondeur", "COM_Profondeur", "Depth");
+                SetOpeningDimensions(fi, prof, false, !(host is Floor || floorOverride), 0, 0, diamFt, depthFt);
                 return;
             }
 
@@ -1445,7 +1693,12 @@ namespace Modification
                 double len;
                 double hgt;
 
-                if (TryCalculateWallOpeningSizeFromSolidIntersection(
+                if (footprintOverride != null)
+                {
+                    len = footprintOverride.Length + oversizeFt;
+                    hgt = footprintOverride.Height + oversizeFt;
+                }
+                else if (TryCalculateWallOpeningSizeFromSolidIntersection(
                         host,
                         hostTransformToCurrentDocument,
                         intersecting,
@@ -1479,9 +1732,7 @@ namespace Modification
                     hgt = RoundUpToNext50mm(hgt);
                 }
 
-                TrySet(fi, prof.ParamLength, len, "Longueur", "COM_Longueur", "Largeur", "COM_Largeur", "Length", "Width");
-                TrySet(fi, prof.ParamHeight, hgt, "Hauteur", "COM_Hauteur", "Height");
-                TrySet(fi, prof.ParamDepth, depthFt, "Profondeur", "COM_Profondeur", "Depth");
+                SetOpeningDimensions(fi, prof, true, true, len, hgt, 0, depthFt);
             }
             else if (host is Floor || floorOverride)
             {
@@ -1494,9 +1745,7 @@ namespace Modification
                     wid = RoundUpToNext50mm(wid);
                 }
 
-                TrySet(fi, prof.ParamLength, len, "Longueur", "COM_Longueur", "Length");
-                TrySet(fi, prof.ParamWidth, wid, "Largeur", "COM_Largeur", "Width");
-                TrySet(fi, prof.ParamDepth, depthFt, "Profondeur", "COM_Profondeur", "Depth");
+                SetOpeningDimensions(fi, prof, true, false, len, wid, 0, depthFt);
             }
         }
 
@@ -1539,9 +1788,7 @@ namespace Modification
                     hgt = RoundUpToNext50mm(hgt);
                 }
 
-                TrySet(fi, prof.ParamLength, len, "Longueur", "COM_Longueur", "Largeur", "COM_Largeur", "Length", "Width");
-                TrySet(fi, prof.ParamHeight, hgt, "Hauteur", "COM_Hauteur", "Height");
-                TrySet(fi, prof.ParamDepth, depthFt, "Profondeur", "COM_Profondeur", "Depth");
+                SetOpeningDimensions(fi, prof, true, true, len, hgt, 0, depthFt);
             }
             else if (host is Floor || floorOverride)
             {
@@ -1554,31 +1801,81 @@ namespace Modification
                     wid = RoundUpToNext50mm(wid);
                 }
 
-                TrySet(fi, prof.ParamLength, len, "Longueur", "COM_Longueur", "Length");
-                TrySet(fi, prof.ParamWidth, wid, "Largeur", "COM_Largeur", "Width");
-                TrySet(fi, prof.ParamDepth, depthFt, "Profondeur", "COM_Profondeur", "Depth");
+                SetOpeningDimensions(fi, prof, true, false, len, wid, 0, depthFt);
             }
         }
 
-        private static bool TrySet(FamilyInstance fi, string preferredName, double val, params string[] fallbacks)
+        private static void SetOpeningDimensions(FamilyInstance instance, ProfileConfig profile,
+            bool rectangular, bool wall, double length, double height, double diameter, double depth)
         {
-            bool Try(string name)
+            var dimensions = new List<(string Label, string Preferred, double Value, string[] Aliases, bool Depth)>();
+            if (!rectangular)
+                dimensions.Add(("diamètre", profile.ParamDiameter, diameter,
+                    new[] { "Diamètre", "COM_Diamètre", "Diametre", "COM_Diametre", "Diameter", "COM_Diameter" }, false));
+            else if (wall)
             {
-                if (string.IsNullOrWhiteSpace(name)) return false;
-                var p = fi.LookupParameter(name);
-                if (p != null && !p.IsReadOnly)
+                dimensions.Add(("largeur", profile.ParamLength, length,
+                    new[] { "Longueur", "COM_Longueur", "Largeur", "COM_Largeur", "Length", "Width", "COM_Length", "COM_Width" }, false));
+                dimensions.Add(("hauteur", profile.ParamHeight, height,
+                    new[] { "Hauteur", "COM_Hauteur", "Height", "COM_Height" }, false));
+            }
+            else
+            {
+                dimensions.Add(("longueur", profile.ParamLength, length,
+                    new[] { "Longueur", "COM_Longueur", "Length", "COM_Length" }, false));
+                dimensions.Add(("largeur", profile.ParamWidth, height,
+                    new[] { "Largeur", "COM_Largeur", "Width", "COM_Width" }, false));
+            }
+            dimensions.Add(("profondeur", profile.ParamDepth, depth,
+                new[] { "Profondeur", "COM_Profondeur", "Depth", "COM_Depth" }, true));
+
+            var resolved = new List<(Parameter Parameter, double Value, bool Write)>();
+            var parameterIds = new HashSet<long>();
+            foreach (var dimension in dimensions)
+            {
+                var names = new[] { dimension.Preferred }.Concat(dimension.Aliases)
+                    .Where(n => !string.IsNullOrWhiteSpace(n)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                bool IsLength(Parameter p) => p != null && p.StorageType == StorageType.Double
+                    && p.Definition.GetDataType() == SpecTypeId.Length;
+                Parameter parameter = names.Select(instance.LookupParameter).FirstOrDefault(p => IsLength(p) && !p.IsReadOnly);
+                bool write = parameter != null;
+                if (parameter == null && dimension.Depth)
                 {
-                    p.Set(val);
-                    return true;
+                    // A fixed depth may cover the host; never change a shared family type.
+                    parameter = names.Select(n => instance.LookupParameter(n) ?? instance.Symbol.LookupParameter(n))
+                        .FirstOrDefault(p => IsLength(p) && p.AsDouble() >= dimension.Value - MmToFt(1));
                 }
-                return false;
+                if (parameter == null || dimension.Value <= 1e-9 || double.IsNaN(dimension.Value) || double.IsInfinity(dimension.Value))
+                    throw new InvalidOperationException(UiLanguage.T(
+                        $"Impossible de régler la {dimension.Label} de la réservation « {instance.Symbol.Family.Name} » (paramètres : {string.Join(", ", names)}).\n" +
+                        "Dans Configuration, choisissez un paramètre de longueur d’occurrence modifiable. Aucune réservation partiellement dimensionnée n’est conservée.",
+                        $"Unable to set the opening dimension '{dimension.Label}' for '{instance.Symbol.Family.Name}' (parameters: {string.Join(", ", names)}).\n" +
+                        "In Settings, choose a writable instance length parameter. No partially sized opening is retained."));
+                if (!parameterIds.Add(parameter.Id.GetIdLongValue()))
+                    throw new InvalidOperationException(UiLanguage.T(
+                        "La largeur, la hauteur et la profondeur doivent utiliser des paramètres distincts. Corrigez le mapping dans Configuration.",
+                        "Width, height and depth must use different parameters. Correct the mapping in Settings."));
+                resolved.Add((parameter, dimension.Value, write));
             }
 
-            if (Try(preferredName)) return true;
-            foreach (var fb in fallbacks ?? Array.Empty<string>())
-                if (Try(fb)) return true;
-
-            return false;
+            foreach (var dimension in resolved.Where(d => d.Write))
+            {
+                try { dimension.Parameter.Set(dimension.Value); }
+                catch (Exception ex)
+                {
+                    throw new InvalidOperationException(UiLanguage.T(
+                        $"Le paramètre « {dimension.Parameter.Definition.Name} » ne peut pas être modifié. Aucune réservation partiellement dimensionnée n’est conservée.",
+                        $"Parameter '{dimension.Parameter.Definition.Name}' cannot be changed. No partially sized opening is retained."), ex);
+                }
+            }
+            instance.Document.Regenerate();
+            foreach (var dimension in resolved.Where(d => d.Write))
+            {
+                if (Math.Abs(dimension.Parameter.AsDouble() - dimension.Value) > 1e-6)
+                    throw new InvalidOperationException(UiLanguage.T(
+                        $"Revit n’a pas appliqué la dimension au paramètre « {dimension.Parameter.Definition.Name} ». Vérifiez les contraintes de la famille.",
+                        $"Revit did not apply the dimension to '{dimension.Parameter.Definition.Name}'. Check the family constraints."));
+            }
         }
 
         // =========================
@@ -1629,6 +1926,21 @@ namespace Modification
             // si on est sur Auto sans décalage manuel et qu'on ne veut pas impacter les cas standards,
             // on peut sortir si l'auto conclut "Center"
             double verticalSizeFt = ComputeReferenceVerticalSize(host, bbIntersect, cfg, objType, intersecting, isRect, normeEnabled);
+            if (host is Wall && objType != ReservationAutoV3Window.ObjectType.Canalisation
+                && objType != ReservationAutoV3Window.ObjectType.Gaine)
+            {
+                var names = isRect
+                    ? new[] { prof.ParamHeight, "Hauteur", "COM_Hauteur", "Height" }
+                    : new[] { prof.ParamDiameter, "Diamètre", "COM_Diamètre", "Diameter" };
+                foreach (string name in names.Where(n => !string.IsNullOrWhiteSpace(n)))
+                {
+                    var parameter = fi.LookupParameter(name);
+                    if (parameter?.StorageType != StorageType.Double || parameter.IsReadOnly || parameter.AsDouble() <= 1e-9)
+                        continue;
+                    verticalSizeFt = parameter.AsDouble();
+                    break;
+                }
+            }
             double shiftFt = MmToFt(prof.VerticalPlacementOffsetMm);
 
             switch (mode)
@@ -2237,6 +2549,76 @@ namespace Modification
             length = Math.Max(0.0, maxAlongWall - minAlongWall) + crossSectionSize;
             height = Math.Max(0.0, maxZ - minZ) + crossSectionSize;
             return length > 1e-9 && height > 1e-9;
+        }
+
+        private sealed class ObjectOpeningFootprint
+        {
+            public XYZ Center { get; set; }
+            public double Length { get; set; }
+            public double Height { get; set; }
+            public double Diameter { get; set; }
+        }
+
+        private static ObjectOpeningFootprint GetWallSizingFootprint(Element host, Transform hostTransform,
+            Element source, Transform sourceTransform, ReservationAutoV3Window.ObjectType objectType, XYZ axis)
+        {
+            return TryCalculateWallOpeningSizeFromSolidIntersection(host, hostTransform, source, sourceTransform,
+                objectType, axis, out double length, out double height)
+                ? new ObjectOpeningFootprint { Length = length, Height = height } : null;
+        }
+
+        // Project the physical overlap onto the opening plane, in current-document coordinates.
+        // IFC elements without usable solids keep a conservative bounding-box fallback.
+        private static ObjectOpeningFootprint GetObjectOpeningFootprint(
+            Element host, Transform hostTransform,
+            Element source, Transform sourceTransform,
+            bool isWall, XYZ axisX, BoundingBoxXYZ fallbackBounds)
+        {
+            var points = new List<XYZ>();
+            var sourceSolids = GetElementSolidsInCurrentDocument(source, sourceTransform);
+            foreach (var hostSolid in GetElementSolidsInCurrentDocument(host, hostTransform))
+            foreach (var sourceSolid in sourceSolids)
+            {
+                try
+                {
+                    var intersection = BooleanOperationsUtils.ExecuteBooleanOperation(
+                        hostSolid, sourceSolid, BooleanOperationsType.Intersect);
+                    if (intersection != null && intersection.Volume > 1e-9)
+                        CollectSolidPoints(intersection, points);
+                }
+                catch { /* Some IFC solids do not support Boolean operations. */ }
+            }
+
+            if (points.Count == 0)
+            {
+                var bounds = ToWorldBoundingBox(fallbackBounds);
+                for (int x = 0; x < 2; x++)
+                for (int y = 0; y < 2; y++)
+                for (int z = 0; z < 2; z++)
+                    points.Add(new XYZ(x == 0 ? bounds.Min.X : bounds.Max.X,
+                        y == 0 ? bounds.Min.Y : bounds.Max.Y,
+                        z == 0 ? bounds.Min.Z : bounds.Max.Z));
+            }
+
+            XYZ xAxis = new XYZ(axisX?.X ?? 1, axisX?.Y ?? 0, 0);
+            xAxis = xAxis.IsZeroLength() ? XYZ.BasisX : xAxis.Normalize();
+            XYZ yAxis = isWall ? XYZ.BasisZ : XYZ.BasisY;
+            XYZ normal = xAxis.CrossProduct(yAxis).Normalize();
+            double minX = points.Min(p => p.DotProduct(xAxis)), maxX = points.Max(p => p.DotProduct(xAxis));
+            double minY = points.Min(p => p.DotProduct(yAxis)), maxY = points.Max(p => p.DotProduct(yAxis));
+            double minN = points.Min(p => p.DotProduct(normal)), maxN = points.Max(p => p.DotProduct(normal));
+            double midX = (minX + maxX) * 0.5, midY = (minY + maxY) * 0.5;
+            return new ObjectOpeningFootprint
+            {
+                Center = xAxis * midX + yAxis * midY + normal * ((minN + maxN) * 0.5),
+                Length = maxX - minX,
+                Height = maxY - minY,
+                Diameter = 2 * points.Max(p =>
+                {
+                    double x = p.DotProduct(xAxis) - midX, y = p.DotProduct(yAxis) - midY;
+                    return Math.Sqrt(x * x + y * y);
+                })
+            };
         }
 
         private static bool TryCalculateWallOpeningSizeFromBooleanIntersection(
@@ -3229,12 +3611,30 @@ namespace Modification
                 "gaine");
         }
 
-        private static bool IsExpectedMepElement(Element elem, ReservationAutoV3Window.ObjectType objectType)
+        private static bool IsReservableSourceElement(Element elem)
         {
+            if (elem == null || elem is ElementType || elem is RevitLinkInstance
+                || elem.ViewSpecific || elem.Category?.CategoryType != CategoryType.Model)
+                return false;
+
+            try { return elem.get_BoundingBox(null) != null; }
+            catch { return false; }
+        }
+
+        private static bool IsExpectedObject(Element elem, ReservationAutoV3Window.ObjectType objectType)
+        {
+            if (!IsReservableSourceElement(elem))
+                return false;
+
             return objectType switch
             {
                 ReservationAutoV3Window.ObjectType.Canalisation => IsPipeLikeElement(elem),
                 ReservationAutoV3Window.ObjectType.Gaine => IsDuctLikeElement(elem),
+                ReservationAutoV3Window.ObjectType.Porte => HasCategory(elem, BuiltInCategory.OST_Doors)
+                    || TextContainsAny(GetElementSearchText(elem), "ifcdoor", "door", "porte"),
+                ReservationAutoV3Window.ObjectType.Fenetre => HasCategory(elem, BuiltInCategory.OST_Windows)
+                    || TextContainsAny(GetElementSearchText(elem), "ifcwindow", "window", "fenêtre", "fenetre"),
+                ReservationAutoV3Window.ObjectType.Autre => true,
                 _ => false
             };
         }
@@ -3338,18 +3738,55 @@ namespace Modification
             public bool AllowReference(Reference reference, XYZ position) => false;
         }
 
-        private class HostMepCurveSelectionFilter : ISelectionFilter
+        private sealed class UnhostedPairSelectionFilter : ISelectionFilter
+        {
+            private readonly Document _doc;
+            private readonly ReservationAutoV3Window.PipeSource _source;
+            private readonly ReservationAutoV3Window.ObjectType _objectType;
+            private readonly ReservationAutoV3Window.HostTarget _hostTarget;
+            private readonly PairSelectionRole _role;
+            private readonly bool _linksOnly;
+
+            public UnhostedPairSelectionFilter(Document doc, ReservationAutoV3Window.PipeSource source,
+                ReservationAutoV3Window.ObjectType objectType, ReservationAutoV3Window.HostTarget hostTarget,
+                PairSelectionRole role, bool linksOnly)
+            {
+                _doc = doc; _source = source; _objectType = objectType;
+                _hostTarget = hostTarget; _role = role; _linksOnly = linksOnly;
+            }
+
+            private bool AllowsLink(RevitLinkInstance link)
+                => link?.GetLinkDocument() != null && (_linksOnly || MatchesExpectedLinkType(link, _source));
+
+            private bool AllowsObject(Element element, bool linked)
+                => (_role != PairSelectionRole.Host && IsExpectedObject(element, _objectType))
+                   || (_role != PairSelectionRole.Source && IsPairHost(element, linked, _hostTarget));
+
+            public bool AllowElement(Element element)
+                => element is RevitLinkInstance link ? AllowsLink(link) : !_linksOnly && AllowsObject(element, false);
+
+            public bool AllowReference(Reference reference, XYZ position)
+            {
+                if (reference == null) return false;
+                if (reference.LinkedElementId == ElementId.InvalidElementId)
+                    return !_linksOnly && AllowsObject(_doc.GetElement(reference.ElementId), false);
+                var link = _doc.GetElement(reference.ElementId) as RevitLinkInstance;
+                return AllowsLink(link) && AllowsObject(link.GetLinkDocument().GetElement(reference.LinkedElementId), true);
+            }
+        }
+
+        private class HostObjectSelectionFilter : ISelectionFilter
         {
             private readonly ReservationAutoV3Window.ObjectType _objectType;
 
-            public HostMepCurveSelectionFilter(ReservationAutoV3Window.ObjectType objectType)
+            public HostObjectSelectionFilter(ReservationAutoV3Window.ObjectType objectType)
             {
                 _objectType = objectType;
             }
 
             public bool AllowElement(Element elem)
             {
-                return IsExpectedMepElement(elem, _objectType);
+                return IsExpectedObject(elem, _objectType);
             }
 
             public bool AllowReference(Reference reference, XYZ position) => false;
@@ -3422,14 +3859,14 @@ namespace Modification
             }
         }
 
-        private class HybridMepCurveSelectionFilter : ISelectionFilter
+        private class HybridObjectSelectionFilter : ISelectionFilter
         {
             private readonly Document _doc;
             private readonly ReservationAutoV3Window.PipeSource _source;
             private readonly ReservationAutoV3Window.ObjectType _objectType;
             private readonly bool _linksOnly;
 
-            public HybridMepCurveSelectionFilter(
+            public HybridObjectSelectionFilter(
                 Document doc,
                 ReservationAutoV3Window.PipeSource source,
                 ReservationAutoV3Window.ObjectType objectType,
@@ -3443,7 +3880,7 @@ namespace Modification
 
             public bool AllowElement(Element elem)
             {
-                if (!_linksOnly && IsExpectedMepCurve(elem))
+                if (!_linksOnly && IsExpectedObject(elem, _objectType))
                     return true;
 
                 var linkInstance = elem as RevitLinkInstance;
@@ -3459,7 +3896,7 @@ namespace Modification
                 if (reference.LinkedElementId == ElementId.InvalidElementId)
                 {
                     Element localElem = _doc.GetElement(reference.ElementId);
-                    return !_linksOnly && IsExpectedMepCurve(localElem);
+                    return !_linksOnly && IsExpectedObject(localElem, _objectType);
                 }
 
                 var linkInstance = _doc.GetElement(reference.ElementId) as RevitLinkInstance;
@@ -3468,12 +3905,7 @@ namespace Modification
                     return false;
 
                 Element linkedElem = linkDoc.GetElement(reference.LinkedElementId);
-                return IsExpectedMepCurve(linkedElem);
-            }
-
-            private bool IsExpectedMepCurve(Element elem)
-            {
-                return IsExpectedMepElement(elem, _objectType);
+                return IsExpectedObject(linkedElem, _objectType);
             }
         }
 
@@ -3558,62 +3990,65 @@ namespace Modification
                 if (!MatchesExpectedLinkType(linkInstance) || linkedElem == null)
                     return false;
 
-                return _objectType switch
-                {
-                    ReservationAutoV3Window.ObjectType.Canalisation => IsPipeLikeElement(linkedElem),
-                    ReservationAutoV3Window.ObjectType.Gaine => IsDuctLikeElement(linkedElem),
-                    _ => false
-                };
+                return IsExpectedObject(linkedElem, _objectType);
             }
         }
 
-        private static Reference PickSingleMepCurveBySource(UIDocument uiDoc, Document doc,
+        private static Reference PickSingleObjectBySource(UIDocument uiDoc, Document doc,
             ReservationAutoV3Window.PipeSource pipeSource,
             ReservationAutoV3Window.ObjectType objectType,
             bool linksOnly = false)
         {
-            var hostFilter = new HostMepCurveSelectionFilter(objectType);
-            var hybridFilter = new HybridMepCurveSelectionFilter(doc, pipeSource, objectType, linksOnly);
+            var hostFilter = new HostObjectSelectionFilter(objectType);
+            var hybridFilter = new HybridObjectSelectionFilter(doc, pipeSource, objectType, linksOnly);
 
-            string objectName = objectType == ReservationAutoV3Window.ObjectType.Gaine
-                ? UiLanguage.T("gaine", "duct")
-                : UiLanguage.T("canalisation", "pipe");
+            string objectName = GetSelectionObjectLabel(objectType, plural: false);
 
             if (linksOnly)
             {
                 return uiDoc.Selection.PickObject(
                     ObjectType.PointOnElement,
                     hybridFilter,
-                    UiLanguage.T($"Sélectionne la {objectName} dans un lien", $"Select the {objectName} in a linked model"));
+                    UiLanguage.T($"Sélectionne {objectName} dans un lien", $"Select the {objectName} in a linked model"));
             }
 
             return pipeSource switch
             {
                 ReservationAutoV3Window.PipeSource.Maquette => uiDoc.Selection.PickObject(
                     ObjectType.Element, hostFilter,
-                    UiLanguage.T($"Sélectionne la {objectName} (maquette)", $"Select the {objectName} in your model")),
+                    UiLanguage.T($"Sélectionne {objectName} (maquette)", $"Select the {objectName} in your model")),
 
                 ReservationAutoV3Window.PipeSource.LienIFC or ReservationAutoV3Window.PipeSource.LienRVT => uiDoc.Selection.PickObject(
                     ObjectType.PointOnElement, hybridFilter,
-                    UiLanguage.T($"Sélectionne la {objectName} dans ta maquette ou dans le lien", $"Select the {objectName} in your model or in the linked model")),
+                    UiLanguage.T($"Sélectionne {objectName} dans ta maquette ou dans le lien", $"Select the {objectName} in your model or in the linked model")),
 
                 _ => uiDoc.Selection.PickObject(
                     ObjectType.Element,
                     hostFilter,
-                    UiLanguage.T($"Sélectionne la {objectName}", $"Select the {objectName}"))
+                    UiLanguage.T($"Sélectionne {objectName}", $"Select the {objectName}"))
             };
         }
 
-        private static IList<Reference> GetMepCurveReferencesBySource(UIDocument uiDoc, Document doc,
+        private static string GetSelectionObjectLabel(ReservationAutoV3Window.ObjectType objectType, bool plural)
+        {
+            return objectType switch
+            {
+                ReservationAutoV3Window.ObjectType.Canalisation => plural ? UiLanguage.T("canalisations", "pipes") : UiLanguage.T("la canalisation", "pipe"),
+                ReservationAutoV3Window.ObjectType.Gaine => plural ? UiLanguage.T("gaines", "ducts") : UiLanguage.T("la gaine", "duct"),
+                ReservationAutoV3Window.ObjectType.Porte => plural ? UiLanguage.T("portes", "doors") : UiLanguage.T("la porte", "door"),
+                ReservationAutoV3Window.ObjectType.Fenetre => plural ? UiLanguage.T("fenêtres", "windows") : UiLanguage.T("la fenêtre", "window"),
+                _ => plural ? UiLanguage.T("objets 3D", "3D objects") : UiLanguage.T("l’objet 3D", "3D object")
+            };
+        }
+
+        private static IList<Reference> GetObjectReferencesBySource(UIDocument uiDoc, Document doc,
             ReservationAutoV3Window.PipeSource pipeSource,
             ReservationAutoV3Window.ObjectType objectType,
             bool linksOnly = false)
         {
-            var hostFilter = new HostMepCurveSelectionFilter(objectType);
-            var hybridFilter = new HybridMepCurveSelectionFilter(doc, pipeSource, objectType, linksOnly);
-            string objectLabelPlural = objectType == ReservationAutoV3Window.ObjectType.Gaine
-                ? UiLanguage.T("gaines", "ducts")
-                : UiLanguage.T("canalisations", "pipes");
+            var hostFilter = new HostObjectSelectionFilter(objectType);
+            var hybridFilter = new HybridObjectSelectionFilter(doc, pipeSource, objectType, linksOnly);
+            string objectLabelPlural = GetSelectionObjectLabel(objectType, plural: true);
 
             if (linksOnly)
             {

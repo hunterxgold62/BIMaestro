@@ -71,11 +71,12 @@ public partial class AppUI : IExternalApplication
 
             new RibbonPanelDefinition("Beta", new List<RibbonItemDefinition>
             {
+                new RibbonItemDefinition("MaintenanceWorkbench", "Maintenance MEP", panel => AddPushButton(panel, "MaintenanceWorkbench", "Maintenance\nMEP", assemblyPath, "BIMaestro.MepBooster.MaintenanceWorkbenchCommand", "MEP Booster vanne rotation.png", "Visualisez une intervention dans son environnement : sortie d’un moteur avec virages et portes, manœuvre d’un volant / levier / chaîne avec opérateur, ou retrait d’un filtre / actionneur. Assistant guidé, repères pointés dans Revit, cotes réglables et obstacles identifiés. Contrôle géométrique ; procédure et efforts restent à confirmer.")),
                 new RibbonItemDefinition("MepBooster", "MEP Booster", panel => AddSplitButton(panel, "MepBooster", "MEP Booster\nOFF", assemblyPath, new List<(string, string, string, string, string)>
                 {
                     ("MepBooster", "MEP Booster\nOFF", "BIMaestro.MepBooster.MepBoosterCommand", "MEP Booster vanne rotation.png", "Active ou désactive la pastille MEP après 0,2 seconde de sélection stable. Survolez la pastille puis un angle pour voir la rotation. Cliquez pour appliquer ; Échap ferme la rosace. Accessoires, raccords droits, coudes et tés, en plan, coupe et 3D orthographique. Les actions qui déplaceraient un connecteur raccordé sont désactivées."),
                     ("PipeSystemColors", "Couleurs\nréseaux", "Visualisation.PipeSystemColorsCommand", "Couleur.png", "Colore les canalisations et raccords selon les couleurs des types de systèmes de canalisation."),
-                    ("MepMotorExtraction", "Extraction\nmoteur", "BIMaestro.MepBooster.MepMotorExtractionCommand", "MEP Booster vanne rotation.png", "Prototype de maintenance : définissez un volume de moteur, une direction locale et une course. Affiche la copie fantôme et recherche les obstacles sur tout le trajet, avec les liens Revit directs chargés. Vue 3D orthographique requise. La pompe sélectionnée est exclue du contrôle.")
+                    ("MepMotorExtraction", "Extraction\nmoteur", "BIMaestro.MepBooster.MepMotorExtractionCommand", "MEP Booster vanne rotation.png", "Maintenance : ajustez le volume du moteur et choisissez la porte de sortie. Recherche automatique d’un chemin avec contrôle des translations et rotations, aperçu fantôme et liens Revit directs chargés. Vue 3D orthographique requise. Hauteur constante ; pompe exclue et porte cible supposée ouverte.")
                 })),
                 new RibbonItemDefinition(
                     "RevitGameCommand",
@@ -177,9 +178,9 @@ public partial class AppUI : IExternalApplication
             {
                 new RibbonItemDefinition("FamilyBrowser", "Navigateur de Familles", panel => AddSplitButton(panel, "FamilyBrowser", "Famille", assemblyPath, new List<(string, string, string, string, string)>
                 {
-                    ("FamilyBrowser", "Navigateur\nde Familles", "Famille.FamilyBrowserCommand", "Famille.png","Parcourt vos dossiers de familles Revit et charge les contenus en quelques clics.\r\nInclut aperçu visuel, favoris, recherche et options d'affichage pour accélérer le travail."), 
-                    ("Rosace", ".","BIMaestro.UI.RadialMenuCommand", "vide.png","Rosace des familles à ajouter en raccourci clavier voir raccourci souris.")
-                }, "Navigateur de Familles", "maison famille (1).png", keepDefaultCurrentButton: true, fixedDisplayText: "Famille")),
+                    ("FamilyBrowser", "Navigateur\nde Familles", "Famille.FamilyBrowserCommand", "FamilyBrowser.png","Parcourt vos dossiers de familles Revit et charge les contenus en quelques clics.\r\nInclut aperçu visuel, favoris, recherche et options d'affichage pour accélérer le travail."), 
+                    ("Rosace", "Rosace\nfamilles","BIMaestro.UI.RadialMenuCommand", "FamilyRadialMenu.png","Rosace des familles à ajouter en raccourci clavier voir raccourci souris.")
+                }, "Navigateur de Familles", "FamilyBrowser.png", keepDefaultCurrentButton: true, fixedDisplayText: "Famille")),
         new RibbonItemDefinition("ConvertSharedToFamily", "Convertir les paramètres partagés", panel => AddPushButton(panel, "ConvertSharedToFamily", "Convertir\nparamètres", assemblyPath, "Famille.ConvertSharedToFamilyParametersCommand", "Convertir paramètres (2).png", "Convertit tous les paramètres partagés modifiables de la famille en paramètres de famille (même nom, même groupe et même type instance/type).")),                new RibbonItemDefinition("FamilyUtilitiesStack", "Outils familles", panel => AddStackedFamilyUtilities(
                     panel,
                     assemblyPath,
@@ -198,18 +199,12 @@ public partial class AppUI : IExternalApplication
 
            new RibbonPanelDefinition("Couleur et information", new List<RibbonItemDefinition>
             {
-                new RibbonItemDefinition("HomeAppearanceTest", "Accueil Test", panel => AddPushButton(panel,
-                    "HomeAppearanceTest", "Accueil\nTest", assemblyPath,
-                    "BIMaestro.Home.HomeAppearanceCommand", "Couleur.png",
-                    "Ouvre les réglages de test pour personnaliser l’accueil de Revit.")),
-                new RibbonItemDefinition("PropertiesAppearance", "Apparence des propriétés", panel => AddPushButton(panel,
-                    "PropertiesAppearance", "Apparence\npropriétés", assemblyPath,
-                    "BIMaestro.PropertiesAppearance.PropertiesAppearanceCommand", "Couleur.png",
-                    "Personnalise le texte et le fond des groupes ou paramètres de la palette Propriétés. Profils généraux, par catégorie ou par type, variantes clair/sombre et aperçu réversible. Aucun changement des valeurs du modèle.")),
                 new RibbonItemDefinition("Changement de couleur", "Couleurs et onglets", panel => AddColorAndDeckButtons(panel, assemblyPath, new List<(string, string, string, string, string)>
                 {
                     ("Couleur de projet", "Couleurs", "Couleur.ToggleCombinedColoringCommand", "Couleur oui non.png","Clic : ouvre la personnalisation des couleurs. Double-clic : active ou désactive les panneaux colorés."),
                     ("Couleur de maquette", "Couleur reset", "Couleur.ResetTabItemRandomColorsCommand", "reset.png","Réinitialise les couleurs appliquées"),
+                    ("HomeAppearanceTest", "Accueil\nTest", "BIMaestro.Home.HomeAppearanceCommand", "HomeAppearance.png", "Ouvre les réglages de test pour personnaliser l’accueil de Revit."),
+                    ("PropertiesAppearance", "Apparence\npropriétés", "BIMaestro.PropertiesAppearance.PropertiesAppearanceCommand", "PropertiesAppearance.png", "Personnalise le texte et le fond des groupes ou paramètres de la palette Propriétés. Profils généraux, par catégorie ou par type, variantes clair/sombre et aperçu réversible. Aucun changement des valeurs du modèle."),
                     ("papa Noël", "papa\nNoël", "Couleur.PapanoelCommand", "papa noel.png","Fait apparaître des couleurs comme des guirlandes\nDouble clic pour revenir à la normale.\n\nAttention désactiver <couleur Oui/Non> avant activation."),
                     ("ViewDeckToggle", "Onglets : OFF", "BIMaestro.ViewHover.ToggleViewDeckCommand", "Miniature.png", "ON : miniatures dans les onglets. OFF : onglets compacts.\r\nLes aperçus au survol se règlent dans Miniature ou Option > Miniatures."),
                     ("BIMaestro_Exemple", "Exemple", "Page.GuideCommand", "Exemple.png", "Page d'information sur le plugin"),

@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net9.0</TargetFramework><OutputType>Exe</OutputType><EnableDefaultCompileItems>false</EnableDefaultCompileItems><LangVersion>9.0</LangVersion></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="../GeometryTestDoubles.cs" Link="GeometryTestDoubles.cs" />
+    <Compile Include="../../../BIMaestro/commands/MEP Booster/MaintenanceAccessModels.cs" Link="MaintenanceAccessModels.cs" />
+    <Compile Include="../../../BIMaestro/commands/MEP Booster/MaintenanceAccessMath.cs" Link="MaintenanceAccessMath.cs" />
+    <Compile Include="../../../BIMaestro/commands/MEP Booster/MaintenanceAccessGeometry.cs" Link="MaintenanceAccessGeometry.cs" />
+    <Compile Include="../../../BIMaestro/commands/MEP Booster/MaintenancePlacementMath.cs" Link="MaintenancePlacementMath.cs" />
+    <Compile Include="../../../BIMaestro/commands/MEP Booster/MotorMeshCollision.cs" Link="MotorMeshCollision.cs" />
+  </ItemGroup>
+</Project>

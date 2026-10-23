@@ -8,11 +8,14 @@ $json = Join-Path $repo 'BIMaestro/bin/Debug/Newtonsoft.Json.dll'
 $assembly = Join-Path $output 'BIMaestro.History.NativeValidation.dll'
 $defines = @(if ($RevitVersion -eq '2024') { '/define:REVIT2024' })
 $networkSource = Join-Path $repo 'BIMaestro/commands/qui est le coupable/ElementHistoryNetwork.cs'
+$networkGuardSource = Join-Path $repo 'BIMaestro/commands/qui est le coupable/ElementHistoryNetwork.Guard.cs'
 $extendedSource = Join-Path $repo 'BIMaestro/commands/qui est le coupable/ElementHistoryReconstruction.Extended.cs'
 $nativeSource = Join-Path $repo 'BIMaestro/commands/qui est le coupable/ElementHistoryNativeArchive.cs'
 $relationsSource = Join-Path $repo 'BIMaestro/commands/qui est le coupable/ElementHistoryRelations.cs'
 $auditSource = Join-Path $repo 'BIMaestro/commands/qui est le coupable/ElementHistoryAudit.cs'
 $realModelSource = Join-Path $PSScriptRoot 'RealModelBenchmark.cs'
+$openingSource = Join-Path $repo 'BIMaestro/commands/qui est le coupable/ElementHistoryOpeningArchive.cs'
+$antibesSource = Join-Path $PSScriptRoot 'AntibesBenchmark.cs'
 if ($RevitVersion -eq '2025') {
     $runtimeConfig = Join-Path $api 'RevitAPI.runtimeconfig.json'
     $privateDotNet = Join-Path $repo 'tmp/dotnet10/dotnet.exe'
@@ -22,7 +25,7 @@ if ($RevitVersion -eq '2025') {
         & 'C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe' (Join-Path $PSScriptRoot 'HistoryNative2025.csproj') /restore /t:Build "/p:HistoryOutput=$output/" /p:RestoreIgnoreFailedSources=true /verbosity:minimal
     }
 } else {
-& 'C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/Roslyn/csc.exe' /nologo /langversion:9 /target:library @defines "/out:$assembly" "/reference:$api/RevitAPI.dll" "/reference:$api/RevitAPIUI.dll" "/reference:$json" $networkSource $extendedSource $nativeSource $relationsSource $auditSource $realModelSource (Join-Path $PSScriptRoot 'NativeArchiveStore.cs') (Join-Path $repo 'BIMaestro/commands/ElementIdExtensions.cs') (Join-Path $repo 'BIMaestro/commands/qui est le coupable/ElementHistoryReconstruction.cs') (Join-Path $repo 'BIMaestro/commands/qui est le coupable/ElementHistoryRestoration.cs') (Join-Path $PSScriptRoot 'HistoryNativeTests.cs')
+& 'C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/Roslyn/csc.exe' /nologo /langversion:9 /target:library @defines "/out:$assembly" "/reference:$api/RevitAPI.dll" "/reference:$api/RevitAPIUI.dll" "/reference:$json" $networkSource $networkGuardSource $extendedSource $nativeSource $openingSource $relationsSource $auditSource $realModelSource $antibesSource (Join-Path $PSScriptRoot 'NativeArchiveStore.cs') (Join-Path $repo 'BIMaestro/commands/ElementIdExtensions.cs') (Join-Path $repo 'BIMaestro/commands/qui est le coupable/ElementHistoryReconstruction.cs') (Join-Path $repo 'BIMaestro/commands/qui est le coupable/ElementHistoryRestoration.cs') (Join-Path $PSScriptRoot 'HistoryNativeTests.cs')
 }
 if ($LASTEXITCODE -ne 0) { throw 'Compilation du banc historique échouée.' }
 Copy-Item -LiteralPath $json -Destination $output -Force

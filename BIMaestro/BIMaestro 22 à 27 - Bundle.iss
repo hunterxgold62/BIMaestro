@@ -153,10 +153,11 @@ begin
   PackagePath := ExpandConstant('{app}\PackageContents.xml');
   AddinPath := ExpandConstant('{app}\Contents\BIMaestro.addin');
 
-  if not SaveStringToFile(PackagePath, BuildPackageContentsXml(), False) then
+  // Respecter l'encodage UTF-8 declare dans les deux fichiers XML.
+  if not SaveStringToFile(PackagePath, Utf8Encode(BuildPackageContentsXml()), False) then
     RaiseException('Impossible de créer PackageContents.xml.');
 
-  if not SaveStringToFile(AddinPath, BuildBundleAddinXml(), False) then
+  if not SaveStringToFile(AddinPath, Utf8Encode(BuildBundleAddinXml()), False) then
     RaiseException('Impossible de créer BIMaestro.addin.');
 end;
 

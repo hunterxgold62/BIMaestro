@@ -88,7 +88,9 @@ begin
       Xml := BuildXml(BinFolder);
       ForceDirectories(AddinsRoot + '\' + Versions[i]);
       ManifestPath := AddinsRoot + '\' + Versions[i] + '\BIMaestro.addin';
-      SaveStringToFile(ManifestPath, Xml, False);
+      // Le XML declare UTF-8 : encoder aussi les chemins contenant des accents.
+      if not SaveStringToFile(ManifestPath, Utf8Encode(Xml), False) then
+        RaiseException('Impossible de créer le manifeste : ' + ManifestPath);
     end;
 
     // --- Copie de l’uninstalleur renommé dans le dossier 2024 ---

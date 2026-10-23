@@ -1,0 +1,51 @@
+{
+  "scenario": "3D view: Phase de construction before Graphismes, restore, reapply",
+  "version": "2024",
+  "build": "24.3.40.26",
+  "pid": 33556,
+  "time": "2026-10-23T07:31:04.3116101Z",
+  "run": "2024-view-fix-before",
+  "nativeAlgorithm": "Production layout sources with test-only category bypass; production view category covered separately by ProductionQualificationTests",
+  "applied": true,
+  "restored": true,
+  "unchanged": true,
+  "parameterHashBefore": "F785A86F905591A07D7A428F7792AF6734894A482FA1485BB022E1E7AFF6675C",
+  "parameterHashAfter": "F785A86F905591A07D7A428F7792AF6734894A482FA1485BB022E1E7AFF6675C",
+  "visibleGroupsApplied": [
+    {
+      "row": 2,
+      "label": "Phase de construction"
+    },
+    {
+      "row": 6,
+      "label": "Graphismes"
+    },
+    {
+      "row": 19,
+      "label": "Etendues"
+    },
+    {
+      "row": 28,
+      "label": "Caméra"
+    }
+  ],
+  "visibleGroupsRestored": [
+    {
+      "row": 2,
+      "label": "Graphismes"
+    },
+    {
+      "row": 15,
+      "label": "Etendues"
+    },
+    {
+      "row": 24,
+      "label": "Caméra"
+    },
+    {
+      "row": 32,
+      "label": "Données d'identification"
+    }
+  ],
+  "deltaCount": 0
+}

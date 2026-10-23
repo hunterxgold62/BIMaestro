@@ -135,6 +135,7 @@ namespace BIMaestro.PropertiesAppearance
         private static string _signature;
         private static DateTime _nextFileCheck;
         private static DateTime _fileStamp;
+        private static Exception _nativeRefreshError;
         internal static string Status { get; private set; } = "Personnalisation désactivée.";
 
         internal static bool IsDark
@@ -164,6 +165,36 @@ namespace BIMaestro.PropertiesAppearance
         private static void Invalidate() { _signature = null; _next = DateTime.MinValue; _renderer?.Dispose(); _renderer = null; }
         internal static void Shutdown() { PropertiesAppearanceCommand.Shutdown(); _preview = null; _renderer?.Dispose(); _renderer = null; }
 
+        // Only native grid access and plain captured metadata are allowed here.
+        // This also runs from WM_PAINT, outside Revit's document API context.
+        private static int RefreshNativePlan(NativePropertiesGrid grid, AppearanceContext context,
+            AppearancePreferences preferences, string version, bool dark, PropertiesPaletteRenderer renderer, bool redraw)
+        {
+            if (!grid.RefreshIfCurrent()) return 0;
+            bool hasColors = preferences.Enabled && preferences.Profiles.Any(p => p.Rules.Count > 0);
+            bool hasOrder = preferences.Enabled && preferences.Profiles.Any(p => !p.Layout.IsEmpty);
+            if (hasOrder || PropertiesPaletteLayout.HasApplied)
+                PropertiesPaletteLayout.Apply(grid, context, hasOrder ? preferences : null, version,
+                    () => renderer.Update(grid, new List<PropertiesPaletteRenderer.CellPlan>(), false));
+            var cells = new List<PropertiesPaletteRenderer.CellPlan>();
+            string group = null;
+            if (hasColors)
+                for (uint row = 1; row <= grid.RowCount; row++)
+                {
+                    string raw = grid.Value(row, 1); if (string.IsNullOrWhiteSpace(raw)) continue;
+                    bool header = grid.IsGroupHeader(row);
+                    if (header) context.GroupMap.TryGetValue(AppearancePreferences.Normalize(raw), out group);
+                    if (group == null) continue;
+                    PropertyTarget parameter = null;
+                    if (!header) context.ParameterMap.TryGetValue(group + "|" + AppearancePreferences.Normalize(raw), out parameter);
+                    if (!header && (parameter == null || parameter.ReadOnly)) continue;
+                    var colors = preferences.Resolve(context.CategoryKey, context.TypeKey, group, parameter?.Key, dark);
+                    if (colors != null) cells.Add(new PropertiesPaletteRenderer.CellPlan { Row = row, Label = raw, Header = header, Colors = colors, Dark = dark });
+                }
+            renderer.Update(grid, cells, redraw);
+            return cells.Count;
+        }
+
         internal static void ProcessIdling(UIApplication app)
         {
             long measured = 0;
@@ -172,6 +203,11 @@ namespace BIMaestro.PropertiesAppearance
                 if (DateTime.UtcNow < _next) return;
                 _next = DateTime.UtcNow.AddMilliseconds(450);
                 measured = PropertiesAppearanceMetrics.Begin();
+                if (_nativeRefreshError != null)
+                {
+                    var error = _nativeRefreshError; _nativeRefreshError = null;
+                    throw new InvalidOperationException("Actualisation native interrompue.", error);
+                }
                 if (_preview == null && DateTime.UtcNow >= _nextFileCheck)
                 {
                     _nextFileCheck = DateTime.UtcNow.AddSeconds(2);
@@ -208,36 +244,27 @@ namespace BIMaestro.PropertiesAppearance
                     Status = context.Caption;
                     return;
                 }
-                if (hasOrder || PropertiesPaletteLayout.HasApplied)
-                {
-                    long layoutTime = PropertiesAppearanceMetrics.Begin();
-                    try { PropertiesPaletteLayout.Apply(grid, context, hasOrder ? preferences : null, app.Application.VersionNumber, () => { _renderer?.Dispose(); _renderer = null; }); }
-                    finally { PropertiesAppearanceMetrics.End("Layout", layoutTime); }
-                }
-                if (!hasColors) { _renderer?.Dispose(); _renderer = null; Status = PropertiesPaletteLayout.Status ?? "Apparence Revit d’origine."; return; }
-                string signature = context.Signature + "/" + IsDark;
-
-                long planTime = PropertiesAppearanceMetrics.Begin();
-                var cells = new List<PropertiesPaletteRenderer.CellPlan>();
-                string group = null;
-                for (uint row = 1; row <= grid.RowCount; row++)
-                {
-                    string raw = grid.Value(row, 1); if (string.IsNullOrWhiteSpace(raw)) continue;
-                    bool header = grid.IsGroupHeader(row);
-                    if (header) context.GroupMap.TryGetValue(AppearancePreferences.Normalize(raw), out group);
-                    if (group == null) continue;
-                    PropertyTarget parameter = null;
-                    if (!header) context.ParameterMap.TryGetValue(group + "|" + AppearancePreferences.Normalize(raw), out parameter);
-                    if (!header && (parameter == null || parameter.ReadOnly)) continue;
-                    var colors = preferences.Resolve(context.CategoryKey, context.TypeKey, group, parameter?.Key, IsDark);
-                    if (colors == null) continue;
-                    cells.Add(new PropertiesPaletteRenderer.CellPlan { Row = row, Label = raw, Header = header, Colors = colors, Dark = IsDark });
-                }
-                PropertiesAppearanceMetrics.End("Plan", planTime);
+                bool dark = IsDark;
+                string version = app.Application.VersionNumber;
+                string signature = context.Signature + "/" + dark;
                 if (_renderer == null || _renderer.Window != grid.Window || _signature != signature)
                 { _renderer?.Dispose(); _renderer = new PropertiesPaletteRenderer(grid); _signature = signature; }
-                _renderer.Update(grid, cells);
-                Status = cells.Count == 0 ? "Aucune règle applicable à cette sélection. Les champs grisés gardent leur style Revit." : cells.Count + " ligne(s) personnalisée(s) · champs grisés et saisie conservés.";
+                var renderer = _renderer;
+                int cellCount = RefreshNativePlan(grid, context, preferences, version, dark, renderer, true);
+                renderer.BeforePaint = () =>
+                {
+                    long refreshTime = PropertiesAppearanceMetrics.Begin();
+                    try { RefreshNativePlan(grid, context, preferences, version, dark, renderer, false); }
+                    catch (Exception ex)
+                    {
+                        renderer.BeforePaint = null;
+                        renderer.Update(grid, new List<PropertiesPaletteRenderer.CellPlan>(), false);
+                        _nativeRefreshError = ex; _next = DateTime.MinValue;
+                    }
+                    finally { PropertiesAppearanceMetrics.End("BeforePaint", refreshTime); }
+                };
+                Status = cellCount == 0 ? "Aucune règle applicable à cette sélection. Les champs grisés gardent leur style Revit." : cellCount + " ligne(s) personnalisée(s) · champs grisés et saisie conservés.";
+                if (!hasColors) { Status = PropertiesPaletteLayout.Status ?? "Apparence Revit d’origine."; return; }
                 if (_renderer.Error != null) Status = _renderer.Error;
                 else if (PropertiesPaletteLayout.Status != null) Status += " " + PropertiesPaletteLayout.Status;
             }

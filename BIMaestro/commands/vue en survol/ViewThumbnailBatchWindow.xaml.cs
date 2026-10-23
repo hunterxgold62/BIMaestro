@@ -2,6 +2,8 @@ using Autodesk.Revit.UI;
 using BIMaestro.Localization;
 using System;
 using System.Windows;
+using System.Windows.Controls;
+using ComboBox = System.Windows.Controls.ComboBox;
 using System.Windows.Threading;
 
 namespace BIMaestro.ViewHover
@@ -11,6 +13,7 @@ namespace BIMaestro.ViewHover
         private readonly ViewThumbnailBatchStartHandler _startHandler;
         private readonly ExternalEvent _startEvent;
         private readonly DispatcherTimer _displayTimer;
+        private bool _updatingHoverSettings;
 
         internal ViewThumbnailBatchWindow(
             ViewThumbnailBatchStartHandler startHandler,
@@ -19,7 +22,13 @@ namespace BIMaestro.ViewHover
         {
             ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
-            HoverPreviewCheckBox.IsChecked = ViewHoverPreviewPreferences.Enabled;
+            foreach (int size in new[] { 50, 75, 100, 125, 150, 200 })
+            {
+                string label = size == 100 ? UiLanguage.T("100 % (actuelle)", "100% (current)") : size + " %";
+                BrowserSizeComboBox.Items.Add(new ComboBoxItem { Content = label, Tag = size });
+                ViewTabsSizeComboBox.Items.Add(new ComboBoxItem { Content = label, Tag = size });
+            }
+            OnHoverPreferencesChanged();
             ViewHoverPreviewPreferences.Changed += OnHoverPreferencesChanged;
             _startHandler = startHandler;
             _startEvent = startEvent;
@@ -44,7 +53,38 @@ namespace BIMaestro.ViewHover
 
         private void OnHoverPreferencesChanged()
         {
-            HoverPreviewCheckBox.IsChecked = ViewHoverPreviewPreferences.Enabled;
+            _updatingHoverSettings = true;
+            try
+            {
+                HoverPreviewCheckBox.IsChecked = ViewHoverPreviewPreferences.Enabled;
+                SelectSize(BrowserSizeComboBox, ViewHoverPreviewPreferences.BrowserSizePercent);
+                SelectSize(ViewTabsSizeComboBox, ViewHoverPreviewPreferences.ViewTabsSizePercent);
+            }
+            finally { _updatingHoverSettings = false; }
+        }
+
+        private static void SelectSize(ComboBox comboBox, int size)
+        {
+            foreach (ComboBoxItem item in comboBox.Items)
+                if ((int)item.Tag == size) { comboBox.SelectedItem = item; break; }
+        }
+
+        private void PreviewSize_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_updatingHoverSettings ||
+                !(BrowserSizeComboBox?.SelectedItem is ComboBoxItem browser) ||
+                !(ViewTabsSizeComboBox?.SelectedItem is ComboBoxItem tabs)) return;
+            SavePreviewSizes((int)browser.Tag, (int)tabs.Tag);
+        }
+
+        private void ResetPreviewSizes_Click(object sender, RoutedEventArgs e) => SavePreviewSizes(100, 100);
+
+        private void SavePreviewSizes(int browser, int tabs)
+        {
+            if (ViewHoverPreviewPreferences.SetSizes(browser, tabs)) return;
+            OnHoverPreferencesChanged();
+            MessageBox.Show(UiLanguage.T("Impossible d’enregistrer la taille des miniatures.",
+                "Unable to save the thumbnail sizes."), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
 
         private void HoverPreviewCheckBox_Click(object sender, RoutedEventArgs e)

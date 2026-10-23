@@ -19,6 +19,14 @@ namespace Analyse
         public int Version { get; set; } = 1;
         public string Kind { get; set; }
         public HistoryNativeArtifact Native { get; set; }
+        public HistoryNativeArtifact OpeningFallback { get; set; }
+        public HistoryPlacement HistoricalPlacement { get; set; }
+        internal HistoryRecipe CopyWithOpeningFallback(HistoryNativeArtifact fallback)
+        {
+            var copy = (HistoryRecipe)MemberwiseClone();
+            copy.OpeningFallback = fallback;
+            return copy;
+        }
         public string NativeFallbackReason { get; set; }
         public string SystemName { get; set; }
         public List<string> SystemMembers { get; set; }
@@ -75,6 +83,59 @@ namespace Analyse
         public List<HistoryCurve> ShapeCreases { get; set; }
     }
 
+    [JsonObject(ItemNullValueHandling = NullValueHandling.Ignore)]
+    internal sealed class HistoryPlacement
+    {
+        public string LevelSourceUniqueId { get; set; }
+        public string HostSourceUniqueId { get; set; }
+        public double[] Point { get; set; }
+        public double[] Origin { get; set; }
+        public double[] BasisX { get; set; }
+        public double[] BasisY { get; set; }
+        public double[] BasisZ { get; set; }
+        public HistoryCurve Curve { get; set; }
+        public List<double[]> BBox { get; set; }
+        public bool? Mirrored { get; set; }
+        public bool? HandFlipped { get; set; }
+        public bool? FacingFlipped { get; set; }
+        public List<HistoryParameter> ElevationParameters { get; set; }
+
+        internal static bool SameVector(double[] expected, double[] actual, double tolerance = 1e-5)
+        {
+            if (expected == null) return true;
+            if (expected.Length != 3 || actual == null || actual.Length != 3) return false;
+            double squared = 0;
+            for (int i = 0; i < 3; i++)
+            {
+                if (double.IsNaN(expected[i]) || double.IsInfinity(expected[i])
+                    || double.IsNaN(actual[i]) || double.IsInfinity(actual[i])) return false;
+                var delta = expected[i] - actual[i]; squared += delta * delta;
+            }
+            return squared <= tolerance * tolerance;
+        }
+
+        internal string Difference(HistoryPlacement actual, bool includeBoundingBox)
+        {
+            if (actual == null) return "Placement de l’objet restauré indisponible.";
+            if (!SameVector(Point, actual.Point)) return "Le point historique de l’objet n’a pas été rétabli.";
+            if (!SameVector(Origin, actual.Origin)) return "L’origine historique de la famille n’a pas été rétablie.";
+            if (!SameVector(BasisX, actual.BasisX) || !SameVector(BasisY, actual.BasisY) || !SameVector(BasisZ, actual.BasisZ))
+                return "L’orientation historique de la famille n’a pas été rétablie.";
+            if (Mirrored.HasValue && Mirrored != actual.Mirrored) return "Le miroir historique de la famille n’a pas été rétabli.";
+            if (HandFlipped.HasValue && HandFlipped != actual.HandFlipped) return "L’inversion de main historique n’a pas été rétablie.";
+            if (FacingFlipped.HasValue && FacingFlipped != actual.FacingFlipped) return "L’inversion de face historique n’a pas été rétablie.";
+            if (Curve != null && (actual.Curve == null
+                || (Curve.Mid == null) != (actual.Curve.Mid == null)
+                || !((SameVector(Curve.Start, actual.Curve.Start) && SameVector(Curve.End, actual.Curve.End))
+                    || (SameVector(Curve.Start, actual.Curve.End) && SameVector(Curve.End, actual.Curve.Start)))
+                || !SameVector(Curve.Mid, actual.Curve.Mid))) return "La courbe historique de l’objet n’a pas été rétablie.";
+            if (includeBoundingBox && BBox != null && (actual.BBox == null || BBox.Count != 2 || actual.BBox.Count != 2
+                || !SameVector(BBox[0], actual.BBox[0]) || !SameVector(BBox[1], actual.BBox[1])))
+                return "L’encombrement historique de l’objet n’a pas été rétabli.";
+            return null;
+        }
+    }
+
     internal sealed class HistoryCircuit
     {
         public string SourceUniqueId { get; set; }
@@ -87,6 +148,12 @@ namespace Analyse
         public double[] Start { get; set; }
         public double[] End { get; set; }
         public double[] Mid { get; set; }
+        public double[] Center { get; set; }
+        public double[] AxisX { get; set; }
+        public double[] AxisY { get; set; }
+        public double? Radius { get; set; }
+        public double? StartParameter { get; set; }
+        public double? EndParameter { get; set; }
         public string SourceUniqueId { get; set; }
         public List<string> RestorationOrigins { get; set; }
     }
@@ -166,6 +233,33 @@ namespace Analyse
                 allowHeavyTerrain: allowHeavyTerrain) : recipe;
         }
 
+        // Read a checkpoint during an explicit restore without preparing another
+        // native archive. Aggregate members must retain their native owner path.
+        internal static HistoryRecipe CaptureDirectForRestore(Element element, Action<string> diagnostic = null)
+        {
+            if (element == null) return null;
+            try
+            {
+                if (ElementHistoryNativeArchive.RequiresAggregate(element)
+                    || ElementHistoryNativeArchive.OpeningRoot(element).Id != element.Id)
+                {
+                    diagnostic?.Invoke("Élément dépendant d’un ensemble : copie native requise.");
+                    return null;
+                }
+                var recipe = CaptureCore(element, diagnostic, includeDetails: true);
+                if (recipe == null) return null;
+                if (recipe.Native != null || recipe.Kind == "native_archive")
+                    throw new InvalidOperationException("La capture directe ne peut pas préparer une archive native.");
+                return Enrich(element, recipe, diagnostic, coreHasDetails: true);
+            }
+            catch (Autodesk.Revit.Exceptions.RegenerationFailedException) { throw; }
+            catch (Exception ex)
+            {
+                diagnostic?.Invoke("Recette directe du modèle d’ouverture indisponible : " + ex.Message);
+                return null;
+            }
+        }
+
         // Enrich the already captured placement/parameters, never recapture them just for joins.
         internal static HistoryRecipe Enrich(Element element, HistoryRecipe recipe, Action<string> diagnostic = null,
             bool coreHasDetails = false, bool allowHeavyTerrain = true)
@@ -224,10 +318,18 @@ namespace Analyse
                 if (recipe.GeometryRelations.Count == 0) recipe.GeometryRelations = null;
                 if (warnings.Count > 0) recipe.CaptureWarnings = warnings;
             }
+            CaptureHistoricalPlacement(element, recipe);
             return recipe;
         }
 
         private static HistoryRecipe CaptureCore(Element element, Action<string> diagnostic, bool includeDetails = true)
+        {
+            var recipe = CaptureCoreWithoutPlacement(element, diagnostic, includeDetails);
+            if (recipe != null) CaptureHistoricalPlacement(element, recipe, includeDetails);
+            return recipe;
+        }
+
+        private static HistoryRecipe CaptureCoreWithoutPlacement(Element element, Action<string> diagnostic, bool includeDetails)
         {
             try
             {
@@ -333,6 +435,10 @@ namespace Analyse
                         return null;
                     }
                     recipe.Kind = "wall";
+                    recipe.Parameters = CaptureParameters(wall)
+                        .Where(value => value.BuiltIn == 0
+                            || value.BuiltIn == (int)BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS
+                            || value.BuiltIn == -1019000).ToList();
                     if (wall.SketchId != ElementId.InvalidElementId)
                     {
                         var sketch = doc.GetElement(wall.SketchId) as Sketch;
@@ -441,6 +547,7 @@ namespace Analyse
             var element = Create(doc, recipe, message => reason = message);
             if (element == null) throw new InvalidOperationException(reason ?? "Unsupported element placement.");
             doc.Regenerate();
+            RestoreHistoricalPlacement(doc, element, recipe);
             if (element.get_BoundingBox(null) == null)
                 throw new InvalidOperationException("The restored element has no geometry.");
             return element;
@@ -650,6 +757,13 @@ namespace Analyse
                 wall.get_Parameter(BuiltInParameter.WALL_KEY_REF_PARAM).Set(recipe.LocationLine);
                 if (recipe.WallProfile) { if (wall.Flipped != recipe.Flipped) wall.Flip(); }
                 else ((LocationCurve)wall.Location).Curve = curve;
+                ApplyParameters(doc, wall, recipe.Parameters);
+                doc.Regenerate();
+                foreach (var value in recipe.Parameters ?? new List<HistoryParameter>())
+                    if (!NativeMetadataValueMatches(doc, wall, value))
+                        throw new InvalidOperationException("Métadonnée du mur non conservée après régénération : "
+                            + (value.Name ?? HistoricalParameter(doc, wall, value)?.Definition?.Name)
+                            + " [builtIn=" + value.BuiltIn + "].");
                 return wall;
             }
             if (recipe.Kind == "floor" && type is FloorType)
@@ -750,28 +864,60 @@ namespace Analyse
                 if (parameter == null) throw new InvalidOperationException("Paramètre historique absent : "
                     + (value.Name ?? (value.BuiltIn < 0 ? ((BuiltInParameter)value.BuiltIn).ToString() : value.Definition ?? value.Shared)) + ".");
                 if (parameter.IsReadOnly) continue;
-                switch ((StorageType)value.Storage)
+                try
                 {
-                    case StorageType.Double:
-                        if (Math.Abs(parameter.AsDouble() - value.Number) > 1e-9 && !parameter.Set(value.Number))
-                            throw new InvalidOperationException("Historical dimension could not be restored.");
-                        break;
-                    case StorageType.Integer:
-                        if (parameter.AsInteger() != (int)value.Number && !parameter.Set((int)value.Number))
-                            throw new InvalidOperationException("Historical integer could not be restored.");
-                        break;
-                    case StorageType.String:
-                        if (parameter.AsString() != value.Text && !parameter.Set(value.Text ?? string.Empty))
-                            throw new InvalidOperationException("Historical text could not be restored.");
-                        break;
-                    case StorageType.ElementId:
-                        var id = value.Reference == null ? ElementIdExtensions.CreateElementId((int)value.Number)
-                            : doc.GetElement(value.Reference)?.Id;
-                        if (id == null) throw new InvalidOperationException("Historical parameter reference is missing.");
-                        if (parameter.AsElementId() != id && !parameter.Set(id))
-                            throw new InvalidOperationException("Historical reference could not be restored.");
-                        if (value.BuiltIn == (int)BuiltInParameter.RBS_FAMILY_CONTENT_DISTRIBUTION_SYSTEM) doc.Regenerate();
-                        break;
+                    switch ((StorageType)value.Storage)
+                    {
+                        case StorageType.Double:
+                            if (Math.Abs(parameter.AsDouble() - value.Number) > 1e-9 && !parameter.Set(value.Number))
+                                throw new InvalidOperationException("Historical dimension could not be restored.");
+                            break;
+                        case StorageType.Integer:
+                            if (parameter.AsInteger() != (int)value.Number && !parameter.Set((int)value.Number))
+                                throw new InvalidOperationException("Historical integer could not be restored.");
+                            break;
+                        case StorageType.String:
+                            if (parameter.AsString() != value.Text && !parameter.Set(value.Text ?? string.Empty))
+                                throw new InvalidOperationException("Historical text could not be restored.");
+                            break;
+                        case StorageType.ElementId:
+                            var id = value.Reference == null ? ElementIdExtensions.CreateElementId((int)value.Number)
+                                : doc.GetElement(value.Reference)?.Id;
+                            if (id == null) throw new InvalidOperationException("Historical parameter reference is missing.");
+                            if (parameter.AsElementId() != id && !parameter.Set(id))
+                                throw new InvalidOperationException("Historical reference could not be restored.");
+                            if (value.BuiltIn == (int)BuiltInParameter.RBS_FAMILY_CONTENT_DISTRIBUTION_SYSTEM) doc.Regenerate();
+                            break;
+                    }
+                }
+                catch (Autodesk.Revit.Exceptions.RegenerationFailedException) { throw; }
+                catch (Exception ex)
+                {
+                    // Keep strict value checks, but identify the exact rejected
+                    // parameter so placement/solver errors can be diagnosed.
+                    var invariant = System.Globalization.CultureInfo.InvariantCulture;
+                    string actual;
+                    try
+                    {
+                        switch (parameter.StorageType)
+                        {
+                            case StorageType.Double: actual = parameter.AsDouble().ToString("R", invariant); break;
+                            case StorageType.Integer: actual = parameter.AsInteger().ToString(invariant); break;
+                            case StorageType.String: actual = parameter.AsString() ?? "(null)"; break;
+                            case StorageType.ElementId: actual = parameter.AsElementId()?.GetIdLongValue().ToString(invariant) ?? "(null)"; break;
+                            default: actual = "(none)"; break;
+                        }
+                    }
+                    catch { actual = "(unavailable)"; }
+                    var historical = (StorageType)value.Storage == StorageType.String ? value.Text ?? "(null)"
+                        : (StorageType)value.Storage == StorageType.ElementId && value.Reference != null ? value.Reference
+                        : value.Number.ToString("R", invariant);
+                    throw new InvalidOperationException(ex.Message + " [parameter=" + parameter.Definition?.Name
+                        + ", id=" + parameter.Id.GetIdLongValue().ToString(invariant)
+                        + ", builtIn=" + (value.BuiltIn < 0 ? ((BuiltInParameter)value.BuiltIn).ToString() : "none")
+                        + ", storage=" + ((StorageType)value.Storage) + ", historical=" + historical + ", actual=" + actual
+                        + ", element=" + element.GetType().Name + " / " + element.Name
+                        + ", elementId=" + element.Id.GetIdLongValue().ToString(invariant) + "]", ex);
                 }
             }
         }
@@ -827,12 +973,24 @@ namespace Analyse
         internal static HistoryCurve CaptureCurve(Curve curve)
         {
             if (!(curve is Line) && !(curve is Arc) || !curve.IsBound) return null;
-            return new HistoryCurve { Start = Pack(curve.GetEndPoint(0)), End = Pack(curve.GetEndPoint(1)),
+            var saved = new HistoryCurve { Start = Pack(curve.GetEndPoint(0)), End = Pack(curve.GetEndPoint(1)),
                 Mid = curve is Arc ? Pack(curve.Evaluate(0.5, true)) : null };
+            if (curve is Arc arc)
+            {
+                saved.Center = Pack(arc.Center); saved.AxisX = Pack(arc.XDirection); saved.AxisY = Pack(arc.YDirection);
+                saved.Radius = arc.Radius; saved.StartParameter = arc.GetEndParameter(0); saved.EndParameter = arc.GetEndParameter(1);
+            }
+            return saved;
         }
-        internal static Curve RestoreCurve(HistoryCurve curve) => curve.Mid == null
-            ? (Curve)Line.CreateBound(Unpack(curve.Start), Unpack(curve.End))
-            : Arc.Create(Unpack(curve.Start), Unpack(curve.End), Unpack(curve.Mid));
+        internal static Curve RestoreCurve(HistoryCurve curve)
+        {
+            if (curve.Radius.HasValue && curve.StartParameter.HasValue && curve.EndParameter.HasValue
+                && curve.Center != null && curve.AxisX != null && curve.AxisY != null)
+                return Arc.Create(Unpack(curve.Center), curve.Radius.Value, curve.StartParameter.Value,
+                    curve.EndParameter.Value, Unpack(curve.AxisX), Unpack(curve.AxisY));
+            return curve.Mid == null ? (Curve)Line.CreateBound(Unpack(curve.Start), Unpack(curve.End))
+                : Arc.Create(Unpack(curve.Start), Unpack(curve.End), Unpack(curve.Mid));
+        }
         private static double[] Pack(XYZ p) => new[] { p.X, p.Y, p.Z };
         private static XYZ Unpack(double[] p) => new XYZ(p[0], p[1], p[2]);
         private static double Value(Element e, BuiltInParameter p) => e.get_Parameter(p)?.AsDouble() ?? 0;

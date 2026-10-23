@@ -16,6 +16,7 @@ namespace BIMaestro.ViewHover
         private readonly TextBlock _title;
         private readonly Border _added, _modified, _deleted;
         private readonly Image _image;
+        private readonly Grid _preview;
         private readonly TextBlock _placeholder;
         private bool _disposed;
         private readonly DispatcherTimer _delay;
@@ -50,15 +51,15 @@ namespace BIMaestro.ViewHover
                 FontSize = 12, Foreground = Brushes.DimGray, TextWrapping = TextWrapping.Wrap,
                 HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center
             };
-            var preview = new Grid { Height = 340, Background = Brushes.White };
-            preview.Children.Add(_placeholder);
-            preview.Children.Add(_image);
+            _preview = new Grid { Height = 340, Background = Brushes.White };
+            _preview.Children.Add(_placeholder);
+            _preview.Children.Add(_image);
             var content = new StackPanel { Background = Brushes.White };
             content.Children.Add(heading);
             content.Children.Add(new Border
             {
                 BorderBrush = Brushes.LightGray, BorderThickness = new Thickness(1),
-                Padding = new Thickness(5), Child = preview
+                Padding = new Thickness(5), Child = _preview
             });
             ToolTip = new ToolTip
             {
@@ -68,6 +69,7 @@ namespace BIMaestro.ViewHover
                 Placement = PlacementMode.Bottom, PlacementTarget = tab, VerticalOffset = 5,
                 Focusable = false, IsHitTestVisible = false, StaysOpen = true
             };
+            ApplyPreviewSize();
             tab.PreviewMouseDown += OnMouseDown;
             tab.Unloaded += OnUnloaded;
             tab.MouseEnter += OnMouseEnter;
@@ -112,6 +114,7 @@ namespace BIMaestro.ViewHover
         private void OnMouseEnter(object sender, MouseEventArgs args)
         {
             if (_disposed || !ViewHoverPreviewPreferences.Enabled) return;
+            ApplyPreviewSize();
             SetOwner(Window.GetWindow(_tab));
             _delay.Stop();
             _delay.Start();
@@ -140,7 +143,19 @@ namespace BIMaestro.ViewHover
         }
 
         private void OnOwnerDeactivated(object sender, EventArgs args) => Close();
-        private void OnPreferencesChanged() => Close();
+        private void ApplyPreviewSize()
+        {
+            double scale = ViewHoverPreviewPreferences.ViewTabsSizePercent / 100.0;
+            ToolTip.Width = 490 * scale;
+            ToolTip.MaxWidth = Math.Max(180, Math.Min(490 * scale, SystemParameters.WorkArea.Width - 32));
+            _preview.Height = Math.Max(80, Math.Min(340 * scale, SystemParameters.WorkArea.Height - 112));
+        }
+
+        private void OnPreferencesChanged()
+        {
+            Close();
+            ApplyPreviewSize();
+        }
         private void OnMouseDown(object sender, MouseButtonEventArgs args) => Close();
         private void OnUnloaded(object sender, RoutedEventArgs args) { Close(); SetOwner(null); }
         internal void Close()

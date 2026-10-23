@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net8.0-windows</TargetFramework><UseWPF>true</UseWPF><EnableDefaultCompileItems>false</EnableDefaultCompileItems><AssemblyName>BIMaestro.AntibesRouteCheck</AssemblyName></PropertyGroup>
+  <ItemGroup>
+    <Reference Include="RevitAPI"><HintPath>C:/Program Files/Autodesk/Revit 2025/RevitAPI.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="RevitAPIUI"><HintPath>C:/Program Files/Autodesk/Revit 2025/RevitAPIUI.dll</HintPath><Private>false</Private></Reference>
+    <Compile Include="AntibesRouteCheck.cs" />
+    <Compile Include="MaintenanceNativeChecks.cs" />
+    <Compile Include="MaintenanceFeatureInspection.cs" />
+    <Compile Include="MaintenanceCaseDiagnostics.cs" />
+    <Compile Include="MaintenanceGenericNativeChecks.cs" />
+    <Compile Include="MaintenanceValve955038Checks.cs" />
+    <Compile Include="MotorRouteDoorInspection.cs" />
+    <Compile Include="MotorRouteNativeCases.cs" />
+    <Compile Include="MaintenanceDemoNativeChecks.cs" />
+    <Compile Include="MaintenanceAutomaticNativeChecks.cs" />
+    <Compile Include="MaintenancePlacementNativeChecks.cs" />
+    <Compile Include="NativeGeometry.cs" />
+    <Compile Include="../motor-door-tests/NativeDoorGeometry.cs" Link="NativeDoorGeometry.cs" />
+  </ItemGroup>
+</Project>

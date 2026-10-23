@@ -4,19 +4,42 @@ Les journaux JSONL sont écrits par le worker historique dans `history-performan
 sous le dossier historique actif. Un fichier par session et jour contient plusieurs
 maquettes, distinguées par ModelKey et RuntimeDocumentId (y compris non enregistrées).
 Le chargement léger traite la maquette active ; revenir sur une autre maquette reprend
-sa file indépendante. Le préchargement général attend 2 secondes sans entrée utilisateur
-ET avec Revit au premier plan, puis au moins 2 secondes entre passages.
-Un retour au premier plan impose à nouveau 2 secondes de délai pour ce préchargement.
+sa file indépendante. Le préchargement léger attend 150 ms sans entrée lorsque Revit
+est au premier plan. Il continue lorsque l'utilisateur travaille dans une autre application.
+Les enrichissements lourds et copies natives attendent toujours une seconde sans
+entrée ET Revit au premier plan. Le retour au premier plan réinitialise ce délai lourd.
 La sélection explicite démarre sans ce délai, via ExternalEvent, en courts passages
 espacés de 100 ms minimum. Elle reste limitée aux éléments sélectionnés et ne travaille
 pas hors de Revit. Stop suspend toutes les préparations ; Reprendre conserve et reprend
 les files et les données capturées. Un appel Revit engagé reste non interruptible.
 
-Les lots légers visent 25 objets / 25 ms et attendent 25 ms entre lots.
+Les lots légers visent au maximum 100 objets / 20 ms. Le dispatcher leur laisse
+50 ms entre passages ; son timer vérifie la disponibilité toutes les 50 ms.
+La collecte initiale des ID occupe un passage séparé. Le scan automatique ne lance
+plus de collecte de vue visible, qui peut déclencher une régénération longue.
 Ce premier passage conserve les données de suivi ET la recette de restauration
 directe pour les objets pris en charge, sans capturer les jonctions, connexions,
 circuits supplémentaires ni lancer les copies natives. Les profils et placements
-nécessaires à la reconstruction restent prioritaires. Le catalogue initial filtre
+nécessaires à la reconstruction restent prioritaires. En complément, un RVT local
+enregistré et non modifié à son ouverture est copié par un worker vers un fichier
+immuable `native-history/snapshot-opening-*.rvt`. Cette copie de fichier ne lit
+aucune API Revit et n'ouvre aucun document Revit supplémentaire pendant le chargement.
+Les suppressions antérieures au scan peuvent conserver leur ID et cette archive :
+identité, parent et recette sont résolus lors de la restauration explicitement demandée.
+Une recette déjà écrite avec `Ready=false` reste exploitable après publication atomique
+du fichier final. Les modifications d'objet, type, famille ou matériau invalident
+le recours à un état initial devenu ancien ; les exclusions sont figées à suppression.
+Les projets non enregistrés/cloud ou déjà modifiés conservent la capture incrémentale.
+Une copie inachevée concurrencée par une sauvegarde utilisateur est refusée.
+Les recettes directes conservent aussi un reçu de secours vers cette copie.
+Son éligibilité est à nouveau vérifiée et figée lors de la suppression, sans
+modifier la recette partagée. Si la création directe échoue, la restauration
+retente une seule fois depuis ce fichier ; les succès directs n'ouvrent aucun
+document source supplémentaire. Le lot entier conserve une seule opération Undo.
+Le diagnostic du premier échec reste dans le rapport `OpeningFallbackTrigger`.
+Les matériaux, styles, vues, informations de projet, types et segments de définition
+ne sont pas proposés comme objets restaurables depuis cette copie.
+Le catalogue initial filtre
 les catégories de modèle, plutôt que parcourir tous les éléments internes du projet.
 Les paramètres d'un type sont
 réutilisés pour les occurrences du même document ; toute transaction du document
@@ -25,6 +48,9 @@ fois pour ses deux extrémités.
 
 Une file distincte enrichit ensuite les recettes (liaisons, dépendances, détails et
 demande d'archives complexes), par passages de 25 ms maximum visé, sélection prioritaire.
+Un checkpoint d'ouverture prêt et encore valide évite la recopie native par objet ;
+ses détails sont lus au moment d'une restauration demandée. Un checkpoint en cours
+reste en attente ; un échec permet le chemin détaillé habituel.
 Sans sélection à préparer, l'enrichissement et les copies natives attendent la fin
 de la couverture de base. La sélection est une exception explicite : ses captures
 manquantes passent avant le scan général, puis ses enrichissements et archives.
@@ -37,16 +63,16 @@ Cette séparation ne rend pas la sauvegarde native RVT interruptible.
 La file vérifie que le snapshot visé est
 toujours celui en mémoire : une modification ou suppression invalide le travail
 ancien. Les grandes sélections ne font plus toutes leurs captures/restaurations
-synchrones : après 80 ms visés, les objets sans snapshot passent dans une file
-de capture différée. Une suppression immédiate peut donc précéder leur capture.
+synchrones : après 20 ms visés, les objets sans snapshot passent dans une file
+de capture différée. La copie d'ouverture fournit alors le secours lorsqu'elle est éligible.
 Le détail de maillage optionnel est lui aussi différé pour les objets sélectionnés.
 `PreloadAtDeletion.Complete` décrit la couverture de base, pas la fin de l'enrichissement
 ni la fin de l'archivage complexe. `RestorationCapturesPendingAtDeletion` compte
 désormais les enrichissements en attente, pouvant déjà avoir une recette directe.
 Les audits contiennent aussi
 `SelectionCapturesPendingAtDeletion` pour distinguer ces états.
-La vue active réordonne les candidats restants. Un DispatcherTimer de 250 ms demande
-un ExternalEvent lorsque Revit est au premier plan et inactif ; seul Execute lit
+Un DispatcherTimer de 50 ms demande
+un ExternalEvent lorsque le gate adapté à la phase l'autorise ; seul Execute lit
 la maquette. Le suivi ne relance plus Idling en boucle avec SetRaiseWithoutDelay.
 Chaque passage vérifie que la maquette active possède une baseline programmée,
 y compris après Enregistrer sous ou si elle était déjà ouverte.
@@ -55,8 +81,9 @@ native : une nouvelle entrée arrête l'enchaînement après l'appel Revit en co
 Le contrôle Windows détecte les entrées de toute la session, y compris dans une autre
 application ; il ne se limite pas à la fenêtre Revit.
 Une collecte visible peut déclencher du travail Revit coûteux : sa durée est mesurée.
-Le callback Idling vise 25 ms de travail historique avant de lancer un autre passage,
-avec 100 ms de pause entre passages. Une phase longue empêche l'empilement des autres
+Le callback vise 25 ms de travail historique avant de lancer un autre passage,
+avec 50 ms de pause pour l'inventaire, 100 ms pour la sélection et une seconde
+pour les enrichissements. Une phase longue empêche l'empilement des autres
 phases dans le même callback. Les archives natives traitent au maximum 16 racines,
 visent 50 ms de copies automatiques (250 ms en test explicite) et attendent 500 ms
 entre vagues (jusqu'à 5 secondes de récupération après une vague longue). Ces budgets sont coopératifs : un appel
@@ -67,6 +94,14 @@ avant la vague suivante pour éviter de réenregistrer une grosse géométrie av
 petit objet suivant. Chaque vague enregistre un nouveau fichier
 immuable. Un changement du modèle source, un changement de maquette ou 30 secondes
 sans travail restant libère le document d'archive. Les anciens fichiers restent utilisables.
+
+Le journal vide son backlog en lots de 1000 toutes les 250 ms. Les événements restent
+en file jusqu'à l'append durable réussi ; un append partiel est tronqué avant réessai.
+Une erreur IO, d'audit ou de maintenance ne termine plus le worker. Les erreurs IO
+temporaires de création/sauvegarde des archives natives sont réessayées trois fois
+au maximum, sans annoncer un reçu prêt avant une sauvegarde réussie.
+Les caches de suivi et archives ne sont oubliés qu'après une fermeture confirmée ;
+une fermeture annulée conserve la protection. Une réouverture repart avec un cache neuf.
 
 Ouvrir plusieurs maquettes représentatives, alterner les vues, sélectionner des objets,
 puis laisser des pauses de plus de 2 secondes. Bouger ensuite la souris pendant les

@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="BIMaestro - Miniatures des vues"
         Width="620"
-        Height="670"
+        Height="800"
         MinWidth="560"
         MinHeight="640"
         WindowStartupLocation="CenterOwner"
@@ -19,6 +19,7 @@
         </ResourceDictionary>
     </Window.Resources>
 
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
     <Grid Margin="18">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -51,6 +52,26 @@
                 <TextBlock Margin="0,8,0,0" TextWrapping="Wrap"
                            Foreground="{DynamicResource Text.Secondary}"
                            Text="Arborescence du projet et onglets de vues au-dessus du projet. Le réglage est appliqué immédiatement et mémorisé."/>
+                <Grid Margin="0,14,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="140"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="Taille au survol de l’arborescence" VerticalAlignment="Center"
+                               Foreground="{DynamicResource Text.Primary}"/>
+                    <ComboBox x:Name="BrowserSizeComboBox" Grid.Column="1"
+                              SelectionChanged="PreviewSize_SelectionChanged"/>
+                    <TextBlock Grid.Row="1" Margin="0,10,0,0" Text="Taille au survol des onglets de vues"
+                               VerticalAlignment="Center" Foreground="{DynamicResource Text.Primary}"/>
+                    <ComboBox x:Name="ViewTabsSizeComboBox" Grid.Row="1" Grid.Column="1" Margin="0,10,0,0"
+                              SelectionChanged="PreviewSize_SelectionChanged"/>
+                </Grid>
+                <Button Content="Rétablir les tailles par défaut" HorizontalAlignment="Left"
+                        Margin="0,12,0,0" Padding="10,5" Click="ResetPreviewSizes_Click"/>
             </StackPanel>
         </Border>
 
@@ -187,4 +208,5 @@
                     Click="StopButton_Click"/>
         </Grid>
     </Grid>
+    </ScrollViewer>
 </Window>

@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="RevitAPI"><HintPath>C:/Program Files/Autodesk/Revit 2025/RevitAPI.dll</HintPath><Private>false</Private></Reference>
+    <Compile Include="RouteCompileStubs.cs" />
+    <Compile Include="../../BIMaestro/commands/MEP Booster/MotorMeshCollision.cs" Link="MotorMeshCollision.cs" />
+    <Compile Include="../../BIMaestro/commands/MEP Booster/MaintenanceAccessModels.cs" Link="MaintenanceAccessModels.cs" />
+    <Compile Include="../../BIMaestro/commands/MEP Booster/MaintenanceAccessMath.cs" Link="MaintenanceAccessMath.cs" />
+    <Compile Include="../../BIMaestro/commands/MEP Booster/MaintenanceAccessGeometry.cs" Link="MaintenanceAccessGeometry.cs" />
+    <Compile Include="../../BIMaestro/commands/MEP Booster/MaintenanceOperatorPlacement.cs" Link="MaintenanceOperatorPlacement.cs" />
+    <Compile Include="../../BIMaestro/commands/MEP Booster/MaintenancePlacementMath.cs" Link="MaintenancePlacementMath.cs" />
+  </ItemGroup>
+</Project>

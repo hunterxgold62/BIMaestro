@@ -1,0 +1,6 @@
+Sélection validée par utilisateur :
+Navigateur de familles : original, dossier bleu avec composants bleus et loupe orange. Fichier : selection/navigateur-familles-32.png
+Accueil Test : maison bleue avec rouleau de peinture orange. Fichier : selection/accueil-test-32.png
+Apparences Propriétés : cube bleu avec engrenage orange. Fichier : selection/apparences-proprietes-32.png
+Format : PNG transparent, 32 x 32 pixels.
+Rosace des familles : roue bleue à huit secteurs avec cube central et secteur orange. Intégrée : Resources/FamilyRadialMenu.png.

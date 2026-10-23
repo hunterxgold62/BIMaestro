@@ -231,18 +231,17 @@ namespace Modification
 
             string obj = (comboObjectType.SelectedItem as ComboBoxItem)?.Content as string ?? "Canalisation";
             bool isCanal = obj == "Canalisation";
-            bool isMepCurve = obj == "Canalisation" || obj == "Gaine";
             bool auto = chkAutomatique?.IsChecked == true;
-            bool doubleLinkAvailable = isMepCurve && !auto;
+            bool doubleLinkAvailable = !auto;
 
             chkDoubleLink.IsEnabled = doubleLinkAvailable;
             if (!doubleLinkAvailable)
                 chkDoubleLink.IsChecked = false;
 
             bool doubleLink = doubleLinkAvailable && chkDoubleLink.IsChecked == true;
-            comboPipeSource.IsEnabled = isMepCurve && !auto && !doubleLink;
+            comboPipeSource.IsEnabled = !auto && !doubleLink;
 
-            if (!isMepCurve || auto)
+            if (auto)
                 comboPipeSource.SelectedIndex = 0;
 
             string shape = (comboShape.SelectedItem as ComboBoxItem)?.Content as string ?? "";
@@ -1351,42 +1350,63 @@ namespace Modification
             if (_allParameterNames.Count == 0)
                 return;
 
-            void suggest(ComboBox combo, params string[] candidates)
+            var availableNames = _allParameterNames
+                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            void suggest(ComboBox combo, string[] candidates, string excludedName = null)
             {
-                if (combo == null || !string.IsNullOrWhiteSpace(combo.Text))
+                if (combo == null)
                     return;
 
-                string exact = _allParameterNames.FirstOrDefault(name =>
-                    candidates.Any(candidate => string.Equals(name, candidate, StringComparison.OrdinalIgnoreCase)));
-                string partial = exact ?? _allParameterNames.FirstOrDefault(name =>
-                    candidates.Any(candidate => name.IndexOf(candidate, StringComparison.OrdinalIgnoreCase) >= 0));
+                string existing = availableNames.FirstOrDefault(name =>
+                    string.Equals(name, combo.Text, StringComparison.OrdinalIgnoreCase));
+                if (existing != null)
+                {
+                    combo.Text = existing;
+                    return;
+                }
 
-                if (!string.IsNullOrWhiteSpace(partial))
-                    combo.Text = partial;
+                var eligibleNames = availableNames.Where(name =>
+                    !string.Equals(name, excludedName, StringComparison.OrdinalIgnoreCase)).ToList();
+                string exact = candidates.Select(candidate => eligibleNames.FirstOrDefault(name =>
+                    string.Equals(name, candidate, StringComparison.OrdinalIgnoreCase))).FirstOrDefault(name => name != null);
+                string partial = exact ?? candidates.Select(candidate => eligibleNames.FirstOrDefault(name =>
+                    name.IndexOf(candidate, StringComparison.OrdinalIgnoreCase) >= 0)).FirstOrDefault(name => name != null);
+
+                combo.Text = partial ?? string.Empty;
             }
+
+            var lengthNames = new[] { "Longueur", "COM_Longueur", "Length", "COM_Length" };
+            var heightNames = new[] { "Hauteur", "COM_Hauteur", "Height", "COM_Height" };
+            var widthNames = new[] { "Largeur", "COM_Largeur", "Width", "COM_Width" };
+            var depthNames = new[] { "Profondeur", "COM_Profondeur", "Depth", "COM_Depth", "Épaisseur", "Epaisseur", "Thickness" };
+            var diameterNames = new[] { "Diamètre", "COM_Diamètre", "Diametre", "COM_Diametre", "Diameter", "COM_Diameter", "Diam" };
 
             int idx = cbTargetProfile.SelectedIndex;
             if (idx == 0)
             {
-                suggest(cbMapWallLen, "Longueur", "Length");
-                suggest(cbMapWallHeight, "Hauteur", "Height");
-                suggest(cbMapWallDepth, "Profondeur", "Depth", "Épaisseur", "Epaisseur", "Thickness");
+                suggest(cbMapWallLen, lengthNames);
+                suggest(cbMapWallHeight, heightNames, cbMapWallLen.Text);
+                if (string.IsNullOrWhiteSpace(cbMapWallHeight.Text))
+                    suggest(cbMapWallHeight, widthNames, cbMapWallLen.Text);
+                suggest(cbMapWallDepth, depthNames);
             }
             else if (idx == 1)
             {
-                suggest(cbMapWallDiam, "Diamètre", "Diametre", "Diameter", "Diam");
-                suggest(cbMapWallDepth2, "Profondeur", "Depth", "Épaisseur", "Epaisseur", "Thickness");
+                suggest(cbMapWallDiam, diameterNames);
+                suggest(cbMapWallDepth2, depthNames);
             }
             else if (idx == 2)
             {
-                suggest(cbMapFloorLen, "Longueur", "Length");
-                suggest(cbMapFloorWidth, "Largeur", "Width");
-                suggest(cbMapFloorDepth, "Profondeur", "Depth", "Épaisseur", "Epaisseur", "Thickness");
+                suggest(cbMapFloorLen, lengthNames);
+                suggest(cbMapFloorWidth, widthNames);
+                suggest(cbMapFloorDepth, depthNames);
             }
             else if (idx == 3)
             {
-                suggest(cbMapFloorDiam, "Diamètre", "Diametre", "Diameter", "Diam");
-                suggest(cbMapFloorDepth2, "Profondeur", "Depth", "Épaisseur", "Epaisseur", "Thickness");
+                suggest(cbMapFloorDiam, diameterNames);
+                suggest(cbMapFloorDepth2, depthNames);
             }
         }
 
@@ -1690,37 +1710,6 @@ namespace Modification
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
                 return;
-            }
-
-            bool usesModelLink = SelectedPipeSource == PipeSource.LienIFC
-                                 || SelectedPipeSource == PipeSource.LienRVT;
-            if (usesModelLink && !DoubleLinkEnabled)
-            {
-                string selectedMode = selectedProfileIsUnhosted
-                    ? UiLanguage.T("SANS HÔTE", "UNHOSTED")
-                    : UiLanguage.T("AVEC HÔTE", "HOSTED");
-                string suitableDirection = selectedProfileIsUnhosted
-                    ? UiLanguage.T("réseau de votre maquette → mur ou sol lié", "network in your model → linked wall or floor")
-                    : UiLanguage.T("réseau lié → mur ou sol de votre maquette", "linked network → wall or floor in your model");
-                string otherDirection = selectedProfileIsUnhosted
-                    ? UiLanguage.T("Pour un réseau lié vers un support de votre maquette, choisissez une famille avec hôte.", "For a linked network crossing a host in your model, choose a hosted family.")
-                    : UiLanguage.T("Pour un réseau de votre maquette vers un support lié, choisissez une famille sans hôte.", "For a network in your model crossing a linked host, choose an unhosted family.");
-
-                var answer = MessageBox.Show(
-                    UiLanguage.T(
-                        $"La famille sélectionnée est {selectedMode}.\n\n" +
-                        $"Elle convient au cas :\n{suitableDirection}.\n\n" +
-                        $"{otherDirection}\n\nContinuer avec cette famille ?",
-                        $"The selected family is {selectedMode}.\n\n" +
-                        $"It is suitable for:\n{suitableDirection}.\n\n" +
-                        $"{otherDirection}\n\nContinue with this family?"),
-                    UiLanguage.T("Vérification du lien", "Link Check"),
-                    MessageBoxButton.OKCancel,
-                    MessageBoxImage.Information,
-                    MessageBoxResult.Cancel);
-
-                if (answer != MessageBoxResult.OK)
-                    return;
             }
 
             Config.DefaultNormeEnabled = NormeEnabled;

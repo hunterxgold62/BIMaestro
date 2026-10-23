@@ -1,4 +1,4 @@
-param([switch]$Preview)
+param([switch]$Preview,[string]$Revit2025Source='')
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $binRoot = [IO.Path]::GetFullPath((Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'BIMaestro/Bin'))
@@ -7,22 +7,27 @@ Add-Type -AssemblyName System.Reflection.Metadata
 $plans = foreach ($year in 2023..2027) {
     $relative = switch ($year) { 2023 { 'Release' } 2024 { 'Release2024' } default { "Revit$year/Release" } }
     $source = Join-Path $repo "BIMaestro/bin/$relative"
+    if ($year -eq 2025 -and $Revit2025Source) { $source = [IO.Path]::GetFullPath($Revit2025Source) }
     $dll = Join-Path $source 'BIMaestro.dll'
     $stream = [IO.File]::OpenRead($dll)
     $pe = [System.Reflection.PortableExecutable.PEReader]::new($stream)
     try {
         $metadata = [System.Reflection.Metadata.PEReaderExtensions]::GetMetadataReader($pe)
+        $loadedId=$metadata.GetGuid($metadata.GetModuleDefinition().Mvid).ToString('N').Substring(0,8).ToUpperInvariant()
         $references = @{}
         foreach ($handle in $metadata.AssemblyReferences) {
             $reference = $metadata.GetAssemblyReference($handle)
             $references[$metadata.GetString($reference.Name)] = $reference.Version
         }
         $hasCommand = $false
+        $hasMaintenance = $false
         foreach ($handle in $metadata.TypeDefinitions) {
             $type = $metadata.GetTypeDefinition($handle)
             if ($metadata.GetString($type.Name) -eq 'MepMotorExtractionCommand') { $hasCommand = $true }
+            if ($metadata.GetString($type.Name) -eq 'MaintenanceWorkbenchCommand') { $hasMaintenance = $true }
         }
         if (!$hasCommand) { throw "Prototype absent de la DLL $year" }
+        if (!$hasMaintenance) { throw "Maintenance MEP absente de la DLL $year" }
         if ($references['RevitAPI'].Major -ne ($year - 2000) -or $references['RevitAPIUI'].Major -ne ($year - 2000)) {
             throw "Références API incorrectes pour $year"
         }
@@ -33,13 +38,13 @@ $plans = foreach ($year in 2023..2027) {
         }
     } finally { $pe.Dispose(); $stream.Dispose() }
     $hash = (Get-FileHash -LiteralPath $dll -Algorithm SHA256).Hash
-    $destination = [IO.Path]::GetFullPath((Join-Path $binRoot ("Revit$year-MotorExtraction-" + $hash.Substring(0, 12))))
+    $destination = [IO.Path]::GetFullPath((Join-Path $binRoot ("Revit$year-Maintenance-" + $hash.Substring(0, 12))))
     if (!$destination.StartsWith($binRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'Destination invalide' }
     $manifest = Join-Path $addinRoot "$year/BIMaestro.addin"
     [xml]$xml = Get-Content -LiteralPath $manifest -Raw
     $entry = @($xml.RevitAddIns.AddIn | Where-Object FullClassName -eq 'BIMaestroApp')
     if ($entry.Count -ne 1) { throw "Manifeste inattendu : $manifest" }
-    [pscustomobject]@{ Year=$year; Source=$source; Destination=$destination; Manifest=$manifest; Hash=$hash; PreviousAssembly=[string]$entry[0].Assembly }
+    [pscustomobject]@{ Year=$year; Source=$source; Destination=$destination; Manifest=$manifest; Hash=$hash; LoadedId=$loadedId; PreviousAssembly=[string]$entry[0].Assembly }
 }
 if ($Preview) { $plans | ConvertTo-Json; return }
 # Each build is staged in a new versioned directory. Running Revit processes keep

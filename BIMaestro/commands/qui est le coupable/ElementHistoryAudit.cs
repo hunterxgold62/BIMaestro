@@ -85,6 +85,28 @@ namespace Analyse
             catch (Exception ex) { Trace.WriteLine("History element performance: " + ex.Message); }
         }
 
+        // Callers detach all Revit objects before passing details. Serialization
+        // and disk writes stay on the existing logger worker.
+        internal static void RecordDetails(Document doc, string phase, double elapsedMs, int elements,
+            int remaining, bool success, object details)
+        {
+            if (doc == null || !doc.IsValidObject || Pending.Count >= 10000) return;
+            try
+            {
+                var path = Path.Combine(CollaborativeModelTrackerStore.ActiveDirectory, "history-performance",
+                    "performance-" + DateTime.UtcNow.ToString("yyyy-MM-dd") + "-" + Session + ".jsonl");
+                Pending.Enqueue(Tuple.Create(path, (object)new
+                {
+                    SchemaVersion = 3, Session, AtUtc = DateTime.UtcNow,
+                    ModelKey = ElementHistoryTracker.GetDocumentKeyForHistory(doc),
+                    RuntimeDocumentId = doc.GetHashCode(), ModelName = doc.Title,
+                    Phase = phase, ElapsedMilliseconds = elapsedMs, Elements = elements,
+                    Remaining = remaining, Success = success, Details = details
+                }));
+            }
+            catch (Exception ex) { Trace.WriteLine("History detail performance: " + ex.Message); }
+        }
+
         internal static void Flush()
         {
             lock (WriteSync)

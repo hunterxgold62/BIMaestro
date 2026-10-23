@@ -28,6 +28,8 @@ namespace BIMaestro.MepBooster
     {
         protected override string ButtonId => "MepMotorExtraction";
         protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
+            => RunWorkflow(data, ref message);
+        internal static Result RunWorkflow(ExternalCommandData data, ref string message)
         {
             var ui = data.Application.ActiveUIDocument;
             if (ui == null || ui.Document.IsFamilyDocument) return Result.Cancelled;
@@ -44,8 +46,39 @@ namespace BIMaestro.MepBooster
                         "Sélectionnez la pompe (équipement mécanique).")) as FamilyInstance;
                 var projection = BoosterProjection.Read(ui);
                 if (pump == null || projection == null) return Result.Cancelled;
-                var dialog = new MotorExtractionWindow(ui.Document, pump, projection, data.Application.MainWindowHandle);
-                dialog.ShowDialog();
+                var state = new MotorExtractionState();
+                while (true)
+                {
+                    var dialog = new MotorExtractionWindow(ui, pump, BoosterProjection.Read(ui) ?? projection, data.Application.MainWindowHandle, state);
+                    dialog.ShowDialog();
+                    if (dialog.PickRequest == null) break;
+                    try
+                    {
+                        if (dialog.PickRequest == "motor")
+                            state.MotorPoint = ui.Selection.PickObject(ObjectType.PointOnElement, "Cliquez le moteur pour positionner le centre XY du volume.").GlobalPoint;
+                        else
+                        {
+                            var reference = ui.Selection.PickObject(ObjectType.PointOnElement, new DoorFilter(ui.Document), "Cliquez la dernière porte de sortie (maquette ou lien Revit).");
+                            var element = ui.Document.GetElement(reference.ElementId);
+                            var link = element as RevitLinkInstance;
+                            var door = (link == null ? element : link.GetLinkDocument().GetElement(reference.LinkedElementId)) as FamilyInstance;
+                            if (door == null) continue;
+                            var transform = link?.GetTotalTransform() ?? Transform.Identity;
+                            var box = door.get_BoundingBox(null);
+                            var location = (door.Location as LocationPoint)?.Point ?? (box.Min + box.Max) / 2;
+                            state.DoorPoint = transform.OfPoint(location);
+                            state.DoorNormal = transform.OfVector(door.GetTransform().BasisY).Normalize();
+                            state.DoorWidth = door.get_Parameter(BuiltInParameter.DOOR_WIDTH)?.AsDouble()
+                                ?? door.Symbol.get_Parameter(BuiltInParameter.DOOR_WIDTH)?.AsDouble() ?? 0;
+                            state.DoorHeight = door.get_Parameter(BuiltInParameter.DOOR_HEIGHT)?.AsDouble()
+                                ?? door.Symbol.get_Parameter(BuiltInParameter.DOOR_HEIGHT)?.AsDouble() ?? 0;
+                            state.DoorSill = transform.OfPoint(location).Z;
+                            state.DoorId = door.Id; state.DoorLinkId = link?.Id ?? ElementId.InvalidElementId;
+                            state.DoorName = door.Name + " [" + BoosterIds.Value(door.Id) + "]";
+                        }
+                    }
+                    catch (Autodesk.Revit.Exceptions.OperationCanceledException) { }
+                }
                 return Result.Succeeded;
             }
             catch (Autodesk.Revit.Exceptions.OperationCanceledException) { return Result.Cancelled; }
@@ -57,6 +90,29 @@ namespace BIMaestro.MepBooster
             public bool AllowElement(Element e) => Accept(e);
             public bool AllowReference(Reference r, XYZ p) => false;
         }
+        private sealed class DoorFilter : ISelectionFilter
+        {
+            private readonly Document _doc;
+            internal DoorFilter(Document doc) { _doc = doc; }
+            public bool AllowElement(Element e) => e is RevitLinkInstance || BoosterIds.Value(e.Category?.Id) == (long)BuiltInCategory.OST_Doors;
+            public bool AllowReference(Reference r, XYZ p)
+            {
+                var e = _doc.GetElement(r.ElementId);
+                if (e is RevitLinkInstance link) e = link.GetLinkDocument()?.GetElement(r.LinkedElementId);
+                return BoosterIds.Value(e?.Category?.Id) == (long)BuiltInCategory.OST_Doors;
+            }
+        }
+    }
+
+    internal sealed class MotorExtractionState
+    {
+        internal readonly Dictionary<string, string> Fields = new Dictionary<string, string>();
+        internal int Direction;
+        internal XYZ DoorPoint, DoorNormal, MotorPoint;
+        internal ElementId DoorId = ElementId.InvalidElementId, DoorLinkId = ElementId.InvalidElementId;
+        internal string DoorName;
+        internal double DoorWidth, DoorHeight, DoorSill;
+        internal bool AllowIntermediateDoors = true;
     }
 
     // A box in a rigid local frame. Extending its interval along a local axis gives
@@ -67,7 +123,8 @@ namespace BIMaestro.MepBooster
         internal XYZ Center, Size;
         internal int Axis, Sign;
         internal double Travel, Margin;
-        internal XYZ Direction => new[] { Frame.BasisX, Frame.BasisY, Frame.BasisZ }[Axis] * Sign;
+        internal XYZ TranslationDirection;
+        internal XYZ Direction => TranslationDirection ?? new[] { Frame.BasisX, Frame.BasisY, Frame.BasisZ }[Axis] * Sign;
         internal XYZ[] Corners(double distance, bool clearance = false)
         {
             double m = clearance ? Margin : 0;
@@ -89,6 +146,31 @@ namespace BIMaestro.MepBooster
             var loop = new CurveLoop();
             for (int i = 0; i < 4; i++) loop.Append(Autodesk.Revit.DB.Line.CreateBound(points[i], points[(i + 1) % 4]));
             return GeometryCreationUtilities.CreateExtrusionGeometry(new[] { loop }, Frame.BasisZ, hi.Z - lo.Z);
+        }
+        // A translated convex box sweeps its initial box plus prisms extruded
+        // from the faces pointing into the movement. This is continuous and exact
+        // for an arbitrary translation, without an oversized diagonal bounding box.
+        internal List<Solid> SweepParts(double distance)
+        {
+            var parts = new List<Solid>();
+            try
+            {
+                parts.Add(Sweep(0));
+                if (distance < 1e-8) return parts;
+                var points = Corners(0, true);
+                var faces = new[] { new[] { 0, 2, 6, 4 }, new[] { 1, 5, 7, 3 },
+                    new[] { 0, 4, 5, 1 }, new[] { 2, 3, 7, 6 }, new[] { 0, 1, 3, 2 }, new[] { 4, 6, 7, 5 } };
+                var normals = new[] { -Frame.BasisX, Frame.BasisX, -Frame.BasisY, Frame.BasisY, -Frame.BasisZ, Frame.BasisZ };
+                for (int f = 0; f < faces.Length; f++)
+                {
+                    if (normals[f].DotProduct(Direction) <= 1e-8) continue;
+                    var loop = new CurveLoop();
+                    for (int i = 0; i < 4; i++) loop.Append(Autodesk.Revit.DB.Line.CreateBound(points[faces[f][i]], points[faces[f][(i + 1) % 4]]));
+                    parts.Add(GeometryCreationUtilities.CreateExtrusionGeometry(new[] { loop }, Direction, distance));
+                }
+                return parts;
+            }
+            catch { foreach (var part in parts) part.Dispose(); throw; }
         }
         internal static Outline Bounds(IEnumerable<XYZ> points)
         {
@@ -112,7 +194,7 @@ namespace BIMaestro.MepBooster
     }
     internal static class MotorExtractionAnalysis
     {
-        internal static MotorExtractionReport Run(Document doc, FamilyInstance pump, MotorEnvelope envelope)
+        internal static MotorExtractionReport Run(Document doc, FamilyInstance pump, MotorEnvelope envelope, ISet<long> extraIgnored = null)
         {
             var report = new MotorExtractionReport();
             var ignored = new HashSet<long>();
@@ -123,7 +205,10 @@ namespace BIMaestro.MepBooster
                     if (doc.GetElement(id) is FamilyInstance child) Ignore(child);
             }
             Ignore(pump);
-            using (var swept = envelope.Sweep(envelope.Travel))
+            if (extraIgnored != null) ignored.UnionWith(extraIgnored);
+            var swept = envelope.SweepParts(envelope.Travel);
+            try
+            {
             using (var bounds = MotorEnvelope.Bounds(envelope.Corners(0, true).Concat(envelope.Corners(envelope.Travel, true))))
             {
                 Scan(doc, Transform.Identity, "", true);
@@ -149,7 +234,7 @@ namespace BIMaestro.MepBooster
                             if (!host) report.Unknown.Add(prefix + element.Name + " : lien imbriqué non analysé");
                             continue;
                         }
-                        if (element.Category == null || element.Category.CategoryType != CategoryType.Model
+                        if (element is View || element is SpatialElement || element.Category == null || element.Category.CategoryType != CategoryType.Model
                             || (host && ignored.Contains(BoosterIds.Value(element.Id)))) continue;
                         string label = prefix + element.Name + " [" + BoosterIds.Value(element.Id) + "]";
                         var solids = new List<Solid>();
@@ -173,8 +258,9 @@ namespace BIMaestro.MepBooster
                                 }
                             }
                             if (solids.Count == 0 || incomplete) report.Unknown.Add(label + " : géométrie incomplète");
-                            bool Intersects(Solid volume)
+                            bool Intersects(IEnumerable<Solid> volumes)
                             {
+                                foreach (var volume in volumes)
                                 foreach (var solid in solids)
                                 using (var intersection = BooleanOperationsUtils.ExecuteBooleanOperation(volume, solid, BooleanOperationsType.Intersect))
                                     if (intersection.Volume > 1e-10) return true;
@@ -182,7 +268,12 @@ namespace BIMaestro.MepBooster
                             }
                             if (!Intersects(swept)) continue;
                             double high = MotorSweepMath.FirstContact(envelope.Travel, 1.0 / 304.8,
-                                distance => { using (var test = envelope.Sweep(distance)) return Intersects(test); }).Value;
+                                distance =>
+                                {
+                                    var tests = envelope.SweepParts(distance);
+                                    try { return Intersects(tests); }
+                                    finally { foreach (var test in tests) test.Dispose(); }
+                                }).Value;
                             var box = element.get_BoundingBox(null);
                             XYZ[] boxPoints = box == null ? null : Enumerable.Range(0, 8).Select(i => transform.OfPoint(box.Transform.OfPoint(new XYZ(
                                 (i & 1) == 0 ? box.Min.X : box.Max.X, (i & 2) == 0 ? box.Min.Y : box.Max.Y,
@@ -195,6 +286,8 @@ namespace BIMaestro.MepBooster
                     }
                 }
             }
+            }
+            finally { foreach (var part in swept) part.Dispose(); }
             report.Obstacles.Sort((a, b) => a.First.CompareTo(b.First));
             return report;
         }
@@ -253,6 +346,21 @@ namespace BIMaestro.MepBooster
             if (report != null) foreach (var obstacle in report.Obstacles.Take(30)) Box(obstacle.Box, Brushes.OrangeRed, true);
             Show();
         }
+        internal void DrawPath(BoosterProjection projection, IList<MotorRoutePose> route)
+        {
+            var line = new Polyline { Stroke = Brushes.DeepSkyBlue, StrokeThickness = 3, StrokeDashArray = new DoubleCollection { 4, 2 } };
+            foreach (var pose in route)
+            {
+                var pixel = projection.Pixel(pose.Center); var dip = BoosterNative.Dip(this, pixel.X, pixel.Y);
+                line.Points.Add(new Point(dip.X - Left, dip.Y - Top));
+            }
+            _canvas.Children.Add(line);
+            if (line.Points.Count > 0)
+            {
+                var label = new TextBlock { Text = "Sortie · porte supposée ouverte", Background = Brushes.White, Foreground = Brushes.Black, Padding = new Thickness(5) };
+                var end = line.Points.Last(); Canvas.SetLeft(label, end.X + 8); Canvas.SetTop(label, end.Y + 8); _canvas.Children.Add(label);
+            }
+        }
     }
 
     internal sealed class MotorExtractionWindow : Window
@@ -262,18 +370,28 @@ namespace BIMaestro.MepBooster
         private readonly BoosterProjection _projection;
         private readonly Transform _frame;
         private readonly MotorGhost _ghost;
+        private readonly MotorExtractionState _state;
+        internal string PickRequest { get; private set; }
         private readonly Dictionary<string, TextBox> _fields = new Dictionary<string, TextBox>();
         private readonly ComboBox _direction = new ComboBox { ItemsSource = new[] { "+X local", "−X local", "+Y local", "−Y local", "+Z local", "−Z local" }, SelectedIndex = 0 };
         private readonly Slider _position = new Slider { Minimum = 0, Maximum = 100, Value = 0 };
         private readonly TextBlock _status = new TextBlock { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 10, 0, 10) };
         private readonly TextBlock _distance = new TextBlock();
+        private readonly TextBlock _details = new TextBlock { TextWrapping=TextWrapping.Wrap, Margin=new Thickness(0,6,0,6) };
+        private readonly Expander _scope = new Expander { Header="Hypothèses et détails du contrôle", IsExpanded=false };
         private readonly DispatcherTimer _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(40) };
         private MotorEnvelope _envelope;
         private MotorExtractionReport _report;
-        internal MotorExtractionWindow(Document doc, FamilyInstance pump, BoosterProjection projection, IntPtr owner)
+        private List<MotorRoutePose> _route;
+        private StackPanel _settings;
+        private readonly Button _cancel = new Button { Content="Annuler la recherche", Visibility=System.Windows.Visibility.Collapsed };
+        private bool _running, _cancelRequested;
+        private string _lastError;
+        internal MotorExtractionWindow(UIDocument ui, FamilyInstance pump, BoosterProjection projection, IntPtr owner, MotorExtractionState state)
         {
-            _doc = doc; _pump = pump; _projection = projection;
-            Title = "MEP · Extraction moteur — prototype"; Width = 430; Height = 790; MinHeight = 500;
+            _doc = ui.Document; _pump = pump; _projection = projection; _state = state;
+            _direction.SelectedIndex = state.Direction;
+            Title = "MEP · Chemin vers la sortie · "+MaintenanceBuildIdentity.Display; Width = 490; Height = 850; MinHeight = 500;
             ResizeMode = ResizeMode.CanResize; ShowInTaskbar = false;
             new WindowInteropHelper(this).Owner = owner; BoosterTheme.Attach(this);
             Background = (Brush)FindResource("Surface");
@@ -282,33 +400,58 @@ namespace BIMaestro.MepBooster
             _frame = Transform.Identity; _frame.Origin = t.Origin;
             _frame.BasisX = t.BasisX.Normalize(); _frame.BasisY = t.BasisY.Normalize();
             _frame.BasisZ = t.BasisZ.Normalize();
-            var box = pump.get_BoundingBox(null) ?? throw new InvalidOperationException("La pompe n’a pas de volume géométrique.");
-            var corners = Enumerable.Range(0, 8).Select(i => _frame.Inverse.OfPoint(box.Transform.OfPoint(new XYZ(
-                (i & 1) == 0 ? box.Min.X : box.Max.X, (i & 2) == 0 ? box.Min.Y : box.Max.Y,
-                (i & 4) == 0 ? box.Min.Z : box.Max.Z)))).ToArray();
-            var min = new XYZ(corners.Min(p => p.X), corners.Min(p => p.Y), corners.Min(p => p.Z));
-            var max = new XYZ(corners.Max(p => p.X), corners.Max(p => p.Y), corners.Max(p => p.Z));
-            var size = max - min; var center = (max + min) / 2;
+            var profile = MotorExtractionProfile.Read(pump);
+            var size = profile.Size; var center = profile.Center;
             var panel = new StackPanel { Margin = new Thickness(18) };
-            Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
-            panel.Children.Add(new TextBlock { Text = "Extraction rectiligne du moteur", FontSize = 19, FontWeight = FontWeights.SemiBold });
+            _settings=panel;
+            var layout = new DockPanel();
+            var resultCard = new Border { Padding = new Thickness(14), Background = Brushes.WhiteSmoke, BorderBrush = Brushes.SlateGray, BorderThickness = new Thickness(0,0,0,1) };
+            var resultPanel = new StackPanel(); resultCard.Child=resultPanel;
+            resultPanel.Children.Add(_status); resultPanel.Children.Add(_distance); resultPanel.Children.Add(_position);
+            _scope.Content=_details; resultPanel.Children.Add(_scope);
+            resultPanel.Children.Add(_cancel); _cancel.Click += (_,__) => _cancelRequested=true;
+            DockPanel.SetDock(resultCard,Dock.Top); layout.Children.Add(resultCard);
+            layout.Children.Add(new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto }); Content=layout;
+            panel.Children.Add(new TextBlock { Text = "Du moteur à la porte de sortie", FontSize = 19, FontWeight = FontWeights.SemiBold });
             panel.Children.Add(new TextBlock { Text = pump.Name + " · " + BoosterIds.Value(pump.Id), Margin = new Thickness(0, 6, 0, 8) });
-            panel.Children.Add(new TextBlock { Text = "Réglez le pavé sur le moteur. Le volume initial couvre la pompe entière : ce n’est pas une reconnaissance du moteur. Dimensions et décalages en mm, selon les axes locaux de la pompe.", TextWrapping = TextWrapping.Wrap });
-            Field("X", "Longueur X", Math.Max(10, size.X * 304.8));
-            Field("Y", "Largeur Y", Math.Max(10, size.Y * 304.8));
-            Field("Z", "Hauteur Z", Math.Max(10, size.Z * 304.8));
+            panel.Children.Add(new TextBlock { Text = profile.Description + " Toutes les valeurs sont en mm.", TextWrapping = TextWrapping.Wrap });
+            Field("X", "Dimension X du moteur", Math.Max(10, size.X * 304.8));
+            Field("Y", "Dimension Y du moteur", Math.Max(10, size.Y * 304.8));
+            Field("Z", "Hauteur Z du moteur", Math.Max(10, size.Z * 304.8));
             Field("CX", "Centre X / origine famille", center.X * 304.8);
             Field("CY", "Centre Y / origine famille", center.Y * 304.8);
             Field("CZ", "Centre Z / origine famille", center.Z * 304.8);
+            if (state.MotorPoint != null)
+            {
+                var current = _frame.OfPoint(new XYZ(ParseSaved("CX", center.X * 304.8), ParseSaved("CY", center.Y * 304.8), ParseSaved("CZ", center.Z * 304.8)) / 304.8);
+                var local = _frame.Inverse.OfPoint(new XYZ(state.MotorPoint.X, state.MotorPoint.Y, current.Z));
+                _fields["CX"].Text = (local.X * 304.8).ToString("0.#"); _fields["CY"].Text = (local.Y * 304.8).ToString("0.#");
+                state.MotorPoint = null;
+            }
+            var pointMotor = new Button { Content = "Pointer le centre du moteur (XY)", Margin = new Thickness(0, 8, 0, 4), Style = (Style)FindResource("SecondaryButton") };
+            panel.Children.Add(pointMotor); pointMotor.Click += (_, __) => { PickRequest = "motor"; Close(); };
+            var pickDoor = new Button { Content = state.DoorPoint == null ? "Choisir la porte de sortie…" : "Changer la porte de sortie…", Style = (Style)FindResource("SecondaryButton") };
+            panel.Children.Add(pickDoor); pickDoor.Click += (_, __) => { PickRequest = "door"; Close(); };
+            panel.Children.Add(new TextBlock { Text = state.DoorName == null ? "Sélectionnez la dernière porte : le chemin sera recherché automatiquement." : "Sortie : " + state.DoorName,
+                TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 6) });
+            var openDoors = new CheckBox { Content = "Portes intermédiaires supposées ouvertes", IsChecked = state.AllowIntermediateDoors,
+                Margin = new Thickness(0, 6, 0, 6), ToolTip = "Le trajet peut traverser d’autres portes. Le passage est contrôlé selon les dimensions disponibles ; l’ouverture effective des vantaux reste à confirmer sur site." };
+            panel.Children.Add(openDoors);
+            openDoors.Checked += (_, __) => { state.AllowIntermediateDoors = true; Invalidate(); };
+            openDoors.Unchecked += (_, __) => { state.AllowIntermediateDoors = false; Invalidate(); };
+            Field("Step", "Pas de recherche (50 à 500)", 200);
+            Field("Buffer", "Recherche autour du trajet", 4000);
+            var find = new Button { Content = "Trouver le chemin jusqu’à la sortie", Margin = new Thickness(0, 10, 0, 6), Style = (Style)FindResource("PrimaryButton"), IsEnabled = state.DoorPoint != null };
+            panel.Children.Add(find); find.Click += (_, __) => FindRoute();
             panel.Children.Add(new TextBlock { Text = "Direction d’extraction", Margin = new Thickness(0, 8, 0, 4) });
             panel.Children.Add(_direction);
             Field("Travel", "Distance d’extraction", 600);
             Field("Margin", "Marge autour du moteur", 10);
-            var check = new Button { Content = "Analyser tout le trajet", Margin = new Thickness(0, 12, 0, 8), Style = (Style)FindResource("PrimaryButton") };
+            var check = new Button { Content = "Tester seulement la dépose rectiligne", Margin = new Thickness(0, 12, 0, 8), Style = (Style)FindResource("SecondaryButton") };
             panel.Children.Add(check);
             var animate = new Button { Content = "▶ Lire / arrêter l’extraction", Style = (Style)FindResource("SecondaryButton") };
-            panel.Children.Add(animate); panel.Children.Add(_position); panel.Children.Add(_distance); panel.Children.Add(_status);
-            panel.Children.Add(new TextBlock { Text = "Bleu : position avant le premier obstacle détecté · Rouge : obstacle rencontré sur le trajet · Orange : non analysé ou incomplet.\n\nLa pompe sélectionnée et ses sous-composants sont exclus. Le test ne vérifie pas le démontage à l’intérieur de la pompe. Liens Revit directs chargés inclus ; liens imbriqués, fichiers CAO et maillages non certifiés. Contrôle du volume saisi, hors outillage, levage et prescriptions fabricant.", TextWrapping = TextWrapping.Wrap, FontSize = 11 });
+            resultPanel.Children.Insert(0,animate);
+            panel.Children.Add(new TextBlock { Text = "Le chemin vérifie les translations et les virages du volume, avec 16 orientations horizontales. Hauteur constante, sans basculement ni levage. La pompe est exclue ; la porte de sortie et, selon l’option, les portes intermédiaires sont supposées ouvertes. Leurs passages restent contrôlés avec les données disponibles. Le résultat dépend du gabarit réglé et ne valide pas une procédure de manutention.", TextWrapping = TextWrapping.Wrap, FontSize = 11 });
             var close = new Button { Content = "Fermer", Margin = new Thickness(0, 12, 0, 0), IsCancel = true };
             panel.Children.Add(close); close.Click += (_, __) => Close();
             foreach (var input in _fields.Values) input.TextChanged += (_, __) => Invalidate();
@@ -319,7 +462,7 @@ namespace BIMaestro.MepBooster
                 _timer.Stop();
                 try
                 {
-                    _envelope = Read(); _report = null;
+                    _envelope = Read(); _report = null; _route = null;
                     using (new WaitCursor()) _report = MotorExtractionAnalysis.Run(_doc, _pump, _envelope);
                     _position.Value = 0;
                     _status.Text = (_report.First.HasValue
@@ -334,19 +477,33 @@ namespace BIMaestro.MepBooster
             animate.Click += (_, __) =>
             {
                 if (_timer.IsEnabled) _timer.Stop();
+                else if (_report == null) _status.Text = "Lancez une recherche de chemin ou le test de dépose avant la lecture.";
                 else if (_envelope != null) { if (_position.Value >= 100) _position.Value = 0; _timer.Start(); }
             };
             _timer.Tick += (_, __) => { _position.Value = Math.Min(100, _position.Value + 1); if (_position.Value >= 100) _timer.Stop(); };
             Loaded += (_, __) => Invalidate();
-            Closed += (_, __) => { _timer.Stop(); _ghost.Close(); };
+            Closing += (_,e) => {if(_running){_cancelRequested=true;e.Cancel=true;}};
+            Closed += (_, __) =>
+            {
+                _timer.Stop(); _ghost.Close();
+                foreach (var item in _fields) state.Fields[item.Key] = item.Value.Text;
+                state.Direction = _direction.SelectedIndex;
+            };
             void Field(string key, string label, double value)
             {
                 var row = new Grid { Margin = new Thickness(0, 5, 0, 0) };
-                row.ColumnDefinitions.Add(new ColumnDefinition()); row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(108) });
+                row.ColumnDefinitions.Add(new ColumnDefinition()); row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(140) });
                 row.Children.Add(new TextBlock { Text = label, VerticalAlignment = VerticalAlignment.Center });
-                var input = new TextBox { Text = value.ToString("0.#", CultureInfo.CurrentCulture), Padding = new Thickness(5) };
+                // Override the shared fixed-height template: it clipped the text
+                // at the DPI/font settings used in Revit.
+                var input = new TextBox { Text = state.Fields.TryGetValue(key, out string saved) ? saved : value.ToString("0.#", CultureInfo.CurrentCulture),
+                    Style = null, Height = double.NaN, MinHeight = 38, FontSize = 15, Padding = new Thickness(8, 5, 8, 5),
+                    VerticalContentAlignment = VerticalAlignment.Center, Foreground = Brushes.Black, Background = Brushes.White,
+                    BorderBrush = Brushes.SlateGray, BorderThickness = new Thickness(1), Margin = new Thickness(0) };
                 Grid.SetColumn(input, 1); row.Children.Add(input); panel.Children.Add(row); _fields.Add(key, input);
             }
+            double ParseSaved(string key, double fallbackValue)
+                => double.TryParse(_fields[key].Text.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out double n) ? n : fallbackValue;
         }
         private MotorEnvelope Read()
         {
@@ -365,16 +522,146 @@ namespace BIMaestro.MepBooster
         }
         private void Invalidate()
         {
-            _timer.Stop(); _report = null; _position.Value = 0;
+            _timer.Stop(); _report = null; _route = null; _position.Value = 0;
             try { _envelope = Read(); _status.Text = "Volume modifié : lancez l’analyse du trajet."; Draw(); }
             catch (Exception ex) { _envelope = null; _ghost.Hide(); _status.Text = ex.Message; }
         }
         private void Draw()
         {
             if (_envelope == null) return;
+            if (_route != null && _route.Count > 1)
+            {
+                double radius = _envelope.Size.GetLength() / 2;
+                double Weight(int i) => (_route[i].Center - _route[i - 1].Center).GetLength()
+                    + radius * Math.Abs(MotorRouteGeometry.AngleDelta(_route[i - 1].Yaw, _route[i].Yaw));
+                double total = Enumerable.Range(1, _route.Count - 1).Sum(Weight);
+                double remaining = total * _position.Value / 100;
+                int segment = 1;
+                while (segment < _route.Count - 1 && remaining > Weight(segment)) { remaining -= Weight(segment); segment++; }
+                double fraction = Math.Min(1, remaining / Math.Max(1e-9, Weight(segment)));
+                var a = _route[segment - 1]; var b = _route[segment];
+                var pose = new MotorRoutePose(a.Center + (b.Center - a.Center) * fraction,
+                    a.Yaw + MotorRouteGeometry.AngleDelta(a.Yaw, b.Yaw) * fraction);
+                _ghost.Draw(_projection, MotorRouteGeometry.At(_envelope, pose), 0, _report);
+                _ghost.DrawPath(_projection, _route);
+                _distance.Text = "Chemin vers la sortie : " + _position.Value.ToString("0") + " % · rotation " + (pose.Yaw * 180 / Math.PI).ToString("0") + "°";
+                return;
+            }
             double distance = _envelope.Travel * _position.Value / 100;
             _distance.Text = "Position du moteur : " + (distance * 304.8).ToString("0") + " mm / " + (_envelope.Travel * 304.8).ToString("0") + " mm";
             _ghost.Draw(_projection, _envelope, distance, _report);
+        }
+        private void FindRoute()
+        {
+            if (_state.DoorPoint == null) return;
+            _timer.Stop(); _route = null; _report = null;
+            _running=true; _cancelRequested=false; _lastError=null; _settings.IsEnabled=false; _cancel.Visibility=System.Windows.Visibility.Visible;
+            var elapsed=System.Diagnostics.Stopwatch.StartNew();
+            try
+            {
+                _envelope = Read();
+                double Input(string key) => double.Parse(_fields[key].Text.Replace(',', '.'), CultureInfo.InvariantCulture);
+                double stepMm = Input("Step"), bufferMm = Input("Buffer");
+                if (double.IsNaN(stepMm) || double.IsInfinity(stepMm) || stepMm < 50 || stepMm > 500
+                    || double.IsNaN(bufferMm) || double.IsInfinity(bufferMm) || bufferMm < 500 || bufferMm > 15000)
+                    throw new InvalidOperationException("Pas : 50 à 500 mm. Périmètre autour du trajet : 500 à 15 000 mm.");
+                double step = stepMm / 304.8, padding = bufferMm / 304.8;
+                var start = _envelope.Frame.OfPoint(_envelope.Center);
+                var door = new XYZ(_state.DoorPoint.X, _state.DoorPoint.Y, start.Z);
+                var normal = new XYZ(_state.DoorNormal.X, _state.DoorNormal.Y, 0).Normalize();
+                if ((door - start).DotProduct(normal) < 0) normal = -normal;
+                double standOff = _envelope.Size.GetLength() / 2 + _envelope.Margin + 300 / 304.8;
+                var before = door - normal * standOff;
+                var after = door + normal * standOff;
+                _status.Text = "Recherche automatique du passage et des virages… (jusqu’à 40 s de recherche après lecture de la géométrie)";
+                Dispatcher.Invoke(System.Windows.Threading.DispatcherPriority.Render, new Action(() => { }));
+                using (new WaitCursor())
+                using (var geometry = new MotorRouteGeometry(_doc, _pump, _envelope, after, padding, _state.DoorId, _state.DoorLinkId, before, Progress, _state.AllowIntermediateDoors))
+                {
+                    var portals = geometry.Portals.ToList();
+                    double horizontalRadius = _envelope.Corners(0, true).Max(p => Math.Sqrt((p.X - start.X) * (p.X - start.X) + (p.Y - start.Y) * (p.Y - start.Y)));
+                    var gates = portals.Select(p => new MotorRouteGate((p.Origin.X - start.X) / step, (p.Origin.Y - start.Y) / step,
+                        p.Normal.X, p.Normal.Y, (horizontalRadius + Math.Max(300 / 304.8, p.Depth / 2 + 50 / 304.8)) / step, p.Target)).ToList();
+                    if (!gates.Any(g => g.Target))
+                        gates.Add(new MotorRouteGate((door.X - start.X) / step, (door.Y - start.Y) / step, normal.X, normal.Y, standOff / step, true));
+                    // Keep the regular orientations and also align with each actual
+                    // opening, so a rotated narrow door is not lost to a 22.5° step.
+                    var angles = Enumerable.Range(0, 16).Select(i => i * Math.PI / 8).ToList();
+                    double initialAngle = Math.Atan2(_envelope.Frame.BasisX.Y, _envelope.Frame.BasisX.X);
+                    foreach (var p in portals)
+                    for (int quarter = 0; quarter < 4; quarter++)
+                    {
+                        double yaw = (Math.Atan2(p.WidthAxis.Y, p.WidthAxis.X) - initialAngle + quarter * Math.PI / 2) % (2 * Math.PI);
+                        if (yaw < 0) yaw += 2 * Math.PI;
+                        if (!angles.Any(a => Math.Abs(MotorRouteGeometry.AngleDelta(a, yaw)) < 1e-7)) angles.Add(yaw);
+                    }
+                    angles.Sort();
+                    var cache = new Dictionary<(MotorRoutePoint, MotorRoutePoint), bool>();
+                    MotorRoutePose Pose(MotorRoutePoint point) => new MotorRoutePose(start + new XYZ(point.X * step, point.Y * step, 0), angles[point.Heading]);
+                    bool Clear(MotorRoutePoint a, MotorRoutePoint b)
+                    {
+                        if (cache.TryGetValue((a, b), out bool free)) return free;
+                        free = geometry.ClearForSearch(Pose(a), Pose(b)); cache[(a, b)] = free; cache[(b, a)] = free; return free;
+                    }
+                    var result = MotorRouteSearch.FindWithPortals(gates, (int)Math.Floor(padding / step),
+                        Math.Max(0.2, _envelope.Size.GetLength() / 2 * Math.PI / 8 / step), Clear,
+                        progress: n=>Progress("Recherche du chemin : "+n+" positions/orientations explorées…"), headingAngles: angles);
+                    _report = new MotorExtractionReport(); _report.Unknown.AddRange(geometry.Unknown.Distinct());
+                    if (result.Points != null)
+                    {
+                        _route = result.Points.Select(Pose).ToList();
+                        _route=Compact(_route);
+                        for(int i=1;i<_route.Count;i++)
+                        {
+                            Progress("Vérification des solides Revit : mouvement "+i+" / "+(_route.Count-1)+"…");
+                            if(!geometry.Clear(_route[i-1],_route[i]))
+                                throw new InvalidOperationException("Le chemin candidat échoue au contrôle précis : "+geometry.LastObstacle+". Aucun trajet validé. Réduisez le pas de recherche.");
+                        }
+                        double length = Enumerable.Range(1, _route.Count - 1).Sum(i => (_route[i].Center - _route[i - 1].Center).GetLength());
+                        int turns = Enumerable.Range(1, _route.Count - 1).Count(i => Math.Abs(MotorRouteGeometry.AngleDelta(_route[i - 1].Yaw, _route[i].Yaw)) > 1e-6);
+                        _status.Text = "Chemin vérifié en "+elapsed.Elapsed.TotalSeconds.ToString("0.0")+" s : " + (length * 0.3048).ToString("0.0") + " m · " + turns + " rotation(s).\n"
+                            + "Passage testé jusqu’au-delà de la porte. Utilisez le curseur ou la lecture pour voir le moteur avancer et tourner.\n";
+                    }
+                    else _status.Text = result.Message + "\n" + (result.Visited <= 1 && geometry.LastObstacle != null ? "Obstacle : " + geometry.LastObstacle + "\n" : "");
+                    _status.Text += result.Visited + " positions/orientations explorées."
+                        + (_report.Unknown.Count==0 ? "" : "\nContrôle incomplet : "+_report.Unknown.Count+" anomalie(s), voir les détails.");
+                    _details.Text=string.Join("\n", geometry.Assumptions)
+                        + (_state.DoorWidth <= 0 || _state.DoorHeight <= 0 ? "\nDimensions nominales de la porte non disponibles : contrôle limité à la géométrie des murs." : "\nLargeur et hauteur nominales de la porte contrôlées, sans déduction des jeux du dormant.")
+                        + (_report.Unknown.Count == 0 ? "" : "\nContrôle incomplet : " + _report.Unknown.Count + " anomalie(s).\n" + string.Join("\n", _report.Unknown.Take(4)));
+                    _position.Value = 0;
+                    if (_route == null) _report = null;
+                    Draw();
+                    if(_route!=null) _timer.Start();
+                }
+            }
+            catch(OperationCanceledException) {_route=null;_report=null;_status.Text="Recherche annulée : aucun trajet validé.";Draw();}
+            catch (Exception ex) { _lastError=ex.ToString(); _route = null; _report = null; _status.Text = "Recherche impossible : " + ex.Message; Draw(); }
+            finally {_running=false;_settings.IsEnabled=true;_cancel.Visibility=System.Windows.Visibility.Collapsed;}
+        }
+        private void Progress(string message)
+        {
+            _status.Text=message; _details.Text="";
+            var frame=new DispatcherFrame();
+            Dispatcher.BeginInvoke(DispatcherPriority.Background,new Action(()=>frame.Continue=false));
+            Dispatcher.PushFrame(frame);
+            if(_cancelRequested) throw new OperationCanceledException();
+        }
+        private static List<MotorRoutePose> Compact(IList<MotorRoutePose> route)
+        {
+            var result=new List<MotorRoutePose>();
+            foreach(var pose in route)
+            {
+                if(result.Count>1)
+                {
+                    var a=result[result.Count-2];var b=result[result.Count-1];
+                    var first=b.Center-a.Center;var next=pose.Center-b.Center;
+                    if(first.GetLength()>1e-8&&next.GetLength()>1e-8 && Math.Abs(MotorRouteGeometry.AngleDelta(a.Yaw,b.Yaw))<1e-8
+                        &&Math.Abs(MotorRouteGeometry.AngleDelta(b.Yaw,pose.Yaw))<1e-8
+                        &&first.Normalize().DotProduct(next.Normalize())>1-1e-8) result.RemoveAt(result.Count-1);
+                }
+                result.Add(pose);
+            }
+            return result;
         }
         private sealed class WaitCursor : IDisposable
         {

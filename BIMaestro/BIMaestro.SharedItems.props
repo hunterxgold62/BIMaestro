@@ -275,6 +275,25 @@
     <Compile Include="commands\MEP Booster\MepBoosterWindow.cs" />
     <Compile Include="commands\MEP Booster\MepMotorExtraction.cs" />
     <Compile Include="commands\MEP Booster\MotorSweepMath.cs" />
+    <Compile Include="commands\MEP Booster\MotorRouteSearch.cs" />
+    <Compile Include="commands\MEP Booster\MotorRouteGeometry.cs" />
+    <Compile Include="commands\MEP Booster\MotorExtractionProfile.cs" />
+    <Compile Include="commands\MEP Booster\MotorMeshCollision.cs" />
+    <Compile Include="commands\MEP Booster\MotorDoorPortal.cs" />
+    <Compile Include="commands\MEP Booster\MaintenanceWorkbench.cs" />
+    <Compile Include="commands\MEP Booster\MaintenanceAutoconfiguration.cs" />
+    <Compile Include="commands\MEP Booster\MaintenanceCorrectionMemory.cs" />
+    <Compile Include="commands\MEP Booster\MaintenanceCorrectionData.cs" />
+    <Compile Include="commands\MEP Booster\MaintenanceDemonstration.cs" />
+    <Compile Include="commands\MEP Booster\MaintenanceFeatureRecognition.cs" />
+    <Compile Include="commands\MEP Booster\MaintenanceFeatureDetection.cs" />
+    <Compile Include="commands\MEP Booster\MaintenanceOperatorPlacement.cs" />
+    <Compile Include="commands\MEP Booster\MaintenancePlacementMath.cs" />
+    <Compile Include="commands\MEP Booster\MaintenancePreview.cs" />
+    <Compile Include="commands\MEP Booster\MaintenanceAccessModels.cs" />
+    <Compile Include="commands\MEP Booster\MaintenanceAccessMath.cs" />
+    <Compile Include="commands\MEP Booster\MaintenanceAccessGeometry.cs" />
+    <Compile Include="commands\MEP Booster\MaintenanceAccessScanner.cs" />
     <Compile Include="Controls\SimpleColorPicker.xaml.cs">
       <DependentUpon>SimpleColorPicker.xaml</DependentUpon>
     </Compile>
@@ -426,8 +445,18 @@
     <Compile Include="commands\qui est le coupable\ElementHistoryAudit.cs" />
     <Compile Include="commands\qui est le coupable\ElementHistoryReconstruction.cs" />
     <Compile Include="commands\qui est le coupable\ElementHistoryReconstruction.Extended.cs" />
+    <Compile Include="commands\qui est le coupable\ElementHistoryReconstruction.NativeMetadata.cs" />
     <Compile Include="commands\qui est le coupable\ElementHistoryNativeArchive.cs" />
+    <Compile Include="commands\qui est le coupable\ElementHistoryNativeArchive.Definitions.cs" />
+    <Compile Include="commands\qui est le coupable\ElementHistoryOpeningArchive.cs" />
+    <Compile Include="commands\qui est le coupable\ElementHistoryDurableStore.cs" />
+    <Compile Include="commands\qui est le coupable\ElementHistoryDurableBridge.cs" />
+    <Compile Include="commands\qui est le coupable\ElementHistoryDurableBridge.Readiness.cs" />
+    <Compile Include="commands\qui est le coupable\ElementHistoryDurableBridge.Direct.cs" />
+    <Compile Include="commands\qui est le coupable\ElementHistoryDefinitionRevisions.cs" />
+    <Compile Include="commands\qui est le coupable\ElementHistoryNativeArchive.Durable.cs" />
     <Compile Include="commands\qui est le coupable\ElementHistoryNetwork.cs" />
+    <Compile Include="commands\qui est le coupable\ElementHistoryNetwork.Guard.cs" />
     <Compile Include="commands\qui est le coupable\ElementHistoryRelations.cs" />
     <Compile Include="commands\qui est le coupable\ElementHistoryRestoration.cs" />
     <Compile Include="commands\qui est le coupable\information au survol d%27un objet\LatestElementHistoryIndex.cs" />
@@ -1117,6 +1146,10 @@
     <EmbeddedResource Include="Resources\Information %282%29.png" />
     <EmbeddedResource Include="Resources\Purge famille2.png" />
     <EmbeddedResource Include="Resources\Famille.png" />
+    <EmbeddedResource Include="Resources\FamilyBrowser.png" />
+    <EmbeddedResource Include="Resources\FamilyRadialMenu.png" />
+    <EmbeddedResource Include="Resources\HomeAppearance.png" />
+    <EmbeddedResource Include="Resources\PropertiesAppearance.png" />
     <EmbeddedResource Include="Resources\Auto réservation.png" />
     <EmbeddedResource Include="Resources\paramétre.png" />
     <EmbeddedResource Include="Resources\Purge famille.png" />

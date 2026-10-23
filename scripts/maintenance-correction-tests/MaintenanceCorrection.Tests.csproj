@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net9.0</TargetFramework><OutputType>Exe</OutputType><LangVersion>9.0</LangVersion><EnableDefaultCompileItems>false</EnableDefaultCompileItems><NoWarn>0649</NoWarn></PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Newtonsoft.Json"><HintPath>../../packages/Newtonsoft.Json.13.0.3/lib/net6.0/Newtonsoft.Json.dll</HintPath></Reference>
+    <Compile Include="Program.cs" /><Compile Include="RevitDoubles.cs" /><Compile Include="CommonStubs.cs" />
+    <Compile Include="../../BIMaestro/commands/MEP Booster/MaintenanceAccessModels.cs" Link="MaintenanceAccessModels.cs" />
+    <Compile Include="../../BIMaestro/commands/MEP Booster/MaintenanceCorrectionData.cs" Link="MaintenanceCorrectionData.cs" />
+    <Compile Include="../../BIMaestro/commands/MEP Booster/MaintenanceCorrectionMemory.cs" Link="MaintenanceCorrectionMemory.cs" />
+  </ItemGroup>
+</Project>

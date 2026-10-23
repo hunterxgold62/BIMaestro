@@ -20,7 +20,9 @@ class Verify {
   Check(s.Resolve(cat.Key,type.Key,"g","p",true).Text=="#FFFFFF","empty dark variants inherit broader rule");
   Check(AppearancePreferences.Normalize(" É tendues ")=="ETENDUES","accent insensitive native label matching");
   var colors=new PaletteColors{Text="#FFFFFF",Background="#FFFFFF"};
-  Check(AppearancePreferences.Contrast(AppearancePreferences.ReadableText(colors,false),Colors.White)>=4.5,"unreadable text corrected");
+  Check(AppearancePreferences.ReadableText(colors,false)==Colors.White,"explicit text color matches the picker");
+  colors.Text=null;
+  Check(AppearancePreferences.Contrast(AppearancePreferences.ReadableText(colors,false),Colors.White)>=4.5,"automatic text color remains readable");
   type.Rules.Clear();s=AppearanceStore.SaveMany(new[]{type},false);
   Check(s.Profiles.Count==2&&!s.Enabled,"reset scope preserves other profiles and disables");
   Check(!Directory.GetFiles(Path.GetDirectoryName(AppearanceStore.FilePath),"*.tmp").Any(),"atomic save leaves no temporary file");

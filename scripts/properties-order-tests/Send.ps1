@@ -5,7 +5,9 @@ $out=Join-Path $repo "tmp/properties-order-tests/$Run"
 $control=Join-Path $out 'control.txt'
 if(Test-Path -LiteralPath $control){throw 'Previous command still pending'}
 $started=[DateTime]::UtcNow
-[IO.File]::WriteAllText($control,$Command)
+$pending=Join-Path $out ('control-'+[guid]::NewGuid().ToString('N')+'.pending')
+[IO.File]::WriteAllText($pending,$Command)
+[IO.File]::Move($pending,$control)
 $report=Join-Path $out "report-$Command.json"
 for($attempt=0;$attempt -lt 120;$attempt++){
  Start-Sleep -Milliseconds 200

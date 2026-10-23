@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <LangVersion>9.0</LangVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="../GeometryTestDoubles.cs" Link="GeometryTestDoubles.cs" />
+    <Compile Include="../FeatureRecognitionTests.cs" Link="FeatureRecognitionTests.cs" />
+    <Compile Include="../../../BIMaestro/commands/MEP Booster/MaintenanceAccessModels.cs" Link="MaintenanceAccessModels.cs" />
+    <Compile Include="../../../BIMaestro/commands/MEP Booster/MaintenanceFeatureRecognition.cs" Link="MaintenanceFeatureRecognition.cs" />
+    <Content Include="../fixtures/filter-1014886.json" Link="fixtures/filter-1014886.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../fixtures/chain-1045267.json" Link="fixtures/chain-1045267.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../fixtures/lever-1016925.json" Link="fixtures/lever-1016925.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

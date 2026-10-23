@@ -1,4 +1,4 @@
-﻿# Apparence des propriétés
+# Apparence des propriétés
 
 Bouton **BIMaestro → Couleur et information → Apparence propriétés**.
 
@@ -6,7 +6,7 @@ Sélectionner une vue ou un seul élément, ouvrir le bouton, puis choisir la po
 
 **Tester en direct dans Revit** est temporaire ; fermer l'annule. **Enregistrer mon affichage** conserve les règles dans `%APPDATA%/BIMaestro/PropertiesAppearance.json`. Décocher l'activation et enregistrer restaure le dessin natif sans effacer les règles. Vider un profil ne retire pas les profils plus généraux. Un profil type utilise catégorie + famille/type (ou ViewType pour une vue), et s'applique donc aux mêmes noms dans les autres projets ; il ne cible pas une instance unique.
 
-Le dessin réversible suit les identités et rectangles des vraies cellules natives. Aucun paramètre du modèle n'est écrit. Les champs en lecture seule, paramètres homonymes ambigus et éditeurs actifs gardent leur rendu Revit. La couleur du texte peut être corrigée pour maintenir un contraste de 4,5. Les réglages prioritaires sont ceux du type, puis de la catégorie, puis généraux ; dans une même portée, un paramètre prime sur son groupe. Une variante vide hérite du profil plus général.
+Le dessin réversible suit les identités et rectangles des vraies cellules natives. Aucun paramètre du modèle n'est écrit. Les champs en lecture seule, paramètres homonymes ambigus et éditeurs actifs gardent leur rendu Revit. Sans couleur de texte explicite, le texte reste noir ; une couleur choisie dans le sélecteur est conservée. Les réglages prioritaires sont ceux du type, puis de la catégorie, puis généraux ; dans une même portée, un paramètre prime sur son groupe. Une variante vide hérite du profil plus général.
 
 ## Validation du 20 octobre 2026
 
@@ -23,9 +23,11 @@ Les captures dans `evidence/` sont de vraies captures Revit. Le petit complémen
 
 Ces tests lient le modèle de préférences de production et utilisent un fichier temporaire isolé. Ils couvrent la priorité des portées, l'héritage des variantes, le contraste, la fusion de sauvegardes entre sessions, le retrait d'un profil et la conservation d'un fichier corrompu.
 
+La [passe de régression du 22 octobre](../appearance-regression-tests/README.md) ajoute les contrôles de restauration interrompue, de reconstruction de grille, de survol asynchrone et de conservation des valeurs visuelles de Revit.
+
 ## Éditeur visuel, ordre et réinitialisation
 
-L’éditeur compare le rendu d’origine à votre aperçu. Un clic sur le titre d’un groupe replie ou déplie ses paramètres ; une recherche révèle temporairement les correspondances. Les poignées déplacent les groupes entiers ou les paramètres dans leur groupe d’origine dans l’aperçu. Les ordres sont enregistrés, mais **leur application à la palette native est suspendue** : les essais MoveRows conservent les cellules visuelles, mais un clic peut déclencher une reconstruction des lignes par Revit. La validation de l’édition native après déplacement n’est donc pas acquise. Les déplacements entre groupes restent désactivés.
+L’éditeur compare le rendu d’origine à votre aperçu. Un clic sur le titre d’un groupe replie ou déplie ses paramètres ; une recherche révèle temporairement les correspondances. Les poignées déplacent les groupes entiers ou les paramètres dans leur groupe d’origine. L’application native est autorisée pour les murs et les vues en Revit 2023 à 2027, sous réserve de vérifier la correspondance native des champs avant et après chaque déplacement. Les autres catégories conservent seulement l’ordre de l’aperçu. Le déplacement d’un groupe de vue 3D, sa restauration et sa réapplication ont été vérifiés dans Revit 2024.3 le 23 octobre ; cela ne qualifie pas tous les éditeurs de vues dans toutes les versions. Les déplacements de paramètres entre groupes restent désactivés.
 
 **Réinitialiser tout…** demande une confirmation dans la fenêtre, puis retire tous les profils, ordres et variantes de couleur et désactive la personnalisation. Les tests utilisent un fichier isolé et ne réinitialisent pas les préférences réelles de l’utilisateur.
 

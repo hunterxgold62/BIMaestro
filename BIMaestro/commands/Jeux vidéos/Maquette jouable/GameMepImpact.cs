@@ -54,7 +54,7 @@ namespace BIMaestro.VideoGames
 
     internal static class GameMepImpactAnalyzer
     {
-        public const string EngineVersion = "mep-topology-2.0.1";
+        public const string EngineVersion = "mep-topology-2.0.4";
         public static string ConnectionLabel(bool arrival, bool outlet) => arrival
             ? (outlet ? "Relié à une arrivée et à un retour" : "Relié à une arrivée")
             : (outlet ? "Relié à un retour uniquement" : "Aucune arrivée ni retour accessible");

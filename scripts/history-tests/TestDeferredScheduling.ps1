@@ -18,9 +18,12 @@ class HistoryPreloadAudit { internal DateTime ScheduledUtc; }
 public static class SchedulerChecks {
     static readonly object SnapshotByElementId = new object();
     static readonly HashSet<string> PrimedDocumentKeys = new HashSet<string>();
+    static readonly Dictionary<Document,HashSet<string>> DocumentCaptureKeys = new Dictionary<Document,HashSet<string>>();
     static readonly Dictionary<string,DeferredPrimeState> DeferredPrimeByDocumentKey = new Dictionary<string,DeferredPrimeState>();
     static readonly Dictionary<string,HistoryPreloadAudit> PreloadAuditByDocumentKey = new Dictionary<string,HistoryPreloadAudit>();
     static readonly TimeSpan DeferredPrimeDelay = TimeSpan.FromSeconds(1);
+    // Identity resolution is a dependency double; this fixture exercises scheduling, not Revit wrapper identity.
+    static bool TryDocumentValue<T>(Dictionary<Document,T> values, Document doc, out T value) => values.TryGetValue(doc, out value);
     static bool ShouldScheduleDeferredPrime(Document doc) => doc != null;
     static string GetDocumentKey(Document doc) => doc.Key;
 '@

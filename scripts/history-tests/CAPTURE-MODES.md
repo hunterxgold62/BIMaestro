@@ -1,4 +1,4 @@
-# Modes de préparation des suppressions — 19 octobre 2026
+# Modes de préparation des suppressions — 22 octobre 2026
 
 Les deux contrôles existants Léger / Détaillé gouvernent maintenant aussi les
 recettes de restauration, et plus seulement le maillage d'aperçu. La préférence
@@ -18,7 +18,7 @@ une capture ciblée immédiate avant leur suppression programmée.
 | Portes, fenêtres, familles à placement pris en charge | Équipements CVC, végétation |
 | Tronçons de tuyaux, gaines, conduits et chemins de câbles | Terrains, topographies, imports, DirectShape |
 | Courbes de modèle et paramètres | Systèmes MEP/électriques complets, connexions et relations géométriques |
-| Aucun repli automatique vers une copie native | Objets sans recette directe nécessitant une archive native |
+| Copie fichier d'ouverture pour les objets enregistrés et inchangés | Objets nouveaux/modifiés sans recette directe nécessitant une archive native |
 
 Les types déjà mesurés lents (>100 ms de capture de base) sont également réservés
 à la préparation détaillée pendant la session. Un objet inconnu peut encore
@@ -27,18 +27,28 @@ restaurabilité de toutes leurs variantes. Les équipements CVC sont classés de
 façon conservatrice, y compris ceux dont certaines instances seraient rapides.
 
 Le suivi des identités et paramètres reste actif pour les objets complexes en
-léger. Leur boîte englobante et leur recette sont différées. Les captures simples
+léger. Leur boîte englobante et leur recette détaillée sont différées. Une copie
+immuable du fichier RVT est désormais préparée hors du thread Revit à l'ouverture
+d'un projet local enregistré et non modifié. Elle permet une restauration native
+des objets initiaux inchangés, même supprimés avant le premier scan. Cette copie
+de fichier ne lance aucune copie API ni sauvegarde de document Revit en arrière-plan.
+Les objets/types/familles modifiés invalident ce recours pour éviter de restaurer
+une ancienne version comme état avant suppression. Les captures simples
 déjà présentes et les archives prêtes ne sont pas supprimées en changeant de mode.
 Les compléments restent en file en léger et reprennent en détaillé. Les objets
 nouveaux/modifiés sont également remis en file. Une suppression avant capture
 reste possible et peut ne pas être restaurable.
 
-Priorités : sélection, vue active, autres éléments. Les captures simples de
+Priorités : sélection, catégories prioritaires, autres éléments. Les captures simples de
 sélection continuent immédiatement par petits lots. Les objets complexes et les
 copies natives attendent l'inactivité même lorsqu'ils sont sélectionnés. Les
 terrains sont de nouveau admissibles en détaillé ; ceci remplace leur exclusion
-automatique du 13 octobre. Le budget inactif reste 500 ms / 100 candidats avec
-une seconde de pause, contrôlé entre éléments, sans interruption d'un appel API.
+automatique du 13 octobre. Le scan léger vise 20 ms / 100 candidats avec
+50 ms de pause ; au premier plan il attend 150 ms sans entrée et peut continuer
+hors de Revit. Le catalogue initial dispose de son propre passage et ne collecte
+plus les éléments visibles de la vue. Les archives/enrichissements conservent
+le délai d'inactivité au premier plan. Le budget est contrôlé entre éléments,
+sans interruption d'un appel API.
 Les appels lourds restent sur le thread Revit et peuvent dépasser ce budget.
 
 ## Mesures du Mans

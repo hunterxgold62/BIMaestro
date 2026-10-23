@@ -15,12 +15,13 @@ namespace BIMaestro.PropertiesAppearance
             internal string Label, Value, Marker;
             internal long? Id;
             internal bool Editable;
+            internal int Height = 24;
             internal Row Copy() => (Row)MemberwiseClone();
         }
         internal IntPtr Window = new IntPtr(10), Core = new IntPtr(20);
         internal List<Row> Rows, Baseline;
         internal bool IsEditing, FreezeMapping, CorruptPayload;
-        internal int Moves;
+        internal int Moves, FailOnMove, DrawingScopes, DrawingDepth;
         internal uint RowCount => (uint)Rows.Count;
         internal static bool IsGroupMarker(string value) => (value ?? "").Trim() == "^" || (value ?? "").Trim() == "v";
         internal bool IsGroupHeader(uint row) => IsGroupMarker(Rows[(int)row - 1].Marker);
@@ -30,6 +31,8 @@ namespace BIMaestro.PropertiesAppearance
             return col == 1 ? item.Label : col == 2 ? item.Value : item.Marker;
         }
         internal bool CanStyle(uint row) => Rows[(int)row - 1].Editable;
+        internal struct Rect { internal int Top, Bottom; }
+        internal Rect Bounds(uint row, uint column) => new Rect { Bottom=Rows[(int)row - 1].Height };
         internal int FindParameterRow(long id)
         {
             var rows = FreezeMapping ? Baseline : Rows;
@@ -39,14 +42,22 @@ namespace BIMaestro.PropertiesAppearance
         internal bool MoveRows(uint first, uint last, uint destination)
         {
             if (IsEditing) throw new Exception("An active editor must never receive MoveRows.");
+            if (DrawingDepth == 0) throw new Exception("A partial permutation must not be painted.");
             Moves++;
             int start = (int)first - 1, count = (int)(last - first + 1);
             var block = Rows.GetRange(start, count); Rows.RemoveRange(start, count);
             Rows.InsertRange((int)destination - 1, block);
             if (CorruptPayload) Rows[0].Value = "CORRUPTED";
-            return true;
+            return Moves != FailOnMove;
         }
         internal void Redraw() { }
+        private sealed class DrawingScope : IDisposable
+        {
+            private readonly NativePropertiesGrid _grid;
+            internal DrawingScope(NativePropertiesGrid grid) { _grid=grid; grid.DrawingDepth++; grid.DrawingScopes++; }
+            public void Dispose() { _grid.DrawingDepth--; }
+        }
+        internal IDisposable DeferDrawing() => new DrawingScope(this);
     }
     internal sealed class PropertyTarget
     {
@@ -106,7 +117,7 @@ internal static class Program
             new NativePropertiesGrid.Row { Label="Constraints", Value="", Marker="^ " },
             new NativePropertiesGrid.Row { Label="  Offset", Value="1.200", Marker="Associate global parameter", Id=11, Editable=true },
             new NativePropertiesGrid.Row { Label="  Comment", Value="wall-A", Marker="", Id=12, Editable=true },
-            new NativePropertiesGrid.Row { Label="", Value="", Marker="" },
+            new NativePropertiesGrid.Row { Label="", Value="", Marker="", Height=0 },
             new NativePropertiesGrid.Row { Label="Phase", Value="", Marker="^ " },
             new NativePropertiesGrid.Row { Label="  Created", Value="New construction", Marker="", Id=21, Editable=true },
             new NativePropertiesGrid.Row { Label="  Demolished", Value="None", Marker="", Id=22, Editable=true }
@@ -180,6 +191,44 @@ internal static class Program
         Apply(f); Check(f.Grid.Moves>moves && f.Grid.Rows[0].Label=="Phase", "Native reconstruction did not reapply the saved order.");
         f.Grid.Rows=f.Grid.Baseline.Select(r=>r.Copy()).ToList(); f.Grid.Core=new IntPtr(21);
         Apply(f); Reset(f); Check(Cells(f.Grid)==f.Original, "New native grid instance retained stale permutation tokens.");
+    }
+    private static void LastRowFiller()
+    {
+        var f=Create(); var filler=new NativePropertiesGrid.Row {Label="",Value="",Marker=""};
+        f.Grid.Rows.Add(filler); f.Grid.Baseline=f.Grid.Rows.Select(r=>r.Copy()).ToList();
+        string original=Cells(f.Grid);
+        Apply(f);
+        Check(ReferenceEquals(f.Grid.Rows.Last(),filler), "The visible grid filler followed the last group to the top.");
+        Check(f.Grid.Rows[3].Label=="Constraints", "A trailing filler created an empty row between moved groups.");
+        int scopes=f.Grid.DrawingScopes; Apply(f);
+        Check(f.Grid.DrawingScopes==scopes && f.Grid.DrawingDepth==0, "An unchanged layout restarted drawing or leaked a drawing lock.");
+        Reset(f); Check(Cells(f.Grid)==original, "Restoration lost the terminal filler.");
+    }
+    private static void ReplacedCoreRetainsOriginalOrder()
+    {
+        var f=Create(); Apply(f);
+        f.Grid.Core=new IntPtr(21); // Revit recreates the control around already ordered rows.
+        Apply(f); Reset(f);
+        Check(Cells(f.Grid)==f.Original, "A new native core adopted the custom order as its original baseline.");
+    }
+    private static void ExistingMiddleFiller()
+    {
+        var f=Create(); var filler=new NativePropertiesGrid.Row {Label="",Value="",Marker="",Height=24};
+        f.Grid.Rows.Insert(4,filler); f.Grid.Baseline=f.Grid.Rows.Select(r=>r.Copy()).ToList();
+        Apply(f);
+        Check(ReferenceEquals(f.Grid.Rows.Last(),filler), "An already displaced filler was retained inside the reordered palette.");
+    }
+    private static void InterruptedRollback()
+    {
+        var f=Create();
+        f.Preferences.Profiles[0].Layout.Groups.Clear();
+        var target=f.Context.Parameters.Single(p=>p.NativeParameterId==22);
+        f.Context.Parameters.Remove(target); f.Context.ParameterMap.Remove(target.GroupKey+"|"+target.NativeName);
+        f.Preferences.Profiles[0].Layout.Parameters["phase"]=new List<string> {
+            new PropertyPreviewRow { GroupKey="phase", Label="  Demolished" }.OrderKey };
+        f.Grid.FailOnMove=2; // Native rollback changes rows, then reports failure.
+        Check(Throws(()=>Apply(f)), "An interrupted rollback did not report failure.");
+        Check(PropertiesPaletteLayout.RequiresNativeRebuild, "An interrupted rollback left uncertain row indices available for editing.");
     }
     private static void CollapsedMarker()
     {
@@ -256,6 +305,21 @@ internal static class Program
                 "An unqualified version/category moved native rows: "+input.Version+"/"+input.Category);
         }
     }
+    private static void QualifiedViewVersions()
+    {
+        foreach(string version in new[]{"2023","2024","2025","2026","2027"})
+        {
+            PropertiesPaletteLayout.Forget(); var f=Create();
+            f.Context.CategoryKey="cat:-2000279";
+            f.Context.TypeKey="cat:-2000279/type:ThreeD";
+            // The screenshot moves a whole group ahead of Graphismes.
+            f.Preferences.Profiles[0].Layout.Parameters.Clear();
+            Apply(f,version);
+            Check(PropertiesPaletteLayout.HasApplied && f.Grid.Rows[0].Label=="Phase",
+                "A view group remained preview-only: "+version);
+            Reset(f); Check(Cells(f.Grid)==f.Original, "A view group did not restore its original order.");
+        }
+    }
     private static void QualificationAfterAppliedWall()
     {
         foreach(string category in new[]{"cat:-2000020","all",null})
@@ -276,6 +340,7 @@ internal static class Program
 #if PRODUCTION_QUALIFICATION_TESTS
         var cases=new (string Name, Action Run)[] {
             ("production qualified walls 2023-2027 move and restore",QualifiedWallVersions),
+            ("production 3D view groups 2023-2027 move and restore",QualifiedViewVersions),
             ("production unqualified versions and categories never move",UnqualifiedContexts),
             ("previously applied wall never bypasses production category qualification",QualificationAfterAppliedWall)
         };
@@ -287,6 +352,10 @@ internal static class Program
             ("unverified field discovered later rolls back earlier movements",MissingIdentityAfterPartialMove),
             ("active editor postpones movement",Editing),
             ("native reconstruction and replacement instance",Rebuild),
+            ("terminal native filler stays below every group",LastRowFiller),
+            ("replacement core preserves the original native baseline",ReplacedCoreRetainsOriginalOrder),
+            ("previously displaced visible filler returns to the bottom",ExistingMiddleFiller),
+            ("interrupted rollback requires native reconstruction",InterruptedRollback),
             ("collapse marker preserves original baseline",CollapsedMarker),
             ("empty identity set is rejected",NoIdentity),
             ("transient capture is atomic and recovers on the next refresh",TransientCapture),
