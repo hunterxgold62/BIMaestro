@@ -14,13 +14,13 @@ namespace Analyse
         public static string LastSaveError { get; private set; }
         public static SmartScanOptions LoadPreferences()
         {
-            try { var file = Path.Combine(StoreFolder, "clash3d_options.json");
+            try { var file = global::BIMaestro.Storage.PreferenceStorage.FilePath("SmartCheck", "clash3d_options.json");
                 return File.Exists(file) ? JsonConvert.DeserializeObject<SmartScanOptions>(File.ReadAllText(file)) : null; }
             catch { return null; }
         }
         public static void SavePreferences(SmartScanOptions options)
         {
-            try { Directory.CreateDirectory(StoreFolder); AtomicWrite(Path.Combine(StoreFolder, "clash3d_options.json"), JsonConvert.SerializeObject(options)); }
+            try { var file = global::BIMaestro.Storage.PreferenceStorage.FilePath("SmartCheck", "clash3d_options.json"); AtomicWrite(file, JsonConvert.SerializeObject(options)); }
             catch { /* Analysis is usable even when preferences cannot be persisted. */ }
         }
         private static readonly object Sync = new object();
@@ -29,8 +29,7 @@ namespace Analyse
         private static readonly Dictionary<string, Dictionary<string, IssueStatusRecord>> StatusByDoc =
             new Dictionary<string, Dictionary<string, IssueStatusRecord>>(StringComparer.OrdinalIgnoreCase);
 
-        private static readonly string StoreFolder = Path.Combine(
-            global::BIMaestro.Storage.UserDataStorage.Root, "SauvegardePréférence");
+        private static readonly string StoreFolder = global::BIMaestro.Storage.PreferenceStorage.Folder("SmartCheck");
 
         private static readonly string StorePath = Path.Combine(StoreFolder, "smartcheck_ignored.json");
         private static readonly string StatusStorePath = Path.Combine(StoreFolder, "smartcheck_status.json");

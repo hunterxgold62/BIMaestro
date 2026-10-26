@@ -14,6 +14,18 @@ namespace Analyse
         protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
             var ui = data.Application;
+            var referencedApi = System.Linq.Enumerable.FirstOrDefault(
+                typeof(SmartClashCommand).Assembly.GetReferencedAssemblies(), reference => reference.Name == "RevitAPI");
+            int runningApi = typeof(Document).Assembly.GetName().Version.Major;
+            if (runningApi >= 25 && referencedApi?.Version.Major != runningApi)
+            {
+                TaskDialog.Show("Clash 3D — installation incompatible",
+                    "Cette DLL BIMaestro a été compilée pour Revit " +
+                    (referencedApi == null ? "inconnu" : (2000 + referencedApi.Version.Major).ToString()) +
+                    ". La session utilise Revit " + (2000 + runningApi) +
+                    ". Installe la version BIMaestro adaptée, puis redémarre Revit avant de lancer l’analyse.");
+                return Result.Cancelled;
+            }
             if (ui.ActiveUIDocument == null || ui.ActiveUIDocument.Document.IsFamilyDocument)
             {
                 TaskDialog.Show("Clash 3D", "Ouvrez une maquette de projet pour analyser les conflits.");

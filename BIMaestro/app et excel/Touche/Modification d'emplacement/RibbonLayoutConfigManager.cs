@@ -46,7 +46,7 @@ namespace BIMaestro.RibbonLayout
 
         public static string GetConfigPath()
         {
-            var dir = Path.Combine(global::BIMaestro.Storage.UserDataStorage.Root, "SauvegardePréférence");
+            var dir = global::BIMaestro.Storage.PreferenceStorage.Folder("Option");
             Directory.CreateDirectory(dir);
             return Path.Combine(dir, ConfigFileName);
         }

@@ -1,0 +1,15 @@
+{
+  "Revit": "2027",
+  "Runtime": "net10",
+  "Source": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\BIMaestro\\bin\\ClashVerified2027",
+  "Destination": "C:\\Users\\plemert\\AppData\\Local\\BIMaestro\\Bin\\Revit2027-Clash3D-125238754753",
+  "Manifest": "C:\\Users\\plemert\\AppData\\Roaming\\Autodesk\\Revit\\Addins\\2027\\BIMaestro.addin",
+  "PreviousAssembly": "C:\\Users\\plemert\\AppData\\Local\\BIMaestro\\Bin\\BIMaestro.dll",
+  "Assembly": "C:\\Users\\plemert\\AppData\\Local\\BIMaestro\\Bin\\Revit2027-Clash3D-125238754753\\BIMaestro.dll",
+  "Sha256": "125238754753366A26D3F8A5CDC7D6CB79DFE63E750CF3329951C7FAD47036A5",
+  "Files": 260,
+  "Bytes": 173546482.0,
+  "Backup": "C:\\Users\\plemert\\AppData\\Roaming\\Autodesk\\Revit\\Addins\\2027\\BIMaestro.addin.before-clash2027-20261026-182213.bak",
+  "Preview": false
+}
+Installation Revit 2027 mise à jour. Redémarrer Revit pour charger la nouvelle DLL.

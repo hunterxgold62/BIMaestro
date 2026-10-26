@@ -53,9 +53,9 @@ namespace Famille
         private bool _tutorialAwaitingPreviewClose;
         private bool _tutorialRestoreWhenPreviewCompletes;
 
-        private readonly string favoritesFile = Path.Combine(global::BIMaestro.Storage.UserDataStorage.Root, "SauvegardePréférence", "Favorites.txt");
-        private readonly string configFile = Path.Combine(global::BIMaestro.Storage.UserDataStorage.Root, "SauvegardePréférence", "Config.txt");
-        private readonly string pathsFile = Path.Combine(global::BIMaestro.Storage.UserDataStorage.Root, "SauvegardePréférence", "CheminsFamille.json");
+        private readonly string favoritesFile = Path.Combine(global::BIMaestro.Storage.PreferenceStorage.Folder("Navigateur de Familles"), "Favorites.txt");
+        private readonly string configFile = Path.Combine(global::BIMaestro.Storage.PreferenceStorage.Folder("Navigateur de Familles"), "Config.txt");
+        private readonly string pathsFile = Path.Combine(global::BIMaestro.Storage.PreferenceStorage.Folder("Navigateur de Familles"), "CheminsFamille.json");
         private readonly string workFolder = Path.Combine(global::BIMaestro.Storage.UserDataStorage.Root, "FamilleRevit");
         private static readonly TimeSpan NewFamilyAge = TimeSpan.FromDays(14);
         private static readonly TimeSpan UpdatedFamilyAge = TimeSpan.FromDays(14);

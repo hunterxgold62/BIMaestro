@@ -8,8 +8,7 @@ namespace Famille
     public static class FamilyUsageManager
     {
         // Chemin du JSON d’usage
-        private static readonly string UsageFile = Path.Combine(
-            global::BIMaestro.Storage.UserDataStorage.Root, "SauvegardePréférence", "FamilyUsage.json");
+        private static readonly string UsageFile = Path.Combine(global::BIMaestro.Storage.PreferenceStorage.Folder("Navigateur de Familles"), "FamilyUsage.json");
 
         // Lit ou renvoie un dictionnaire vide
         public static Dictionary<string, int> Load()

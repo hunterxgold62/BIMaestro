@@ -1,0 +1,52 @@
+[
+  {
+    "revit": 2023,
+    "tests": 57,
+    "failures": 0,
+    "clean_shutdown": true,
+    "proof": "tmp\\codex-native-validation\\2023-clash-matrix-20261026-r2\\result.json",
+    "journal": "C:\\Users\\plemert\\AppData\\Local\\Autodesk\\Revit\\Autodesk Revit 2023\\Journals\\journal.3183.txt",
+    "journal_normal_exit": true,
+    "process_exit_code": null
+  },
+  {
+    "revit": 2024,
+    "tests": 57,
+    "failures": 0,
+    "clean_shutdown": true,
+    "proof": "tmp\\codex-native-validation\\2024-clash-matrix-20261026-r4\\result.json",
+    "journal": "C:\\Users\\plemert\\AppData\\Local\\Autodesk\\Revit\\Autodesk Revit 2024\\Journals\\journal.0616.txt",
+    "journal_normal_exit": true,
+    "process_exit_code": 0
+  },
+  {
+    "revit": 2025,
+    "tests": 57,
+    "failures": 0,
+    "clean_shutdown": true,
+    "proof": "tmp\\codex-native-validation\\2025-clash-matrix-20261026-r2\\result.json",
+    "journal": "C:\\Users\\plemert\\AppData\\Local\\Autodesk\\Revit\\Autodesk Revit 2025\\Journals\\journal.1723.txt",
+    "journal_normal_exit": true,
+    "process_exit_code": null
+  },
+  {
+    "revit": 2026,
+    "tests": 57,
+    "failures": 0,
+    "clean_shutdown": true,
+    "proof": "tmp\\codex-native-validation\\2026-clash-matrix-20261026-r2\\result.json",
+    "journal": "C:\\Users\\plemert\\AppData\\Local\\Autodesk\\Revit\\Autodesk Revit 2026\\Journals\\journal.0050.txt",
+    "journal_normal_exit": true,
+    "process_exit_code": null
+  },
+  {
+    "revit": 2027,
+    "tests": 57,
+    "failures": 0,
+    "clean_shutdown": true,
+    "proof": "tmp\\codex-native-validation\\2027-clash-matrix-20261026-r2\\result.json",
+    "journal": "C:\\Users\\plemert\\AppData\\Local\\Autodesk\\Revit\\Autodesk Revit 2027\\Journals\\journal.0017.txt",
+    "journal_normal_exit": true,
+    "process_exit_code": null
+  }
+]

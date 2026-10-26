@@ -16,9 +16,7 @@ namespace Modification
     public static class DynamoSettings
     {
         private const int ButtonCount = 5;
-        private static readonly string ConfigFolder = Path.Combine(
-            global::BIMaestro.Storage.UserDataStorage.Root,
-            "SauvegardePréférence");
+        private static readonly string ConfigFolder = global::BIMaestro.Storage.PreferenceStorage.Folder("Dynamo");
         private static readonly string ConfigFile = Path.Combine(ConfigFolder, "DynamoButtons.json");
         private static readonly string LegacyConfigFile = Path.Combine(ConfigFolder, "DynamoPaths.txt");
         private static readonly string DefaultPath =

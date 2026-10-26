@@ -340,10 +340,7 @@ namespace Analyse
         private const bool IncludeAnnotationCategoriesForFuture = false;
         private const bool DefaultCaptureDetailedDeletedMesh = false;
         private static volatile bool _captureDetailedDeletedMesh = DefaultCaptureDetailedDeletedMesh;
-        private static readonly string DeletedMeshModePreferencePath = Path.Combine(
-            global::BIMaestro.Storage.UserDataStorage.Root,
-            "SauvegardePréférence",
-            "ElementHistoryDeletedMeshMode.json");
+        private static readonly string DeletedMeshModePreferencePath = Path.Combine(global::BIMaestro.Storage.PreferenceStorage.Folder("Qui a fait ça"), "ElementHistoryDeletedMeshMode.json");
         private static readonly string[] ImageExtensions = { ".png", ".jpg", ".jpeg", ".bmp" };
         private static readonly string[] IgnoredTransactionFragments =
         {
@@ -3459,10 +3456,7 @@ namespace Analyse
         {
             try
             {
-                var file = Path.Combine(
-                    global::BIMaestro.Storage.UserDataStorage.Root,
-                    "SauvegardePréférence",
-                    "CheminsFamille.json");
+                var file = Path.Combine(global::BIMaestro.Storage.PreferenceStorage.Folder("Navigateur de Familles"), "CheminsFamille.json");
 
                 if (!File.Exists(file)) return new List<string>();
                 var cfg = JsonConvert.DeserializeObject<FamilyFolderSettings>(File.ReadAllText(file));

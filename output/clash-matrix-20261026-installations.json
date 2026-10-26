@@ -1,0 +1,47 @@
+[
+  {
+    "Revit": 2023,
+    "Dll": "C:\\Users\\plemert\\AppData\\Local\\BIMaestro\\Bin\\BIMaestro.dll",
+    "References": {
+      "mscorlib": "4.0.0.0",
+      "RevitAPIUI": "23.0.0.0",
+      "RevitAPI": "23.0.0.0"
+    }
+  },
+  {
+    "Revit": 2024,
+    "Dll": "C:\\Users\\plemert\\AppData\\Local\\BIMaestro\\Bin\\BIMaestro.dll",
+    "References": {
+      "mscorlib": "4.0.0.0",
+      "RevitAPIUI": "23.0.0.0",
+      "RevitAPI": "23.0.0.0"
+    }
+  },
+  {
+    "Revit": 2025,
+    "Dll": "C:\\Users\\plemert\\AppData\\Local\\BIMaestro\\Bin\\BIMaestro.dll",
+    "References": {
+      "mscorlib": "4.0.0.0",
+      "RevitAPIUI": "23.0.0.0",
+      "RevitAPI": "23.0.0.0"
+    }
+  },
+  {
+    "Revit": 2026,
+    "Dll": "C:\\Users\\plemert\\AppData\\Local\\BIMaestro\\Bin\\Revit2026-Clash3D-8357179DCEBF\\BIMaestro.dll",
+    "References": {
+      "RevitAPIUI": "26.4.10.0",
+      "RevitAPI": "26.4.10.0",
+      "System.Runtime": "8.0.0.0"
+    }
+  },
+  {
+    "Revit": 2027,
+    "Dll": "C:\\Users\\plemert\\AppData\\Local\\BIMaestro\\Bin\\BIMaestro.dll",
+    "References": {
+      "mscorlib": "4.0.0.0",
+      "RevitAPIUI": "23.0.0.0",
+      "RevitAPI": "23.0.0.0"
+    }
+  }
+]

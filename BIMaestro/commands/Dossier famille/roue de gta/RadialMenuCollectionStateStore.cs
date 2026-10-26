@@ -13,8 +13,7 @@ namespace Famille
 
     public static class RadialMenuCollectionStateStore
     {
-        private static readonly string FilePath = Path.Combine(
-            global::BIMaestro.Storage.UserDataStorage.Root, "SauvegardePréférence", "RadialMenuCollectionState.json");
+        private static readonly string FilePath = Path.Combine(global::BIMaestro.Storage.PreferenceStorage.Folder("Rosace familles"), "RadialMenuCollectionState.json");
 
         public static RadialMenuCollectionState Load()
         {

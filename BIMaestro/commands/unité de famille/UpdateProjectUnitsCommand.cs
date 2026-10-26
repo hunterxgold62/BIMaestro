@@ -21,7 +21,7 @@ namespace Famille
             var commandData = data;
             // 1) Chemin du JSON
             string docDir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-            string prefDir = Path.Combine(global::BIMaestro.Storage.UserDataStorage.Root, "SauvegardePréférence");
+            string prefDir = global::BIMaestro.Storage.PreferenceStorage.Folder("Unités");
             string filePath = Path.Combine(prefDir, "RevitUnits.json");
 
             if (!File.Exists(filePath))

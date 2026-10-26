@@ -1,5 +1,17 @@
 # Clash 3D : fonctionnement et validation
 
+La validation du 26 octobre 2026 couvre désormais Revit 2023 à 2027 : **57 scénarios natifs réussis par version, aucun échec sur les passages finaux**. Voir [le compte rendu de compatibilité, les limites et les preuves](COMPATIBILITY-2023-2027.md).
+
+## Diagnostic Revit 2026 du 26 octobre 2026
+
+Le journal utilisateur `journal.0048.txt` signale le chargement de `BIMaestro.dll` avec des références RevitAPI/RevitAPIUI 23 et WPF 4 dans Revit 26.4.10 / .NET 8. Le manifeste 2026 pointait vers la DLL commune `AppData/Local/BIMaestro/Bin/BIMaestro.dll`. Cette installation est incompatible. La commande refuse désormais explicitement une référence API différente de celle de l’hôte pour Revit 2025 et suivants.
+
+Un test natif isolé contre les API Revit 2026, avec une compilation complète nommée distinctement, valide l’analyse progressive de la scène de formation : trois sources et deux intersections confirmées en périmètre Sélection, les mêmes deux intersections en Maquette entière, puis une seule après correction du tuyau transversal. Aucun échec du moteur ; `exited-cleanly.txt` confirme la sortie propre de cette instance. Les preuves et le code du test sont dans `output/clash-2026-diagnostic`. Ce test ne rejoue pas les douze étapes du guide, la réservation et l’export.
+
+La fenêtre différencie maintenant une analyse interrompue d’une absence de conflits ; le bilan conserve l’étape et la pile de l’exception. Le guide ne recommande plus de changer les options lorsqu’une erreur a interrompu le moteur. Le bouton de fin du guide MEP Booster, créé mais absent du panneau visuel, a été ajouté à son panneau.
+
+Pour installer une compilation 2026 adaptée, `InstallRevit2025Fix.ps1` accepte aussi `-RevitVersion 2026` et `-SourceDirectory BIMaestro/bin/TutorialFix2026`. Il vérifie les références API et .NET, conserve une sauvegarde du manifeste et utilise un dossier distinct. Redémarrer Revit après installation.
+
 Clash 3D propose un parcours court : choisir le périmètre, analyser, puis voir les résultats en 3D. Les réglages sont repliés par défaut. La fenêtre de détail rassemble l'explication, les deux objets, l'aperçu et la décision enregistrée avec son commentaire.
 
 ## Périmètre de la refonte

@@ -3,5 +3,6 @@
   <ItemGroup>
     <Compile Include="Program.cs" />
     <Compile Include="../../BIMaestro/app et excel/Supabase/UserDataStorage.cs" />
+    <Compile Include="../../BIMaestro/app et excel/Supabase/PreferenceStorage.cs" />
   </ItemGroup>
 </Project>

@@ -116,6 +116,11 @@ public class BIMaestroApp : IExternalApplication
             if (!string.IsNullOrEmpty(global::BIMaestro.Storage.UserDataStorage.MigrationWarning))
                 TaskDialog.Show("BIMaestro — stockage des données",
                     global::BIMaestro.Storage.UserDataStorage.MigrationWarning);
+            global::BIMaestro.Storage.PreferenceStorage.Initialize(userDataRoot);
+            global::BIMaestro.Storage.PreferenceStorage.Initialize(selectionDataRoot);
+            if (!string.IsNullOrEmpty(global::BIMaestro.Storage.PreferenceStorage.MigrationWarning))
+                TaskDialog.Show("BIMaestro — classement des préférences",
+                    global::BIMaestro.Storage.PreferenceStorage.MigrationWarning);
             UiLanguage.Initialize(application.ControlledApplication.Language.ToString());
 
             // --- WPF BIMaestroApp ---

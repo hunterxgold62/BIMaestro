@@ -158,7 +158,12 @@ namespace Analyse
                     if (_pendingVisuals.Count >= 32) return;
                 } while (slice.ElapsedMilliseconds < milliseconds);
             }
-            catch (Exception ex) { Error = ex.Message; Finish(); }
+            catch (Exception ex)
+            {
+                Error = ex.Message;
+                Diagnostics.Add("Analyse interrompue pendant « " + Stage + " » : " + ex);
+                Finish();
+            }
         }
         private void Finish()
         {

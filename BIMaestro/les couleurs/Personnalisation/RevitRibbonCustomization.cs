@@ -237,10 +237,7 @@ namespace Couleur
         private static NativeRibbonSettings _cachedSettings;
 
         private static string LegacyPreferenceFilePath { get; } =
-            Path.Combine(
-                global::BIMaestro.Storage.UserDataStorage.Root,
-                "SauvegardePréférence",
-                "couleursRubanRevit.json");
+            Path.Combine(global::BIMaestro.Storage.PreferenceStorage.Folder("Option"), "couleursRubanRevit.json");
 
         public static string PreferenceFilePath =>
             RibbonColorPreferences.PreferenceFilePath;

@@ -1,0 +1,57 @@
+[
+  {
+    "Revit": 2023,
+    "Dll": "C:\\Users\\plemert\\AppData\\Local\\BIMaestro\\Bin\\Revit2023-Clash3D-69A9D13E9695\\BIMaestro.dll",
+    "References": {
+      "mscorlib": "4.0.0.0",
+      "RevitAPI": "23.0.0.0",
+      "RevitAPIUI": "23.0.0.0"
+    },
+    "Sha256": "69A9D13E969582D7C8523F62ACA85B7971A6DE3D1D5CAB0789F9582A4726B376",
+    "MatchesBuild": true
+  },
+  {
+    "Revit": 2024,
+    "Dll": "C:\\Users\\plemert\\AppData\\Local\\BIMaestro\\Bin\\Revit2024-Clash3D-F8A0BEFE3F8D\\BIMaestro.dll",
+    "References": {
+      "mscorlib": "4.0.0.0",
+      "RevitAPI": "24.3.40.0",
+      "RevitAPIUI": "24.3.40.0"
+    },
+    "Sha256": "F8A0BEFE3F8DA88BCE0B28CA61494E224E8816AD4601A727543D06F2F93A4F64",
+    "MatchesBuild": true
+  },
+  {
+    "Revit": 2025,
+    "Dll": "C:\\Users\\plemert\\AppData\\Local\\BIMaestro\\Bin\\Revit2025-Clash3D-107ACD3EC59D\\BIMaestro.dll",
+    "References": {
+      "System.Runtime": "8.0.0.0",
+      "RevitAPI": "25.4.40.0",
+      "RevitAPIUI": "25.4.40.0"
+    },
+    "Sha256": "107ACD3EC59DCD27C6B4F683EFF4D5D86B69E24D9C9D7043554706FBD8819625",
+    "MatchesBuild": true
+  },
+  {
+    "Revit": 2026,
+    "Dll": "C:\\Users\\plemert\\AppData\\Local\\BIMaestro\\Bin\\Revit2026-Clash3D-BC388F45C048\\BIMaestro.dll",
+    "References": {
+      "System.Runtime": "8.0.0.0",
+      "RevitAPI": "26.4.10.0",
+      "RevitAPIUI": "26.4.10.0"
+    },
+    "Sha256": "BC388F45C04898C1BA227C1A91116E43A715624300979116AB67EE98ADA3414C",
+    "MatchesBuild": true
+  },
+  {
+    "Revit": 2027,
+    "Dll": "C:\\Users\\plemert\\AppData\\Local\\BIMaestro\\Bin\\Revit2027-Clash3D-125238754753\\BIMaestro.dll",
+    "References": {
+      "System.Runtime": "10.0.0.0",
+      "RevitAPI": "27.0.10.0",
+      "RevitAPIUI": "27.0.10.0"
+    },
+    "Sha256": "125238754753366A26D3F8A5CDC7D6CB79DFE63E750CF3329951C7FAD47036A5",
+    "MatchesBuild": true
+  }
+]

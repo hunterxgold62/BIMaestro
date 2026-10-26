@@ -59,8 +59,7 @@ namespace Couleur
 
     public static class ProjectBrowserIcons
     {
-        private static readonly string FilePath = Path.Combine(
-            Path.GetDirectoryName(RibbonColorPreferences.PreferenceFilePath), "iconesArborescence.json");
+        private static string FilePath => global::BIMaestro.Storage.PreferenceStorage.FilePath("Option", "iconesArborescence.json");
         private static BrowserIconSettings _current;
         private static BrowserIconSettings _projectOverride;
         private static readonly Lazy<List<BrowserIconAsset>> BuiltIns = new Lazy<List<BrowserIconAsset>>(() =>

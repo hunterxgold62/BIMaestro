@@ -16,9 +16,14 @@ namespace Analyse.Tests
             {
                 var root = Directory.Exists(ui.Application.FamilyTemplatePath) ? ui.Application.FamilyTemplatePath
                     : "C:/ProgramData/Autodesk/RVT " + ui.Application.VersionNumber + "/Family Templates";
-                var template = Directory.EnumerateFiles(root, "*.rft", SearchOption.AllDirectories)
-                    .First(p => p.IndexOf("Metric Generic Model.rft", StringComparison.OrdinalIgnoreCase) >= 0
+                // Some installations omit the plain generic template in French while
+                // shipping it in English. Search the same Revit year's other languages.
+                var template = new[] { root, "C:/ProgramData/Autodesk/RVT " + ui.Application.VersionNumber + "/Family Templates" }
+                    .Where(Directory.Exists).Distinct(StringComparer.OrdinalIgnoreCase)
+                    .SelectMany(folder => Directory.EnumerateFiles(folder, "*.rft", SearchOption.AllDirectories))
+                    .FirstOrDefault(p => Path.GetFileName(p).Equals("Metric Generic Model.rft", StringComparison.OrdinalIgnoreCase)
                         || Path.GetFileName(p).Equals("Modèle générique métrique.rft", StringComparison.OrdinalIgnoreCase));
+                Check(template != null, "No plain metric generic family template is installed for this Revit year.");
                 var familyDoc = ui.Application.NewFamilyDocument(template);
                 var doc = ui.Application.NewProjectDocument(UnitSystem.Metric);
                 try

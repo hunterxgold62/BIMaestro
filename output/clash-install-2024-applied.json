@@ -1,0 +1,15 @@
+{
+  "Revit": "2024",
+  "Runtime": ".NET Framework 4.8",
+  "Source": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\BIMaestro\\bin\\ClashVerified2024",
+  "Destination": "C:\\Users\\plemert\\AppData\\Local\\BIMaestro\\Bin\\Revit2024-Clash3D-F8A0BEFE3F8D",
+  "Manifest": "C:\\Users\\plemert\\AppData\\Roaming\\Autodesk\\Revit\\Addins\\2024\\BIMaestro.addin",
+  "PreviousAssembly": "C:\\Users\\plemert\\AppData\\Local\\BIMaestro\\Bin\\BIMaestro.dll",
+  "Assembly": "C:\\Users\\plemert\\AppData\\Local\\BIMaestro\\Bin\\Revit2024-Clash3D-F8A0BEFE3F8D\\BIMaestro.dll",
+  "Sha256": "F8A0BEFE3F8DA88BCE0B28CA61494E224E8816AD4601A727543D06F2F93A4F64",
+  "Files": 271,
+  "Bytes": 188426239.0,
+  "Backup": "C:\\Users\\plemert\\AppData\\Roaming\\Autodesk\\Revit\\Addins\\2024\\BIMaestro.addin.before-clash2024-20261026-182127.bak",
+  "Preview": false
+}
+Installation Revit 2024 mise à jour. Redémarrer Revit pour charger la nouvelle DLL.

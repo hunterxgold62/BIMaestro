@@ -490,7 +490,7 @@ namespace Famille
         private static string GetCachePath()
         {
             string MyDocuments = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-            string dir = Path.Combine(MyDocuments, "BIMaestro", "SauvegardePréférence");
+            string dir = global::BIMaestro.Storage.PreferenceStorage.Folder("Trad.IA");
             return Path.Combine(dir, "translation_cache.json");
         }
     }

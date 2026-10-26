@@ -29,7 +29,7 @@ namespace Visualisation
         private const string FileNameLastSet = "SelectSimilarLastSet.json";
         public static string GetFolder()
         {
-            var target = Path.Combine(global::BIMaestro.Storage.UserDataStorage.SelectionPreferencesRoot, "SauvegardePréférence");
+            var target = global::BIMaestro.Storage.PreferenceStorage.Folder("Sélection d'objet", global::BIMaestro.Storage.UserDataStorage.SelectionPreferencesRoot);
             Directory.CreateDirectory(target);
             return target;
         }

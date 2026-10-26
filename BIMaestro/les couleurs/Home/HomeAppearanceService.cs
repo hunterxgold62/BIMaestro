@@ -16,7 +16,10 @@ namespace BIMaestro.Home
     internal static class HomeAppearanceService
     {
         const BindingFlags InstanceFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
-        static string settingsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "BIMaestro", "HomeAppearance.test.json");
+        static string settingsPath;
+        static string SettingsPath => settingsPath ?? global::BIMaestro.Storage.PreferenceStorage.FilePath("Accueil", "HomeAppearance.json",
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "BIMaestro", "HomeAppearance.json"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "BIMaestro", "HomeAppearance.test.json"));
         static readonly List<WeakReference> browsers = new List<WeakReference>();
         static readonly HashSet<object> pending = new HashSet<object>(ReferenceComparer.Instance);
         static readonly object requestGate = new object();
@@ -41,9 +44,10 @@ namespace BIMaestro.Home
             HomeHistoryCatalog.ConfigureVersion(application.ControlledApplication.VersionNumber);
             try
             {
-                if (File.Exists(settingsPath))
+                var path = SettingsPath;
+                if (File.Exists(path))
                 {
-                    var saved = JsonConvert.DeserializeObject<Preferences>(File.ReadAllText(settingsPath));
+                    var saved = JsonConvert.DeserializeObject<Preferences>(File.ReadAllText(path));
                     if (saved != null && IsStyle(saved.Style)) { CurrentStyle = saved.Style; HistoryEnabled = saved.History; }
                 }
             }
@@ -61,11 +65,12 @@ namespace BIMaestro.Home
         internal static void SetPreferences(string style, bool history)
         {
             if (!IsStyle(style)) throw new ArgumentException("Affichage inconnu.", nameof(style));
+            var path = SettingsPath;
             var json = JsonConvert.SerializeObject(new Preferences { Style = style, History = history }, Formatting.Indented);
-            Directory.CreateDirectory(Path.GetDirectoryName(settingsPath));
-            var temporary = settingsPath + "." + System.Diagnostics.Process.GetCurrentProcess().Id + ".tmp";
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            var temporary = path + "." + System.Diagnostics.Process.GetCurrentProcess().Id + ".tmp";
             File.WriteAllText(temporary, json);
-            try { if (File.Exists(settingsPath)) File.Replace(temporary, settingsPath, null); else File.Move(temporary, settingsPath); }
+            try { if (File.Exists(path)) File.Replace(temporary, path, null); else File.Move(temporary, path); }
             finally { if (File.Exists(temporary)) File.Delete(temporary); }
             CurrentStyle = style; HistoryEnabled = history; restorePending = true;
             if (history) HomeHistoryCatalog.RequestRefresh();

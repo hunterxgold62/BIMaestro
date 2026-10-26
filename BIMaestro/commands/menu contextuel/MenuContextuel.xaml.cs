@@ -76,8 +76,7 @@ namespace TonNamespace
 
         private Dictionary<string, ExternalEvent> _externalEventMap;
         private List<string> _configuredCommands;
-        private string ConfigFilePath => Path.Combine(
-            global::BIMaestro.Storage.UserDataStorage.Root, "SauvegardePréférence", "Menu contexte.json");
+        private string ConfigFilePath => Path.Combine(global::BIMaestro.Storage.PreferenceStorage.Folder("Menu contextuel"), "Menu contexte.json");
 
         // Pour drag & drop
         private Button _draggedBtn;

@@ -111,6 +111,11 @@ namespace Analyse
         private void TutorialScanCompleted()
         {
             if (!_tutorialPrepared) return;
+            if (_session.Error != null)
+            {
+                RunText.Text += " · Le guide attend une analyse sans erreur. Consulte le bilan pour le diagnostic ; changer les options ne corrige pas une erreur du moteur.";
+                return;
+            }
             if (_tutorialReservationCreated)
             {
                 _tutorialReservationRescanVerified = OwnerDocument.GetElement(_tutorialReservationId) is FamilyInstance &&

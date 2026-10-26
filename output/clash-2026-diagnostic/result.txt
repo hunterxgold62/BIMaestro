@@ -1,0 +1,5 @@
+REFUSED: existing documents
+Stage 1: sources=3 issues=2 error=
+Stage 2: sources=3 issues=2 error=
+Stage 3: sources=3 issues=1 error=
+PASS: Revit 2026 progressive selection/model/correction

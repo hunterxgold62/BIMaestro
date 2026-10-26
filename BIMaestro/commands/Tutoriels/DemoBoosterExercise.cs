@@ -48,6 +48,7 @@ namespace BIMaestro.Tutorials
             _text = new TextBlock { TextWrapping = TextWrapping.Wrap, MinHeight = 95 };
             panel.Children.Add(_text);
             var quit = new Button { Content = "Quitter le guide", Padding = new Thickness(8), HorizontalAlignment = HorizontalAlignment.Right };
+            panel.Children.Add(quit);
             Window card = _card;
             _finish = quit;
             quit.Click += (_, __) => {

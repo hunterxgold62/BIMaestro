@@ -18,10 +18,10 @@ namespace BIMaestro.MepBooster
 {
     internal static class BoosterPreferences
     {
-        internal static string EnabledPath => System.IO.Path.Combine(Environment.GetFolderPath(
-            Environment.SpecialFolder.LocalApplicationData), "BIMaestro", "Settings", "mep-booster-enabled.txt");
-        internal static string AnglePath => System.IO.Path.Combine(Environment.GetFolderPath(
-            Environment.SpecialFolder.LocalApplicationData), "BIMaestro", "Settings", "mep-booster-angle.txt");
+        internal static string EnabledPath => global::BIMaestro.Storage.PreferenceStorage.FilePath("MEP Booster", "mep-booster-enabled.txt",
+            System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BIMaestro", "Settings", "mep-booster-enabled.txt"));
+        internal static string AnglePath => global::BIMaestro.Storage.PreferenceStorage.FilePath("MEP Booster", "mep-booster-angle.txt",
+            System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BIMaestro", "Settings", "mep-booster-angle.txt"));
         internal static bool LoadEnabled(string path)
         {
             try

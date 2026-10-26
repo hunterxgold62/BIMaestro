@@ -191,7 +191,7 @@ public partial class AppUI : IExternalApplication
                     }),
                     ("Export d'unité", "Unités", new List<(string, string, string, string, string)>
                     {
-                        ("Export d'unité", "Unités", "Famille.ExportProjectUnitsCommand", "Unités.png","Sauvegarde dans un fichier JSON les unités et leur précision (longueur, surface, volume, angle, etc.) du projet en cours, dans le dossier Mes Documents/BIMaestro_Revit/SauvegardePréférence."),
+                        ("Export d'unité", "Unités", "Famille.ExportProjectUnitsCommand", "Unités.png","Sauvegarde dans un fichier JSON les unités et leur précision (longueur, surface, volume, angle, etc.) du projet en cours, dans le dossier Mes Documents/BIMaestro_Revit/SauvegardePréférence/Unités."),
                         ("Import d'unité", "Import\nd'unité","Famille.ImportProjectUnitsCommand", "Import unités.png","Recharge depuis le fichier JSON les unités et leur précision pour appliquer rapidement vos préférences au projet.")
                     })))
             }),
@@ -647,9 +647,27 @@ public partial class AppUI : IExternalApplication
 
     private static string GetRibbonBadgeLabel(string buttonName)
     {
-        if (string.Equals(buttonName, "Qui a fait ça ?", StringComparison.OrdinalIgnoreCase)) return "MAJ";
-        if (string.Equals(buttonName, "ViewTemplateTransfer", StringComparison.OrdinalIgnoreCase)) return "NEW";
-        return null;
+        switch (buttonName?.ToUpperInvariant())
+        {
+            case "MAINTENANCEWORKBENCH":
+            case "CREATEDEMOPROJECT":
+            case "DEMOTOURS":
+            case "HOMEAPPEARANCETEST":
+            case "PROPERTIESAPPEARANCE":
+                return "NEW";
+            case "VIEWTHUMBNAILBATCH":
+            case "REVITGAMECOMMAND":
+            case "RESÉRVATIONAUTO":
+            case "CODEXCHAT":
+            case "QUI A FAIT ÇA ?":
+            case "TEMPS PAR PROJET":
+            case "CLASH 3D":
+            case "COULEUR DE PROJET":
+            case "RADIALMENUBUTTONSCOMMAND":
+                return "MAJ";
+            default:
+                return null;
+        }
     }
 
     private static ImageSource AddRibbonBadge(ImageSource icon, string buttonName, int size)
@@ -700,11 +718,11 @@ public partial class AppUI : IExternalApplication
             foreach (string buttonName in new[] { "ViewTemplateTransfer", "Qui a fait ça ?", "PipeLengthByDiameterV2", "AnalysePoidsButton", "Temps par projet", "Clash 3D", "Sélection d'objet", "HighlightElementsByCategories",
                 "ResérvationAuto", "Bride auto", "Choix bride", "Suppression de brides",
                 "OpenSheetFromViewButton", "Export Nomenclature", "ViewThumbnailBatch", "ExportDwgBatch", "GetPaintedMaterialsButton", "ReorientViewButton",
-                "MepBooster", "PipeSystemColors", "RevitGameCommand",
+                "MaintenanceWorkbench", "MepBooster", "PipeSystemColors", "RevitGameCommand",
                 "CodexChat", "CommunityFamilies", "GPTBotWindowButton", "TextCorrectionButton", "ScanText", "RealisticViewImage",
                 "FamilyBrowser", "Rosace", "ConvertSharedToFamily", "PurgeFamilyParameters", "Familytraduction", "FamilyViewtraduction", "Export d'unité", "Import d'unité",
                 "ElementHistoryHoverToggle", "Suivi maquette collaboratif",
-                "Couleur de projet", "Couleur de maquette", "papa Noël", "ViewDeckToggle", "BIMaestro_Exemple", "CreateDemoProject", "DemoTours", "NOTE_MAJ", "Snake", "FlappyBird", "CustomizeRibbon", "ContactCommand", "RadialMenuButtonsCommand", "SupportCommand",
+                "Couleur de projet", "Couleur de maquette", "HomeAppearanceTest", "PropertiesAppearance", "papa Noël", "ViewDeckToggle", "BIMaestro_Exemple", "CreateDemoProject", "DemoTours", "NOTE_MAJ", "Snake", "FlappyBird", "CustomizeRibbon", "ContactCommand", "RadialMenuButtonsCommand", "SupportCommand",
                 "dynamo 1", "dynamo 2", "dynamo 3", "dynamo 4", "dynamo 5", "dynamo réglage",
                 "GestionExcelCmd", "Surcharges vues", "ElementRenamerButton", "PhaseQuickEditButton", "Purge du plan" })
             {
@@ -768,7 +786,6 @@ public partial class AppUI : IExternalApplication
         var toolTipType = adWindows.GetType("Autodesk.Windows.RibbonToolTip");
         object toolTip = Activator.CreateInstance(toolTipType);
         string label = GetRibbonBadgeLabel(info.Id);
-        if (info.Id == "Temps par projet") label = "SUIVI";
         var badgeBrush = new SolidColorBrush(label == "MAJ"
             ? System.Windows.Media.Color.FromRgb(35, 120, 225)
             : label == "SUIVI" ? System.Windows.Media.Color.FromRgb(125, 76, 196)
@@ -801,7 +818,6 @@ public partial class AppUI : IExternalApplication
             shortDescription = shortDescription.Substring(prefix.Length);
         shortDescription = GetToolTipExampleDescription(info.Id) ?? shortDescription;
         var content = new StackPanel();
-        content.Children.Add(header);
         content.Children.Add(new TextBlock
         {
             Text = shortDescription,
@@ -816,6 +832,7 @@ public partial class AppUI : IExternalApplication
             hasExample = true;
         }
         else hasExample = AddToolTipExample(content, info.Id);
+        content.Children.Insert(0, header);
 
         string expanded = info.PushButton.LongDescription ?? string.Empty;
         int firstLineEnd = expanded.IndexOfAny(new[] { '\r', '\n' });
@@ -1136,9 +1153,13 @@ public partial class AppUI : IExternalApplication
             ? "Choisissez un parcours pour essayer les outils BIMaestro pas à pas dans cette maquette d’essai."
             : "Crée et ouvre une nouvelle maquette d’essai BIMaestro dans Documents\\BIMaestro_Revit, puis propose les exercices guidés.";
         UpdatePushButtonPresentation(info.Id, text, description);
+        string badgeLabel = GetRibbonBadgeLabel(info.Id);
+        if (badgeLabel != null) info.PushButton.ToolTip = badgeLabel + " · " + UiLanguage.T(description);
         info.PushButton.LongDescription = UiLanguage.T(description);
-        info.PushButton.Image = LoadBitmapFromResource(image, 16);
-        info.PushButton.LargeImage = LoadBitmapFromResource(image, 32);
+        var small = LoadBitmapFromResource(image, 16);
+        if (small != null) info.PushButton.Image = AddRibbonBadge(small, info.Id, 16);
+        var large = LoadBitmapFromResource(image, 32);
+        if (large != null) info.PushButton.LargeImage = AddRibbonBadge(large, info.Id, 32);
         info.DisplayName = text;
         info.ImageResourceName = image;
         badgeToolTipsApplied.Remove(info.Id);

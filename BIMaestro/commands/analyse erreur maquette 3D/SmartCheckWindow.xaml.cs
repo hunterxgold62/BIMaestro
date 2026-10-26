@@ -337,9 +337,11 @@ namespace Analyse
             if (_filtered.Count == 0)
             {
                 bool partial = _session == null || _session.Cancelled || _session.Error != null;
-                EmptyTitle.Text = _all.Count > 0 ? "Aucun résultat avec ces filtres" : Scanning ? "Analyse en cours" : partial ? "Aucun résultat disponible" : "Aucun conflit détecté dans ce périmètre";
+                EmptyTitle.Text = _all.Count > 0 ? "Aucun résultat avec ces filtres" : Scanning ? "Analyse en cours" : _session?.Error != null ? "Analyse interrompue par une erreur" : partial ? "Aucun résultat disponible" : "Aucun conflit détecté dans ce périmètre";
                 EmptyDescription.Text = _all.Count > 0 ? "Changez le statut ou le contrôle, ou effacez la recherche." : Scanning
                     ? "Les objets et les liens sont préparés, puis les résultats apparaissent dès leur détection. Le bilan reste provisoire jusqu'à la fin."
+                    : _session?.Error != null
+                    ? "Ce résultat ne permet pas de conclure à l’absence de conflits. Consultez le bilan pour le détail de l’erreur avant de relancer."
                     : partial
                     ? "Lancez une analyse complète pour obtenir un bilan." : _session.SourceCount == 0
                     ? "Aucun objet des catégories choisies n'a été trouvé. Ajustez les catégories ou le périmètre."

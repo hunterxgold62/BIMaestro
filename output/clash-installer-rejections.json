@@ -1,0 +1,22 @@
+[
+  {
+    "host": "2024",
+    "payload": "2023",
+    "rejected": true
+  },
+  {
+    "host": "2025",
+    "payload": "2023",
+    "rejected": true
+  },
+  {
+    "host": "2026",
+    "payload": "2025",
+    "rejected": true
+  },
+  {
+    "host": "2027",
+    "payload": "2026",
+    "rejected": true
+  }
+]

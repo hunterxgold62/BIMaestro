@@ -39,10 +39,7 @@ namespace ScanTextRevit
         {
             get
             {
-                string baseDir = Path.Combine(
-                    global::BIMaestro.Storage.UserDataStorage.Root,
-                    "SauvegardePréférence"
-                );
+                string baseDir = global::BIMaestro.Storage.PreferenceStorage.Folder("Corr. IA");
                 Directory.CreateDirectory(baseDir);
                 return Path.Combine(baseDir, "thème IA auto.json");
             }

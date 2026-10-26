@@ -22,8 +22,7 @@ namespace Couleur
     // First-run invitation and the hand-off from the ribbon to the color window.
     internal static class AppearanceOnboarding
     {
-        private static readonly string ChoiceFile = Path.Combine(
-            global::BIMaestro.Storage.UserDataStorage.Root, "SauvegardePréférence", "AppearanceGuideFirstLaunch.txt");
+        private static readonly string ChoiceFile = Path.Combine(global::BIMaestro.Storage.PreferenceStorage.Folder("Option"), "AppearanceGuideFirstLaunch.txt");
         private static readonly DateTime ReadyAfterUtc = DateTime.UtcNow.AddSeconds(12);
         private static bool _askedThisSession;
         private static DateTime? _projectReadyUtc;

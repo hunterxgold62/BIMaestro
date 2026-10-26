@@ -2015,8 +2015,7 @@ namespace BIMaestro.Bonus
         // -------------------------------
         private string GetStateFilePath()
         {
-            string logsFolder = IOPath.Combine(
-                global::BIMaestro.Storage.UserDataStorage.Root, "SauvegardePréférence");
+            string logsFolder = global::BIMaestro.Storage.PreferenceStorage.Folder("Snake");
             Directory.CreateDirectory(logsFolder);
             return IOPath.Combine(logsFolder, "snake.json");
         }

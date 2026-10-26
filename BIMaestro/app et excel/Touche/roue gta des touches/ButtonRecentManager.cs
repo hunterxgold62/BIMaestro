@@ -15,8 +15,7 @@ namespace BIMaestro.UI
             public DateTime Utc { get; set; }
         }
 
-        private static readonly string FilePath = Path.Combine(
-            global::BIMaestro.Storage.UserDataStorage.Root, "SauvegardePréférence", "RecentButtons.json");
+        private static readonly string FilePath = Path.Combine(global::BIMaestro.Storage.PreferenceStorage.Folder("Rosace Boutons"), "RecentButtons.json");
 
         public static void RegisterUse(string buttonId, string commandClass)
         {

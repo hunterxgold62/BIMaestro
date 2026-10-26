@@ -51,3 +51,34 @@ Avant diffusion : essai dans Revit sur un profil de test avec copie des données
 réelles, notamment les préférences de familles et les fichiers OneDrive hors ligne.
 Les tests automatisés ne reproduisent pas le service OneDrive ni les anciennes
 versions du plugin en fonctionnement.
+
+Classement des préférences par bouton (v1)
+----------------------------------------
+Les lectures ET les écritures passent par PreferenceStorage.Folder.
+Le classement est commun à tous les modules : copie vérifiée, répartition des
+fichiers dans les dossiers des boutons, puis basculement du dossier complet.
+Les fichiers partagés restent dans un seul dossier (ex. Navigateur de Familles).
+Les fichiers inconnus sont conservés dans « Autres préférences ».
+L'ancien dossier complet est conservé à côté, sous
+SauvegardePréférence_avant_classement_v1. Il ne reçoit plus les nouvelles écritures.
+Le marqueur caché .organized-v1 rend le classement idempotent.
+Un conflit, un fichier verrouillé ou plusieurs sessions Revit diffèrent le classement
+et tous les modules restent sur l'organisation à plat pour cette session.
+Une interruption entre les deux renommages est récupérée depuis la sauvegarde.
+Les nouvelles installations utilisent directement les dossiers par bouton.
+Les données réelles du compte Windows ne sont jamais modifiées par ces tests.
+
+Correction de quatre emplacements de préférences
+----------------------------------------------
+Les icônes d'arborescence sont classées dans Option, et clash3d_options.json dans
+SmartCheck. Les fichiers déjà rangés dans « Autres préférences » sont récupérés
+par copie vérifiée lors de leur première lecture, sans remplacer un réglage actuel.
+L'accueil utilise Accueil/HomeAppearance.json et importe l'ancien fichier
+AppData/Roaming/BIMaestro/HomeAppearance.test.json. L'activation et l'angle du
+MEP Booster utilisent le dossier MEP Booster, avec import de leurs anciens TXT
+dans AppData/Local/BIMaestro/Settings.
+Les sources restent conservées. Un marqueur caché par fichier empêche de réimporter
+un ancien réglage après une réinitialisation volontaire. Les importations sont
+sérialisées entre processus ; un fichier verrouillé n'est pas remplacé par des
+valeurs par défaut et peut être récupéré à l'essai suivant. Ces migrations seront
+effectuées par la version corrigée ; les tests n'importent que des fixtures isolées.

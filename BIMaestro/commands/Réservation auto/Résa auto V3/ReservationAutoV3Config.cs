@@ -273,7 +273,7 @@ namespace Modification
     public static class ReservationAutoV3PersoConfigStore
     {
         private static string Folder =>
-            Path.Combine(global::BIMaestro.Storage.UserDataStorage.Root, "SauvegardePréférence");
+            global::BIMaestro.Storage.PreferenceStorage.Folder("Auto réservation");
 
         public static string ConfigPath =>
             Path.Combine(Folder, "ResaPerso.json");

@@ -8,11 +8,12 @@ $roamingPath = [Environment]::GetFolderPath('ApplicationData')
 $localPath = [Environment]::GetFolderPath('LocalApplicationData')
 $dataRoot = Join-Path $documentsPath 'BIMaestro_Revit'
 if (!(Test-Path -LiteralPath (Join-Path $dataRoot '.bimaestro-migration-v1')) -and (Test-Path -LiteralPath (Join-Path $documentsPath 'RevitLogs'))) { $dataRoot = Join-Path $documentsPath 'RevitLogs' }
+$appearanceGroup = if (Test-Path -LiteralPath (Join-Path $dataRoot 'SauvegardePréférence/.organized-v1')) { 'SauvegardePréférence/Option' } else { 'SauvegardePréférence' }
 $targets = @(
     (Join-Path $dataRoot 'License/welcome_state.json'),
     (Join-Path $dataRoot 'License/support_prompt_state.json'),
     (Join-Path $dataRoot 'License/button_update_notes_seen.json'),
-    (Join-Path $dataRoot 'SauvegardePréférence/AppearanceGuideFirstLaunch.txt'),
+    (Join-Path $dataRoot ($appearanceGroup + '/AppearanceGuideFirstLaunch.txt')),
     (Join-Path $roamingPath 'BIMaestro/update_notifier_state.json')
 )
 if ($WelcomeOnly) { $targets = @($targets | Where-Object { [IO.Path]::GetFileName($_) -eq 'welcome_state.json' }) }

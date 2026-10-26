@@ -105,7 +105,7 @@ namespace BIMaestro.Storage
             }
         }
 
-        private static void Publish(string stage, string destination)
+        internal static void Publish(string stage, string destination)
         {
             // Antivirus/OneDrive can briefly retain a handle after verification.
             for (int attempt = 0; ; attempt++)
@@ -156,7 +156,7 @@ namespace BIMaestro.Storage
             }
         }
 
-        private static void CopyVerified(string source, string target)
+        internal static void CopyVerified(string source, string target)
         {
             RejectLink(source);
             Directory.CreateDirectory(target);
@@ -174,7 +174,7 @@ namespace BIMaestro.Storage
                 CopyVerified(dir, Path.Combine(target, Path.GetFileName(dir)));
         }
 
-        private static void VerifyTree(string source, string target)
+        internal static void VerifyTree(string source, string target)
         {
             RejectLink(source);
             var files = Directory.GetFiles(source);

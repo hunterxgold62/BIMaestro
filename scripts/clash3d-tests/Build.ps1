@@ -1,12 +1,19 @@
-param([ValidateSet('2023','2024','2025')][string]$RevitVersion='2024', [ValidatePattern('^[a-zA-Z0-9-]+$')][string]$RunName='clash-v1', [string]$ReservationAssembly='')
+param([ValidateSet('2023','2024','2025','2026','2027')][string]$RevitVersion='2024', [ValidatePattern('^[a-zA-Z0-9-]+$')][string]$RunName='clash-v1', [string]$ReservationAssembly='')
 $ErrorActionPreference='Stop'
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $output=Join-Path $repo ('tmp/codex-native-validation/' + $RevitVersion + '-' + $RunName)
+if (Test-Path -LiteralPath (Join-Path $output 'started.txt')) { throw 'Ce passage a déjà démarré. Choisir un nouveau RunName pour conserver ses preuves.' }
 New-Item -ItemType Directory -Path $output -Force | Out-Null
 $module=Join-Path $repo 'BIMaestro/commands/analyse erreur maquette 3D'
 $api='C:/Program Files/Autodesk/Revit ' + $RevitVersion
+$modern = [int]$RevitVersion -ge 2025
+$framework = 'net8.0-windows'
+if ($modern -and (Get-Content -LiteralPath (Join-Path $api 'RevitAPI.runtimeconfig.json') -Raw).Contains('net10.0')) { $framework = 'net10.0-windows' }
+$dotnet = Join-Path $repo 'tmp/dotnet10/dotnet.exe'
+if (!(Test-Path -LiteralPath $dotnet)) { $dotnet = 'C:/Program Files/dotnet/dotnet.exe' }
 $assemblyName='BIMaestro.ClashValidation'
 $xaml=(Get-Content -LiteralPath (Join-Path $module 'SmartCheckWindow.xaml') -Raw).Replace('/BIMaestro;component/', '/' + $assemblyName + ';component/')
+$xaml=$xaml.Replace('../../Themes/BIMaestroTheme.xaml', '/' + $assemblyName + ';component/Themes/BIMaestroTheme.xaml')
 [IO.File]::WriteAllText((Join-Path $output 'SmartCheckWindow.xaml'),$xaml)
 # Only the user-document storage root differs in this copy; persistence logic remains production code.
 $testDocumentsLiteral='"' + $output.Replace('\','/').Replace('"','\"') + '/test-documents"'
@@ -26,14 +33,15 @@ $project += '<Compile Include="SmartCheckState.cs"/>'
 $project += '<Compile Include="' + (Join-Path $repo 'BIMaestro/commands/Tutoriels/DemoClashExercise.cs') + '"/>'
 foreach ($name in @('NativeStubs.cs','NativeValidation.cs','ReservationValidation.cs')) { $project += '<Compile Include="' + (Join-Path $PSScriptRoot $name) + '"/>' }
 $project += '<Compile Include="' + (Join-Path $repo 'BIMaestro/commands/ElementIdExtensions.cs') + '"/><Page Include="SmartCheckWindow.xaml"/><Page Include="' + (Join-Path $repo 'BIMaestro/Themes/BIMaestroTheme.xaml') + '"><Link>Themes/BIMaestroTheme.xaml</Link></Page></ItemGroup><Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets"/></Project>'
-if ($RevitVersion -eq '2025') {
+if ($modern) {
     $project=$project.Replace('<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">','<Project Sdk="Microsoft.NET.Sdk">').Replace('<Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props"/>','').Replace('<Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets"/>','').Replace('<TargetFrameworkVersion>v4.8</TargetFrameworkVersion>','<TargetFramework>net8.0-windows</TargetFramework><UseWPF>true</UseWPF><EnableDefaultItems>false</EnableDefaultItems><AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath><DefineConstants>REVIT2025_OR_GREATER</DefineConstants>')
     foreach ($name in @('System','System.Core','WindowsBase','PresentationCore','PresentationFramework','System.Xaml')) { $project=$project.Replace('<Reference Include="' + $name + '"/>','') }
+    $project=$project.Replace('net8.0-windows', $framework)
 }
 [IO.File]::WriteAllText((Join-Path $output 'ClashValidation.csproj'),$project)
-if ($RevitVersion -eq '2025') {
+if ($modern) {
     [IO.File]::WriteAllText((Join-Path $output 'NuGet.Config'),'<configuration><packageSources><clear/></packageSources></configuration>')
-    & 'C:/Program Files/dotnet/dotnet.exe' build (Join-Path $output 'ClashValidation.csproj') --configfile (Join-Path $output 'NuGet.Config') -v:q -clp:ErrorsOnly
+    & $dotnet build (Join-Path $output 'ClashValidation.csproj') --configfile (Join-Path $output 'NuGet.Config') -v:q -clp:ErrorsOnly
 } else {
     & 'C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe' (Join-Path $output 'ClashValidation.csproj') /t:Build /m /verbosity:quiet /nologo /clp:ErrorsOnly
 }

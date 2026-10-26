@@ -248,8 +248,8 @@ namespace BIMaestro.RibbonLayout
             {
                 MessageBox.Show(
                     UiLanguage.T(
-                        "Impossible d’enregistrer le choix de langue dans Documents\\BIMaestro_Revit\\SauvegardePréférence.",
-                        "Unable to save the language choice in Documents\\BIMaestro_Revit\\SauvegardePréférence."),
+                        "Impossible d’enregistrer le choix de langue dans Documents\\BIMaestro_Revit\\SauvegardePréférence/Option.",
+                        "Unable to save the language choice in Documents\\BIMaestro_Revit\\SauvegardePréférence/Option."),
                     "BIMaestro",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);

@@ -1,5 +1,5 @@
 <Project>
-  <ItemGroup><Compile Include="app et excel\Supabase\UserDataStorage.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="app et excel\Supabase\UserDataStorage.cs" /><Compile Include="app et excel\Supabase\PreferenceStorage.cs" /></ItemGroup>
   <ItemGroup><Compile Include="les couleurs\Proprietes\*.cs" /></ItemGroup>
   <ItemGroup>
     <Compile Include="les couleurs\Home\*.cs" />

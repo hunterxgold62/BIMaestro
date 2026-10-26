@@ -1378,7 +1378,7 @@ namespace Couleur
 
     /// <summary>
     /// Charge et enregistre les couleurs de fond et de texte des panneaux BIMaestro.
-    /// Les valeurs sont conservées dans Documents\BIMaestro_Revit\SauvegardePréférence.
+    /// Les valeurs sont conservées dans Documents\BIMaestro_Revit\SauvegardePréférence/Option.
     /// </summary>
     public static class RibbonColorPreferences
     {
@@ -1419,10 +1419,7 @@ namespace Couleur
         private static Dictionary<string, RibbonPanelColorScheme> _cachedColors;
 
         public static string PreferenceFilePath { get; } =
-            Path.Combine(
-                global::BIMaestro.Storage.UserDataStorage.Root,
-                "SauvegardePréférence",
-                "couleursRuban.json");
+            Path.Combine(global::BIMaestro.Storage.PreferenceStorage.Folder("Option"), "couleursRuban.json");
 
         internal static object PreferenceSyncRoot => SyncRoot;
 

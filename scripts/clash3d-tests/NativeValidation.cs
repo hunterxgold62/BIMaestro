@@ -294,6 +294,7 @@ namespace Analyse.Tests
                 Test("actual pipe, duct, tray and conduit categories are analysed", () => MepFixture(ui));
                 Test("insulation-only collision expands broad and narrow phase geometry", () => InsulationFixture(ui));
                 Test("connected MEP parts are not reported as clashes", () => ConnectedFixture(ui));
+                Test("training scene has two intersections then one after correction", () => TrainingSceneFixture(ui));
                 ReservationFixture(ui);
                 Test("decision remains independent from detection severity", () =>
                 {
@@ -356,7 +357,13 @@ namespace Analyse.Tests
                 // Opening a document changes its active view asynchronously. Test on a later API callback.
                 _next.Action = nextUi => StartFinalTests(nextUi, host); _nextEvent.Raise();
             }
-            catch (Exception ex) { _failed++; _results.Add(new { fatal = ex.ToString() }); WriteReport(); File.WriteAllText(Path.Combine(_folder, "finished.txt"), "fatal"); }
+            catch (Exception ex)
+            {
+                _failed++; _results.Add(new { fatal = ex.ToString() }); WriteReport();
+                if (host != null && host.IsValidObject && ui.ActiveUIDocument?.Document != host) host.Close(false);
+                File.WriteAllText(Path.Combine(_folder, "finished.txt"), "fatal");
+                ui.PostCommand(RevitCommandId.LookupPostableCommandId(PostableCommand.ExitRevit));
+            }
         }
         private static SmartScanOptions GenericOptions() => new SmartScanOptions { Pipes = false, Ducts = false, CableTrays = false,
             Conduits = false, GenericModels = true, LinkedClashes = false };
@@ -372,6 +379,37 @@ namespace Analyse.Tests
             var loop = new CurveLoop(); var points = new[] { min, new XYZ(max.X, min.Y, min.Z), new XYZ(max.X, max.Y, min.Z), new XYZ(min.X, max.Y, min.Z) };
             for (int i = 0; i < 4; i++) loop.Append(Line.CreateBound(points[i], points[(i + 1) % 4]));
             return GeometryCreationUtilities.CreateExtrusionGeometry(new[] { loop }, XYZ.BasisZ, max.Z - min.Z);
+        }
+        private void TrainingSceneFixture(UIApplication ui)
+        {
+            var doc = ui.Application.NewProjectDocument(UnitSystem.Metric);
+            try
+            {
+                using (var tx = new Transaction(doc, "Training prerequisites"))
+                {
+                    tx.Start();
+                    if (!new FilteredElementCollector(doc).OfClass(typeof(Level)).Any()) Level.Create(doc, 0);
+                    if (!new FilteredElementCollector(doc).OfClass(typeof(PipingSystemType)).Any())
+                        PipingSystemType.Create(doc, MEPSystemClassification.DomesticColdWater, "Training water");
+                    tx.Commit();
+                }
+                doc.SaveAs(Path.Combine(_folder, "BIMaestro_Apprentissage_ClashMatrix.rvt"));
+                BIMaestro.Tutorials.DemoClashExercise.Prepare(doc);
+                var setup = new SmartScanSetup { Document = doc, Selection = BIMaestro.Tutorials.DemoClashExercise.Sources(doc) };
+                var options = new SmartScanOptions { Scope = SmartScanScope.Selection, Pipes = true,
+                    Ducts = false, CableTrays = false, Conduits = false, Fittings = false,
+                    LocalClashes = true, LinkedClashes = false, IncludeInsulation = false, MinimumVolumeMm3 = 10 };
+                using (var initial = Scan(setup, options))
+                    Check(BIMaestro.Tutorials.DemoClashExercise.Verify(doc, initial, false), "Initial training pairs differ.");
+                options.Scope = SmartScanScope.Model;
+                using (var model = Scan(setup, options))
+                    Check(model.Issues.Count == 2 && model.Issues.All(i => !i.IsApproximate), "Model scope loses training intersections.");
+                BIMaestro.Tutorials.DemoClashExercise.Correct(doc);
+                options.Scope = SmartScanScope.Selection;
+                using (var corrected = Scan(setup, options))
+                    Check(BIMaestro.Tutorials.DemoClashExercise.Verify(doc, corrected, true), "Corrected training pairs differ.");
+            }
+            finally { doc.Close(false); }
         }
         private static Solid Cylinder(double radius, double length)
         {

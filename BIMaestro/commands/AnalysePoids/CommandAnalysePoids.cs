@@ -51,8 +51,7 @@ namespace Analyse
                 return Result.Cancelled;
 
             // 2. Préparer cache familles
-            string logsFolder = Path.Combine(
-                global::BIMaestro.Storage.UserDataStorage.Root, "SauvegardePréférence");
+            string logsFolder = global::BIMaestro.Storage.PreferenceStorage.Folder("Analyse de Poids");
             Directory.CreateDirectory(logsFolder);
             string cacheFile = Path.Combine(logsFolder, "CacheTailleFamille.json");
             var cache = LoadCache(cacheFile);

@@ -61,8 +61,7 @@ namespace Famille
         {
             try
             {
-                var file = Path.Combine(
-                    global::BIMaestro.Storage.UserDataStorage.Root, "SauvegardePréférence", "CheminsFamille.json");
+                var file = Path.Combine(global::BIMaestro.Storage.PreferenceStorage.Folder("Navigateur de Familles"), "CheminsFamille.json");
 
                 if (!File.Exists(file)) return;
 

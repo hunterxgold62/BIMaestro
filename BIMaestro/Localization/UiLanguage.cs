@@ -311,9 +311,7 @@ namespace BIMaestro.Localization
 
         private static string GetSettingsPath()
         {
-            string directory = Path.Combine(
-                global::BIMaestro.Storage.UserDataStorage.Root,
-                "SauvegardePréférence");
+            string directory = global::BIMaestro.Storage.PreferenceStorage.Folder("Option");
             return Path.Combine(directory, SettingsFileName);
         }
 

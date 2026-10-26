@@ -1,0 +1,15 @@
+{
+  "Revit": "2025",
+  "Runtime": "net8",
+  "Source": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\BIMaestro\\bin\\ClashVerified2025",
+  "Destination": "C:\\Users\\plemert\\AppData\\Local\\BIMaestro\\Bin\\Revit2025-Clash3D-107ACD3EC59D",
+  "Manifest": "C:\\Users\\plemert\\AppData\\Roaming\\Autodesk\\Revit\\Addins\\2025\\BIMaestro.addin",
+  "PreviousAssembly": "C:\\Users\\plemert\\AppData\\Local\\BIMaestro\\Bin\\BIMaestro.dll",
+  "Assembly": "C:\\Users\\plemert\\AppData\\Local\\BIMaestro\\Bin\\Revit2025-Clash3D-107ACD3EC59D\\BIMaestro.dll",
+  "Sha256": "107ACD3EC59DCD27C6B4F683EFF4D5D86B69E24D9C9D7043554706FBD8819625",
+  "Files": 268,
+  "Bytes": 175220801.0,
+  "Backup": "C:\\Users\\plemert\\AppData\\Roaming\\Autodesk\\Revit\\Addins\\2025\\BIMaestro.addin.before-clash2025-20261026-182131.bak",
+  "Preview": false
+}
+Installation Revit 2025 mise à jour. Redémarrer Revit pour charger la nouvelle DLL.

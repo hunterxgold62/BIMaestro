@@ -1,0 +1,14 @@
+{
+  "Revit": "2023",
+  "Runtime": ".NET Framework 4.8",
+  "Source": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\BIMaestro\\bin\\ClashVerified2023",
+  "Destination": "C:\\Users\\plemert\\AppData\\Local\\BIMaestro\\Bin\\Revit2023-Clash3D-69A9D13E9695",
+  "Manifest": "C:\\Users\\plemert\\AppData\\Roaming\\Autodesk\\Revit\\Addins\\2023\\BIMaestro.addin",
+  "PreviousAssembly": "C:\\Users\\plemert\\AppData\\Local\\BIMaestro\\Bin\\BIMaestro.dll",
+  "Assembly": "C:\\Users\\plemert\\AppData\\Local\\BIMaestro\\Bin\\Revit2023-Clash3D-69A9D13E9695\\BIMaestro.dll",
+  "Sha256": "69A9D13E969582D7C8523F62ACA85B7971A6DE3D1D5CAB0789F9582A4726B376",
+  "Files": 271,
+  "Bytes": 188425215.0,
+  "Backup": "C:\\Users\\plemert\\AppData\\Roaming\\Autodesk\\Revit\\Addins\\2023\\BIMaestro.addin.before-clash2023-20261026-181246.bak",
+  "Preview": true
+}

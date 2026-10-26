@@ -1,0 +1,32 @@
+[
+  {
+    "version": "2023",
+    "production": true,
+    "harness": false,
+    "folder": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\tmp\\codex-native-validation\\2023-clash-payload-20261026"
+  },
+  {
+    "version": "2024",
+    "production": true,
+    "harness": false,
+    "folder": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\tmp\\codex-native-validation\\2024-clash-payload-20261026"
+  },
+  {
+    "version": "2025",
+    "production": true,
+    "harness": false,
+    "folder": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\tmp\\codex-native-validation\\2025-clash-payload-20261026"
+  },
+  {
+    "version": "2026",
+    "production": true,
+    "harness": false,
+    "folder": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\tmp\\codex-native-validation\\2026-clash-payload-20261026"
+  },
+  {
+    "version": "2027",
+    "production": true,
+    "harness": false,
+    "folder": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\tmp\\codex-native-validation\\2027-clash-payload-20261026"
+  }
+]
