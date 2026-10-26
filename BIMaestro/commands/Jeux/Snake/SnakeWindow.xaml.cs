@@ -2016,8 +2016,7 @@ namespace BIMaestro.Bonus
         private string GetStateFilePath()
         {
             string logsFolder = IOPath.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                "RevitLogs", "SauvegardePréférence");
+                global::BIMaestro.Storage.UserDataStorage.Root, "SauvegardePréférence");
             Directory.CreateDirectory(logsFolder);
             return IOPath.Combine(logsFolder, "snake.json");
         }

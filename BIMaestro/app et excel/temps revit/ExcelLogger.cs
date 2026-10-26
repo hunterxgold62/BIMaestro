@@ -40,10 +40,10 @@ public static class ExcelLogger
     private static readonly TimeSpan SnapshotHeartbeatInterval = TimeSpan.FromMinutes(1);
 
     private static readonly string LogDirectory =
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs");
+        global::BIMaestro.Storage.UserDataStorage.Root;
 
     private static readonly string SnapshotPath =
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "TimeSnapshots.dat");
+        Path.Combine(global::BIMaestro.Storage.UserDataStorage.Root, "TimeSnapshots.dat");
 
     private static readonly string SnapshotTempDirectory =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BIMaestro", "RevitLogs", "Temp");

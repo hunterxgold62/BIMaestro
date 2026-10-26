@@ -27,7 +27,7 @@ namespace Famille
         {
             // Prépare le dossier et le fichier JSON
             string docDir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-            string prefDir = Path.Combine(docDir, "RevitLogs", "SauvegardePréférence");
+            string prefDir = Path.Combine(global::BIMaestro.Storage.UserDataStorage.Root, "SauvegardePréférence");
             Directory.CreateDirectory(prefDir);
             string filePath = Path.Combine(prefDir, "RevitUnits.json");
 

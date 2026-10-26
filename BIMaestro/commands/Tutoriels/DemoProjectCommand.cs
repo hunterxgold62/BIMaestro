@@ -52,7 +52,7 @@ namespace BIMaestro.Tutorials
         internal static string Create(UIApplication uiApp)
         {
             string path = CopyReference(uiApp.Application.VersionNumber,
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs"));
+                global::BIMaestro.Storage.UserDataStorage.Root);
             uiApp.OpenAndActivateDocument(path);
             DemoTrainingInvitation.OnDocumentOpened(uiApp.ActiveUIDocument?.Document);
             return path;

@@ -61,7 +61,7 @@ namespace BIMaestro.Tutorials
         private static void Emit(string id, Attempt attempt, string action)
         {
             Telemetry.TrackButton("Tutorial.Event", true, new {
-                schema_version = 1, catalog_version = "1", tutorial_id = id,
+                schema_version = 1, catalog_version = "2", tutorial_id = id,
                 attempt_id = attempt.Id, event_id = Guid.NewGuid().ToString("D"),
                 action, step_index = attempt.Step, step_title = attempt.Title
             });
@@ -175,8 +175,8 @@ namespace BIMaestro.Tutorials
                 new DemoStep("Adapter à ta bibliothèque", "« Modifier les chemins… » permet de choisir ton propre dossier de familles RFA, puis un dossier d'images PNG. Leurs sous-dossiers doivent se correspondre. Pendant ce guide, tes chemins enregistrés sont protégés : quitte le tutoriel avant de choisir ta bibliothèque personnelle.", "ChangePathsButton", true),
                 new DemoStep("Découvrir l’assistant IA", "Clique sur « Ouvrir l’assistant… » dans Mots-clés intelligents. Dans la fenêtre, coche une ou deux familles puis utilise le bouton « Proposer avec l’IA » encadré en vert. Relis les propositions : elles restent modifiables. Ferme ensuite l’assistant pour poursuivre le parcours. Tu peux passer cette étape si l’IA n’est pas disponible.", "SearchMetadataAssistantButton", true, completionEvent: "search-assistant-closed"),
                 new DemoStep("Charger et placer une famille", "Bulbizarre revient au dossier Bureau. Trois favoris temporaires sont préparés pour la suite : un bureau, une table et une chaise. Ils seront disponibles dans la collection Favoris de la rosace. Double-clique sur la carte « Bureau commun » : le simple clic sélectionne la carte, le double-clic charge la famille dans Revit et lance son placement. Clique ensuite dans la vue pour la poser, puis appuie sur Échap pour sortir du mode placement.", "FamilyListView", completionEvent: "load-bureau-commun"),
-                new DemoStep("Ouvrir Famille dans Revit", "Le navigateur se ferme et Bulbizarre revient dans Revit. Termine le placement précédent avec Échap, ouvre l'onglet BIMaestro si besoin, puis clique sur la petite flèche du bouton « Navigateur de Familles ». Le contour vert suit le bon bouton.", "RevitFamilySplit"),
-                new DemoStep("Choisir la rosace « . »", "Dans la liste ouverte par la flèche de « Navigateur de Familles », clique sur l'entrée « . ». Cette rosace s'ouvre près de la souris avec les 16 familles récentes simulées de l'exercice. Bulbizarre attend son ouverture avant de poursuivre.", "RevitRosace", completionEvent: "radial-opened"),
+                new DemoStep("Ouvrir Famille dans Revit", "Le navigateur se ferme et Bulbizarre revient dans Revit. Termine le placement précédent avec Échap, ouvre l'onglet BIMaestro si besoin, puis clique sur la petite flèche du bouton « Famille ». Le contour vert suit le bon bouton.", "RevitFamilySplit"),
+                new DemoStep("Choisir la rosace « . »", "Dans la liste ouverte par la flèche de « Famille », clique sur l'entrée « . ». Cette rosace s'ouvre près de la souris avec les 16 familles récentes simulées de l'exercice. Bulbizarre attend son ouverture avant de poursuivre.", "RevitRosace", completionEvent: "radial-opened"),
                 new DemoStep("Comprendre les familles récentes", "Pour l'exercice, la rosace affiche 16 familles du catalogue de formation, réparties sur deux pages de 8. Les noms sont réels, mais leur historique récent est simulé : ces exemples ne viennent pas de ton historique personnel. Hors tutoriel, la rosace propose une page Top-8 des familles les plus utilisées et deux pages des 16 familles récentes chargées ou utilisées depuis le navigateur et la rosace. Garde la souris sur la rosace et tourne la molette pour passer d'une page de familles à l'autre. Affiche la seconde page Récents démo, puis reviens à la première. Survole les cases pour lire les noms, puis clique sur Suivant.", "RevitUseShortcut", true),
                 new DemoStep("Passer à l'onglet Vue", "Ferme la rosace avec Échap, puis clique sur l'onglet « Vue » du ruban Revit. Bulbizarre encadre l'onglet et suit ton choix.", "RevitViewTab"),
                 new DemoStep("Ouvrir Interface utilisateur", "Dans Vue, ouvre « Interface utilisateur » dans le panneau Fenêtres. Le contour vert passe du ruban BIMaestro au ruban Revit.", "RevitUserInterface"),
@@ -190,7 +190,7 @@ namespace BIMaestro.Tutorials
                 new DemoStep("Deux suppressions et une modification", "Bulbizarre a supprimé deux objets de la scène, puis passé le troisième de 4 à 2 chaises. Nous allons faire réapparaître les deux objets, puis retrouver les anciennes valeurs du témoin. Dans Action, choisis « Suppressions ».", "ActionFilterCombo"),
                 new DemoStep("Filtrer par utilisateur", "Ce filtre isole les actions d'une personne. Il sert à comprendre qui a modifié la maquette, mais une absence de résultat peut aussi venir de la période chargée. Ne change rien pour retrouver les objets de la démo.", "UserFilterCombo", true),
                 new DemoStep("Recherche et période", "La recherche cible un élément ou une information précise. Les dates « Du » et « Au » limitent les événements chargés ; « Charger période » relit alors l'historique. Garde les filtres actuels pour l'exercice.", "SearchBox", true),
-                new DemoStep("Commencer en mode Simple", "Choisis « Simple ». Ce mode affiche des volumes rouges pour repérer les objets supprimés, avec un impact généralement imperceptible sur le PC. Garde-le par défaut.", "SimpleMeshModeRadio"),
+                new DemoStep("Commencer en mode Simple", "Choisis « Simple ». Ce mode affiche des volumes rouges pour repérer les objets supprimés, avec moins de détails à charger que le mode Détaillé. Garde-le par défaut.", "SimpleMeshModeRadio"),
                 new DemoStep("Choisir le cluster", "Sélectionne la carte contenant les deux meubles supprimés. Nous allons observer le même cluster dans les deux modes.", "VisualCardsList"),
                 new DemoStep("Observer l’aperçu Simple", "Clique sur « Visualiser cluster ». La fenêtre se mettra de côté pour te laisser observer les volumes rouges dans Revit.", "VisualizeDeletedButton", completionEvent: "history-preview-simple-observed"),
                 new DemoStep("Passer en mode Détaillé", "Choisis maintenant « Détaillé ». Il montre mieux la forme des meubles lorsque les données sont disponibles, mais peut ralentir le chargement et demander davantage de ressources au PC. Le tuto reviendra automatiquement en Simple après la comparaison et à sa fermeture.", "DetailedMeshModeRadio"),
@@ -229,9 +229,11 @@ namespace BIMaestro.Tutorials
                 ["reservation"] = new[]
                 {
                     new DemoStep("Choisir le support", "Mur crée une réservation dans un mur traversé ; Sol correspond à un autre cas de famille. Pour pratiquer avec une scène prête, ouvre Parcours guidés puis la maquette de formation.", "hostMurCard", true),
-                    new DemoStep("Choisir la forme et le réseau", "La forme rectangulaire demande des paramètres de longueur, hauteur et profondeur. Choisis ensuite Canalisation ou Gaine selon le réseau réel à traiter.", "shapeRectCard", true),
+                    new DemoStep("Choisir la forme et le réseau", "La forme et le support déterminent les dimensions à associer à ta famille. Choisis Canalisation, Gaine, Porte, Fenêtre ou Autre objet 3D selon l’élément à traiter. Le parcours de formation utilise une canalisation et une réservation rectangulaire murale.", "shapeRectCard", true),
                     new DemoStep("Configurer ta famille", "L'onglet Familles relie un type RFA à chaque combinaison de support, forme et hébergement. Vérifie les paramètres de dimensions avant d'enregistrer un nouveau mapping.", "ReservationFamiliesTab", true),
-                    new DemoStep("Lancer dans ton projet", "En mode manuel, sélectionne un réseau puis le mur traversé. Contrôle la famille créée et ses dimensions. La maquette de formation propose un exercice vérifié pas à pas.", "DemoRunReservationButton", true)
+                    new DemoStep("Choisir les sources", "Maquette utilise les objets et supports locaux. Lien IFC ou Lien RVT donne accès à la maquette et aux liens du type choisi. Double lien impose deux éléments liés, qui peuvent appartenir au même lien. Une famille avec hôte nécessite un support local.", "chkDoubleLink", true),
+                    new DemoStep("Manuel ou automatique", "Le scan automatique est limité aux murs et aux éléments locaux. En mode manuel, une famille sans hôte permet de sélectionner l’objet et le mur ou le sol dans l’ordre voulu. Vérifie les options avant de lancer.", "chkAutomatique", true),
+                    new DemoStep("Lancer dans ton projet", "Clique sur Lancer, sélectionne les éléments demandés puis contrôle la position, les dimensions et l’ouverture réelle de la réservation. La maquette de formation propose un exercice vérifié pas à pas.", "DemoRunReservationButton", true)
                 },
                 ["pipe-calculation"] = new[]
                 {
@@ -251,9 +253,11 @@ namespace BIMaestro.Tutorials
                 {
                     new DemoStep("Retrouver les actions", "Filtre l'historique par type d'action, utilisateur ou période. La maquette de formation prépare deux suppressions pour l'exercice complet.", "ActionFilterCombo", true),
                     new DemoStep("Examiner un élément", "Sélectionne une carte dans la vue visuelle pour identifier l’objet et son action.", "VisualCardsList", true),
-                    new DemoStep("Visualiser", "L'aperçu permet de situer un élément supprimé sans le recréer dans la maquette.", "VisualizeDeletedButton", true),
+                    new DemoStep("Choisir l’aperçu", "Simple utilise des volumes pour situer les objets supprimés. Détaillé restitue mieux leur forme lorsque les données sont disponibles, avec davantage de ressources nécessaires. La maquette de formation permet de comparer ces deux modes.", "SimpleMeshModeRadio", true),
+                    new DemoStep("Visualiser", "Visualiser cluster affiche l’aperçu du cluster sélectionné sans recréer les éléments supprimés dans la maquette.", "VisualizeDeletedButton", true),
                     new DemoStep("Nettoyer l’aperçu", "Après avoir observé les objets dans Revit, clique sur Nettoyer previews pour retirer les silhouettes temporaires.", "CleanPreviewsButton", true),
-                    new DemoStep("Restaurer si nécessaire", "Restaurer recrée l'élément dans le projet. Utilise cette action après avoir confirmé la suppression et la disponibilité de la famille correspondante.", "RestoreDeletedButton", true)
+                    new DemoStep("Restaurer les éléments supprimés", "Restaurer les éléments recrée les objets supprimés. Vérifie la suppression et la disponibilité de la famille correspondante avant de confirmer, puis contrôle le résultat dans Revit.", "RestoreDeletedButton", true),
+                    new DemoStep("Restaurer les paramètres", "Pour une modification de paramètres, sélectionne l’événement correspondant puis utilise Restaurer. Cette action réapplique les anciennes valeurs enregistrées ; elle ne recrée pas un objet supprimé. Le parcours de formation fait essayer les deux restaurations.", "RestoreParametersButton", true)
                 }
             };
 
@@ -1623,6 +1627,7 @@ namespace BIMaestro.Tutorials
                 int current = _index;
                 _window.Dispatcher.BeginInvoke(new Action(() =>
                 {
+                    if (_closed || _index != current) return;
                     Highlight(step.Target, current);
                     if (!step.IsExplanation && step.CompletionEvent == null)
                         WatchAction(step.Target, current);
@@ -1668,10 +1673,16 @@ namespace BIMaestro.Tutorials
                 }
                 else if (target is System.Windows.Controls.TextBox textBox)
                 {
+                    if (targetName == "PrefixTextBox" &&
+                        string.Equals(textBox.Text, "PK-", StringComparison.Ordinal))
+                    {
+                        _completed = true;
+                        _next.IsEnabled = true;
+                    }
                     TextChangedEventHandler handler = (_, __) =>
                     {
                         if (targetName != "PrefixTextBox" ||
-                            textBox.Text.StartsWith("PK-", StringComparison.OrdinalIgnoreCase))
+                            string.Equals(textBox.Text, "PK-", StringComparison.Ordinal))
                             CompleteStep(expectedIndex);
                     };
                     textBox.TextChanged += handler;

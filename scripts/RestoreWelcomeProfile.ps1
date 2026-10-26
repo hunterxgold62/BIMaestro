@@ -1,7 +1,10 @@
-param([Parameter(Mandatory)][string]$BackupFile)
+﻿param([Parameter(Mandatory)][string]$BackupFile)
 $ErrorActionPreference = 'Stop'
 if (@(Get-Process Revit -ErrorAction SilentlyContinue).Count -gt 0) { throw 'Fermer Revit avant de restaurer les informations du profil.' }
-$current = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'RevitLogs/License/welcome_state.json'
+$documentsPath = [Environment]::GetFolderPath('MyDocuments')
+$dataRoot = Join-Path $documentsPath 'BIMaestro_Revit'
+if (!(Test-Path -LiteralPath (Join-Path $dataRoot '.bimaestro-migration-v1')) -and (Test-Path -LiteralPath (Join-Path $documentsPath 'RevitLogs'))) { $dataRoot = Join-Path $documentsPath 'RevitLogs' }
+$current = Join-Path $dataRoot 'License/welcome_state.json'
 $old = Get-Content -LiteralPath $BackupFile -Raw | ConvertFrom-Json -AsHashtable
 $state = if (Test-Path -LiteralPath $current) { Get-Content -LiteralPath $current -Raw | ConvertFrom-Json -AsHashtable } else { @{ SchemaVersion = 1; InstallId = $old.InstallId } }
 if ($state.Email -and $old.Email -and $state.Email -ne $old.Email) { throw 'Le profil courant appartient à une autre adresse. Aucune information remplacée.' }

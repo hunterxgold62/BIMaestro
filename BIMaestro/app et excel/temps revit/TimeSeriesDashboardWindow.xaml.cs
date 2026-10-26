@@ -26,7 +26,7 @@ namespace BIMaestro.Dashboard
     [Obfuscation(Exclude = true, ApplyToMembers = true, StripAfterObfuscation = false)]
     public partial class TimeSeriesDashboardWindow : Window
     {
-        private readonly string _excelPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "Historique_Temps_Revit.xlsx");
+        private readonly string _excelPath = Path.Combine(global::BIMaestro.Storage.UserDataStorage.Root, "Historique_Temps_Revit.xlsx");
         private List<Entry> _saved = new List<Entry>();
         private List<Entry> _all = new List<Entry>();
         private List<Entry> _detail = new List<Entry>();

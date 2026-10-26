@@ -428,8 +428,7 @@ namespace BIMaestro.UI
         }
 
         private static string CacheFolder => Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-            "RevitLogs", "CacheVignettes");
+            global::BIMaestro.Storage.UserDataStorage.Root, "CacheVignettes");
 
         private static void EnsureHandlers()
         {

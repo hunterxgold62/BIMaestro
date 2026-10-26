@@ -40,8 +40,7 @@ namespace Visualisation
 
                 // 2) Dossiers de sortie
                 string baseDir = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                    "RevitLogs", "Export Nomenclatures");
+                    global::BIMaestro.Storage.UserDataStorage.Root, "Export Nomenclatures");
                 string excelDir = Path.Combine(baseDir, "Excel");
                 string pdfDir = Path.Combine(baseDir, "PDF");
                 Directory.CreateDirectory(excelDir);

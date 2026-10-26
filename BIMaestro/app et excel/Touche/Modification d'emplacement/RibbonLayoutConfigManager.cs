@@ -46,7 +46,7 @@ namespace BIMaestro.RibbonLayout
 
         public static string GetConfigPath()
         {
-            var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "SauvegardePréférence");
+            var dir = Path.Combine(global::BIMaestro.Storage.UserDataStorage.Root, "SauvegardePréférence");
             Directory.CreateDirectory(dir);
             return Path.Combine(dir, ConfigFileName);
         }

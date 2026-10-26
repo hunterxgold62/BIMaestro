@@ -490,7 +490,7 @@ namespace Famille
         private static string GetCachePath()
         {
             string MyDocuments = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-            string dir = Path.Combine(MyDocuments, "RevitLogs", "SauvegardePréférence");
+            string dir = Path.Combine(MyDocuments, "BIMaestro", "SauvegardePréférence");
             return Path.Combine(dir, "translation_cache.json");
         }
     }

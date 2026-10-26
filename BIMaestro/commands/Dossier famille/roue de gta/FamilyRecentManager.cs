@@ -15,8 +15,7 @@ namespace Famille
         }
 
         private static readonly string FilePath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-            "RevitLogs", "SauvegardePréférence", "FamilyRecent.json");
+            global::BIMaestro.Storage.UserDataStorage.Root, "SauvegardePréférence", "FamilyRecent.json");
 
         public static void RegisterUse(string familyPath)
         {

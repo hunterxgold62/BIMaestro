@@ -16,8 +16,7 @@ namespace BIMaestro.UI
         }
 
         private static readonly string FilePath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-            "RevitLogs", "SauvegardePréférence", "RecentButtons.json");
+            global::BIMaestro.Storage.UserDataStorage.Root, "SauvegardePréférence", "RecentButtons.json");
 
         public static void RegisterUse(string buttonId, string commandClass)
         {

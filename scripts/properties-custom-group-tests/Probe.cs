@@ -26,13 +26,19 @@ namespace BIMaestro.PropertiesCustomGroupTests
   {
    var probe=current;if(probe==null||!probe.IsFixture(app)||app.Application.VersionNumber!="2025")return false;
    if(!File.Exists(Path.Combine(probe.dir,"target-pid.txt"))||File.ReadAllText(Path.Combine(probe.dir,"target-pid.txt")).Trim()!=Process.GetCurrentProcess().Id.ToString())return false;
-   PropertiesAppearanceWindow.CustomGroupRequested=title=>Enqueue(ui=>{
+   PropertiesAppearanceEditor.CustomGroupRequested=title=>Enqueue(ui=>{
     if(!probe.IsFixture(ui))throw new InvalidOperationException("Laboratory fixture only.");
     if(string.IsNullOrWhiteSpace(title)||title.Length>120||title.Contains("\n")||title.Contains("\r"))throw new InvalidOperationException("Invalid group title.");
     NativeGroupExperiment.Run(ui,probe.dir,"group-restore");
     File.WriteAllText(Path.Combine(probe.dir,"custom-title.txt"),title.Trim());probe.autoGroup=true;
    });
-   var window=new PropertiesAppearanceWindow(AppearanceContext.ForEditor(app));
+   var editor=new PropertiesAppearanceEditor(AppearanceContext.ForEditor(app));
+   var window=new System.Windows.Window { Content=editor, Width=1280, Height=850 };
+   var root=new System.Windows.Controls.DockPanel();window.Content=root;window.Resources=editor.Resources;
+   var actions=new System.Windows.Controls.StackPanel { Orientation=System.Windows.Controls.Orientation.Horizontal,HorizontalAlignment=System.Windows.HorizontalAlignment.Right,Margin=new System.Windows.Thickness(12) };
+   var save=new System.Windows.Controls.Button { Content="Enregistrer mon affichage",MinWidth=210 };save.SetResourceReference(System.Windows.FrameworkElement.StyleProperty,"PrimaryButton");save.Click+=(_,__)=>editor.SaveChanges(null);actions.Children.Add(save);
+   System.Windows.Controls.DockPanel.SetDock(actions,System.Windows.Controls.Dock.Bottom);root.Children.Add(actions);root.Children.Add(editor);
+   window.Closed+=(_,__)=>{editor.Close();Enqueue(ui=>{PropertiesAppearanceService.CancelPreview();PropertiesAppearanceService.ProcessIdling(ui);});};
    window.Title="Apparence des propriétés · Prototype numéroté "+Path.GetFileName(probe.dir);
    new System.Windows.Interop.WindowInteropHelper(window){Owner=app.MainWindowHandle};window.Show();return true;
   }
@@ -84,6 +90,7 @@ namespace BIMaestro.PropertiesCustomGroupTests
    if(command=="fixture") { Fixture(app); Write("fixture.json",new {path=FixturePath,pid=Process.GetCurrentProcess().Id});return; }
    RequireFixture(app);
    IsolateInstalledAppearance(app);
+   if(CustomGroupCommand(app,command))return;
    if(ExtraCommand(app,command))return;
    if(command=="audit-full"||command=="audit-fast"||command=="perf"||command=="diagnostics-on"||command=="diagnostics-off")
    {

@@ -22,7 +22,11 @@ namespace BIMaestro.PropertiesAppearance {
   internal static void ResetAll(){Saved=AppearanceStore.ResetAll();}
   internal static void CancelPreview(){CancelCount++;}
  }
- internal static class PropertiesAppearanceCommand { internal static void Request(Action<object> action)=>action(null); }
+ internal static class PropertiesAppearanceCommand {
+  internal static bool Hold;internal static Queue<Action<object>> Pending=new Queue<Action<object>>();
+  internal static void Request(Action<object> action){if(Hold)Pending.Enqueue(action);else action(null);}
+  internal static void Drain(){while(Pending.Count>0)Pending.Dequeue()(null);}
+ }
 }
 class Program {
  internal static AppearanceContext Context=new AppearanceContext();
@@ -33,7 +37,7 @@ class Program {
  static void Preset(object w,int index){var item=((IEnumerable)Field(w,"_presets")).Cast<object>().ElementAt(index);((Button)item.GetType().GetProperty("Item1").GetValue(item)).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));}
  [STAThread]static void Main(){
   new System.Windows.Application();
-  string folder=Path.Combine(Path.GetTempPath(),"BIMaestro-EditorFlow-"+Guid.NewGuid());AppearanceStore.TestFilePath=Path.Combine(folder,"settings.json");
+  string folder=Path.Combine(Environment.CurrentDirectory,"output","tests","BIMaestro-EditorFlow-"+Guid.NewGuid());AppearanceStore.TestFilePath=Path.Combine(folder,"settings.json");
   var group=new PropertyPreviewRow{Header=true,GroupKey="g",Label="Graphismes"};
   var scale=new PropertyPreviewRow{GroupKey="g",ParameterKey="scale",Label="Échelle de la vue",Value="1 : 100"};
   var locked=new PropertyPreviewRow{GroupKey="g",ParameterKey="locked",Label="Valeur de l’échelle",Value="100",ReadOnly=true};
@@ -41,8 +45,13 @@ class Program {
   var extents=new PropertyPreviewRow{Header=true,GroupKey="ext",Label="Étendues"};
   var crop=new PropertyPreviewRow{GroupKey="ext",ParameterKey="crop",Label="Cadrer la vue",Value="Non"};
   Context.PreviewRows.AddRange(new[]{group,scale,locked,detail,extents,crop});
-  var w=new PropertiesAppearanceWindow(Context);
+  LayoutFlow.Run(Context);
+  var w=new PropertiesAppearanceEditor(Context);
+  Check(w is UserControl && !w.HasChanges,"embedded editor starts from saved preferences without changes");
+  Check(((System.Windows.Media.SolidColorBrush)w.Resources["Ink"]).Color==((System.Windows.Media.SolidColorBrush)w.Resources["Text.Primary"]).Color,"embedded editor uses the shared Couleur palette");
   Check(((TextBlock)Field(w,"_selection")).Text.Contains("Graphismes"),"initial selection identifies the group");
+  HomeFlow.Render(w,"proprietes");
+  HomeFlow.Run();
   Preset(w,1);var profiles=(Dictionary<string,AppearanceProfile>)Field(w,"_drafts");
   Check(profiles[Context.CategoryKey].Rules.Count==1&&!File.Exists(AppearanceStore.FilePath),"preset changes the category draft without saving");
   Check(((PaletteColors)Invoke(w,"Effective",detail)).Background=="#FFE7F1FB","group preset immediately appears on writable rows");
@@ -65,7 +74,7 @@ class Program {
   Check(!(bool)Invoke(w,"CanMove",detail,crop),"cross-group parameter moves are kept disabled pending native editing qualification");
   Invoke(w,"Save");Check(AppearanceStore.Load().Enabled&&AppearanceStore.Load().Profiles.Single().Key==Context.CategoryKey,"save persists the intended category and activation");
   Check(AppearanceStore.Load().Profiles.Single().Layout.Groups[0]=="ext","saved layout survives serialization");
-  var reopened=new PropertiesAppearanceWindow(Context);var reopenedProfiles=(Dictionary<string,AppearanceProfile>)Field(reopened,"_drafts");Check(reopenedProfiles[Context.CategoryKey].Rules.Count==2,"reopening restores both group and parameter customization");
+  var reopened=new PropertiesAppearanceEditor(Context);var reopenedProfiles=(Dictionary<string,AppearanceProfile>)Field(reopened,"_drafts");Check(reopenedProfiles[Context.CategoryKey].Rules.Count==2,"reopening restores both group and parameter customization");
   ((CheckBox)Field(reopened,"_live")).IsChecked=true;((CheckBox)Field(reopened,"_live")).IsChecked=false;Check(PropertiesAppearanceService.CancelCount==1,"stopping the live test restores the saved palette");
   var originalRows=((StackPanel)Field(reopened,"_rows")).Children.Count;
   Invoke(reopened,"ClickRow",group);Check(((StackPanel)Field(reopened,"_rows")).Children.Count==originalRows-3,"single click collapses the group on both sides");
@@ -73,6 +82,18 @@ class Program {
   ((TextBox)Field(reopened,"_search")).Text="";Invoke(reopened,"ClickRow",group);Check(((StackPanel)Field(reopened,"_rows")).Children.Count==originalRows,"second click expands the group again");
   Invoke(reopened,"ResetEverything");var reset=AppearanceStore.Load();Check(!reset.Enabled&&reset.Profiles.Count==0,"global reset clears order and colors across all scopes and themes");
   Check(((Dictionary<string,AppearanceProfile>)Field(reopened,"_drafts")).Values.All(p=>p.Rules.Count==0&&p.Layout.IsEmpty),"global reset also clears the visible draft and comparison");
-  reopened.Close();w.Close();File.Delete(AppearanceStore.FilePath);File.Delete(AppearanceStore.FilePath+".bak");Directory.Delete(folder);
+  bool completed=false;Preset(reopened,1);PropertiesAppearanceCommand.Hold=true;
+  reopened.SaveChanges(()=>completed=true);
+  Check(!completed&&AppearanceStore.Load().Profiles.Count==0,"shared save waits for the Revit event before completing");
+  PropertiesAppearanceCommand.Drain();Check(completed&&!reopened.HasChanges,"shared save completes only after the draft is persisted");
+  Preset(reopened,2);reopened.SaveChanges(()=>throw new Exception("closed editor must not complete a save"));reopened.Close();
+  var saved=File.ReadAllText(AppearanceStore.FilePath);PropertiesAppearanceCommand.Drain();
+  Check(File.ReadAllText(AppearanceStore.FilePath)==saved,"closing an editor prevents a queued draft from being saved");
+  PropertiesAppearanceCommand.Hold=false;
+  CustomGroupFlow.Run(Context);
+  PackFlow.Run(Context);
+  w.Close();File.Delete(AppearanceStore.FilePath);File.Delete(AppearanceStore.FilePath+".bak");
+  string snapshots=AppearanceStore.FilePath+".groups";if(Directory.Exists(snapshots)){foreach(var file in Directory.GetFiles(snapshots,"*.json"))File.Delete(file);Directory.Delete(snapshots);}
+  Directory.Delete(folder);
  }
 }

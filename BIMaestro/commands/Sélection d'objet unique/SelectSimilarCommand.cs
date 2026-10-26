@@ -27,31 +27,10 @@ namespace Visualisation
 
         private const string FileNamePrefs = "SelectSimilarPreferences.json";
         private const string FileNameLastSet = "SelectSimilarLastSet.json";
-        private const string SubPath = "RevitLogs\\SauvegardePréférence";
-
-        // OneDrive pro/perso si dispo, sinon Mes Documents
-        private static string ResolvePreferredDocuments()
-        {
-            var odBiz = Environment.GetEnvironmentVariable("OneDriveCommercial");
-            if (!string.IsNullOrWhiteSpace(odBiz)) return Path.Combine(odBiz, "Documents");
-            var od = Environment.GetEnvironmentVariable("OneDrive");
-            if (!string.IsNullOrWhiteSpace(od)) return Path.Combine(od, "Documents");
-            var odConsumer = Environment.GetEnvironmentVariable("OneDriveConsumer");
-            if (!string.IsNullOrWhiteSpace(odConsumer)) return Path.Combine(odConsumer, "Documents");
-            return Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-        }
-
         public static string GetFolder()
         {
-            var docsRoot = ResolvePreferredDocuments();
-            var target = Path.Combine(docsRoot, SubPath);
-            try { Directory.CreateDirectory(target); }
-            catch
-            {
-                var fb = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-                target = Path.Combine(fb, SubPath);
-                Directory.CreateDirectory(target);
-            }
+            var target = Path.Combine(global::BIMaestro.Storage.UserDataStorage.SelectionPreferencesRoot, "SauvegardePréférence");
+            Directory.CreateDirectory(target);
             return target;
         }
 

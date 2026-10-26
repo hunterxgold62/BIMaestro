@@ -9,8 +9,7 @@ namespace Famille
     {
         // Chemin du JSON d’usage
         private static readonly string UsageFile = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-            "RevitLogs", "SauvegardePréférence", "FamilyUsage.json");
+            global::BIMaestro.Storage.UserDataStorage.Root, "SauvegardePréférence", "FamilyUsage.json");
 
         // Lit ou renvoie un dictionnaire vide
         public static Dictionary<string, int> Load()

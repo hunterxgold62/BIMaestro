@@ -15,8 +15,7 @@ namespace Famille
     public static class CollectionStore
     {
         private static readonly string FilePath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-            "RevitLogs", "SauvegardePréférence", "Collections.json");
+            global::BIMaestro.Storage.UserDataStorage.Root, "SauvegardePréférence", "Collections.json");
 
         public static List<Collection> Load()
         {

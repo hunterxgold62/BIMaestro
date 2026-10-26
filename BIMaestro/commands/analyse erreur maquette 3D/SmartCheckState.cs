@@ -30,8 +30,7 @@ namespace Analyse
             new Dictionary<string, Dictionary<string, IssueStatusRecord>>(StringComparer.OrdinalIgnoreCase);
 
         private static readonly string StoreFolder = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-            "RevitLogs", "SauvegardePréférence");
+            global::BIMaestro.Storage.UserDataStorage.Root, "SauvegardePréférence");
 
         private static readonly string StorePath = Path.Combine(StoreFolder, "smartcheck_ignored.json");
         private static readonly string StatusStorePath = Path.Combine(StoreFolder, "smartcheck_status.json");
@@ -160,8 +159,7 @@ namespace Analyse
         public static string GetThumbnailFolder(string docKey)
         {
             var root = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                "RevitLogs", "Clash3D", "Miniatures");
+                global::BIMaestro.Storage.UserDataStorage.Root, "Clash3D", "Miniatures");
             string suffix;
             using (var hash = SHA256.Create()) suffix = BitConverter.ToString(hash.ComputeHash(Encoding.UTF8.GetBytes(docKey ?? "document"))).Replace("-", "").Substring(0, 16);
             var safe = MakeSafeFileName(string.IsNullOrWhiteSpace(docKey) ? "document" : docKey) + "_" + suffix;
@@ -171,8 +169,7 @@ namespace Analyse
         public static string GetReportFolder()
         {
             return Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                "RevitLogs", "Clash3D", "Rapports");
+                global::BIMaestro.Storage.UserDataStorage.Root, "Clash3D", "Rapports");
         }
 
         private static string NormalizeStatus(string status)

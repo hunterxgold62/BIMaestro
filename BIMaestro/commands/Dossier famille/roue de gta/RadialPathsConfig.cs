@@ -14,8 +14,7 @@ namespace BIMaestro.UI
             try
             {
                 var file = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                    "RevitLogs", "SauvegardePréférence", "CheminsFamille.json");
+                    global::BIMaestro.Storage.UserDataStorage.Root, "SauvegardePréférence", "CheminsFamille.json");
                 if (!File.Exists(file)) return null;
                 return JsonConvert.DeserializeObject<RadialPathsConfig>(File.ReadAllText(file));
             }

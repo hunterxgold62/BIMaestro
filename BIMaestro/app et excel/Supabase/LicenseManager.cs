@@ -14,7 +14,7 @@ namespace Licensing
 {
     /// <summary>
     /// Validation licence + cache hors-ligne (fichier) + machine_id.
-    /// Cache : Mes Documents\RevitLogs\License\token_{licence}.json
+    /// Cache : Mes Documents\BIMaestro_Revit\License\token_{licence}.json
     /// </summary>
     public static class LicenseManager
     {
@@ -57,7 +57,7 @@ namespace Licensing
         }
 
         /// <summary>
-        /// ID d’installation persistant (GUID) : RevitLogs\License\install_id.txt
+        /// ID d’installation persistant (GUID) : BIMaestro\License\install_id.txt
         /// </summary>
         public static string GetOrCreateInstallId()
         {

@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFrameworks>net8.0;net48</TargetFrameworks><AutomaticallyUseReferenceAssemblyPackages>false</AutomaticallyUseReferenceAssemblyPackages><EnableDefaultItems>false</EnableDefaultItems></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="../../BIMaestro/app et excel/Supabase/UserDataStorage.cs" />
+  </ItemGroup>
+</Project>

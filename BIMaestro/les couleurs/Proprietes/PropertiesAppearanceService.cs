@@ -33,6 +33,8 @@ namespace BIMaestro.PropertiesAppearance
                 var grid = NativePropertiesGrid.Find(app);
                 if (grid != null)
                 {
+                    var original=PropertiesPaletteLayout.OriginalPreview(grid,context);
+                    if(original!=null){context.PreviewRows=original;context.PreviewHint="Glissez un paramètre vers un bandeau personnalisé.";return context;}
                     string group = null;
                     for (uint row = 1; row <= grid.RowCount; row++)
                     {
@@ -135,6 +137,9 @@ namespace BIMaestro.PropertiesAppearance
 
     internal static class PropertiesAppearanceService
     {
+        internal static long ModelRevision {get;private set;}
+        private static Autodesk.Revit.ApplicationServices.Application _observedApplication;
+        private static void ModelChanged(object sender,Autodesk.Revit.DB.Events.DocumentChangedEventArgs args){ModelRevision++;}
 #if BIMAESTRO_PROPERTIES_TESTS
         // The isolated group prototype owns its permutation after normal ordering.
         // Keep the two native layout writers from moving the same rows independently.
@@ -198,14 +203,14 @@ namespace BIMaestro.PropertiesAppearance
         internal static void ResetAll() { _saved = AppearanceStore.ResetAll(); _preview = null; Invalidate(); }
         internal static void CancelPreview() { _preview = null; Invalidate(); }
         private static void Invalidate() { _signature = null; _next = DateTime.MinValue; _renderer?.Dispose(); _renderer = null; }
-        internal static void Shutdown() { Presentation.Dispose();_presentationEvent?.Dispose();_presentationEvent=null; PropertiesAppearanceCommand.Shutdown(); _preview = null; _renderer?.Dispose(); _renderer = null; }
+        internal static void Shutdown() { if(_observedApplication!=null){_observedApplication.DocumentChanged-=ModelChanged;_observedApplication=null;} Presentation.Dispose();_presentationEvent?.Dispose();_presentationEvent=null; PropertiesAppearanceCommand.Shutdown(); _preview = null; _renderer?.Dispose(); _renderer = null; }
 
         // Only native grid access and plain captured metadata are allowed here.
         // This also runs from WM_PAINT, outside Revit's document API context.
         private static int RefreshNativePlan(NativePropertiesGrid grid, AppearanceContext context,
             AppearancePreferences preferences, string version, bool dark, PropertiesPaletteRenderer renderer, bool redraw)
         {
-            if (!grid.RefreshIfCurrent()) return 0;
+            if(PropertiesPaletteLayout.IsApplying||!grid.RefreshIfCurrent()) return 0;
             bool hasColors = preferences.Enabled && preferences.Profiles.Any(p => p.Rules.Count > 0);
             bool hasOrder = preferences.Enabled && preferences.Profiles.Any(p => !p.Layout.IsEmpty);
             bool customLayout = false;
@@ -227,10 +232,11 @@ namespace BIMaestro.PropertiesAppearance
                     if(customColors!=null && (header || grid.CanStyle(row)))
                     { cells.Add(new PropertiesPaletteRenderer.CellPlan { Row=row,Label=raw,Header=header,Colors=customColors,Dark=dark });continue; }
 #endif
-                    if (header) context.GroupMap.TryGetValue(AppearancePreferences.Normalize(raw), out group);
+                    if (header) {context.GroupMap.TryGetValue(AppearancePreferences.Normalize(raw), out group);group=PropertiesPaletteLayout.CustomGroupAt(grid,row)??group;}
                     if (group == null) continue;
                     PropertyTarget parameter = null;
                     if (!header) context.ParameterMap.TryGetValue(group + "|" + AppearancePreferences.Normalize(raw), out parameter);
+                    if(!header)parameter=PropertiesPaletteLayout.ParameterAt(grid,context,row)??parameter;
                     if (!header && (parameter == null || parameter.ReadOnly)) continue;
                     var colors = preferences.Resolve(context.CategoryKey, context.TypeKey, group, parameter?.Key, dark);
                     if (colors != null) cells.Add(new PropertiesPaletteRenderer.CellPlan { Row = row, Label = raw, Header = header, Colors = colors, Dark = dark });
@@ -245,6 +251,7 @@ namespace BIMaestro.PropertiesAppearance
             try
             {
                 if (DateTime.UtcNow < _next) return;
+                if(_observedApplication==null&&app!=null){_observedApplication=app.Application;_observedApplication.DocumentChanged+=ModelChanged;}
                 if(_presentationEvent==null)_presentationEvent=ExternalEvent.Create(new PresentationHandler());
                 _next = DateTime.UtcNow.AddMilliseconds(450);
                 measured = PropertiesAppearanceMetrics.Begin();
@@ -315,13 +322,17 @@ namespace BIMaestro.PropertiesAppearance
             }
             catch (Exception ex)
             {
+                var recoveryGrid=_cachedGrid;
                 _renderer?.Dispose(); _renderer = null; _cachedGrid = null;
                 if (PropertiesPaletteLayout.RequiresNativeRebuild && app?.ActiveUIDocument != null)
                 {
+                    bool idle=false;
+                    try{idle=recoveryGrid!=null&&recoveryGrid.IsCurrent()&&!recoveryGrid.IsEditing;}catch{}
+                    if(!idle){Status="Actualisation différée pour préserver la saisie en cours. Changez de sélection après validation. "+ex.Message;_next=DateTime.UtcNow.AddSeconds(5);return;}
                     // Idling is on Revit's UI thread: discard uncertain row indices
                     // before returning control to the user. Never write model values.
                     var selection = app.ActiveUIDocument.Selection;
-                    var ids = selection.GetElementIds();
+                    var ids = selection.GetElementIds().ToArray();
                     selection.SetElementIds(new ElementId[0]);
                     selection.SetElementIds(ids);
                     PropertiesPaletteLayout.Forget();

@@ -1,5 +1,29 @@
 # Vérification des badges d’infobulle
 
+### Nouveaux boutons — 26 octobre 2026
+
+Ajout de trois aperçus avec le lecteur existant (boucle muette, poster de
+secours et fermeture à la disparition de l’infobulle) :
+
+- Maintenance MEP : trajet coudé d’extraction d’un moteur autour d’un obstacle,
+  enveloppe de dégagement et manœuvre d’un levier avec opérateur.
+- Accueil Revit : alternance entre cartes et liste des projets récents.
+- Propriétés : couleurs des groupes et paramètres, puis retour à l’état initial
+  pour illustrer l’aperçu réversible.
+
+`python scripts/ribbon-badge-tests/GenerateNewButtonExamples.py` régénère ces
+trois médias ; des noms d’assets peuvent être passés pour cibler la génération.
+Pillow et ffmpeg sur PATH sont nécessaires. Les médias sont des schémas
+illustratifs, sans exécution des commandes métier.
+
+Posters inspectés ; les trois MP4 ont été décodés intégralement : 120 images,
+six secondes, 640 × 360. Contrôle des correspondances du ruban : les 59 IDs
+de boutons actifs possèdent un exemple. Compilation Revit 2025 réussie ;
+contrats du ruban Autodesk et présence des médias dans la sortie validés
+(68 correspondances, 32 vidéos). La vérification multiversion a été interrompue
+après absence de progression du build 2023 ; les autres versions restent à vérifier.
+Pas de nouvelle vérification du survol dans Revit ni de déploiement des DLL.
+
 ### Réservation auto — fiche outil du 12 octobre 2026
 
 La mise en page native personnalisée de ce bouton devient une fiche statique :

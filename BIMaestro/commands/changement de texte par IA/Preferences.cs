@@ -9,8 +9,7 @@ public class Preferences
     private static string GetPrefFilePath()
     {
         string baseDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-            "RevitLogs",
+            global::BIMaestro.Storage.UserDataStorage.Root,
             "SauvegardePréférence"
         );
         Directory.CreateDirectory(baseDir);

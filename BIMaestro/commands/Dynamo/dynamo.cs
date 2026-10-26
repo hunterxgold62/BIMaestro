@@ -17,8 +17,7 @@ namespace Modification
     {
         private const int ButtonCount = 5;
         private static readonly string ConfigFolder = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-            "RevitLogs",
+            global::BIMaestro.Storage.UserDataStorage.Root,
             "SauvegardePréférence");
         private static readonly string ConfigFile = Path.Combine(ConfigFolder, "DynamoButtons.json");
         private static readonly string LegacyConfigFile = Path.Combine(ConfigFolder, "DynamoPaths.txt");

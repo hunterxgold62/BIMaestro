@@ -25,6 +25,9 @@ public partial class AppUI
             case "Sélection d'objet": return "Sélectionnez un élément de référence, puis retrouvez les éléments similaires dans le projet.";
             case "HighlightElementsByCategories": return "Partez d’un objet sélectionné, choisissez les familles/types et la portée, puis sélectionnez les éléments correspondants.";
             case "MepBooster": return "Activez la pastille MEP, survolez un angle pour prévisualiser la rotation, puis cliquez pour appliquer une action autorisée.";
+            case "MaintenanceWorkbench": return "Préparez une intervention MEP : extraction d’un moteur, manœuvre avec opérateur ou retrait d’un filtre / actionneur. Repérez les obstacles et ajustez les cotes ; la procédure et les efforts restent à confirmer.";
+            case "HomeAppearanceTest": return "Choisissez la présentation de l’accueil Revit et retrouvez vos projets, familles et, en option, leur historique.";
+            case "PropertiesAppearance": return "Personnalisez les couleurs et l’organisation de la palette Propriétés, avec des profils généraux, par catégorie ou par type et un aperçu réversible.";
             case "PipeSystemColors": return "Colorez les canalisations et raccords selon les couleurs des types de systèmes dans la vue active.";
             case "RevitGameCommand": return "Explorez la vue 3D en maquette interactive : déplacez-vous, inspectez les objets et interagissez avec les portes et les vannes.";
             case "CodexChat": return "Créez ou modifiez des familles Revit avec Codex ou Claude Code, selon les autorisations du panneau. Bêta.";
@@ -126,6 +129,9 @@ public partial class AppUI
             case "ScanText": example = ModificationImage("AiAudit"); caption = "Anomalies repérées et classées • exemple illustré"; break;
             case "RealisticViewImage": example = ExampleVideo("AiRender"); caption = "Plan / rendu • comparaison de principe illustrée"; break;
             case "MepBooster": example = ExampleVideo("BetaBooster"); caption = "Rotation d’un raccord libre • démonstration illustrée"; break;
+            case "MaintenanceWorkbench": example = ExampleVideo("MaintenanceMep"); caption = "Extraction et manœuvre • contrôle géométrique illustratif"; break;
+            case "HomeAppearanceTest": example = ExampleVideo("InfoHomeAppearance"); caption = "Cartes ou liste • présentations d’accueil illustrées"; break;
+            case "PropertiesAppearance": example = ExampleVideo("InfoPropertiesAppearance"); caption = "Couleurs et groupes • aperçu réversible illustré"; break;
             case "PipeSystemColors": example = ExampleVideo("BetaColors"); caption = "Coloration par système • palette illustrative"; break;
             case "RevitGameCommand": example = ExampleVideo("BetaWalkthrough"); caption = "Visite en vue subjective • maquette illustrative"; break;
             case "OpenSheetFromViewButton": example = ExampleVideo("VisNavigation"); caption = "Navigation vue / feuille • exemple illustré"; break;

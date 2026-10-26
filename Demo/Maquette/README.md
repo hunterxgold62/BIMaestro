@@ -19,7 +19,7 @@ refusent une préparation sans le RVT, les huit familles et les témoins du cata
 y compris pour Revit 2025.
 
 Le bouton copie la référence puis l'ouvre avec la version de Revit utilisée,
-dans `Documents/RevitLogs/BIMaestro_Apprentissage_<version>.rvt`.
+dans `Documents/BIMaestro_Revit/BIMaestro_Apprentissage_<version>.rvt`.
 Si ce fichier existe, une nouvelle copie horodatée est créée. L'utilisateur
 peut donc modifier ses exercices sans remplacer la base ni ses anciens fichiers.
 L'utilisateur n'a pas besoin d'un gabarit Autodesk MEP pour ouvrir cette copie.

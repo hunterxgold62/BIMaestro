@@ -64,7 +64,7 @@ namespace Licensing
             _machineIdHash = machineIdHash;
             _fallbackLicenseKey = fallbackLicenseKey;
 
-            var logDir = Paths.RevitLogsDir;
+            var logDir = Paths.BIMaestroDir;
             _queueFile = Path.Combine(logDir, "telemetry.queue.json");
 
             _http = NetSupport.CreateHttpClient(TimeSpan.FromSeconds(10));

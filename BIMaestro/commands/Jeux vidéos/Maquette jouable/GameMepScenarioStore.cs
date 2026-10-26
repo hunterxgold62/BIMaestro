@@ -856,8 +856,7 @@ namespace BIMaestro.VideoGames
             if (!string.IsNullOrWhiteSpace(storageDirectoryOverride))
                 return storageDirectoryOverride;
             return Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                "RevitLogs",
+                global::BIMaestro.Storage.UserDataStorage.Root,
                 "MaquetteJouable",
                 "FluidesMEP");
         }

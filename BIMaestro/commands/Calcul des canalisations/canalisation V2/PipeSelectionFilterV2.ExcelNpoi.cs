@@ -70,8 +70,7 @@ namespace Analyse
         {
             string folderName = includeDucts ? "LongueurCanalisations-Gaine" : "LongueurCanalisations";
             string folderPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                "RevitLogs",
+                global::BIMaestro.Storage.UserDataStorage.Root,
                 folderName);
             Directory.CreateDirectory(folderPath);
 

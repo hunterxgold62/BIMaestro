@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using System.Security.Cryptography;
 using System.Windows.Media;
 using Newtonsoft.Json;
 
@@ -27,12 +28,22 @@ namespace BIMaestro.PropertiesAppearance
         public AppearanceRule Copy() => new AppearanceRule { Kind = Kind, TargetKey = TargetKey, Label = Label, Light = Light.Copy(), Dark = Dark.Copy() };
     }
 
+    public sealed class AppearanceCustomGroup
+    {
+        public string Key { get; set; } = "custom:" + Guid.NewGuid().ToString("N");
+        public string Name { get; set; } = "Mes paramètres";
+        public List<string> Members { get; set; } = new List<string>();
+        public AppearanceCustomGroup Copy() => new AppearanceCustomGroup { Key=Key,Name=Name,Members=Members.ToList() };
+    }
+
     public sealed class AppearanceLayout
     {
         public List<string> Groups { get; set; } = new List<string>();
         public Dictionary<string, List<string>> Parameters { get; set; } = new Dictionary<string, List<string>>();
-        [JsonIgnore] public bool IsEmpty => Groups.Count == 0 && !Parameters.Any(p => p.Value.Count > 0);
-        public AppearanceLayout Copy() => new AppearanceLayout { Groups = Groups.ToList(), Parameters = Parameters.ToDictionary(p => p.Key, p => p.Value.ToList()) };
+        // null inherits the wider scope; an explicit empty list clears inherited custom groups.
+        [JsonIgnore] public List<AppearanceCustomGroup> CustomGroups { get; set; }
+        [JsonIgnore] public bool IsEmpty => Groups.Count == 0 && !Parameters.Any(p => p.Value.Count > 0) && CustomGroups==null;
+        public AppearanceLayout Copy() => new AppearanceLayout { Groups = Groups.ToList(), Parameters = Parameters.ToDictionary(p => p.Key, p => p.Value.ToList()),CustomGroups=CustomGroups?.Select(g=>g.Copy()).ToList() };
     }
 
     public sealed class AppearanceProfile
@@ -101,6 +112,44 @@ namespace BIMaestro.PropertiesAppearance
 
     internal static class AppearanceStore
     {
+        // Existing BIMaestro versions preserve parameter-order entries but drop unknown JSON
+        // properties. Keep immutable group snapshots and reference them through that known map.
+        private const string GroupsReference="bimaestro:custom-groups:v1";
+        private static string Digest(string json)
+        {using(var sha=SHA256.Create())return BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(json))).Replace("-","");}
+        private static void ReadGroups(AppearancePreferences preferences,Newtonsoft.Json.Linq.JObject document)
+        {
+            foreach(var profile in preferences.Profiles)
+            {
+                if(profile.Layout==null)continue;
+                if(profile.Layout.Parameters!=null&&profile.Layout.Parameters.TryGetValue(GroupsReference,out var reference))
+                {
+                    if(reference==null||reference.Count!=1||reference[0]==null||reference[0].Length!=64||reference[0].Any(c=>!Uri.IsHexDigit(c)))throw new InvalidDataException("Référence de groupes personnalisés invalide.");
+                    string json=File.ReadAllText(Path.Combine(FilePath+".groups",reference[0].ToUpperInvariant()+".json"));
+                    if(!string.Equals(Digest(json),reference[0],StringComparison.OrdinalIgnoreCase))throw new InvalidDataException("La sauvegarde des groupes personnalisés a été modifiée.");
+                    profile.Layout.CustomGroups=JsonConvert.DeserializeObject<List<AppearanceCustomGroup>>(json)??throw new InvalidDataException("Sauvegarde des groupes vide.");
+                }
+                else
+                {
+                    // Migrate inline group definitions from the initial experimental builds.
+                    var legacy=document["Profiles"]?.FirstOrDefault(p=>(string)p["Key"]==profile.Key)?["Layout"]?["CustomGroups"];
+                    if(legacy!=null&&legacy.Type!=Newtonsoft.Json.Linq.JTokenType.Null)profile.Layout.CustomGroups=legacy.ToObject<List<AppearanceCustomGroup>>();
+                }
+            }
+        }
+        private static void WriteGroups(AppearanceLayout layout)
+        {
+            if(layout.CustomGroups==null){layout.Parameters.Remove(GroupsReference);return;}
+            string json=JsonConvert.SerializeObject(layout.CustomGroups,Formatting.None),hash=Digest(json),folder=FilePath+".groups";
+            Directory.CreateDirectory(folder);string target=Path.Combine(folder,hash+".json");
+            if(!File.Exists(target))
+            {
+                string temp=target+"."+Guid.NewGuid().ToString("N")+".tmp";
+                try{File.WriteAllText(temp,json,new UTF8Encoding(false));File.Move(temp,target);}finally{if(File.Exists(temp))File.Delete(temp);}
+            }
+            else if(Digest(File.ReadAllText(target))!=hash)throw new InvalidDataException("La sauvegarde des groupes personnalisés est incohérente.");
+            layout.Parameters[GroupsReference]=new List<string>{hash};
+        }
         #if BIMAESTRO_PROPERTIES_TESTS
         internal static string TestFilePath;
 #endif
@@ -112,15 +161,28 @@ namespace BIMaestro.PropertiesAppearance
         internal static AppearancePreferences Load()
         {
             if (!File.Exists(FilePath)) return new AppearancePreferences();
-            var value = JsonConvert.DeserializeObject<AppearancePreferences>(File.ReadAllText(FilePath));
+            string json=File.ReadAllText(FilePath);
+            var value = JsonConvert.DeserializeObject<AppearancePreferences>(json);
             if (value == null || value.Version != 1) throw new InvalidDataException("Format de préférences des propriétés non reconnu.");
             value.Profiles = value.Profiles ?? new List<AppearanceProfile>();
+            ReadGroups(value,Newtonsoft.Json.Linq.JObject.Parse(json));
             foreach (var p in value.Profiles)
             {
                 p.Rules = p.Rules ?? new List<AppearanceRule>();
                 p.Layout = p.Layout ?? new AppearanceLayout(); p.Layout.Groups = p.Layout.Groups ?? new List<string>();
                 p.Layout.Parameters = p.Layout.Parameters ?? new Dictionary<string, List<string>>();
                 foreach (var key in p.Layout.Parameters.Keys.ToArray()) p.Layout.Parameters[key] = p.Layout.Parameters[key] ?? new List<string>();
+                if(p.Layout.CustomGroups!=null)
+                {
+                    if(p.Layout.CustomGroups.Count>20)throw new InvalidDataException("Maximum : 20 groupes personnalisés par profil.");
+                    var keys=new HashSet<string>();var names=new HashSet<string>();var members=new HashSet<string>();
+                    foreach(var g in p.Layout.CustomGroups)
+                    {
+                        if(g==null||string.IsNullOrWhiteSpace(g.Key)||!g.Key.StartsWith("custom:",StringComparison.Ordinal)||!keys.Add(g.Key)||string.IsNullOrWhiteSpace(g.Name)||g.Name.Length>80||g.Name.Any(char.IsControl)||!names.Add(AppearancePreferences.Normalize(g.Name)))throw new InvalidDataException("Groupe personnalisé invalide ou dupliqué.");
+                        g.Members=g.Members??new List<string>();
+                        if(g.Members.Count>256||g.Members.Any(k=>string.IsNullOrWhiteSpace(k)||!members.Add(k)))throw new InvalidDataException("Un paramètre ne peut appartenir qu’à un groupe personnalisé.");
+                    }
+                }
                 foreach (var r in p.Rules) { r.Light = r.Light ?? new PaletteColors(); r.Dark = r.Dark ?? new PaletteColors(); }
             }
             return value;
@@ -146,6 +208,7 @@ namespace BIMaestro.PropertiesAppearance
                         latest.Profiles.RemoveAll(p => p.Key == profile.Key);
                         if (!profile.Layout.IsEmpty || profile.Rules.Any(r => !r.Light.IsEmpty || !r.Dark.IsEmpty)) latest.Profiles.Add(profile.Copy());
                     }
+                    foreach(var profile in latest.Profiles)WriteGroups(profile.Layout);
                     Directory.CreateDirectory(Path.GetDirectoryName(FilePath));
                     string temp = FilePath + "." + Guid.NewGuid().ToString("N") + ".tmp";
                     try

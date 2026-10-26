@@ -103,13 +103,19 @@ public class BIMaestroApp : IExternalApplication
         TimeSpan.FromSeconds(30);
 
     private static readonly string LogDirectory =
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs");
+        global::BIMaestro.Storage.UserDataStorage.Root;
 
     public Result OnStartup(UIControlledApplication application)
     {
         try
         {
             UIControlledApp = application;
+            // Resolve migration before any module reads or caches a user-data path.
+            var userDataRoot = global::BIMaestro.Storage.UserDataStorage.Root;
+            var selectionDataRoot = global::BIMaestro.Storage.UserDataStorage.SelectionPreferencesRoot;
+            if (!string.IsNullOrEmpty(global::BIMaestro.Storage.UserDataStorage.MigrationWarning))
+                TaskDialog.Show("BIMaestro — stockage des données",
+                    global::BIMaestro.Storage.UserDataStorage.MigrationWarning);
             UiLanguage.Initialize(application.ControlledApplication.Language.ToString());
 
             // --- WPF BIMaestroApp ---

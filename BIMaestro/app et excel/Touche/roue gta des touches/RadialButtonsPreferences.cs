@@ -28,8 +28,7 @@ namespace BIMaestro.UI
         public const int SlotCount = 16;
         private const string RadialButtonId = "RadialMenuButtonsCommand";
         private static readonly string FilePath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-            "RevitLogs", "SauvegardePréférence", "RadialButtons.json");
+            global::BIMaestro.Storage.UserDataStorage.Root, "SauvegardePréférence", "RadialButtons.json");
         private static readonly Mutex PreferencesMutex =
             new Mutex(false, @"Local\BIMaestro.RadialButtonsPreferences");
         private static RadialButtonsPreferences _lastValidPreferences;

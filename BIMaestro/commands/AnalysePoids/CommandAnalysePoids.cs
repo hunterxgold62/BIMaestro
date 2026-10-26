@@ -52,8 +52,7 @@ namespace Analyse
 
             // 2. Préparer cache familles
             string logsFolder = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                "RevitLogs", "SauvegardePréférence");
+                global::BIMaestro.Storage.UserDataStorage.Root, "SauvegardePréférence");
             Directory.CreateDirectory(logsFolder);
             string cacheFile = Path.Combine(logsFolder, "CacheTailleFamille.json");
             var cache = LoadCache(cacheFile);

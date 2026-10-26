@@ -14,7 +14,7 @@ elseif($Command -eq 'shutdown-fixture'){$report=Join-Path $out 'shutdown-request
 for($attempt=0;$attempt -lt 600;$attempt++){
  Start-Sleep -Milliseconds 200
  if((Test-Path -LiteralPath $report) -and (Get-Item -LiteralPath $report).LastWriteTimeUtc -ge $started){
-  $data=Get-Content -LiteralPath $report -Raw | ConvertFrom-Json
+  try{$data=Get-Content -LiteralPath $report -Raw | ConvertFrom-Json}catch{continue}
   if($Evidence){Copy-Item -LiteralPath $report -Destination (Join-Path $out "$Evidence.json")}
   $data | Select-Object command,version,status,layoutStatus,hasApplied,hash | ConvertTo-Json
   exit 0

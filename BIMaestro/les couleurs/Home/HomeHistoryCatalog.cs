@@ -35,7 +35,7 @@ namespace BIMaestro.Home
         private static int _publishedRevision;
         private sealed class PreviewMemo { internal string Stamp, Url; internal DateTime At; }
         private static readonly Dictionary<string, PreviewMemo> PreviewCache = new Dictionary<string, PreviewMemo>(StringComparer.OrdinalIgnoreCase);
-        internal static readonly string SourcePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "Historique_Temps_Revit.xlsx");
+        internal static readonly string SourcePath = Path.Combine(global::BIMaestro.Storage.UserDataStorage.Root, "Historique_Temps_Revit.xlsx");
 
         internal static string GetPayloadJson() { lock (Gate) return _json; }
         internal static bool IsRefreshing { get { lock (Gate) return _busy; } }

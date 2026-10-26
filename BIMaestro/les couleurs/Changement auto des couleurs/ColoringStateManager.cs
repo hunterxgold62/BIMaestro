@@ -129,8 +129,7 @@ namespace Couleur
         private const bool DefaultFullMode = false;
 
         private static readonly string persistenceFilePath =
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                         "RevitLogs", "SauvegardePréférence", "resetColor.txt");
+            Path.Combine(global::BIMaestro.Storage.UserDataStorage.Root, "SauvegardePréférence", "resetColor.txt");
 
         public static bool IsColoringActive { get; private set; }
         public static bool IsFullMode { get; private set; }

@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace BIMaestro.PropertiesAppearance
 {
-    internal static class PropertiesPaletteLayout
+    internal static partial class PropertiesPaletteLayout
     {
         private sealed class NativeRow
         {
@@ -37,7 +37,7 @@ namespace BIMaestro.PropertiesAppearance
                 (version == "2023" || version == "2024" || version == "2025" || version == "2026" || version == "2027");
 #endif
         }
-        internal static bool HasApplied => _baseline != null && _current != null && !_current.SequenceEqual(_baseline.Select(r => r.Token));
+        internal static bool HasApplied => _baseline != null && _current != null && (_customRowCount>0||!_current.SequenceEqual(_baseline.Select(r => r.Token)));
         internal static string Status { get; private set; }
         internal static bool RequiresNativeRebuild { get; private set; }
 
@@ -49,6 +49,7 @@ namespace BIMaestro.PropertiesAppearance
         }
         private static List<NativeRow> Read(NativePropertiesGrid grid)
         {
+            grid.RefreshRowCount();
             var rows = new List<NativeRow>();
             for (uint i = 1; i <= grid.RowCount; i++) rows.Add(new NativeRow { Token = (int)i - 1, Label = grid.Value(i, 1), Value = grid.Value(i, 2), Marker = grid.Value(i, 3) });
             return rows;
@@ -120,6 +121,7 @@ namespace BIMaestro.PropertiesAppearance
             _window = grid.Window; _core = grid.Core; _context = context.Signature;
             _baseline = rows; _current = current; _groups = groups; _prefix = prefix; _suffix = suffix; _parameterTokens = parameterTokens;
             _failed = false; RequiresNativeRebuild = false;
+            _originalRowCount=rows.Count;_customRowCount=0;_customSignature=null;_customNotice=null;_customMembership.Clear();
             return true;
         }
         private static bool ParameterMappingMatches(NativePropertiesGrid grid, IList<int> order)
@@ -150,7 +152,13 @@ namespace BIMaestro.PropertiesAppearance
                 RequiresNativeRebuild = false;
             }
         }
+        internal static bool IsApplying {get;private set;}
         internal static void Apply(NativePropertiesGrid grid, AppearanceContext context, AppearancePreferences preferences, string revitVersion, Action beforeMove)
+        {
+            if(IsApplying)return;IsApplying=true;
+            try{ApplyCore(grid,context,preferences,revitVersion,beforeMove);}finally{IsApplying=false;}
+        }
+        private static void ApplyCore(NativePropertiesGrid grid, AppearanceContext context, AppearancePreferences preferences, string revitVersion, Action beforeMove)
         {
             Status = null;
             var layout = preferences == null ? new AppearanceLayout() : AppearanceOrdering.Resolve(preferences, context.CategoryKey, context.TypeKey);
@@ -168,6 +176,8 @@ namespace BIMaestro.PropertiesAppearance
             bool sameInstance = _window == grid.Window && _core == grid.Core && _context == context.Signature && _baseline != null;
             if (!sameInstance)
             {
+                if(_customRowCount>0 && _context!=context.Signature && actual.Any(r=>_baseline.Skip(_originalRowCount).Any(b=>!string.IsNullOrWhiteSpace(b.Label)&&Identity(b)==Identity(r))))
+                {Status="En attente de la palette de la nouvelle sélection.";return;}
                 bool retainedOrder = _baseline != null && _context == context.Signature &&
                     actual.Select(Identity).SequenceEqual(_current.Select(i => Identity(_baseline[i]))) &&
                     ParameterMappingMatches(grid, _current);
@@ -185,6 +195,7 @@ namespace BIMaestro.PropertiesAppearance
             }
             if (_failed) { Status = "Ordre natif suspendu pour cette sélection après une réponse inattendue de Revit."; return; }
             if (!ParameterMappingMatches(grid, _current)) { _failed = true; RequiresNativeRebuild = HasApplied; throw new InvalidOperationException("La correspondance native des paramètres a changé avant le déplacement."); }
+            PrepareCustomGroups(grid,context,layout,revitVersion,beforeMove);
             var desired = _prefix.ToList();
             foreach (var group in AppearanceOrdering.Ranked(_groups, layout.Groups, g => g.Key))
             {
@@ -194,7 +205,7 @@ namespace BIMaestro.PropertiesAppearance
             }
             desired.AddRange(_suffix);
             if (desired.Count != _current.Count || desired.Distinct().Count() != _current.Count) throw new InvalidOperationException("Ordre incomplet : aucune ligne native n’est déplacée.");
-            if (_current.SequenceEqual(desired)) { Status = HasApplied ? "Ordre personnalisé appliqué à la palette Revit." : null; return; }
+            if (_current.SequenceEqual(desired)) { Status = LayoutStatus(); return; }
             int moves = 0; bool notified = false;
             using (grid.DeferDrawing())
             {
@@ -232,8 +243,8 @@ namespace BIMaestro.PropertiesAppearance
                     RequiresNativeRebuild = false;
                 }
             }
-            Status = HasApplied ? "Ordre personnalisé appliqué à la palette Revit." : null;
+            Status = LayoutStatus();
         }
-        internal static void Forget() { _baseline = null; _current = null; _groups = null; _prefix = null; _suffix = null; _parameterTokens = null; _failed = false; _context = null; RequiresNativeRebuild = false; }
+        internal static void Forget() { _baseline = null; _current = null; _groups = null; _prefix = null; _suffix = null; _parameterTokens = null; _failed = false; _context = null; RequiresNativeRebuild = false;_originalRowCount=0;_customRowCount=0;_customSignature=null;_customNotice=null;_customMembership.Clear(); }
     }
 }

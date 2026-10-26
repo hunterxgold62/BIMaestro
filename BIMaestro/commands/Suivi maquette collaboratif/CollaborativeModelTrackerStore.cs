@@ -33,13 +33,11 @@ namespace Analyse
         private static string _configuredSharedDirectory;
 
         private static readonly string FallbackDirectory = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-            "RevitLogs",
+            global::BIMaestro.Storage.UserDataStorage.Root,
             "SuiviMaquettesCollaboratif");
 
         private static readonly string CustomPathConfigFile = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-            "RevitLogs",
+            global::BIMaestro.Storage.UserDataStorage.Root,
             "SuiviMaquettesCollaboratif",
             "shared_path_override.txt");
 

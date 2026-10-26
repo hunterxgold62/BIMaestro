@@ -238,8 +238,7 @@ namespace Couleur
 
         private static string LegacyPreferenceFilePath { get; } =
             Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                "RevitLogs",
+                global::BIMaestro.Storage.UserDataStorage.Root,
                 "SauvegardePréférence",
                 "couleursRubanRevit.json");
 

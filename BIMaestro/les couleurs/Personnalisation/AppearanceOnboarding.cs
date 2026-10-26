@@ -23,8 +23,7 @@ namespace Couleur
     internal static class AppearanceOnboarding
     {
         private static readonly string ChoiceFile = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-            "RevitLogs", "SauvegardePréférence", "AppearanceGuideFirstLaunch.txt");
+            global::BIMaestro.Storage.UserDataStorage.Root, "SauvegardePréférence", "AppearanceGuideFirstLaunch.txt");
         private static readonly DateTime ReadyAfterUtc = DateTime.UtcNow.AddSeconds(12);
         private static bool _askedThisSession;
         private static DateTime? _projectReadyUtc;

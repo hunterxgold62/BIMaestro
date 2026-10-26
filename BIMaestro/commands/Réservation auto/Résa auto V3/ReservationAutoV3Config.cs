@@ -273,7 +273,7 @@ namespace Modification
     public static class ReservationAutoV3PersoConfigStore
     {
         private static string Folder =>
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "SauvegardePréférence");
+            Path.Combine(global::BIMaestro.Storage.UserDataStorage.Root, "SauvegardePréférence");
 
         public static string ConfigPath =>
             Path.Combine(Folder, "ResaPerso.json");

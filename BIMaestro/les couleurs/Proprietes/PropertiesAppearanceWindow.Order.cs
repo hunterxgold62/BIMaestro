@@ -8,7 +8,7 @@ using System.Windows.Media;
 
 namespace BIMaestro.PropertiesAppearance
 {
-    internal sealed partial class PropertiesAppearanceWindow
+    internal sealed partial class PropertiesAppearanceEditor
     {
         private Point _dragStart;
         private DateTime _ignoreRowClickUntil;
@@ -44,6 +44,8 @@ namespace BIMaestro.PropertiesAppearance
             for (int i = 0; i < Math.Max(before.Count, after.Count); i++)
             {
                 UIElement left = i < before.Count ? PreviewCell(before[i], false) : new Border();
+                if(i<after.Count&&!_originNumbers.ContainsKey(after[i]))
+                {var original=_context.PreviewRows.FirstOrDefault(r=>r.OrderKey==after[i].OrderKey);_originNumbers[after[i]]=original!=null&&_originNumbers.TryGetValue(original,out var number)?number:"＋";}
                 UIElement right = i < after.Count ? PreviewCell(after[i], true) : new Border();
                 var pair = Pair(left, right); pair.Margin = new Thickness(0, 0, 3, 3); _rows.Children.Add(pair);
             }
@@ -68,7 +70,7 @@ namespace BIMaestro.PropertiesAppearance
                 bool valid = CanMove(source, row);
                 e.Effects = valid ? DragDropEffects.Move : DragDropEffects.None; e.Handled = true;
                 ClearDropIndicator();
-                if (!valid) { if (source != null && !source.Header && source.GroupKey != row.GroupKey) Notify("Pour cet essai, les paramètres restent dans leur groupe Revit. Les groupes entiers peuvent être déplacés librement."); return; }
+                if (!valid) { if (source != null && !source.Header && source.GroupKey != row.GroupKey) Notify("Déposez un paramètre modifiable dans un groupe personnalisé, ou dans son groupe Revit d’origine."); return; }
                 bool after = e.GetPosition(button).Y > button.ActualHeight / 2;
                 _dropIndicator = button; _previousDropBrush = button.BorderBrush; _previousDropThickness = button.BorderThickness;
                 button.BorderBrush = Brush("#19A36E"); button.BorderThickness = after ? new Thickness(1, 1, 1, 4) : new Thickness(1, 4, 1, 1);
@@ -95,14 +97,22 @@ namespace BIMaestro.PropertiesAppearance
         }
         private bool CanMove(PropertyPreviewRow source, PropertyPreviewRow target)
         {
-            if (source == null || target == null || ReferenceEquals(source, target) || !_context.PreviewRows.Contains(source) || _profile == null) return false;
+            if (source == null || target == null || source.OrderKey==target.OrderKey || _profile == null) return false;
             if (source.Header) return target.Header && source.GroupKey != null && target.GroupKey != null;
-            if (source.GroupKey == null || source.GroupKey != target.GroupKey) return false;
-            return _context.PreviewRows.Count(r => r.OrderKey == source.OrderKey) == 1 && _context.PreviewRows.Count(r => r.OrderKey == target.OrderKey) == 1;
+            var original=_context.PreviewRows.SingleOrDefault(r=>!r.Header&&r.ParameterKey!=null&&r.ParameterKey==source.ParameterKey);
+            if(original==null)return false;
+            if(source.GroupKey!=target.GroupKey)
+                return !source.ReadOnly && (target.GroupKey==original.GroupKey||(DraftLayout.CustomGroups??new List<AppearanceCustomGroup>()).Any(g=>g.Key==target.GroupKey));
+            return true;
         }
         private void MoveRow(PropertyPreviewRow source, PropertyPreviewRow target, bool after)
         {
             if (!CanMove(source, target)) return;
+            if(!source.Header&&source.GroupKey!=target.GroupKey)
+            {
+                AssignToGroup(source,(target.GroupKey??"").StartsWith("custom:",StringComparison.Ordinal)?target.GroupKey:null);
+                source=_selected;
+            }
             var arranged = AppearanceOrdering.Arrange(_context.PreviewRows, DraftLayout);
             var keys = source.Header ? arranged.Where(r => r.Header).Select(r => r.GroupKey).ToList() : arranged.Where(r => !r.Header && r.GroupKey == source.GroupKey).Select(r => r.OrderKey).ToList();
             string sourceKey = source.Header ? source.GroupKey : source.OrderKey;
@@ -115,7 +125,7 @@ namespace BIMaestro.PropertiesAppearance
         }
         private void ResetOrder()
         {
-            if (_profile == null) return; _profile.Layout = new AppearanceLayout(); Changed();
+            if (_profile == null) return; var custom=_profile.Layout.CustomGroups;_profile.Layout = new AppearanceLayout{CustomGroups=custom}; Changed();
             Notify("Ordre personnalisé retiré pour cette portée. Un ordre plus général peut rester applicable.");
         }
     }

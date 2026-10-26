@@ -1,17 +1,27 @@
 <Project Sdk="Microsoft.NET.Sdk">
- <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0-windows</TargetFramework><UseWPF>true</UseWPF><UseWindowsForms>true</UseWindowsForms><EnableDefaultItems>false</EnableDefaultItems><DefineConstants>BIMAESTRO_PROPERTIES_TESTS</DefineConstants><NuGetAudit>false</NuGetAudit></PropertyGroup>
+ <PropertyGroup><OutputType>Exe</OutputType><TargetFramework Condition="'$(EditorTargetFramework)' == ''">net10.0-windows</TargetFramework><TargetFramework Condition="'$(EditorTargetFramework)' != ''">$(EditorTargetFramework)</TargetFramework><UseWPF>true</UseWPF><UseWindowsForms>true</UseWindowsForms><EnableDefaultItems>false</EnableDefaultItems><DefineConstants>BIMAESTRO_PROPERTIES_TESTS</DefineConstants><NuGetAudit>false</NuGetAudit></PropertyGroup>
  <ItemGroup>
   <Compile Include="EditorFlow.cs"/>
+  <Compile Include="HomeFlow.cs"/>
+  <Compile Include="CustomGroupFlow.cs"/>
+  <Compile Include="PackFlow.cs"/>
+  <Compile Include="LayoutFlow.cs"/>
+  <None Include="../../../BIMaestro/les couleurs/Personnalisation/ColorPreferencesWindow.xaml" Link="HostAppearance.xaml" CopyToOutputDirectory="Always"/>
+  <Compile Include="../../../BIMaestro/les couleurs/Personnalisation/AppearancePack.cs"/>
+  <Compile Include="../../../BIMaestro/les couleurs/Personnalisation/AppearancePackScopeDialog.cs"/>
+  <Compile Include="../../../BIMaestro/les couleurs/Home/HomeAppearanceCommand.cs"/>
   <Compile Include="../../../BIMaestro/les couleurs/Proprietes/PropertiesAppearanceWindow.Reset.cs"/>
   <Compile Include="../../../BIMaestro/les couleurs/Proprietes/PropertiesAppearanceMetrics.cs"/>
   <Compile Include="../../../BIMaestro/les couleurs/Proprietes/PropertyPreviewRow.cs"/>
 
   <Compile Include="../../../BIMaestro/les couleurs/Proprietes/PropertiesAppearanceWindow.Order.cs"/>
+  <Compile Include="../../../BIMaestro/les couleurs/Proprietes/PropertiesAppearanceWindow.Groups.cs"/>
   <Compile Include="../../../BIMaestro/les couleurs/Proprietes/AppearanceOrdering.cs"/>
   <Compile Include="../../../BIMaestro/les couleurs/Proprietes/PropertiesAppearanceWindow.cs"/>
   <Compile Include="../../../BIMaestro/les couleurs/Proprietes/AppearancePreferences.cs"/>
   <Compile Include="../../../BIMaestro/Controls/SimpleColorPicker.xaml.cs"/>
   <Page Include="../../../BIMaestro/Controls/SimpleColorPicker.xaml"/>
+  <Page Include="../../../BIMaestro/Themes/BIMaestroTheme.xaml" Link="Themes/BIMaestroTheme.xaml"/>
   <PackageReference Include="Newtonsoft.Json" Version="13.0.3"/>
  </ItemGroup>
 </Project>

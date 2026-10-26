@@ -6,8 +6,7 @@ namespace BIMaestro.ViewHover
     internal static class ViewHoverPreviewPreferences
     {
         private static readonly string FilePath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-            "RevitLogs", "SauvegardePréférence", "ViewHoverPreview.txt");
+            global::BIMaestro.Storage.UserDataStorage.Root, "SauvegardePréférence", "ViewHoverPreview.txt");
 
         internal static bool Enabled { get; private set; } = Load();
         internal static event Action Changed;

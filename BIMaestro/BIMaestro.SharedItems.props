@@ -1,4 +1,5 @@
 <Project>
+  <ItemGroup><Compile Include="app et excel\Supabase\UserDataStorage.cs" /></ItemGroup>
   <ItemGroup><Compile Include="les couleurs\Proprietes\*.cs" /></ItemGroup>
   <ItemGroup>
     <Compile Include="les couleurs\Home\*.cs" />
@@ -81,6 +82,7 @@
     <Compile Include="commands\Codex\CodexCommunitySnapshot.cs" />
     <Compile Include="les couleurs\Personnalisation\ProjectBrowserIcons.cs" />
     <Compile Include="les couleurs\Personnalisation\AppearancePack.cs" />
+    <Compile Include="les couleurs\Personnalisation\AppearancePackScopeDialog.cs" />
     <Compile Include="les couleurs\Personnalisation\ProjectBrowserProjectStorage.cs" />
     <Compile Include="les couleurs\Personnalisation\ProjectBrowserRuleWindow.cs" />
     <Compile Include="les couleurs\Personnalisation\BrowserAtmosphere.cs" />
@@ -1160,6 +1162,7 @@
     <EmbeddedResource Include="Resources\Déplacement protégé.png" />
     <EmbeddedResource Include="Resources\3D.jpg" />
     <EmbeddedResource Include="Resources\Maquette MEP v2.png" />
+    <EmbeddedResource Include="Resources\Maintenance MEP.png" />
     <EmbeddedResource Include="Resources\MEP Booster vanne rotation.png" />
     <EmbeddedResource Include="Resources\MEP Booster vanne rotation OFF.png" />
     <Content Include="Themes\BIMaestro_Charte_Graphique.txt" />

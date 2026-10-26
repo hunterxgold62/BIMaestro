@@ -22,6 +22,9 @@ namespace Couleur
     {
         private readonly System.IntPtr _mainWindowHandle;
         private readonly Document _document;
+        private readonly BIMaestro.PropertiesAppearance.PropertiesAppearanceEditor _propertiesEditor;
+        private readonly BIMaestro.Home.HomeAppearanceEditor _homeEditor;
+        private bool _savingAppearance;
         private readonly bool _canApplyBrowserToProject;
         private bool _hasSharedBrowserAppearance;
         private readonly BrowserProjectWriteHandler _projectWriteHandler;
@@ -48,13 +51,39 @@ namespace Couleur
 
         public ColorPreferencesWindow(
             System.IntPtr mainWindowHandle,
-            Document document = null)
+            Document document = null,
+            UIApplication application = null)
         {
             ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
+            AppearanceTabs.SelectionChanged += (_, args) =>
+            {
+                if (ReferenceEquals(args.Source, AppearanceTabs) && ViewsAndFoldersTab.IsSelected)
+                    BrowserTabs.SelectedItem = BrowserBackgroundTab;
+            };
+            ViewsAndFoldersTab.PreviewMouseLeftButtonDown += (_, args) =>
+            {
+                if (new Rect(ViewsAndFoldersTab.RenderSize).Contains(args.GetPosition(ViewsAndFoldersTab)))
+                    BrowserTabs.SelectedItem = BrowserBackgroundTab;
+            };
 
             _mainWindowHandle = mainWindowHandle;
             _document = document;
+            if (application != null)
+            {
+                _propertiesEditor = BIMaestro.PropertiesAppearance.PropertiesAppearanceCommand.CreateEditor(application);
+                _propertiesEditor.SaveBackupRequested = () => ExportCurrentPack(false, false,
+                    "Sauvegarder mes propriétés avant réinitialisation", "Mes propriétés avant réinitialisation.bimaestro-style.json", true, false);
+                PropertiesEditorHost.Content = _propertiesEditor;
+                _homeEditor = new BIMaestro.Home.HomeAppearanceEditor();
+                HomeEditorHost.Content = _homeEditor;
+                _homeEditor.ShowHomeRequested += ShowHome;
+            }
+            else
+            {
+                PropertiesTab.IsEnabled = false;
+                HomeTab.IsEnabled = false;
+            }
             bool browserSourceChanged = document != null &&
                 ProjectBrowserProjectStorage.Activate(document);
             _canApplyBrowserToProject = document != null && !document.IsReadOnly && !document.IsFamilyDocument;
@@ -91,19 +120,85 @@ namespace Couleur
             _projectWriteHandler.Event = _projectWriteEvent;
             Closing += (_, args) =>
             {
-                if (_projectWriteHandler.HasPending)
+                if (_projectWriteHandler.HasPending || _savingAppearance)
                 {
                     args.Cancel = true;
-                    MessageBox.Show(this, "Patientez : Revit termine l’application au projet.", "Application en cours", MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show(this, "Patientez : Revit termine l’enregistrement des réglages.", "Enregistrement en cours", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
             };
             Closed += (_, __) =>
             {
+                if (_propertiesEditor != null)
+                    BIMaestro.PropertiesAppearance.PropertiesAppearanceCommand.ReleaseEditor(_propertiesEditor);
                 _projectWriteHandler.DisposeWhenIdle = true;
                 if (!_projectWriteHandler.HasPending)
                     _projectWriteHandler.DisposeEventOnce();
             };
             DataContext = this;
+        }
+
+        internal void SelectAppearanceSection(string section)
+        {
+            if (section == "properties") AppearanceTabs.SelectedItem = PropertiesTab;
+            else if (section == "home") AppearanceTabs.SelectedItem = HomeTab;
+        }
+
+        private void AppearanceActionFailed(System.Exception error)
+        {
+            SetSavingAppearance(false);
+            ShowSaveError(error);
+        }
+
+        private void SetSavingAppearance(bool saving)
+        {
+            _savingAppearance = saving;
+            AppearanceTabs.IsEnabled = !saving;
+            TutorialSave.IsEnabled = !saving;
+        }
+
+        private void ShowHome()
+        {
+            SaveSettingsAndContinue(() =>
+            {
+                SetSavingAppearance(true);
+                BIMaestro.PropertiesAppearance.PropertiesAppearanceCommand.Request(app =>
+                {
+                    try
+                    {
+                        var command = RevitCommandId.LookupPostableCommandId(PostableCommand.ToggleHome);
+                        SetSavingAppearance(false);
+                        if (!app.CanPostCommand(command))
+                        {
+                            MessageBox.Show(this, "Vos réglages sont enregistrés. Revit ne peut pas afficher l’accueil pour le moment.", "Accueil Revit", MessageBoxButton.OK, MessageBoxImage.Information);
+                            return;
+                        }
+                        app.PostCommand(command);
+                        Close();
+                    }
+                    catch (System.Exception ex) { AppearanceActionFailed(ex); }
+                });
+            });
+        }
+
+        private void SaveAppearanceEditorsAndContinue(System.Action next)
+        {
+            SetSavingAppearance(true);
+            System.Action complete = () =>
+            {
+                try
+                {
+                    if (_homeEditor != null && _homeEditor.HasChanges) _homeEditor.SaveChanges();
+                    SetSavingAppearance(false);
+                    next();
+                }
+                catch (System.Exception ex) { AppearanceActionFailed(ex); }
+            };
+            try
+            {
+                if (_propertiesEditor != null && _propertiesEditor.HasChanges) _propertiesEditor.SaveChanges(complete, AppearanceActionFailed);
+                else complete();
+            }
+            catch (System.Exception ex) { AppearanceActionFailed(ex); }
         }
 
         private sealed class BrowserProjectWriteRequest
@@ -234,7 +329,7 @@ namespace Couleur
             OnPropertyChanged(nameof(BrowserSourceLabel));
             OnPropertyChanged(nameof(BrowserSourceStatus));
         }
-        private string _packStatus = "Partagez un fichier contenant les couleurs du ruban, l’arborescence et les icônes, y compris vos images importées.";
+        private string _packStatus = "Sauvegardez ou restaurez les panneaux BIMaestro, l’arborescence et ses icônes, les propriétés et l’accueil Revit. Les profils et groupes personnalisés sont inclus.";
         public string PackStatus { get => _packStatus; private set { _packStatus = value; OnPropertyChanged(); } }
 
         private void ExportPack_Click(object sender, RoutedEventArgs e)
@@ -244,7 +339,7 @@ namespace Couleur
             try
             {
                 ExportCurrentPack(scopeDialog.IncludesRibbon, scopeDialog.IncludesBrowser,
-                    "Exporter un pack d’apparence", "Mon pack.bimaestro-style.json");
+                    "Exporter un pack d’apparence", "Mon pack.bimaestro-style.json", scopeDialog.IncludesProperties, scopeDialog.IncludesHome);
             }
             catch (System.Exception ex) { MessageBox.Show(this, ex.Message, "Export du pack", MessageBoxButton.OK, MessageBoxImage.Error); }
         }
@@ -257,16 +352,18 @@ namespace Couleur
             try
             {
                 var pack = AppearancePackFile.Import(dialog.FileName);
+                var scope = new AppearancePackScopeDialog(pack) { Owner = this };
+                if (scope.ShowDialog() != true) return;
                 if (!OfferBackup("Avant l’import, voulez-vous enregistrer vos réglages actuels dans un pack de secours ?", "Import du pack"))
                     return;
-                if (pack.IncludesRibbon)
+                if (scope.IncludesRibbon)
                 {
                     foreach (var item in PanelColors)
                         if (pack.Ribbon.TryGetValue(item.PanelName, out var scheme)) item.ApplyScheme(scheme);
                     AreColoredPanelsEnabled = pack.RibbonEnabled;
                     UseFullPanelColoring = pack.FullPanels;
                 }
-                if (pack.IncludesBrowser)
+                if (scope.IncludesBrowser)
                 {
                     BrowserPreferences = pack.Browser;
                     BrowserIcons = pack.Icons;
@@ -274,6 +371,8 @@ namespace Couleur
                     OnPropertyChanged(nameof(BrowserIcons));
                     OnPropertyChanged(nameof(BrowserIconAssets));
                 }
+                if (scope.IncludesProperties) _propertiesEditor.LoadPreferences(pack.Properties);
+                if (scope.IncludesHome) _homeEditor.LoadSettings(pack.Home);
                 PackStatus = "Pack chargé : " + System.IO.Path.GetFileName(dialog.FileName) + ". Vérifiez les onglets puis cliquez sur Enregistrer pour l’appliquer, ou Annuler pour abandonner.";
             }
             catch (System.Exception ex) { MessageBox.Show(this, ex.Message, "Import du pack", MessageBoxButton.OK, MessageBoxImage.Error); }
@@ -286,16 +385,20 @@ namespace Couleur
                 title, MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
             if (choice == MessageBoxResult.Cancel) return false;
             return choice != MessageBoxResult.Yes || ExportCurrentPack(true, true,
-                "Enregistrer mes réglages actuels", "Mes réglages avant modification.bimaestro-style.json");
+                "Enregistrer mes réglages actuels", "Mes réglages avant modification.bimaestro-style.json", _propertiesEditor != null, _homeEditor != null);
         }
 
-        private bool ExportCurrentPack(bool includesRibbon, bool includesBrowser, string title, string fileName)
+        private bool ExportCurrentPack(bool includesRibbon, bool includesBrowser, string title, string fileName,
+            bool includesProperties = false, bool includesHome = false)
         {
             var dialog = new Microsoft.Win32.SaveFileDialog { Title = title,
                 Filter = "Pack BIMaestro|*.bimaestro-style.json", FileName = fileName, AddExtension = true };
             if (dialog.ShowDialog(this) != true) return false;
             AppearancePackFile.Export(dialog.FileName, new AppearancePack {
                 IncludesRibbon = includesRibbon, IncludesBrowser = includesBrowser,
+                IncludesProperties = includesProperties, IncludesHome = includesHome,
+                Properties = includesProperties ? _propertiesEditor.CapturePreferences() : null,
+                Home = includesHome ? _homeEditor.CaptureSettings() : null,
                 RibbonEnabled = AreColoredPanelsEnabled, FullPanels = UseFullPanelColoring,
                 Ribbon = includesRibbon ? PanelColors.ToDictionary(item => item.PanelName, item => item.CreateScheme()) : null,
                 Browser = includesBrowser ? BrowserPreferences : null,
@@ -303,6 +406,12 @@ namespace Couleur
             });
             PackStatus = "Pack exporté : " + System.IO.Path.GetFileName(dialog.FileName) + ".";
             return true;
+        }
+
+        private void ResetProperties_Click(object sender, RoutedEventArgs e)
+        {
+            SelectAppearanceSection("properties");
+            _propertiesEditor?.ShowResetConfirmation();
         }
 
         private void ApplyBrowserToCurrentProject_Click(
@@ -1336,21 +1445,29 @@ namespace Couleur
             bool guided = _appearanceGuideStep == AppearanceGuideStepCount - 1;
             SaveSettingsAndContinue(() =>
             {
+                if (guided)
+                {
+                    BIMaestro.Tutorials.TutorialAnalytics.Complete("colors");
+                    StopAppearanceTutorial();
+                }
                 Close();
                 if (guided)
                 {
                     BIMaestro.Tutorials.DemoTourCompletion.Show(_mainWindowHandle, "colors",
-                        "Tes couleurs et tes icônes sont enregistrées. Tu as terminé le tutoriel Couleurs et vues.");
+                        "Tes réglages d’apparence sont enregistrés. Tu as terminé le tutoriel Couleurs et vues, avec les onglets Propriétés, Accueil Revit et partage des réglages.");
                 }
             });
         }
 
         private void SaveSettingsAndContinue(System.Action next)
         {
+            if (_savingAppearance || _projectWriteHandler.HasPending) return;
+            SetSavingAppearance(true);
             if (HasSharedBrowserAppearance)
             {
                 if (!CanApplyBrowserToProject)
                 {
+                    SetSavingAppearance(false);
                     MessageBox.Show(this,
                         "Cette maquette partage son apparence, mais elle est en lecture seule. Les changements ne peuvent pas être conservés dans ce projet.",
                         "Enregistrer mes réglages", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -1360,7 +1477,7 @@ namespace Couleur
                 {
                     if (error != null)
                     {
-                        ShowSaveError(error);
+                        AppearanceActionFailed(error);
                         return;
                     }
                     try
@@ -1368,9 +1485,9 @@ namespace Couleur
                         NotifyBrowserSourceChanged(true);
                         SaveCurrentColors(false);
                         CustomizeRibbonColorsCommand.ReapplyColors(_mainWindowHandle);
-                        next();
+                        SaveAppearanceEditorsAndContinue(next);
                     }
-                    catch (System.Exception ex) { ShowSaveError(ex); }
+                    catch (System.Exception ex) { AppearanceActionFailed(ex); }
                 });
                 return;
             }
@@ -1378,11 +1495,11 @@ namespace Couleur
             {
                 SaveCurrentColors(true);
                 CustomizeRibbonColorsCommand.ReapplyColors(_mainWindowHandle);
-                next();
+                SaveAppearanceEditorsAndContinue(next);
             }
             catch (System.Exception ex)
             {
-                ShowSaveError(ex);
+                AppearanceActionFailed(ex);
             }
         }
 
@@ -1440,57 +1557,6 @@ namespace Couleur
             PropertyChanged?.Invoke(
                 this,
                 new PropertyChangedEventArgs(propertyName));
-        }
-    }
-
-    internal sealed class AppearancePackScopeDialog : Window
-    {
-        private readonly RadioButton _both;
-        private readonly RadioButton _ribbon;
-        private readonly RadioButton _browser;
-
-        public AppearancePackScopeDialog()
-        {
-            Title = "Que voulez-vous exporter ?";
-            Width = 430;
-            Height = 265;
-            MinWidth = 430;
-            MinHeight = 265;
-            WindowStartupLocation = WindowStartupLocation.CenterOwner;
-            ResizeMode = ResizeMode.NoResize;
-            ShowInTaskbar = false;
-            var layout = new DockPanel { Margin = new Thickness(20) };
-            Content = layout;
-            var actions = new StackPanel { Orientation = Orientation.Horizontal,
-                HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 18, 0, 0) };
-            DockPanel.SetDock(actions, Dock.Bottom);
-            layout.Children.Add(actions);
-            var cancel = new Button { Content = "Annuler", MinWidth = 90, Height = 32,
-                Margin = new Thickness(0, 0, 8, 0), IsCancel = true };
-            var confirm = new Button { Content = "Exporter…", MinWidth = 105,
-                Height = 32, IsDefault = true };
-            confirm.Click += (_, __) => DialogResult = true;
-            actions.Children.Add(cancel);
-            actions.Children.Add(confirm);
-            var choices = new StackPanel();
-            layout.Children.Add(choices);
-            choices.Children.Add(new TextBlock { Text = "Choisissez le contenu du pack :",
-                FontSize = 17, FontWeight = FontWeights.SemiBold,
-                Margin = new Thickness(0, 0, 0, 14) });
-            _both = AddChoice(choices, "L’arborescence et les panneaux BIMaestro", true);
-            _ribbon = AddChoice(choices, "Les panneaux BIMaestro uniquement", false);
-            _browser = AddChoice(choices, "L’arborescence et ses icônes uniquement", false);
-        }
-
-        public bool IncludesRibbon => _both.IsChecked == true || _ribbon.IsChecked == true;
-        public bool IncludesBrowser => _both.IsChecked == true || _browser.IsChecked == true;
-
-        private static RadioButton AddChoice(Panel parent, string text, bool selected)
-        {
-            var choice = new RadioButton { Content = text, IsChecked = selected,
-                Margin = new Thickness(0, 0, 0, 11), FontSize = 13 };
-            parent.Children.Add(choice);
-            return choice;
         }
     }
 

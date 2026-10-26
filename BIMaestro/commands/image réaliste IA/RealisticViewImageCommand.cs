@@ -687,8 +687,7 @@ namespace IA
             string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
 
             string folder = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                "RevitLogs",
+                global::BIMaestro.Storage.UserDataStorage.Root,
                 "BIMaestro",
                 "IAImage",
                 "Historique",

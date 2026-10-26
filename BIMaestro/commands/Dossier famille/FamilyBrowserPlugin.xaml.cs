@@ -53,10 +53,10 @@ namespace Famille
         private bool _tutorialAwaitingPreviewClose;
         private bool _tutorialRestoreWhenPreviewCompletes;
 
-        private readonly string favoritesFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "SauvegardePréférence", "Favorites.txt");
-        private readonly string configFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "SauvegardePréférence", "Config.txt");
-        private readonly string pathsFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "SauvegardePréférence", "CheminsFamille.json");
-        private readonly string workFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "FamilleRevit");
+        private readonly string favoritesFile = Path.Combine(global::BIMaestro.Storage.UserDataStorage.Root, "SauvegardePréférence", "Favorites.txt");
+        private readonly string configFile = Path.Combine(global::BIMaestro.Storage.UserDataStorage.Root, "SauvegardePréférence", "Config.txt");
+        private readonly string pathsFile = Path.Combine(global::BIMaestro.Storage.UserDataStorage.Root, "SauvegardePréférence", "CheminsFamille.json");
+        private readonly string workFolder = Path.Combine(global::BIMaestro.Storage.UserDataStorage.Root, "FamilleRevit");
         private static readonly TimeSpan NewFamilyAge = TimeSpan.FromDays(14);
         private static readonly TimeSpan UpdatedFamilyAge = TimeSpan.FromDays(14);
         private List<string> _newFamilyPaths = new();
@@ -65,8 +65,7 @@ namespace Famille
 
         // Cache de vignettes (disque)
         private readonly string thumbCacheFolder =
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                         "RevitLogs", "CacheVignettes");
+            Path.Combine(global::BIMaestro.Storage.UserDataStorage.Root, "CacheVignettes");
 
         // Options (exposables dans Paramètres si tu veux)
         private bool useShellThumbs = true;   // ON par défaut

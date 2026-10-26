@@ -74,12 +74,13 @@ namespace Couleur
             ShowPreferences(data.Application);
         }
 
-        private static void ShowPreferences(UIApplication app)
+        internal static void ShowPreferences(UIApplication app, string section = null)
         {
             if (app == null) return;
 
             if (_openWindow != null && _openWindow.IsVisible)
             {
+                _openWindow.SelectAppearanceSection(section);
                 _openWindow.Activate();
                 if (AppearanceOnboarding.ConsumeColorClick()) _openWindow.StartAppearanceTutorial();
                 return;
@@ -89,13 +90,15 @@ namespace Couleur
 
             var window = new ColorPreferencesWindow(
                 app.MainWindowHandle,
-                app.ActiveUIDocument?.Document);
+                app.ActiveUIDocument?.Document,
+                app);
             new WindowInteropHelper(window)
             {
                 Owner = app.MainWindowHandle
             };
 
             _openWindow = window;
+            window.SelectAppearanceSection(section);
             window.Closed += (_, __) =>
             {
                 if (ReferenceEquals(_openWindow, window))

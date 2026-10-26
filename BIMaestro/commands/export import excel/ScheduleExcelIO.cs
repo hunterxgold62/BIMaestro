@@ -53,7 +53,7 @@ namespace ScheduleIO
     {
         public static string EnsureExportDir()
         {
-            var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "RevitLogs", "Exports");
+            var root = Path.Combine(global::BIMaestro.Storage.UserDataStorage.Root, "Exports");
             Directory.CreateDirectory(root);
             return root;
         }

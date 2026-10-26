@@ -152,7 +152,7 @@ namespace Famille
         private string GetBackupFilePath(Document doc)
         {
             string myDocs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-            string backupFolder = Path.Combine(myDocs, "RevitLogs", "FamilleRevit");
+            string backupFolder = Path.Combine(myDocs, "BIMaestro", "FamilleRevit");
             if (!Directory.Exists(backupFolder))
                 Directory.CreateDirectory(backupFolder);
 

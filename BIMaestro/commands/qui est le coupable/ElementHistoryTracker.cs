@@ -341,8 +341,7 @@ namespace Analyse
         private const bool DefaultCaptureDetailedDeletedMesh = false;
         private static volatile bool _captureDetailedDeletedMesh = DefaultCaptureDetailedDeletedMesh;
         private static readonly string DeletedMeshModePreferencePath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-            "RevitLogs",
+            global::BIMaestro.Storage.UserDataStorage.Root,
             "SauvegardePréférence",
             "ElementHistoryDeletedMeshMode.json");
         private static readonly string[] ImageExtensions = { ".png", ".jpg", ".jpeg", ".bmp" };
@@ -3210,8 +3209,7 @@ namespace Analyse
                 }
 
                 var dir = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                    "RevitLogs",
+                    global::BIMaestro.Storage.UserDataStorage.Root,
                     "CacheVignettes",
                     "QuiAFaitCa");
                 Directory.CreateDirectory(dir);
@@ -3462,8 +3460,7 @@ namespace Analyse
             try
             {
                 var file = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                    "RevitLogs",
+                    global::BIMaestro.Storage.UserDataStorage.Root,
                     "SauvegardePréférence",
                     "CheminsFamille.json");
 

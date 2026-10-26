@@ -17,6 +17,9 @@ namespace BIMaestro.PropertiesAppearance
         private int _revitVersion;
         private int _drawingDepth;
         internal uint RowCount;
+        internal IntPtr ElementGrid { get { if(!IsCurrent()||_elementGrid==IntPtr.Zero)throw new InvalidOperationException("Grille native remplacée.");return _elementGrid; } }
+        internal void RefreshRowCount(){if(!IsCurrent())throw new InvalidOperationException("Grille native remplacée.");RowCount=_rows(Core);if(RowCount>2000)throw new InvalidOperationException("Nombre de lignes natif inattendu.");}
+        internal void ResetLayoutCell(){if(!IsCurrent()||IsEditing)throw new InvalidOperationException("Saisie native en cours.");_resetCurrentCell(Core,0);if(!IsCurrent()||IsEditing)throw new InvalidOperationException("L’éditeur natif a changé.");}
         private static IntPtr _og, _mfc, _desktop;
         private static bool _checked;
         private static string _failure;

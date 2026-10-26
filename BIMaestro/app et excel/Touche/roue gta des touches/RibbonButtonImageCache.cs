@@ -7,8 +7,7 @@ namespace BIMaestro.UI
     internal static class RibbonButtonImageCache
     {
         private static readonly string CacheFolder = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-            "RevitLogs", "CacheVignettes", "RibbonButtons");
+            global::BIMaestro.Storage.UserDataStorage.Root, "CacheVignettes", "RibbonButtons");
 
         public static string GetOrCreate(string resourceFileName)
         {

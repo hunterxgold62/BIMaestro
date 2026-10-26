@@ -14,8 +14,7 @@ namespace Famille
     public static class RadialMenuCollectionStateStore
     {
         private static readonly string FilePath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-            "RevitLogs", "SauvegardePréférence", "RadialMenuCollectionState.json");
+            global::BIMaestro.Storage.UserDataStorage.Root, "SauvegardePréférence", "RadialMenuCollectionState.json");
 
         public static RadialMenuCollectionState Load()
         {

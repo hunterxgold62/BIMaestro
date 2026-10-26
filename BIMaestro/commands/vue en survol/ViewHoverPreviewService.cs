@@ -63,8 +63,7 @@ namespace BIMaestro.ViewHover
         private static bool _isProcessing;
 
         private static readonly string CacheRoot = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-            "RevitLogs",
+            global::BIMaestro.Storage.UserDataStorage.Root,
             "CacheVignettes",
             "VueEnSurvol");
         private const long MaximumCacheBytes = 100L * 1024L * 1024L;

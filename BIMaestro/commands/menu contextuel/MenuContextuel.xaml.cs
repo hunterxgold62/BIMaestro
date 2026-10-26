@@ -77,8 +77,7 @@ namespace TonNamespace
         private Dictionary<string, ExternalEvent> _externalEventMap;
         private List<string> _configuredCommands;
         private string ConfigFilePath => Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-            "RevitLogs", "SauvegardePréférence", "Menu contexte.json");
+            global::BIMaestro.Storage.UserDataStorage.Root, "SauvegardePréférence", "Menu contexte.json");
 
         // Pour drag & drop
         private Button _draggedBtn;
