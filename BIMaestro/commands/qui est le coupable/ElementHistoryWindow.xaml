@@ -330,6 +330,8 @@
                     <Button x:Name="DetailsButton" Content="Détails" Width="96" Style="{StaticResource HistoryButton}" Click="DetailsButton_Click"/>
                     <Button x:Name="RestoreParametersButton" Content="Restaurer" Width="108" Style="{StaticResource HistoryButton}" Click="RestoreParametersButton_Click" Visibility="Collapsed"/>
                     <Button x:Name="CleanPreviewsButton" Content="Nettoyer previews" Width="155" Style="{StaticResource HistoryButton}" Click="CleanPreviewsButton_Click"/>
+                    <Button x:Name="PreparePendingButton" Content="Charger les éléments en attente" MinWidth="235" Style="{StaticResource HistoryButton}" Click="PreparePendingButton_Click" ToolTip="Prépare les données de restauration depuis les copies temporaires sans attendre une pause. La maquette courante est prioritaire, puis les autres maquettes sont traitées. Revit peut être occupé pendant la préparation."/>
+                    <TextBlock x:Name="PreparationStatusText" TextWrapping="Wrap" VerticalAlignment="Center" Foreground="{DynamicResource Text.Secondary}" Margin="0,6,8,0"/>
                     <TextBlock x:Name="RestoreAvailabilityText" TextWrapping="Wrap" VerticalAlignment="Center" Foreground="{DynamicResource Text.Secondary}" Margin="0,6,0,0"/>
                 </WrapPanel>
             </Grid>
@@ -445,11 +447,14 @@
                                                            MaxWidth="142"
                                                            MaxHeight="142"
                                                            Visibility="{Binding ImageVisibility}"/>
-                                                    <TextBlock Text="{Binding VisualInitials}"
+                                                    <TextBlock Text="{Binding PreviewPlaceholder}"
                                                                Foreground="{DynamicResource Text.Primary}"
-                                                               FontSize="34"
-                                                               FontWeight="Bold"
-                                                               Opacity="0.38"
+                                                               FontSize="14"
+                                                               FontWeight="Normal"
+                                                               Opacity="0.65"
+                                                               Margin="12,38,12,12"
+                                                               TextWrapping="Wrap"
+                                                               TextAlignment="Center"
                                                                HorizontalAlignment="Center"
                                                                VerticalAlignment="Center"
                                                                Visibility="{Binding InitialsVisibility}"/>

@@ -136,6 +136,7 @@ namespace BIMaestro.PropertiesAppearance
 
             var right = new StackPanel(); right.Children.Add(Label("Personnaliser la sélection", 16, true)); BindText(_selection, 15, true); _selection.Margin = new Thickness(0, 8, 0, 6); right.Children.Add(_selection);
             BindText(_selectionHint, 12, false, true); _selectionHint.Margin = new Thickness(0, 0, 0, 15); right.Children.Add(_selectionHint);
+            right.Children.Add(_groupTools);
             right.Children.Add(Label("Appliquer à…", 13, true)); _scope.SelectionChanged += (_, __) => ScopeChanged(); right.Children.Add(_scope);
             BindText(_scopeHint, 12, false, true); _scopeHint.Margin = new Thickness(0, 7, 0, 14); right.Children.Add(_scopeHint);
             var tones = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 12) }; tones.Children.Add(_lightButton); tones.Children.Add(_darkButton); right.Children.Add(tones);
@@ -149,7 +150,6 @@ namespace BIMaestro.PropertiesAppearance
             BindText(_colorHint, 12, false, true); _colorHint.Margin = new Thickness(0, 0, 0, 10); _editor.Children.Add(_colorHint);
             _editor.Children.Add(MakeButton("↶  Retirer mes couleurs ici", ResetSelection));
             right.Children.Add(_editor);
-            right.Children.Add(_groupTools);
             _live.Margin = new Thickness(0, 14, 0, 12); right.Children.Add(_live);
             _enabled.Checked += (_, __) => EnabledChanged(); _enabled.Unchecked += (_, __) => EnabledChanged();
             _live.Checked += (_, __) => SchedulePreview(); _live.Unchecked += (_, __) => { if (_loading) return; _previewTimer.Stop(); RequestCancelPreview(); };

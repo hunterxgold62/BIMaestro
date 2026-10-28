@@ -164,7 +164,7 @@ namespace BIMaestro.PropertiesAppearance
             _signature=null;
             var preferences=_preview??_saved;
             if(preferences==null||!preferences.Enabled)return;
-            try{Presentation.Hold(_cachedGrid);_presentationEvent?.Raise();}
+            try{if(!Analyse.HistoryBackgroundWork.IsTextInputActive()){Presentation.Hold(_cachedGrid);_presentationEvent?.Raise();}}
             catch{Presentation.Release();}
         }
         private static AppearancePreferences _saved;
@@ -210,7 +210,7 @@ namespace BIMaestro.PropertiesAppearance
         private static int RefreshNativePlan(NativePropertiesGrid grid, AppearanceContext context,
             AppearancePreferences preferences, string version, bool dark, PropertiesPaletteRenderer renderer, bool redraw)
         {
-            if(PropertiesPaletteLayout.IsApplying||!grid.RefreshIfCurrent()) return 0;
+            if(Analyse.HistoryBackgroundWork.IsTextInputActive()||PropertiesPaletteLayout.IsApplying||!grid.RefreshIfCurrent()) return 0;
             bool hasColors = preferences.Enabled && preferences.Profiles.Any(p => p.Rules.Count > 0);
             bool hasOrder = preferences.Enabled && preferences.Profiles.Any(p => !p.Layout.IsEmpty);
             bool customLayout = false;
@@ -247,6 +247,7 @@ namespace BIMaestro.PropertiesAppearance
 
         internal static void ProcessIdling(UIApplication app)
         {
+            if (Analyse.HistoryBackgroundWork.IsTextInputActive()) return;
             long measured = 0;
             try
             {

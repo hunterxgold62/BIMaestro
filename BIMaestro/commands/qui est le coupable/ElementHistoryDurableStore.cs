@@ -69,7 +69,88 @@ namespace Analyse
         }
 
         private static string NativePath(string root, string id) => Path.Combine(root, "native", PayloadId(id) + ".json.gz");
-        private static string RecordPath(string root, string kind, string id) => Path.Combine(root, kind == "job" ? "jobs" : "conversions", EventId(id) + ".json.gz");
+        private static string RecordPath(string root, string kind, string id) => Path.Combine(root,
+            kind == "job" ? "jobs" : kind == "opening-classifications-v2" ? "opening-classifications-v2"
+                : kind == "classification" ? "opening-classifications"
+                : kind == "nativeconversion" ? "native-conversions"
+                : kind == "autonomousconversion" ? "autonomous-conversions" : "conversions", EventId(id) + ".json.gz");
+        private static readonly object ClassificationSync = new object();
+        private static readonly Dictionary<string, HistoryOpeningClassification> Classifications = new Dictionary<string, HistoryOpeningClassification>(StringComparer.OrdinalIgnoreCase);
+        private static readonly HashSet<string> LegacyClassifications = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, DateTime> MissingClassifications = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
+        internal static int ClassificationRevision { get; private set; }
+        // UI lookup only: never open a file or deserialize a restoration recipe.
+        internal static HistoryOpeningClassification GetCachedOpeningClassification(string eventId,string storeDirectory)
+        {
+            try
+            {
+                if(string.IsNullOrWhiteSpace(storeDirectory))return null;
+                var key=Path.Combine(Path.GetFullPath(Path.Combine(storeDirectory,"history-data")),EventId(eventId));
+                lock(ClassificationSync) return Classifications.TryGetValue(key,out var value) ? value : null;
+            }
+            catch(ArgumentException) { return null; }
+            catch(IOException) { return null; }
+        }
+        internal static HistoryOpeningClassification ResolveOpeningClassification(string eventId)
+        {
+            var root = Root(); var id = EventId(eventId); var key = Path.Combine(root, id);
+            HistoryOpeningClassification legacyCached = null;
+            lock (ClassificationSync)
+            {
+                if (Classifications.TryGetValue(key, out var cached))
+                {
+                    if (!LegacyClassifications.Contains(key)) return cached;
+                    legacyCached = cached;
+                }
+                // A legacy cached record may have been upgraded by another
+                // Revit process. Recheck v2 without repeatedly inflating v1.
+                if (MissingClassifications.TryGetValue(key, out var checkedUtc) && DateTime.UtcNow - checkedUtc < TimeSpan.FromSeconds(10)) return legacyCached;
+            }
+            var data = ReadRecord(RecordPath(root, "opening-classifications-v2", id), "opening-classifications-v2", id);
+            var legacy = data == null;
+            if (legacy && legacyCached != null)
+            {
+                lock (ClassificationSync)
+                {
+                    if (Classifications.TryGetValue(key, out var current) && !LegacyClassifications.Contains(key)) return current;
+                    MissingClassifications[key] = DateTime.UtcNow;
+                    return legacyCached;
+                }
+            }
+            if (legacy) data = ReadRecord(RecordPath(root, "classification", id), "classification", id);
+            if (data == null)
+            {
+                lock (ClassificationSync)
+                {
+                    if (Classifications.TryGetValue(key, out var current)) return current;
+                    if (MissingClassifications.Count > 32768) MissingClassifications.Clear();
+                    MissingClassifications[key] = DateTime.UtcNow;
+                }
+                return null;
+            }
+            var result = data.ToObject<HistoryOpeningClassification>(Serializer());
+            if (result?.IsValid() != true) throw new InvalidDataException("Classification d’ouverture invalide.");
+            lock (ClassificationSync)
+            {
+                // Do not overwrite a v2 publication with an older v1 disk read
+                // that was already in flight when publication completed.
+                if (legacy && Classifications.TryGetValue(key, out var current) && !LegacyClassifications.Contains(key)) return current;
+                Classifications[key] = result;
+                if (legacy) { LegacyClassifications.Add(key); MissingClassifications[key] = DateTime.UtcNow; }
+                else { LegacyClassifications.Remove(key); MissingClassifications.Remove(key); }
+                ClassificationRevision++;
+            }
+            return result;
+        }
+        internal static void PublishOpeningClassification(string eventId, HistoryOpeningClassification classification)
+        {
+            if (classification?.IsValid() != true) throw new InvalidDataException("Classification d’ouverture invalide.");
+            var root = Root(); var id = EventId(eventId);
+            var data = JObject.FromObject(classification, Serializer());
+            WriteRecord(root, "opening-classifications-v2", id, data, false);
+            var published = data.ToObject<HistoryOpeningClassification>(Serializer());
+            lock (ClassificationSync) { var key = Path.Combine(root, id); Classifications[key] = published; LegacyClassifications.Remove(key); MissingClassifications.Remove(key); ClassificationRevision++; }
+        }
         private static string Hex(byte[] hash) => BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
         private static string Hash(byte[] data) { using (var sha = SHA256.Create()) return Hex(sha.ComputeHash(data)); }
         private static void RemoveOwnTemporary(string path) { try { if (path != null) File.Delete(path); } catch { } }
@@ -427,11 +508,67 @@ namespace Analyse
         internal static HistoryRestoreRequest ResolveConversion(string eventId)
         {
             var id = EventId(eventId); var root = Root();
-            var data = ReadRecord(RecordPath(root, "conversion", id), "conversion", id);
+            var data = ReadRecord(RecordPath(root, "nativeconversion", id), "nativeconversion", id)
+                ?? ReadRecord(RecordPath(root, "conversion", id), "conversion", id);
             return data == null ? null : ValidateConversion(root, data);
         }
+        internal static void PublishNativeConversion(string eventId, HistoryRestoreRequest request)
+        {
+            var root = Root(); var id = EventId(eventId); var data = JObject.FromObject(request, Serializer());
+            ValidateConversion(root, data);
+            if (request.Recipe != null && (request.Recipe.Native == null || string.IsNullOrWhiteSpace(request.Recipe.Native.PayloadId)))
+                throw new InvalidDataException("Une restauration native exige une capsule native vérifiée.");
+            WriteRecord(root, "nativeconversion", id, data, false);
+        }
 
-        internal static bool HasConversion(string eventId) => ResolveConversion(eventId) != null;
+        // Semantic recovery data is independent of every RVT/native payload. It
+        // remains useful as long as its exact project definitions still exist.
+        private static HistoryRestoreRequest ValidateAutonomousConversion(string root, JObject data)
+        {
+            if (data.Descendants().OfType<JProperty>().Any(property =>
+                (property.Name == "Native" || property.Name == "OpeningFallback") && property.Value.Type != JTokenType.Null))
+                throw new InvalidDataException("Une recette JSON autonome ne peut pas référencer une archive native.");
+            var request = ValidateConversion(root, data);
+            if (string.IsNullOrWhiteSpace(request.SourceUniqueId) || request.Recipe == null)
+                throw new InvalidDataException("Identité ou recette JSON autonome absente.");
+            var recipes = new Stack<HistoryRecipe>();
+            recipes.Push(request.Recipe);
+            while (recipes.Count > 0)
+            {
+                var recipe = recipes.Pop();
+                if (recipe == null || recipe.Native != null || recipe.OpeningFallback != null
+                    || recipe.Kind == "native_archive" || !recipe.UsesExistingModelDefinitions
+                    || ElementHistoryReconstruction.ReadRecipe(recipe) == null)
+                    throw new InvalidDataException("La recette JSON autonome doit être complète et indépendante des archives natives.");
+                foreach (var circuit in recipe.ElectricalCircuits ?? new List<HistoryCircuit>())
+                {
+                    if (circuit == null) throw new InvalidDataException("Circuit JSON autonome absent.");
+                    recipes.Push(circuit.Recipe);
+                }
+            }
+            return request;
+        }
+
+        internal static void PublishAutonomousConversion(string eventId, HistoryRestoreRequest request)
+        {
+            var id = EventId(eventId);
+            if (request == null) throw new ArgumentNullException(nameof(request));
+            var root = Root(); var data = JObject.FromObject(request, Serializer());
+            ValidateAutonomousConversion(root, data);
+            WriteRecord(root, "autonomousconversion", id, data, false);
+            var published = ReadRecord(RecordPath(root, "autonomousconversion", id), "autonomousconversion", id);
+            if (published == null) throw new IOException("Recette JSON autonome absente après publication.");
+            ValidateAutonomousConversion(root, published);
+        }
+
+        internal static HistoryRestoreRequest ResolveAutonomousConversion(string eventId)
+        {
+            var id = EventId(eventId); var root = Root();
+            var data = ReadRecord(RecordPath(root, "autonomousconversion", id), "autonomousconversion", id);
+            return data == null ? null : ValidateAutonomousConversion(root, data);
+        }
+
+        internal static bool HasConversion(string eventId) => ResolveAutonomousConversion(eventId) != null || ResolveConversion(eventId) != null;
 
         internal static void WriteJob(ElementHistoryEvent evt)
         {
@@ -489,9 +626,15 @@ namespace Analyse
         internal static void DeleteJob(string eventId)
         {
             var id = EventId(eventId); var root = Root();
-            var conversion = ReadRecord(RecordPath(root, "conversion", id), "conversion", id);
-            if (conversion == null) throw new InvalidOperationException("Le travail ne peut être retiré avant sa conversion durable.");
-            ValidateConversion(root, conversion);
+            var autonomous = ReadRecord(RecordPath(root, "autonomousconversion", id), "autonomousconversion", id);
+            if (autonomous != null) ValidateAutonomousConversion(root, autonomous);
+            else
+            {
+                var conversion = ReadRecord(RecordPath(root, "nativeconversion", id), "nativeconversion", id)
+                    ?? ReadRecord(RecordPath(root, "conversion", id), "conversion", id);
+                if (conversion == null) throw new InvalidOperationException("Le travail ne peut être retiré avant sa conversion durable.");
+                ValidateConversion(root, conversion);
+            }
             File.Delete(RecordPath(root, "job", id)); InvalidateJobIndex(root);
         }
 

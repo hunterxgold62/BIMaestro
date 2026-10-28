@@ -9,6 +9,21 @@ using System.Linq;
 
 namespace Analyse
 {
+    // The shared Release DLL must not bake the enum/ElementId width of its build API
+    // into category arrays. Revit 2024+ changed these values from Int32 to Int64.
+    internal static class SmartRevitCompatibility
+    {
+        public static ElementMulticategoryFilter CategoryFilter(IEnumerable<long> categoryIds)
+            => new ElementMulticategoryFilter(categoryIds.Select(ElementIdExtensions.CreateElementId).ToList());
+
+        private static readonly System.Reflection.MethodInfo BuiltInParameterGetter =
+            typeof(Element).GetMethod("get_Parameter", new[] { typeof(BuiltInParameter) });
+
+        public static Parameter Mark(Element element)
+            => element == null ? null : (Parameter)BuiltInParameterGetter.Invoke(element,
+                new[] { Enum.ToObject(typeof(BuiltInParameter), (long)BuiltInParameter.ALL_MODEL_MARK) });
+    }
+
     public enum SmartScanScope { Model, ActiveView, Selection }
     public sealed class SmartLinkChoice
     {
@@ -67,18 +82,18 @@ namespace Analyse
         public string Signature => string.Join("|", new object[] { Scope, Pipes, Ducts, CableTrays, Conduits, Fittings,
             Equipment, GenericModels, LocalClashes, LinkedClashes, OpenConnectors, WallSupports, IncludeInsulation,
             MinimumVolumeMm3.ToString("R", CultureInfo.InvariantCulture), string.Join(",", LinkIds.Select(x => x.GetIdLongValue()).OrderBy(x => x)) });
-        public List<BuiltInCategory> SourceCategories()
+        public List<long> SourceCategories()
         {
-            var result = new List<BuiltInCategory>();
-            if (Pipes) { result.Add(BuiltInCategory.OST_PipeCurves); result.Add(BuiltInCategory.OST_FlexPipeCurves);
-                if (Fittings) result.AddRange(new[] { BuiltInCategory.OST_PipeFitting, BuiltInCategory.OST_PipeAccessory }); }
-            if (Ducts) { result.Add(BuiltInCategory.OST_DuctCurves); result.Add(BuiltInCategory.OST_FlexDuctCurves);
-                if (Fittings) result.AddRange(new[] { BuiltInCategory.OST_DuctFitting, BuiltInCategory.OST_DuctAccessory }); }
-            if (CableTrays) { result.Add(BuiltInCategory.OST_CableTray); if (Fittings) result.Add(BuiltInCategory.OST_CableTrayFitting); }
-            if (Conduits) { result.Add(BuiltInCategory.OST_Conduit); if (Fittings) result.Add(BuiltInCategory.OST_ConduitFitting); }
-            if (Equipment) result.AddRange(new[] { BuiltInCategory.OST_MechanicalEquipment, BuiltInCategory.OST_PlumbingFixtures,
-                BuiltInCategory.OST_ElectricalEquipment, BuiltInCategory.OST_ElectricalFixtures, BuiltInCategory.OST_DuctTerminal });
-            if (GenericModels) result.Add(BuiltInCategory.OST_GenericModel);
+            var result = new List<long>();
+            if (Pipes) { result.Add((long)BuiltInCategory.OST_PipeCurves); result.Add((long)BuiltInCategory.OST_FlexPipeCurves);
+                if (Fittings) result.AddRange(new[] { (long)BuiltInCategory.OST_PipeFitting, (long)BuiltInCategory.OST_PipeAccessory }); }
+            if (Ducts) { result.Add((long)BuiltInCategory.OST_DuctCurves); result.Add((long)BuiltInCategory.OST_FlexDuctCurves);
+                if (Fittings) result.AddRange(new[] { (long)BuiltInCategory.OST_DuctFitting, (long)BuiltInCategory.OST_DuctAccessory }); }
+            if (CableTrays) { result.Add((long)BuiltInCategory.OST_CableTray); if (Fittings) result.Add((long)BuiltInCategory.OST_CableTrayFitting); }
+            if (Conduits) { result.Add((long)BuiltInCategory.OST_Conduit); if (Fittings) result.Add((long)BuiltInCategory.OST_ConduitFitting); }
+            if (Equipment) result.AddRange(new[] { (long)BuiltInCategory.OST_MechanicalEquipment, (long)BuiltInCategory.OST_PlumbingFixtures,
+                (long)BuiltInCategory.OST_ElectricalEquipment, (long)BuiltInCategory.OST_ElectricalFixtures, (long)BuiltInCategory.OST_DuctTerminal });
+            if (GenericModels) result.Add((long)BuiltInCategory.OST_GenericModel);
             return result.Distinct().ToList();
         }
     }
@@ -189,7 +204,7 @@ namespace Analyse
                 throw new InvalidOperationException("Cette vue ne permet pas une analyse. Choisissez la maquette ou une sélection.");
             var sources = new List<Entry>();
             Stage = "Collecte des objets à analyser";
-            foreach (var e in categories.Count == 0 ? Enumerable.Empty<Element>() : ScopedCollector(doc).WhereElementIsNotElementType().WherePasses(new ElementMulticategoryFilter(categories)))
+            foreach (var e in categories.Count == 0 ? Enumerable.Empty<Element>() : ScopedCollector(doc).WhereElementIsNotElementType().WherePasses(SmartRevitCompatibility.CategoryFilter(categories)))
             {
                 var entry = CreateEntry(e, Transform.Identity, null);
                 if (entry != null) sources.Add(entry);
@@ -197,16 +212,16 @@ namespace Analyse
                 yield return true;
             }
             SourceCount = sources.Count;
-            var targetCategories = new SmartScanOptions { Equipment = true, GenericModels = true }.SourceCategories().Concat(new[] { BuiltInCategory.OST_Walls, BuiltInCategory.OST_Floors,
-                BuiltInCategory.OST_Roofs, BuiltInCategory.OST_StructuralFraming, BuiltInCategory.OST_StructuralColumns,
-                BuiltInCategory.OST_Columns, BuiltInCategory.OST_StructuralFoundation, BuiltInCategory.OST_Stairs }).Distinct().ToList();
+            var targetCategories = new SmartScanOptions { Equipment = true, GenericModels = true }.SourceCategories().Concat(new[] { (long)BuiltInCategory.OST_Walls, (long)BuiltInCategory.OST_Floors,
+                (long)BuiltInCategory.OST_Roofs, (long)BuiltInCategory.OST_StructuralFraming, (long)BuiltInCategory.OST_StructuralColumns,
+                (long)BuiltInCategory.OST_Columns, (long)BuiltInCategory.OST_StructuralFoundation, (long)BuiltInCategory.OST_Stairs }).Distinct().ToList();
             var index = new SpatialIndex();
             if (_options.LocalClashes && SourceCount > 0)
             {
                 Stage = "Préparation de la maquette";
                 var collector = _options.Scope == SmartScanScope.ActiveView
                     ? new FilteredElementCollector(doc, _setup.ViewId) : new FilteredElementCollector(doc);
-                foreach (var e in collector.WhereElementIsNotElementType().WherePasses(new ElementMulticategoryFilter(targetCategories)))
+                foreach (var e in collector.WhereElementIsNotElementType().WherePasses(SmartRevitCompatibility.CategoryFilter(targetCategories)))
                 {
                     var entry = CreateEntry(e, Transform.Identity, null);
                     if (entry != null) { index.Add(entry); CandidateCount++; }
@@ -229,7 +244,7 @@ namespace Analyse
                         var linkedDoc = link.GetLinkDocument();
                         if (linkedDoc == null) { Warn("link:" + id, "Lien non chargé : " + link.Name); continue; }
                         foreach (var e in new FilteredElementCollector(linkedDoc).WhereElementIsNotElementType()
-                            .WherePasses(new ElementMulticategoryFilter(targetCategories)))
+                            .WherePasses(SmartRevitCompatibility.CategoryFilter(targetCategories)))
                         {
                             var entry = CreateEntry(e, link.GetTotalTransform(), link);
                             if (entry != null && SmartGeometry.Overlap(entry.Box, sourceBox)) { index.Add(entry); CandidateCount++; }
@@ -301,7 +316,7 @@ namespace Analyse
                 Stage = "Vérification indicative des supports de murs";
                 var supports = new List<BoundingBoxXYZ>();
                 foreach (var e in new FilteredElementCollector(doc).WhereElementIsNotElementType().WherePasses(
-                    new ElementMulticategoryFilter(new[] { BuiltInCategory.OST_Floors, BuiltInCategory.OST_Walls, BuiltInCategory.OST_StructuralFoundation })))
+                    SmartRevitCompatibility.CategoryFilter(new[] { (long)BuiltInCategory.OST_Floors, (long)BuiltInCategory.OST_Walls, (long)BuiltInCategory.OST_StructuralFoundation })))
                 { var b = SmartGeometry.WorldBox(e.get_BoundingBox(null), Transform.Identity); if (b != null) supports.Add(b); yield return true; }
                 foreach (var w in ScopedCollector(doc).OfClass(typeof(Wall)).Cast<Wall>())
                 {
@@ -365,11 +380,11 @@ namespace Analyse
         }
         private IEnumerable<ElementId> InsulationIds(Element element)
         {
-            var category = (BuiltInCategory)(element.Category?.Id.GetIdLongValue() ?? 0);
-            bool pipe = category == BuiltInCategory.OST_PipeCurves || category == BuiltInCategory.OST_FlexPipeCurves
-                || category == BuiltInCategory.OST_PipeFitting || category == BuiltInCategory.OST_PipeAccessory;
-            bool duct = category == BuiltInCategory.OST_DuctCurves || category == BuiltInCategory.OST_FlexDuctCurves
-                || category == BuiltInCategory.OST_DuctFitting || category == BuiltInCategory.OST_DuctAccessory;
+            var category = (element.Category?.Id.GetIdLongValue() ?? 0);
+            bool pipe = category == (long)BuiltInCategory.OST_PipeCurves || category == (long)BuiltInCategory.OST_FlexPipeCurves
+                || category == (long)BuiltInCategory.OST_PipeFitting || category == (long)BuiltInCategory.OST_PipeAccessory;
+            bool duct = category == (long)BuiltInCategory.OST_DuctCurves || category == (long)BuiltInCategory.OST_FlexDuctCurves
+                || category == (long)BuiltInCategory.OST_DuctFitting || category == (long)BuiltInCategory.OST_DuctAccessory;
             var ids = new List<ElementId>();
             if (!pipe && !duct) return ids;
             try { ids.AddRange(InsulationLiningBase.GetInsulationIds(element.Document, element.Id)); }

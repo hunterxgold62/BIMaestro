@@ -4,10 +4,48 @@ $source = [IO.File]::ReadAllText((Join-Path $repo 'BIMaestro/commands/qui est le
 $start = $source.IndexOf('    internal static class HistoryBackgroundWork')
 $end = $source.IndexOf('    internal sealed class HistoryNativeArtifact', $start)
 $gate = $source.Substring($start, $end - $start)
+# Exercise the production decisions with deterministic native focus snapshots.
+$gate = [regex]::Replace($gate, '\[DllImport\("user32.dll"[^\]]*\)\]\s*(\[return: MarshalAs\(UnmanagedType.Bool\)\]\s*)?private static extern bool GetGUIThreadInfo\(uint threadId, ref GuiThreadInfo info\);', 'private static bool GetGUIThreadInfo(uint threadId, ref GuiThreadInfo info) { info.Caret = TestCaret ? new IntPtr(1) : IntPtr.Zero; return TestGuiAvailable; }')
+$gate = [regex]::Replace($gate, '\[DllImport\("user32.dll"[^\]]*\)\]\s*private static extern int GetClassName\(IntPtr window, System.Text.StringBuilder name, int capacity\);', 'private static int GetClassName(IntPtr window, System.Text.StringBuilder name, int capacity) { name.Append(TestClass); return TestClass.Length; }')
+$gate = [regex]::Replace($gate, '\[DllImport\("user32.dll"\)\]\s*private static extern IntPtr GetForegroundWindow\(\);', 'internal static bool TestCaret, TestGuiAvailable = true, TestForeground = true; internal static string TestClass = "Grid"; private static IntPtr GetForegroundWindow() => new IntPtr(1);')
+$gate = [regex]::Replace($gate, '\[DllImport\("user32.dll"\)\]\s*private static extern uint GetWindowThreadProcessId\(IntPtr window, out uint processId\);', 'private static uint GetWindowThreadProcessId(IntPtr window, out uint processId) { processId = TestForeground ? ProcessId : 0; return 1; }')
+$wpfStubs = @'
+namespace System.Windows.Input { internal static class Keyboard { internal static object FocusedElement; } }
+namespace System.Windows.Controls.Primitives { internal class TextBoxBase {} }
+namespace System.Windows.Controls { internal class PasswordBox {} internal class ComboBox { internal bool IsEditable; } }
+'@
 $checks = @'
 public static class IdleGateChecks {
     static void Check(bool value, string message) { if (!value) throw new Exception(message); }
     public static void Run() {
+        Check(!HistoryBackgroundWork.IsTextInputActive(), "Grid focus permits background work");
+        HistoryBackgroundWork.SelectionRequested = true;
+        HistoryBackgroundWork.TestCaret = true;
+        Check(HistoryBackgroundWork.IsTextInputActive(), "Native caret protects ribbon editing even between keystrokes");
+        Check(!HistoryBackgroundWork.SelectionCanRun(), "Selection priority cannot interrupt a native edit");
+        Check(!HistoryBackgroundWork.InventoryCanRun(), "Inventory cannot interrupt a native edit");
+        Check(!HistoryBackgroundWork.UserIsIdle(), "Long typing pauses must still protect the edit");
+        Check(!HistoryBackgroundWork.PreparationCanRun(), "Preparation cannot interrupt a native edit");
+        HistoryBackgroundWork.TestCaret = false;
+        HistoryBackgroundWork.TestClass = "WindowsForms10.EDIT.app";
+        Check(HistoryBackgroundWork.IsTextInputActive(), "Native edit remains protected when caret is unavailable");
+        HistoryBackgroundWork.TestClass = "HwndWrapper";
+        System.Windows.Input.Keyboard.FocusedElement = new System.Windows.Controls.Primitives.TextBoxBase();
+        Check(HistoryBackgroundWork.IsTextInputActive(), "WPF ribbon textbox is protected");
+        System.Windows.Input.Keyboard.FocusedElement = new System.Windows.Controls.ComboBox { IsEditable = true };
+        Check(HistoryBackgroundWork.IsTextInputActive(), "Editable ribbon combo is protected");
+        System.Windows.Input.Keyboard.FocusedElement = new System.Windows.Controls.ComboBox();
+        Check(!HistoryBackgroundWork.IsTextInputActive(), "Noneditable combo permits background work");
+        System.Windows.Input.Keyboard.FocusedElement = null;
+        HistoryBackgroundWork.TestGuiAvailable = false;
+        Check(HistoryBackgroundWork.IsTextInputActive(), "Unknown foreground input state defers work");
+        HistoryBackgroundWork.TestGuiAvailable = true;
+        HistoryBackgroundWork.TestCaret = true;
+        HistoryBackgroundWork.TestForeground = false;
+        Check(!HistoryBackgroundWork.IsTextInputActive(), "Other applications do not block Revit inventory");
+        HistoryBackgroundWork.TestForeground = true;
+        HistoryBackgroundWork.TestCaret = false;
+        Check(HistoryBackgroundWork.SelectionCanRun(), "Pending selection resumes after leaving the editor");
         HistoryBackgroundWork.SelectionRequested = true;
         Check(HistoryBackgroundWork.CanStartSelection(true, true, false), "Explicit selection starts without idle delay");
         Check(!HistoryBackgroundWork.CanStartSelection(true, true, true), "Stop blocks explicit selection");
@@ -47,6 +85,6 @@ public static class IdleGateChecks {
     }
 }
 '@
-Add-Type -TypeDefinition ("using System; using System.Diagnostics; using System.Runtime.InteropServices;`n" + $gate + $checks)
+Add-Type -TypeDefinition ("using System; using System.Diagnostics; using System.Runtime.InteropServices;`n" + $gate + $checks + $wpfStubs)
 [IdleGateChecks]::Run()
 Write-Output 'PASS: selection, Stop, heavy foreground suspension, return delay, input interruption, light inventory in background, 150ms threshold and tick rollover.'

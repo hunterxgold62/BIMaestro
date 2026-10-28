@@ -14,7 +14,7 @@ namespace Analyse
         {
             // NewGroup may choose another logical origin even when all member
             // coordinates are identical. Members carry the physical placement.
-            if (element == null || recipe == null || element is Group) return;
+            if (element == null || recipe == null || element is Group || element is MEPSystem) return;
             if (recipe.HistoricalPlacement == null)
             {
                 recipe.HistoricalPlacement = ReadHistoricalPlacement(element, includeBoundingBox);
@@ -96,7 +96,10 @@ namespace Analyse
                 var plain = SavedHistoricalPlacement(recipe);
                 if (plain == null || element is Group) return;
                 if (!doc.IsModifiable) throw new InvalidOperationException("Le recalage historique nécessite une transaction.");
-                if (VerifyHistoricalPlacement(element, recipe, out _, true)) return;
+                // A wall bound includes its joins with other restored walls. Check
+                // the axis now; the complete bound is checked after relations.
+                bool includeBoundingBox = !(element is Wall);
+                if (VerifyHistoricalPlacement(element, recipe, out _, includeBoundingBox)) return;
                 if (ElementHistoryNetwork.Ports(element).Any(port => port.IsConnected))
                     throw new InvalidOperationException("Le recalage déplacerait un objet déjà connecté ; opération annulée.");
                 if (element.Location is LocationCurve locationCurve && plain.Curve != null)
@@ -105,7 +108,7 @@ namespace Analyse
                     ElementTransformUtils.MoveElement(doc, element.Id, Unpack(plain.Point) - locationPoint.Point);
                 else throw new InvalidOperationException("Le placement historique de cet objet natif ne peut pas être recalé.");
                 doc.Regenerate();
-                if (!VerifyHistoricalPlacement(element, recipe, out var plainFailure, true)) throw new InvalidOperationException(plainFailure);
+                if (!VerifyHistoricalPlacement(element, recipe, out var plainFailure, includeBoundingBox)) throw new InvalidOperationException(plainFailure);
                 return;
             }
             var saved = SavedHistoricalPlacement(recipe);

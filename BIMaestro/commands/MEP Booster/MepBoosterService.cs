@@ -56,24 +56,58 @@ namespace BIMaestro.MepBooster
         internal static Action<bool> TutorialActivation;
         internal static Action<Document, IEnumerable<ElementId>, string, double> TutorialProgress;
         private static bool _startupStateRestored;
-        private static readonly Dictionary<string, System.Windows.Media.Imaging.BitmapImage> _icons =
-            new Dictionary<string, System.Windows.Media.Imaging.BitmapImage>();
-        internal static System.Windows.Media.Imaging.BitmapImage StateIcon(bool enabled, int size)
+        private static readonly Dictionary<string, System.Windows.Media.ImageSource> _icons =
+            new Dictionary<string, System.Windows.Media.ImageSource>();
+        internal static System.Windows.Media.ImageSource StateIcon(bool enabled, int size)
         {
             string name = enabled ? "MEP Booster vanne rotation.png" : "MEP Booster vanne rotation OFF.png";
             string key = name + size;
             if (_icons.TryGetValue(key, out var cached)) return cached;
-            using (var stream = typeof(MepBoosterService).Assembly.GetManifestResourceStream("BIMaestro.Resources." + name))
+            System.Windows.Media.ImageSource icon;
+            try
             {
-                if (stream == null) throw new InvalidOperationException("Icône MEP Booster absente : " + name);
-                var bitmap = new System.Windows.Media.Imaging.BitmapImage();
-                bitmap.BeginInit();
-                bitmap.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
-                bitmap.StreamSource = stream; bitmap.DecodePixelWidth = size;
-                bitmap.EndInit(); bitmap.Freeze();
-                _icons[key] = bitmap;
-                return bitmap;
+                using (var resource = typeof(MepBoosterService).Assembly.GetManifestResourceStream("BIMaestro.Resources." + name))
+                {
+                    if (resource == null) throw new InvalidOperationException("Icône MEP Booster absente : " + name);
+                    // Give WIC an independent, seekable stream. Never leave the native
+                    // decoder bound to the assembly's unmanaged resource stream.
+                    using (var buffer = new MemoryStream())
+                    {
+                        resource.CopyTo(buffer); buffer.Position = 0;
+                        var bitmap = new System.Windows.Media.Imaging.BitmapImage();
+                        bitmap.BeginInit();
+                        bitmap.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                        bitmap.StreamSource = buffer; bitmap.DecodePixelWidth = size;
+                        bitmap.EndInit(); bitmap.Freeze();
+                        icon = bitmap;
+                    }
+                }
             }
+            catch (Exception ex)
+            {
+                // Ribbon artwork is optional. A codec or resource error must not
+                // abort plugin startup, disable its commands or prevent toggling.
+                WriteDiagnostic("Icône de secours " + name + " (" + size + "): " + ex);
+                icon = CreateFallbackStateIcon(enabled);
+            }
+            _icons[key] = icon;
+            return icon;
+        }
+        private static System.Windows.Media.ImageSource CreateFallbackStateIcon(bool enabled)
+        {
+            var drawing = new System.Windows.Media.DrawingGroup();
+            using (var context = drawing.Open())
+            {
+                context.DrawRoundedRectangle(enabled ? System.Windows.Media.Brushes.ForestGreen : System.Windows.Media.Brushes.DimGray,
+                    null, new System.Windows.Rect(1, 1, 30, 30), 6, 6);
+                var pen = new System.Windows.Media.Pen(System.Windows.Media.Brushes.White, 3);
+                context.DrawEllipse(null, pen, new System.Windows.Point(16, 18), 7, 7);
+                context.DrawLine(pen, new System.Windows.Point(16, 5), new System.Windows.Point(16, 17));
+            }
+            drawing.Freeze();
+            var icon = new System.Windows.Media.DrawingImage(drawing);
+            icon.Freeze();
+            return icon;
         }
         private ExternalEvent _event;
         private DispatcherTimer _timer;

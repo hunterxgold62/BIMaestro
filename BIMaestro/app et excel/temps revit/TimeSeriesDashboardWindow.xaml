@@ -287,12 +287,15 @@
                             <TextBlock Grid.Row="3" x:Name="SelectionCount" Style="{StaticResource Hint}" Margin="0,10,0,0" />
                         </Grid>
                     </Border>
-                    <Grid Grid.Column="1">
+                    <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <Grid Margin="0,0,8,0">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
-                            <RowDefinition />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <DockPanel>
                             <Button x:Name="PdfButton" DockPanel.Dock="Right" Content="Exporter PDF" Style="{StaticResource PrimaryButton}" Click="Pdf_Click" />
@@ -301,9 +304,15 @@
                         <StackPanel Grid.Row="1" Margin="0,0,0,12">
                             <TextBlock x:Name="DetailSummary" FontSize="28" FontWeight="SemiBold" TextWrapping="Wrap" Foreground="{DynamicResource Brand}" />
                             <TextBlock x:Name="DetailContext" Style="{StaticResource Hint}" Margin="0,4,0,0" />
+                            <WrapPanel Margin="0,12,0,0">
+                                <TextBlock x:Name="DetailAverage" FontWeight="SemiBold" Margin="0,0,20,6" />
+                                <TextBlock x:Name="DetailPeak" FontWeight="SemiBold" Margin="0,0,0,6" />
+                            </WrapPanel>
+                            <TextBlock x:Name="DetailComparison" Style="{StaticResource Hint}" TextWrapping="Wrap" />
+                            <TextBlock x:Name="DetailLive" Style="{StaticResource Hint}" Margin="0,4,0,0" />
                         </StackPanel>
                         <Border Grid.Row="2" Style="{StaticResource CompactCard}" Margin="0,0,0,12">
-                            <Expander x:Name="DetailChartExpansion">
+                            <Expander x:Name="DetailChartExpansion" IsExpanded="True">
                                 <Expander.Header>
                                     <TextBlock x:Name="DetailChartTitle" FontWeight="SemiBold" />
                                 </Expander.Header>
@@ -313,9 +322,36 @@
                                 </Grid>
                             </Expander>
                         </Border>
-                        <Border Grid.Row="3" Style="{StaticResource Card}">
+                        <Border Grid.Row="3" Style="{StaticResource Card}" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Text="Temps par jour actif" Style="{StaticResource H2}" />
+                                <DataGrid x:Name="DailyTable" MaxHeight="230">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Jour" Binding="{Binding Day, StringFormat=dd/MM/yyyy}" Width="*" />
+                                        <DataGridTextColumn Header="Temps actif" Binding="{Binding Duration}" SortMemberPath="Hours" Width="110" />
+                                        <DataGridTextColumn Header="Plages d’activité" Binding="{Binding Count}" Width="110" />
+                                        <DataGridTextColumn Header="Dont sessions ouvertes" Binding="{Binding LiveDuration}" SortMemberPath="LiveHours" Width="160" />
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Row="4" Style="{StaticResource Card}" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Text="Plages d’activité" Style="{StaticResource H2}" />
+                                <TextBlock Text="Une session peut contenir plusieurs plages. La date correspond à la fin de la plage enregistrée." Style="{StaticResource Hint}" TextWrapping="Wrap" Margin="0,0,0,8" />
+                                <DataGrid x:Name="ActivityTable" MaxHeight="280">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Date / heure" Binding="{Binding When, StringFormat=dd/MM/yyyy HH:mm}" Width="135" />
+                                        <DataGridTextColumn Header="Maquette / famille" Binding="{Binding Name}" Width="*" />
+                                        <DataGridTextColumn Header="Temps actif" Binding="{Binding Duration}" SortMemberPath="Hours" Width="100" />
+                                        <DataGridTextColumn Header="État" Binding="{Binding State}" Width="125" />
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Row="5" Style="{StaticResource Card}">
                             <Grid>
-                            <DataGrid x:Name="DetailTable">
+                            <DataGrid x:Name="DetailTable" MaxHeight="230">
                                 <DataGrid.Columns>
                                     <DataGridTemplateColumn Header="Maquette / famille" SortMemberPath="Name" Width="*">
                                         <DataGridTemplateColumn.CellTemplate>
@@ -337,6 +373,7 @@
                             </Grid>
                         </Border>
                     </Grid>
+                    </ScrollViewer>
                 </Grid>
             </TabItem>
         </TabControl>

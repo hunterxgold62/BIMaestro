@@ -12,6 +12,14 @@ namespace Analyse
 {
     internal static partial class ElementHistoryNativeArchive
     {
+        internal sealed class NativePreparationMemberException : InvalidOperationException
+        {
+            internal string SourceUniqueId { get; }
+            internal string RootSourceUniqueId { get; }
+            internal string Stage { get; }
+            internal NativePreparationMemberException(string stage, string sourceUniqueId, string rootSourceUniqueId, string message)
+                : base(message) { Stage = stage; SourceUniqueId = sourceUniqueId; RootSourceUniqueId = rootSourceUniqueId; }
+        }
         private sealed class DocumentReferenceComparer : IEqualityComparer<Document>
         {
             internal static readonly DocumentReferenceComparer Instance = new DocumentReferenceComparer();
@@ -74,6 +82,7 @@ namespace Analyse
 
         private static void ReleaseHistoricalMaterializations(Document document)
         {
+            Sources.ReleaseBridgeLease(document);
             if (!HistoricalMaterializations.TryGetValue(document, out var paths)) return;
             // Remove one lease only after its release succeeds; a failed cleanup
             // remains retryable without releasing another reader's lease twice.
@@ -171,12 +180,20 @@ namespace Analyse
             internal ElementType SystemDefinition;
         }
 
-        // Called from a Revit API context. The source checkpoint is never edited.
+        // Called from a Revit API context. The source checkpoint is never saved;
+        // temporary copy identities are rolled back in the isolated document.
         // Only requested roots, their native dependencies and explicit system
         // definitions enter a fresh capsule; the full model is never SaveAs'ed.
         internal static Dictionary<string, HistoryRecipe> ExportDurableBatch(Document source,
             IEnumerable<HistoryRestoreRequest> requests, string outputRvt, string sourceVersion = null,
             Dictionary<string, string> failures = null)
+            => ExportDurableBatchCore(source, requests, outputRvt, sourceVersion, failures, false);
+        internal static Dictionary<string, HistoryRecipe> ExportDurableNativeBatch(Document source,
+            IEnumerable<HistoryRestoreRequest> requests, string outputRvt)
+            => ExportDurableBatchCore(source, requests, outputRvt, null, null, true);
+        private static Dictionary<string, HistoryRecipe> ExportDurableBatchCore(Document source,
+            IEnumerable<HistoryRestoreRequest> requests, string outputRvt, string sourceVersion,
+            Dictionary<string, string> failures, bool nativeClipboard)
         {
             if (source == null || source.IsFamilyDocument || source.IsModifiable)
                 throw new InvalidOperationException("La conversion exige un projet historique hors transaction.");
@@ -231,14 +248,139 @@ namespace Analyse
                             System.Diagnostics.Trace.WriteLine("History stock type retained: " + definitionContext + " " + ex.ToString());
                         }
                     }
+                    if (nativeClipboard)
+                        foreach (var family in new FilteredElementCollector(capsule).OfClass(typeof(Family)).Cast<Family>())
+                            if (!IsPresentationDefinition(family)) family.Name=VersionedDefinitionName(family.Name,version,"template-family:"+family.UniqueId);
                     foreach (var material in templateDefinitions.Select(capsule.GetElement).OfType<Material>())
                     {
                         stage = "initialize_template_material";
                         definitionContext = DurableDefinitionDiagnostic(material);
                         material.Name = VersionedDefinitionName(material.Name, version, "template-material:" + material.Name);
                     }
+                    if (nativeClipboard)
+                    {
+                        stage = "initialize_native_levels";
+                        PrepareNativeCapsuleLevels(source, capsule, version);
+                    }
                     CommitDurableTransaction(tx);
                 }
+                Dictionary<string, Element> clipboard = null;
+                if (nativeClipboard)
+                {
+                    CaptureNativePlacementProbe(source, capsule, null, items.Select(item => item.Request), "before_native_copy");
+                    // Freeze only requested metadata before temporary source copy identities.
+                    foreach (var item in items.Where(item => item.DirectSystem == null))
+                    {
+                        stage = "capture_native_member_metadata"; rootContext = item.Root.UniqueId; memberContext = item.Element.UniqueId; definitionContext = null;
+                        var recipe = Recipe(item.Element, DurableArtifact(item, outputRvt, null, version));
+                        PreserveDurableLiveMetadata(item, recipe, captureMissingParameters: false);
+                        recipe.Ports = ElementHistoryNetwork.CaptureNativeSystemPorts(item.Element);
+                        recipe.Native.PreserveLogicalSystemIdentities = true;
+                        result.Add(item.Element.UniqueId, recipe);
+                    }
+                    stage = "copy_native_set";
+                    definitionContext = null;
+                    using var tx = new Transaction(capsule, "BIMaestro - Copier le lot natif complet");
+                    tx.Start();
+                    var clipboardFailures = new Failures();
+                    tx.SetFailureHandlingOptions(tx.GetFailureHandlingOptions().SetFailuresPreprocessor(clipboardFailures).SetClearAfterRollback(true));
+                    bool includeContext = Environment.GetEnvironmentVariable("BIMAESTRO_HISTORY_MANUAL_TEST") == "1"
+                        && File.Exists(Path.Combine(CollaborativeModelTrackerStore.ActiveDirectory, "native-include-connected-context.txt"));
+                    try { clipboard = CopyNativeSet(source, items.Where(item => item.DirectSystem == null).Select(item => item.Element), capsule, includeConnectedContext:includeContext); }
+                    catch (Exception) when (Environment.GetEnvironmentVariable("BIMAESTRO_HISTORY_MANUAL_TEST") == "1"
+                        && File.Exists(Path.Combine(CollaborativeModelTrackerStore.ActiveDirectory,"native-copy-commit-diagnostic.txt")))
+                    {
+                        var diagnosticStatus=tx.Commit();
+                        object WallRows(Document doc) => new FilteredElementCollector(doc).OfClass(typeof(Wall)).Cast<Wall>().Select(w=>new {
+                            Identity=NativeCopyIdentity(w), Source=ReadCopySourceId(w), Origins=ElementHistoryRestoration.GetOrigins(w),
+                            PhaseCreated=doc.GetElement(w.CreatedPhaseId)?.Name, PhaseDemolished=doc.GetElement(w.DemolishedPhaseId)?.Name,
+                            DesignOption=w.DesignOption?.Name, Type=w.WallType.Name }).ToList();
+                        File.WriteAllText(Path.Combine(CollaborativeModelTrackerStore.ActiveDirectory,"native-copy-diagnostic.json"),
+                            Newtonsoft.Json.JsonConvert.SerializeObject(new {Status=diagnosticStatus.ToString(),clipboardFailures.Message,clipboardFailures.Warnings,
+                                Source=WallRows(source),Destination=WallRows(capsule)},Newtonsoft.Json.Formatting.Indented));
+                        throw;
+                    }
+                    if(tx.Commit()!=TransactionStatus.Committed)
+                    {
+                        var evidence = Newtonsoft.Json.Linq.JArray.FromObject(clipboardFailures.Errors);
+                        if (Environment.GetEnvironmentVariable("BIMAESTRO_HISTORY_MANUAL_TEST") == "1")
+                            File.WriteAllText(Path.Combine(CollaborativeModelTrackerStore.ActiveDirectory, "native-copy-failures.json"),
+                                evidence.ToString(Newtonsoft.Json.Formatting.Indented));
+                        var localized = new List<Exception>();
+                        bool completeEvidence = evidence.Count > 0;
+                        foreach (var record in evidence)
+                        {
+                            var primaryIds = new HashSet<long>((record["FailingElements"] ?? new Newtonsoft.Json.Linq.JArray())
+                                .Values<long>());
+                            var targets = (record["Targets"] ?? new Newtonsoft.Json.Linq.JArray()).ToList();
+                            var identities = targets.Where(target => primaryIds.Contains((long?)target["TargetId"] ?? 0))
+                                .Select(target => (string)target["SourceUniqueId"]).Where(uid => !string.IsNullOrWhiteSpace(uid)).Distinct().ToList();
+                            if (identities.Count == 0)
+                                identities = targets.Select(target => (string)target["SourceUniqueId"])
+                                    .Where(uid => !string.IsNullOrWhiteSpace(uid)).Distinct().ToList();
+                            int localizedBefore = localized.Count;
+                            foreach (var uid in identities)
+                            {
+                                var original = source.GetElement(uid);
+                                if (original == null) continue;
+                                var root = OpeningRoot(original);
+                                if (!items.Any(item => item.Element.UniqueId == uid || item.Root.UniqueId == root.UniqueId)) continue;
+                                localized.Add(new NativePreparationMemberException(stage, uid, root.UniqueId,
+                                    "Objet refusé par Revit pendant le collage natif : " + original.Id.GetIdValue()
+                                    + " — " + (string)record["Message"] + " [défaut=" + (string)record["Id"] + "]."));
+                            }
+                            if (localized.Count == localizedBefore) completeEvidence = false;
+                        }
+                        if (completeEvidence && localized.Count > 0)
+                            throw new AggregateException("Revit a refusé " + localized.Count + " objet(s) localisé(s) du lot natif.", localized);
+                        throw new InvalidOperationException("Le lot natif a été refusé par Revit : " + clipboardFailures.Message
+                            + " Diagnostic=" + evidence.ToString(Newtonsoft.Json.Formatting.None));
+                    }
+                    CaptureNativePlacementProbe(source, capsule, clipboard, items.Select(item => item.Request), "after_native_copy");
+                    VerifyNativeSetConnections(source, clipboard, capsule);
+                    VerifyNativeHosts(source, clipboard, capsule);
+                    // Partial capsules may split logical systems; original JSON identities
+                    // are verified together in the final destination after boundary reconnection.
+                }
+                if (clipboard != null)
+                {
+                    // The native set has already been copied. Stamp the complete set once,
+                    // instead of committing two transactions for every pipe and fitting.
+                    using (var tx = new Transaction(capsule, "BIMaestro - Conserver les identités du lot natif"))
+                    {
+                        tx.Start(); ConfigureDurableFailures(tx);
+                        stage = "remove_native_insulation";
+                        RemoveNativeClipboardInsulation(capsule, clipboard);
+                        var stampedTypes = new HashSet<ElementId>();
+                        foreach (var pair in clipboard)
+                        {
+                            stage = "stamp_native_member"; memberContext = pair.Key;
+                            var original = source.GetElement(pair.Key);
+                            if (original == null || pair.Value?.IsValidObject != true)
+                                throw new InvalidOperationException("Un membre natif a disparu pendant la préparation : " + pair.Key);
+                            ElementHistoryRestoration.SetOrigins(pair.Value,
+                                (ElementHistoryRestoration.GetOrigins(original) ?? new List<string>()).Concat(new[] { original.UniqueId }));
+                            if (stampedTypes.Add(pair.Value.GetTypeId()))
+                                StampDurableDefinitionPair(source.GetElement(original.GetTypeId()), capsule.GetElement(pair.Value.GetTypeId()), version);
+                        }
+                        CommitDurableTransaction(tx);
+                    }
+                    VerifyNativeSetConnections(source, clipboard, capsule);
+                    VerifyNativeHosts(source, clipboard, capsule);
+                    // Partial capsules may split logical systems; original JSON identities
+                    // are verified together in the final destination after boundary reconnection.
+                    CaptureNativePlacementProbe(source, capsule, clipboard, items.Select(item => item.Request), "after_native_identity_stamp");
+                    foreach (var item in items.Where(item => item.DirectSystem == null))
+                    {
+                        memberContext = item.Element.UniqueId;
+                        if (!clipboard.TryGetValue(item.Root.UniqueId, out var root) || root?.IsValidObject != true
+                            || !clipboard.TryGetValue(item.Element.UniqueId, out var member) || member?.IsValidObject != true)
+                            throw new InvalidOperationException("Le membre demandé n’a pas été conservé dans le lot natif : " + memberContext);
+                        result[item.Element.UniqueId].Native.RootUniqueId = root.UniqueId;
+                    }
+                }
+                else
+                {
                 var roots = items.Where(item => item.DirectSystem == null).GroupBy(item => item.Root.UniqueId, StringComparer.Ordinal);
                 foreach (var group in roots)
                 {
@@ -258,7 +400,8 @@ namespace Analyse
                         {
                             tx.Start();
                             ConfigureDurableFailures(tx);
-                            using (var options = Options()) copiedRoot = CopyRoot(source, root, capsule, options);
+                            if (clipboard != null) copiedRoot = clipboard[root.UniqueId];
+                            else using (var options = Options()) copiedRoot = CopyRoot(source, root, capsule, options);
                             if (copiedRoot == null) throw new InvalidOperationException("La racine de l’ensemble n’a pas été copiée.");
                             copiedRootUid = copiedRoot.UniqueId;
                             stage = "commit_root_copy";
@@ -275,7 +418,14 @@ namespace Analyse
                             ConfigureDurableFailures(tx);
                             stage = "match_aggregate";
                             copiedRoot = RequireDurableElement(capsule, copiedRootUid);
-                            mapping = MatchAggregate(source, root, capsule, copiedRoot);
+                            if (clipboard == null) mapping = MatchAggregate(source, root, capsule, copiedRoot);
+                            else
+                            {
+                                var sourceMembers = new HashSet<string>(Aggregate(source, root).Select(e => e.UniqueId)
+                                    .Concat(group.Select(item=>item.Element.UniqueId)), StringComparer.Ordinal);
+                                mapping = clipboard.Where(pair => sourceMembers.Contains(pair.Key) && pair.Value.IsValidObject)
+                                    .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+                            }
                             foreach (var item in group)
                                 if (!mapping.ContainsKey(item.Element.UniqueId))
                                     throw new InvalidOperationException("Le membre demandé n’a pas été conservé dans la capsule : " + item.Element.UniqueId);
@@ -317,6 +467,7 @@ namespace Analyse
                         }
                         System.Diagnostics.Trace.WriteLine(diagnostic.ToString());
                     }
+                }
                 }
                 foreach (var item in items.Where(item => item.DirectSystem != null))
                 {
@@ -414,6 +565,23 @@ namespace Analyse
                     result[uid] = Newtonsoft.Json.Linq.JObject.FromObject(result[uid]).ToObject<HistoryRecipe>();
                     StampDurablePortVersions(result[uid], version);
                 }
+                if (clipboard != null)
+                {
+                    stage = "verify_native_placements";
+                    CaptureNativePlacementProbe(source, capsule, clipboard, items.Select(item => item.Request), "after_native_definition_versions");
+                    // This temporary capsule omits unrelated joined neighbours. Its bounds
+                    // can therefore differ while native location/orientation stay identical.
+                    // Full bounds are still checked in the destination after relations restore.
+                    var placementFailures = new List<Exception>();
+                    foreach (var item in items.Where(item => item.DirectSystem == null))
+                        if (!VerifyNativeCapsulePlacement(item.Element, clipboard[item.Element.UniqueId],
+                            result[item.Element.UniqueId], out var failure))
+                            placementFailures.Add(new NativePreparationMemberException(stage, item.Element.UniqueId, item.Root.UniqueId,
+                                "Le copier-coller natif a modifié un placement historique : " + item.Element.UniqueId + " : " + failure));
+                    if (placementFailures.Count == 1) throw placementFailures[0];
+                    if (placementFailures.Count > 1)
+                        throw new AggregateException("Le placement natif n’a pas été conservé pour " + placementFailures.Count + " objet(s) du lot.", placementFailures);
+                }
                 // SaveAs is outside every API transaction/group. Compact removes
                 // dead data; it never serves as a substitute for selecting roots.
                 using (var options = new SaveAsOptions { Compact = true, MaximumBackups = 1, OverwriteExistingFile = false })
@@ -489,18 +657,59 @@ namespace Analyse
         private static string DurableDefinitionDiagnostic(Element definition)
             => definition.UniqueId + "|" + definition.GetType().FullName + "|name=" + definition.Name;
 
-        private static DurableItem ResolveDurableItem(Document source, HistoryRestoreRequest request)
+        private static void PrepareNativeCapsuleLevels(Document source, Document capsule, string version)
+        {
+            // A metric template's default levels are not evidence of the source
+            // levels, even when their names match. Copy real level definitions
+            // before the physical clipboard operation chooses its references.
+            var templateLevels = new FilteredElementCollector(capsule).OfClass(typeof(Level)).Cast<Level>().ToList();
+            foreach (var level in templateLevels)
+                level.Name = VersionedDefinitionName(level.Name, version, "template-level:" + level.UniqueId);
+            var originals = new FilteredElementCollector(source).OfClass(typeof(Level)).Cast<Level>().ToList();
+            if (originals.Count == 0) return;
+            using (var options = Options())
+                ElementTransformUtils.CopyElements(source, originals.Select(e => e.Id).ToList(), capsule, Transform.Identity, options);
+            capsule.Regenerate();
+            var levels = new FilteredElementCollector(capsule).OfClass(typeof(Level)).Cast<Level>().ToList();
+            foreach (var original in originals)
+            {
+                var matches = levels.Where(level => level.Name == original.Name
+                    && Math.Abs(level.ProjectElevation - original.ProjectElevation) < 1e-8).ToList();
+                if (matches.Count != 1) throw new InvalidOperationException("Le niveau source n’a pas été copié exactement : " + original.Name);
+                StampDurableDefinitionPair(original, matches[0], version);
+            }
+            if (templateLevels.Count > 0) capsule.Delete(templateLevels.Select(level => level.Id).ToList());
+        }
+
+        private static Element ResolveDurableMember(Document source, HistoryRestoreRequest request)
         {
             if (request == null) throw new ArgumentException("Une demande de conversion est absente.");
             var saved = request.Recipe?.Native ?? request.Recipe?.OpeningFallback;
             Element element = string.IsNullOrWhiteSpace(request.SourceUniqueId) ? null : source.GetElement(request.SourceUniqueId);
             if (element == null && !string.IsNullOrEmpty(saved?.MemberSourceUniqueId)) element = source.GetElement(saved.MemberSourceUniqueId);
             if (element == null && saved?.SourceElementId > 0) element = source.GetElement(ElementIdExtensions.CreateElementId(saved.SourceElementId));
-            if (element == null || (!ElementHistoryOpeningArchive.IsEligibleElement(element) && !(element is MEPSystem)) || IsCalo(element))
-                throw new InvalidOperationException("L’objet demandé est absent du checkpoint ou exclu de la restauration.");
+            if (element == null)
+                throw new InvalidOperationException("Objet absent de la copie historique : " + request.Label
+                    + " [source=" + (saved?.SourceElementId ?? 0) + "].");
+            if ((!ElementHistoryOpeningArchive.IsEligibleElement(element) && !(element is MEPSystem)) || IsCalo(element))
+                throw new InvalidOperationException("Objet hors du périmètre du collage natif : " + request.Label
+                    + " [source=" + element.Id.GetIdValue() + "; classe=" + element.GetType().FullName
+                    + "; catégorie=" + element.Category?.Name + "].");
             RejectExternalModel(element, "durable_member");
             if (!string.IsNullOrEmpty(saved?.MemberSourceUniqueId) && saved.MemberSourceUniqueId != element.UniqueId)
                 throw new InvalidOperationException("L’identité du membre ne correspond pas au checkpoint.");
+            return element;
+        }
+
+        // Validate each member before forming an atomic clipboard set. A rejected
+        // member must not mark unrelated valid members as unavailable.
+        internal static void ValidateDurableNativeMember(Document source, HistoryRestoreRequest request)
+            => ResolveDurableMember(source, request);
+
+        private static DurableItem ResolveDurableItem(Document source, HistoryRestoreRequest request)
+        {
+            var element = ResolveDurableMember(source, request);
+            var saved = request.Recipe?.Native ?? request.Recipe?.OpeningFallback;
             var item = new DurableItem { Request = request, Element = element, Root = Root(element) };
             RejectExternalModel(item.Root, "durable_root");
             foreach (var member in Aggregate(source, item.Root)) RejectExternalModel(member, "durable_aggregate");
@@ -556,10 +765,48 @@ namespace Analyse
             return artifact;
         }
 
-        private static void PreserveDurableLiveMetadata(DurableItem item, HistoryRecipe recipe)
+        private static void RemoveNativeClipboardInsulation(Document capsule, Dictionary<string, Element> clipboard)
+        {
+            // Do not ungroup or rebuild native groups merely to remove insulation.
+            // Grouped insulation remains a hidden technical dependency.
+            var insulation = new FilteredElementCollector(capsule).WhereElementIsNotElementType()
+                .Where(element => IsCalo(element) && element.GroupId == ElementId.InvalidElementId)
+                .Select(element => element.Id).ToList();
+            if (insulation.Count == 0) return;
+            var identities = clipboard.ToDictionary(pair => pair.Key, pair => pair.Value.UniqueId, StringComparer.Ordinal);
+            using (var cleanup = new SubTransaction(capsule))
+            {
+                cleanup.Start();
+                try
+                {
+                    capsule.Delete(insulation);
+                    if (identities.Values.Any(uid => capsule.GetElement(uid) == null))
+                        throw new InvalidOperationException("Le retrait du calorifuge affecterait un membre natif.");
+                    if (cleanup.Commit() != TransactionStatus.Committed)
+                        throw new InvalidOperationException("Le retrait du calorifuge n’a pas été validé.");
+                }
+                catch (Autodesk.Revit.Exceptions.RegenerationFailedException) { throw; }
+                catch (Exception failure)
+                {
+                    var status = cleanup.GetStatus();
+                    if (status == TransactionStatus.Started)
+                    {
+                        if (cleanup.RollBack() != TransactionStatus.RolledBack) throw;
+                    }
+                    else if (status != TransactionStatus.RolledBack) throw;
+                    foreach (var pair in identities)
+                        clipboard[pair.Key] = capsule.GetElement(pair.Value)
+                            ?? throw new InvalidOperationException("Un membre natif est absent après annulation du retrait du calorifuge.");
+                    System.Diagnostics.Trace.WriteLine("Native insulation retained: " + failure.Message);
+                }
+            }
+        }
+
+        private static void PreserveDurableLiveMetadata(DurableItem item, HistoryRecipe recipe, bool captureMissingParameters = true)
         {
             var live = item.Request.Recipe;
-            recipe.Parameters = live?.Parameters ?? recipe.Parameters ?? ElementHistoryReconstruction.CaptureParameters(item.Element);
+            recipe.Parameters = live?.Parameters ?? recipe.Parameters
+                ?? (captureMissingParameters ? ElementHistoryReconstruction.CaptureParameters(item.Element) : null);
             if (live?.HistoricalPlacement != null) recipe.HistoricalPlacement = live.HistoricalPlacement;
             if (live?.Connections != null) recipe.Connections = live.Connections;
             if (live?.Ports != null) recipe.Ports = live.Ports;

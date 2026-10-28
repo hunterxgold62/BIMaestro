@@ -41,6 +41,8 @@ namespace Analyse
         public string Classification { get; set; }
         public string SystemType { get; set; }
         public string SystemVersion { get; set; }
+        public string SystemSourceUniqueId { get; set; }
+        public bool? SystemSourceCaptured { get; set; }
     }
     internal sealed class HistoryConnection
     {
@@ -66,10 +68,17 @@ namespace Analyse
             Point = Pack(c.Origin), Direction = Pack(c.CoordinateSystem.BasisZ), Domain = (int)c.Domain, Shape = (int)c.Shape,
             Id = c.Id, ConnectorType = (int)c.ConnectorType,
             Classification = ReadPortClassification(c), SystemType = ReadPortSystemType(c)?.UniqueId,
+            SystemSourceUniqueId = c.Domain == Domain.DomainPiping || c.Domain == Domain.DomainHvac ? c.MEPSystem?.UniqueId : null,
+            SystemSourceCaptured = c.Domain == Domain.DomainPiping || c.Domain == Domain.DomainHvac ? (bool?)true : null,
             Diameter = c.Shape == ConnectorProfileType.Round ? (double?)(c.Radius * 2) : null,
-            Width = c.Shape != ConnectorProfileType.Round ? (double?)c.Width : null,
-            Height = c.Shape != ConnectorProfileType.Round ? (double?)c.Height : null
+            Width = c.Shape == ConnectorProfileType.Rectangular || c.Shape == ConnectorProfileType.Oval ? (double?)c.Width : null,
+            Height = c.Shape == ConnectorProfileType.Rectangular || c.Shape == ConnectorProfileType.Oval ? (double?)c.Height : null
         };
+        // Capture the original logical-system identity before a partial native transfer.
+        internal static List<HistoryPort> CaptureNativeSystemPorts(Element element)
+            => Ports(element).Where(port => port.Domain == Domain.DomainPiping || port.Domain == Domain.DomainHvac)
+                .Select(CapturePort).ToList();
+
         internal static List<HistoryPort> CaptureFamilyPorts(FamilyInstance instance)
         {
             return Ports(instance).Where(c => c.Domain == Domain.DomainPiping || c.Domain == Domain.DomainHvac

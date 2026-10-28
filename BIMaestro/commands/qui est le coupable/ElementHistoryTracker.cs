@@ -1477,6 +1477,26 @@ namespace Analyse
         internal static bool IsDisplayableHistoryEvent(ElementHistoryEvent ev)
         {
             if (ev == null) return false;
+            if (ElementHistoryPresentationPolicy.IsRestorationRepair(ev.Tx)) return false;
+            if (IsInsulationCategoryName(ev.Category)) return false;
+            if (ev.Action == "delete")
+            {
+                if (ElementHistoryDurableBridge.IsKnownLiveExclusion(ev)) return false;
+                try
+                {
+                    var classification = ElementHistoryDurableStore.ResolveOpeningClassification(ElementHistoryDurableBridge.EventId(ev));
+                    object deletedUid = null;
+                    ev.Delta?.TryGetValue("deletedUniqueId", out deletedUid);
+                    if (classification?.SourceElementId == ev.ElementId
+                        && (string.IsNullOrWhiteSpace(Convert.ToString(deletedUid))
+                            || string.Equals(classification.SourceUniqueId, Convert.ToString(deletedUid), StringComparison.Ordinal)))
+                    {
+                        if (classification.IsExcluded()) return false;
+                        if (!string.IsNullOrWhiteSpace(classification.Category)) ev.Category = classification.Category;
+                    }
+                }
+                catch (Exception ex) { Trace.WriteLine("History classification display: " + ex.Message); }
+            }
             // Internal rollback/cleanup IDs emitted while recreating an object
             // remain in the audit, but are not meaningful deletion cards.
             if (ev.Action == "delete" && ev.Category == "Non capturé"
@@ -2871,7 +2891,7 @@ namespace Analyse
                         ? "Élément supprimé avant sa capture et sans copie initiale exploitable."
                         : null,
                     ["snapshotMissing"] = true
-                } : BuildDeleteDelta(doc, snapshot)
+                } : BuildDeleteDelta(doc, snapshot, id)
             });
         }
 
@@ -2893,13 +2913,15 @@ namespace Analyse
             return recipe;
         }
 
-        private static Dictionary<string, object> BuildDeleteDelta(Document doc, ElementSnapshot snapshot)
+        private static Dictionary<string, object> BuildDeleteDelta(Document doc, ElementSnapshot snapshot, ElementId deletedId = null)
         {
             if (snapshot == null) return null;
 
             var includeDetailedMesh = CaptureDetailedDeletedMesh;
             var recipe = FreezeDeletionRecipe(doc, snapshot.Recipe ?? ElementHistoryNativeArchive.Find(doc, snapshot.UniqueId));
             if (recipe != null) recipe = JObject.FromObject(recipe).ToObject<HistoryRecipe>();
+            if (recipe != null && recipe.Native?.WholeModel != true && recipe.OpeningFallback == null)
+                recipe.OpeningFallback = deletedId == null ? null : ElementHistoryOpeningArchive.TryCreateDeletedRecipe(doc, deletedId)?.Native;
             var delta = new Dictionary<string, object>
             {
                 ["deletedUniqueId"] = snapshot.UniqueId,
@@ -2928,6 +2950,7 @@ namespace Analyse
         private static bool IsIgnoredTransaction(string transactionName)
         {
             if (string.IsNullOrWhiteSpace(transactionName)) return false;
+            if (ElementHistoryPresentationPolicy.IsRestorationRepair(transactionName)) return true;
             return IgnoredTransactionFragments.Any(fragment =>
                 transactionName.IndexOf(fragment, StringComparison.OrdinalIgnoreCase) >= 0);
         }

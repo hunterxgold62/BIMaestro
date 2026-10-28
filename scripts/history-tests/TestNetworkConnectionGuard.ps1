@@ -40,7 +40,7 @@ namespace Autodesk.Revit.Exceptions { public sealed class RegenerationFailedExce
 namespace Autodesk.Revit.DB {
 public enum Domain { DomainPiping,DomainHvac,DomainCableTrayConduit }
 public enum ConnectorType { End,Curve,Physical,Logical }
-public enum ConnectorProfileType { Round,Rectangular }
+public enum ConnectorProfileType { Round,Rectangular,Oval,Undefined }
 public enum StorageType { ElementId,Double }
 public enum BuiltInParameter { RBS_PIPING_SYSTEM_TYPE_PARAM,RBS_DUCT_SYSTEM_TYPE_PARAM }
 public enum TransactionStatus { Uninitialized,Started,Committed,RolledBack }
@@ -169,6 +169,12 @@ public static class NetworkGuardChecks {
     static FamilyInstance Family(Document d,string uid) {return d.Add(new FamilyInstance {Location=new LocationPoint()},uid);}
     static HistoryRecipe Undefined() {return new HistoryRecipe {Native=new HistoryNativeArtifact {SourceSystemTypeDefined=false}};}
     public static string Run() {
+        var dimensions=new Document(); var unknown=Family(dimensions,"undefined-shape"); var other=Family(dimensions,"peer-shape");
+        var untyped=Port(unknown); var otherPort=Port(other); untyped.Shape=ConnectorProfileType.Undefined;
+        untyped.AllRefs.Add(otherPort); otherPort.AllRefs.Add(untyped);
+        var unknownEdge=ElementHistoryNetwork.CaptureConnections(unknown).Single();
+        Assert(!unknownEdge.Port.Width.HasValue&&!unknownEdge.Port.Height.HasValue&&!unknownEdge.Port.Diameter.HasValue,
+            "A physical port without a geometric profile must never read rectangular/oval dimensions.");
         var d=new Document();var a=Family(d,"a");var b=Family(d,"b");var neighbor=Family(d,"neighbor");
         var pa=Port(a);var pb=Port(b);var pn=Port(neighbor);pa.AllRefs.Add(pn);pn.AllRefs.Add(pa);
         var guard=ElementHistoryNetwork.CaptureConnectionGuard(d,a,b);
@@ -216,6 +222,44 @@ public static class NetworkGuardChecks {
         Reject(()=>ElementHistoryNetwork.VerifyConnectionGuard(d,primaryGuard),"The primary native receipt must take precedence over contradictory fallback metadata.");
         var historical=links[0].Port;historical.Classification="SupplyHydronic";
         Reject(()=>ElementHistoryNetwork.VerifyConnectionGuard(d,ElementHistoryNetwork.CaptureConnectionGuard(d,a,null,null,null,historical)),"Historical endpoint semantics must be checked independently from the current snapshot.");
+        // A restored pump may acquire its saved system only during the connection transaction commit.
+        var phases=new Document(); var pump=Family(phases,"restored-pump"); var endpoint=Family(phases,"existing-pipe");
+        var retainedNeighbor=Family(phases,"retained-neighbor"); var pumpPort=Port(pump); var retainedPort=Port(pump,2);
+        var endpointPort=Port(endpoint); var neighborPort=Port(retainedNeighbor);
+        retainedPort.Origin=XYZ.BasisX;neighborPort.Origin=XYZ.BasisX;
+        var phaseSupply=phases.Add(new PipingSystemType {SystemClassification=MEPSystemClassification.SupplyHydronic},"phase-supply");
+        var phaseReturn=phases.Add(new PipingSystemType {SystemClassification=MEPSystemClassification.ReturnHydronic},"phase-return");
+        pumpPort.PipeSystemType=PipeSystemType.UndefinedSystemType;retainedPort.PipeSystemType=PipeSystemType.UndefinedSystemType;
+        endpointPort.PipeSystemType=PipeSystemType.SupplyHydronic;neighborPort.PipeSystemType=PipeSystemType.SupplyHydronic;
+        endpoint.SystemType=phaseSupply;retainedNeighbor.SystemType=phaseSupply;
+        retainedPort.AllRefs.Add(neighborPort);neighborPort.AllRefs.Add(retainedPort);
+        var savedPumpPort=new HistoryPort {Point=new[]{0d,0d,0d},Direction=new[]{0d,0d,1d},Domain=(int)Domain.DomainPiping,
+            Shape=(int)ConnectorProfileType.Round,ConnectorType=(int)ConnectorType.End,Diameter=.1,Classification="SupplyHydronic",SystemType="phase-supply"};
+        var phaseGuard=ElementHistoryNetwork.CaptureConnectionGuard(phases,pump,endpoint,null,null,savedPumpPort);
+        ElementHistoryNetwork.VerifyConnectionGuard(phases,phaseGuard,verifyHistoricalEndpoints:false);
+        Assert(true,"The pre-commit phase permits the still-undefined saved endpoint without weakening its current state checks.");
+        Reject(()=>ElementHistoryNetwork.VerifyConnectionGuard(phases,phaseGuard),"An undefined final system is still rejected by the default strict post-commit check.");
+        ((LocationPoint)retainedNeighbor.Location).Point=XYZ.BasisX;
+        Reject(()=>ElementHistoryNetwork.VerifyConnectionGuard(phases,phaseGuard,false),"Deferring historical system semantics must not allow an existing neighbour to move.");
+        ((LocationPoint)retainedNeighbor.Location).Point=XYZ.Zero;
+        pump.TypeId=new ElementId(999);
+        Reject(()=>ElementHistoryNetwork.VerifyConnectionGuard(phases,phaseGuard,false),"Deferring historical system semantics must not allow a type replacement.");pump.TypeId=new ElementId(100);
+        pumpPort.Radius=.06;
+        Reject(()=>ElementHistoryNetwork.VerifyConnectionGuard(phases,phaseGuard,false),"The pre-commit phase still checks current port geometry.");pumpPort.Radius=.05;
+        endpointPort.PipeSystemType=PipeSystemType.ReturnHydronic;
+        Reject(()=>ElementHistoryNetwork.VerifyConnectionGuard(phases,phaseGuard,false),"A concrete current classification cannot change during the pre-commit phase.");endpointPort.PipeSystemType=PipeSystemType.SupplyHydronic;
+        retainedPort.AllRefs.Remove(neighborPort);neighborPort.AllRefs.Remove(retainedPort);
+        Reject(()=>ElementHistoryNetwork.VerifyConnectionGuard(phases,phaseGuard,false),"Pre-existing physical links remain mandatory before commit.");
+        retainedPort.AllRefs.Add(neighborPort);neighborPort.AllRefs.Add(retainedPort);
+        savedPumpPort.Point=new[]{2d,0d,0d};
+        Reject(()=>ElementHistoryNetwork.VerifyConnectionGuard(phases,phaseGuard,false),"Historical endpoint geometry is checked even while historical system semantics are deferred.");savedPumpPort.Point=new[]{0d,0d,0d};
+        pumpPort.PipeSystemType=PipeSystemType.SupplyHydronic;pump.SystemType=phaseSupply;
+        ElementHistoryNetwork.VerifyConnectionGuard(phases,phaseGuard);
+        Assert(true,"The final concrete classification and exact historical system type must match after commit.");
+        pumpPort.PipeSystemType=PipeSystemType.ReturnHydronic;
+        Reject(()=>ElementHistoryNetwork.VerifyConnectionGuard(phases,phaseGuard),"Deferral must never authorize a different concrete final classification.");pumpPort.PipeSystemType=PipeSystemType.SupplyHydronic;
+        pump.SystemType=phaseReturn;
+        Reject(()=>ElementHistoryNetwork.VerifyConnectionGuard(phases,phaseGuard),"Matching final classification does not authorize a different historical system type.");
         // Exercise the real private sizing selector through a test-only partial wrapper.
         var target=new HistoryPort {Point=new[]{0d,0d,0d},Domain=(int)Domain.DomainPiping,Classification="ReturnHydronic",SystemType="return"};
         Assert(ElementHistoryNetwork.TestSizing(d,target,new HistoryRecipe())==ret.Id,"Sizing must choose the retained return system, never the first available supply system.");
@@ -231,6 +275,8 @@ public static class NetworkGuardChecks {
         target.Classification="Fitting";Reject(()=>ElementHistoryNetwork.TestSizing(d,target,new HistoryRecipe()),"An undefined/fitting classification does not identify a project system.");
         d.Elements.Remove(ret2);target.Classification="ReturnHydronic";
         Assert(ElementHistoryNetwork.TestSizing(d,target,new HistoryRecipe())==ret.Id,"A unique matching classification may size an otherwise unidentified fitting.");
+        Assert(ElementHistoryNetwork.HistoricalSystemTypeMatches(ret,ret.UniqueId,"v-saved"),"The exact original project system UID must not require a capsule version tag.");
+        Assert(!ElementHistoryNetwork.HistoricalSystemTypeMatches(ret,"another-original-system","v-saved"),"An untagged system with a different UID must never pass as the original.");
         ret.HistoricalTypeVersion="v-current";ret.Origins.Add("historical-return");
         Assert(!ElementHistoryNetwork.HistoricalSystemTypeMatches(ret,"historical-return","v-saved"),"An origin alone must not authorize a different historical type version.");
         ret.HistoricalTypeVersion="v-saved";ret.Origins.Clear();

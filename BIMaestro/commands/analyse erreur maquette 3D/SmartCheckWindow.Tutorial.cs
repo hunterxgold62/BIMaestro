@@ -49,8 +49,8 @@ namespace Analyse
             _tutorialReservationId = null;
             _tutorialInitialHtml = _tutorialInitialCsv = null;
             var pipes = _setup.Selection.Select(OwnerDocument.GetElement).ToList();
-            _tutorialCrossA = pipes.Single(p => p.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() == DemoClashExercise.Prefix + "CROSS_A").Id;
-            _tutorialCrossB = pipes.Single(p => p.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() == DemoClashExercise.Prefix + "CROSS_B").Id;
+            _tutorialCrossA = pipes.Single(p => SmartRevitCompatibility.Mark(p)?.AsString() == DemoClashExercise.Prefix + "CROSS_A").Id;
+            _tutorialCrossB = pipes.Single(p => SmartRevitCompatibility.Mark(p)?.AsString() == DemoClashExercise.Prefix + "CROSS_B").Id;
             ScopeCombo.SelectedIndex = 2;
             PipesCheck.IsChecked = LocalCheck.IsChecked = true;
             DuctsCheck.IsChecked = TraysCheck.IsChecked = ConduitsCheck.IsChecked = FittingsCheck.IsChecked =
@@ -174,7 +174,7 @@ namespace Analyse
             else if (_handler.Action == SmartAction.CreateReservation && _handler.TutorialReservation &&
                 DemoClashExercise.IsWall(OwnerDocument, _handler.FocusIssue) && _handler.CreatedReservationId != null &&
                 OwnerDocument.GetElement(_handler.CreatedReservationId) is FamilyInstance reservation &&
-                reservation.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() == DemoClashExercise.Prefix + "RESERVATION")
+                SmartRevitCompatibility.Mark(reservation)?.AsString() == DemoClashExercise.Prefix + "RESERVATION")
             {
                 _tutorialReservationId = reservation.Id; _tutorialReservationCreated = true; _tutorialReservationRescanVerified = false;
                 DemoTourService.ReportAction(this, "clash-reservation-created");

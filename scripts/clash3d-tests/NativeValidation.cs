@@ -1,4 +1,4 @@
-using Autodesk.Revit.DB;
+﻿using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Mechanical;
 using Autodesk.Revit.DB.Plumbing;
 using Autodesk.Revit.DB.Electrical;
@@ -78,7 +78,7 @@ namespace Analyse.Tests
                 _realDocument = ui.Application.OpenDocumentFile(path);
                 var options = new SmartScanOptions { Equipment = true, GenericModels = true, Scope = SmartScanScope.Selection };
                 var ids = new FilteredElementCollector(_realDocument).WhereElementIsNotElementType()
-                    .WherePasses(new ElementMulticategoryFilter(options.SourceCategories())).ToElementIds().Take(563).ToList();
+                    .WherePasses(SmartRevitCompatibility.CategoryFilter(options.SourceCategories())).ToElementIds().Take(563).ToList();
                 options.LinkIds = new FilteredElementCollector(_realDocument).OfClass(typeof(RevitLinkInstance)).ToElementIds().ToList();
                 _realScan = new SmartScanSession(new SmartScanSetup { Document = _realDocument, Selection = ids, DocumentKey = "real-fixture-copy" }, options);
                 _realDeadline = DateTime.UtcNow.AddMinutes(10);

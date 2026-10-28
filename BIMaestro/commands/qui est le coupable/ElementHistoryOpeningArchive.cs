@@ -83,6 +83,20 @@ namespace Analyse
 
         private static async Task CopyAsync(State state)
         {
+            IDisposable copyLease;
+            try { copyLease = ElementHistoryBridgeCache.BeginCopy(ElementHistoryDurableBridge.LocalBridgeDirectory, state.Destination, state.Length); }
+            catch (Exception ex)
+            {
+                lock (state.Sync)
+                {
+                    state.Failure = "Copie d’ouverture indisponible : " + ex.Message;
+                    foreach (var receipt in state.Receipts) receipt.Failure = state.Failure;
+                    state.Receipts.Clear();
+                }
+                return;
+            }
+            using (copyLease)
+            {
             var temporary = state.Destination + ".partial";
             Exception lastFailure = null;
             for (int attempt = 0; attempt < 4; attempt++)
@@ -155,6 +169,7 @@ namespace Analyse
                 state.Receipts.Clear();
             }
             Trace.WriteLine(state.Failure);
+            }
         }
 
         internal static void Invalidate(Document doc, IEnumerable<ElementId> changedIds)

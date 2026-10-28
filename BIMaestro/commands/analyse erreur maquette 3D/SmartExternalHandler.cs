@@ -194,7 +194,7 @@ namespace Analyse
             if (TutorialReservation)
             {
                 using (var tx = new Transaction(ui.Document, "BIMaestro - Repérer la réservation d'essai"))
-                { tx.Start(); instance.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.Set(BIMaestro.Tutorials.DemoClashExercise.Prefix + "RESERVATION"); tx.Commit(); }
+                { tx.Start(); SmartRevitCompatibility.Mark(instance)?.Set(BIMaestro.Tutorials.DemoClashExercise.Prefix + "RESERVATION"); tx.Commit(); }
             }
             ReservationMessage = "Réservation créée · #" + instance.Id.GetIdLongValue()
                 + (link == null ? ". Relancez l'analyse pour vérifier la traversée." : " dans la maquette active. Le lien reste à coordonner ; relancez l'analyse.");

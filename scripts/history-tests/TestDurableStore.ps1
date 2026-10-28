@@ -33,6 +33,8 @@ internal sealed class HistoryNativeArtifact {
 internal sealed class HistoryCircuit { public HistoryRecipe Recipe {get;set;} }
 internal sealed class HistoryRecipe {
     public int Version {get;set;}=1; public string Kind {get;set;} public string Type {get;set;}
+    public string Level {get;set;} public bool UsesExistingModelDefinitions {get;set;}
+    public List<string> SystemMembers {get;set;} public int ElectricalSystemType {get;set;}
     public HistoryNativeArtifact Native {get;set;} public HistoryNativeArtifact OpeningFallback {get;set;}
     public List<HistoryCircuit> ElectricalCircuits {get;set;}
 }
@@ -68,6 +70,42 @@ internal static class StoreChecks {
         Environment.SetEnvironmentVariable("TMP",Temp);Environment.SetEnvironmentVariable("TEMP",Temp);
         Check(Path.GetFullPath(Path.GetTempPath()).StartsWith(Temp,StringComparison.OrdinalIgnoreCase),"Tests must keep every real scratch write inside the workspace fixture.");
         Store=Path.Combine(Root,"store");CollaborativeModelTrackerStore.ActiveDirectory=Store;
+        // Seed a genuine v1 record through the production writer, then verify
+        // that v2 upgrades preserve it and supersede both local and remote caches.
+        var writeRecord=typeof(ElementHistoryDurableStore).GetMethod("WriteRecord",System.Reflection.BindingFlags.NonPublic|System.Reflection.BindingFlags.Static);
+        var recordRoot=Path.Combine(Store,"history-data");
+        var legacyData=JObject.Parse("{\"SourceElementId\":42,\"SourceUniqueId\":\"wall-uid\",\"Class\":\"Autodesk.Revit.DB.Wall\",\"CategoryId\":-2000011}");
+        writeRecord.Invoke(null,new object[]{recordRoot,"classification","migration-local",legacyData,false});
+        var legacyPath=Path.Combine(recordRoot,"opening-classifications","migration-local.json.gz");
+        var legacyBytes=File.ReadAllBytes(legacyPath);
+        Check(ElementHistoryDurableStore.ResolveOpeningClassification("migration-local").IsDocumentElement==null&&!ElementHistoryDurableStore.ResolveOpeningClassification("migration-local").IsExcluded(),"V1 null membership must remain visible.");
+        var membership=new HistoryOpeningClassification{SourceElementId=42,SourceUniqueId="wall-uid",Class="Autodesk.Revit.DB.Wall",CategoryId=-2000011,IsDocumentElement=false};
+        ElementHistoryDurableStore.PublishOpeningClassification("migration-local",membership);
+        Check(ElementHistoryDurableStore.ResolveOpeningClassification("migration-local").IsDocumentElement==false&&ElementHistoryDurableStore.ResolveOpeningClassification("migration-local").IsExcluded(),"V2 proof must supersede cached V1.");
+        Check(legacyBytes.SequenceEqual(File.ReadAllBytes(legacyPath)),"V2 publication must preserve V1 bytes.");
+        var v2Path=Path.Combine(recordRoot,"opening-classifications-v2","migration-local.json.gz");
+        Check((string)JObject.Parse(Gunzip(v2Path))["Kind"]=="opening-classifications-v2","V2 must have its separate record kind and directory.");
+        membership.IsDocumentElement=true;
+        Reject(()=>ElementHistoryDurableStore.PublishOpeningClassification("migration-local",membership),"V2 evidence is immutable.");
+        Check(ElementHistoryDurableStore.ResolveOpeningClassification("migration-local").IsDocumentElement==false,"Mutating the publisher object must not mutate cached immutable evidence.");
+        writeRecord.Invoke(null,new object[]{recordRoot,"classification","migration-external",legacyData,false});
+        Check(ElementHistoryDurableStore.ResolveOpeningClassification("migration-external").IsDocumentElement==null,"External upgrade must start from V1 fallback.");
+        membership.IsDocumentElement=false;
+        writeRecord.Invoke(null,new object[]{recordRoot,"opening-classifications-v2","migration-external",JObject.FromObject(membership),false});
+        var misses=(Dictionary<string,DateTime>)typeof(ElementHistoryDurableStore).GetField("MissingClassifications",System.Reflection.BindingFlags.NonPublic|System.Reflection.BindingFlags.Static).GetValue(null);
+        misses.Remove(Path.Combine(recordRoot,"migration-external"));
+        Check(ElementHistoryDurableStore.ResolveOpeningClassification("migration-external").IsDocumentElement==false,"V2 published externally must supersede expired V1 cache.");
+        Check(ElementHistoryDurableStore.ResolveOpeningClassification("classified-a")==null,"Unknown classification must not hide any object.");
+        ElementHistoryDurableStore.PublishConversion("classified-a",new HistoryRestoreRequest{CaptureFailure="Old unsupported capture"});
+        var oldConversion=File.ReadAllBytes(Conversion("classified-a"));
+        var classification=new HistoryOpeningClassification{SourceElementId=42,SourceUniqueId="pipe-insulation-uid",Class="Autodesk.Revit.DB.Plumbing.PipeInsulation"};
+        ElementHistoryDurableStore.PublishOpeningClassification("classified-a",classification);
+        var classified=ElementHistoryDurableStore.ResolveOpeningClassification("classified-a");
+        Check(classified.IsExcluded()&&classified.SourceUniqueId=="pipe-insulation-uid","Classification can acknowledge an old insulation failure.");
+        Check(oldConversion.SequenceEqual(File.ReadAllBytes(Conversion("classified-a"))),"Reclassification must never rewrite the old immutable conversion.");
+        ElementHistoryDurableStore.PublishOpeningClassification("classified-a",classification);
+        Reject(()=>ElementHistoryDurableStore.PublishOpeningClassification("classified-a",new HistoryOpeningClassification{SourceElementId=42,SourceUniqueId="different-object",Class="Autodesk.Revit.DB.Plumbing.PipeInsulation"}),"Classification identity cannot be replaced.");
+        Reject(()=>ElementHistoryDurableStore.PublishOpeningClassification("invalid-classification",new HistoryOpeningClassification{Class="Autodesk.Revit.DB.Element"}),"Unverified classification is rejected.");
         var inputs=Path.Combine(Root,"inputs");Directory.CreateDirectory(inputs);
         var lengths=new[]{1,2,3,49151,49152,49153,65536,131073};string payload=null,source=null;
         foreach(var length in lengths) {
@@ -174,6 +212,12 @@ internal static class StoreChecks {
         Check(File.Exists(JobPath("job-a")),"A job was deleted after a corrupt conversion.");File.WriteAllBytes(Conversion("job-a"),jobConversionSaved);
         Gzip(nativeFile,"corrupt");Reject(()=>ElementHistoryDurableStore.DeleteJob("job-a"),"A corrupt referenced native capsule must keep its job.");File.WriteAllBytes(nativeFile,saved);
         ElementHistoryDurableStore.DeleteJob("job-a");Check(!File.Exists(JobPath("job-a")) && File.Exists(Conversion("job-a")),"Only the acknowledged job should be removed.");
+        ElementHistoryDurableStore.PublishConversion("native-upgrade",new HistoryRestoreRequest{SourceUniqueId="original-member",CaptureFailure="Old direct failure"});
+        var originalFailure=File.ReadAllBytes(Conversion("native-upgrade"));
+        ElementHistoryDurableStore.PublishNativeConversion("native-upgrade",Request(payload));
+        Check(ElementHistoryDurableStore.ResolveConversion("native-upgrade").Recipe.Native.PayloadId==payload,"Native clipboard data supersedes an old direct failure.");
+        Check(originalFailure.SequenceEqual(File.ReadAllBytes(Conversion("native-upgrade"))),"Native upgrade preserves the original audit bytes.");
+        Reject(()=>ElementHistoryDurableStore.PublishNativeConversion("wrong-native",new HistoryRestoreRequest{Recipe=new HistoryRecipe{Kind="family"}}),"A parameter recipe cannot be published as a native copy.");
         var originalStore=Store;CollaborativeModelTrackerStore.ActiveDirectory=Path.Combine(Root,"other-store");
         Check(!ElementHistoryDurableStore.ReadPendingJobs().Any() && ElementHistoryDurableStore.ResolveConversion("event-a")==null,"Indexes and conversion paths must not leak across store changes.");
         CollaborativeModelTrackerStore.ActiveDirectory=originalStore;
@@ -186,6 +230,17 @@ internal static class StoreChecks {
 }
 }
 '@
+$reconstruction=[IO.File]::ReadAllText((Join-Path $repo 'BIMaestro/commands/qui est le coupable/ElementHistoryReconstruction.cs'))
+$parserStart=$reconstruction.IndexOf('internal static HistoryRecipe ReadRecipe(object raw)',[StringComparison]::Ordinal)
+if($parserStart -lt 0){throw 'Production recipe parser missing.'}
+$parserOpening=$reconstruction.IndexOf('{',$parserStart);$parserDepth=0;$parserEnd=-1
+for($parserIndex=$parserOpening;$parserIndex -lt $reconstruction.Length;$parserIndex++){
+ if($reconstruction[$parserIndex] -eq '{'){$parserDepth++}
+ if($reconstruction[$parserIndex] -eq '}'){$parserDepth--;if($parserDepth -eq 0){$parserEnd=$parserIndex;break}}
+}
+if($parserEnd -lt $parserOpening){throw 'Production recipe parser unclosed.'}
+$parser=$reconstruction.Substring($parserStart,$parserEnd-$parserStart+1)
+$fixtures=$fixtures.Replace('internal static class StoreChecks {','internal enum ElectricalSystemType {UndefinedSystemType=0,PowerCircuit=1} internal static class ElementHistoryReconstruction {'+$parser+'} internal static class StoreChecks {')
 [IO.File]::WriteAllText((Join-Path $root 'Fixtures.cs'),$fixtures)
 $project=@"
 <Project Sdk="Microsoft.NET.Sdk">
@@ -193,6 +248,7 @@ $project=@"
  <ItemGroup>
   <Reference Include="Newtonsoft.Json"><HintPath>$([Security.SecurityElement]::Escape($json))</HintPath></Reference>
   <Compile Include="$([Security.SecurityElement]::Escape($source))" />
+  <Compile Include="$([Security.SecurityElement]::Escape((Join-Path $repo 'BIMaestro/commands/qui est le coupable/HistoryOpeningClassification.cs')))" />
   <Compile Include="Fixtures.cs" />
  </ItemGroup>
 </Project>

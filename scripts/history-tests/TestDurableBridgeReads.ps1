@@ -32,6 +32,7 @@ $production = @(
     (ExtractBlock (ReadSource 'ElementHistoryNativeArchive.cs') 'internal sealed class HistoryNativeContextDefinition')
     (ExtractBlock (ReadSource 'ElementHistoryRelations.cs') 'internal sealed class HistoryGeometryRelation')
     (ExtractBlock (ReadSource 'ElementHistoryRestoration.cs') 'internal sealed class HistoryRestoreRequest')
+    (ExtractBlock (ReadSource 'HistoryOpeningClassification.cs') 'internal sealed class HistoryOpeningClassification')
     (ExtractBlock (ReadSource 'ElementHistoryTracker.cs') 'internal sealed class ElementHistoryEvent')
     'internal static class ElementHistoryReconstruction {'
     (ExtractBlock $reconstruction 'internal static HistoryRecipe ReadRecipe(object raw)')

@@ -1,5 +1,15 @@
 # Bibliothèque communautaire Famille IA
 
+## Intervention du 27 octobre 2026
+
+- Incident confirmé en production : `GET /v1/families` répondait HTTP 429 `quota_exceeded`. La cause était `quota_policy.verified_until = 2026-10-20T00:00:00.000Z`, expiré ; aucun compteur de la bibliothèque n'avait atteint son plafond.
+- Compteurs avant intervention : 36 858 028 octets R2 réservés, 65 opérations A, 1 481 opérations B, 1 999 requêtes, 511 744 lectures D1, 31 984 écritures D1 et 704 512 octets D1 réservés. Les 29 familles étaient présentes et `ready` ; taille réelle D1 : 49 152 octets.
+- Rapprochement du compte par l'API Analytics : trois buckets R2, maximum récent cumulé de 124 779 642 octets ; depuis le 1er octobre, 29 PutObject, 29 HeadObject, 2 DeleteObjects et 1 761 GetObject. Du 26 octobre à 00:00 au 27 octobre à 13:00 UTC : 38 requêtes Workers, zéro erreur. D1 depuis le 26 octobre : 123 lignes lues, zéro écriture avant intervention. Les métriques Analytics sont une observation, pas un plafond de facturation.
+- Tarifs gratuits revérifiés dans les documentations officielles Workers, D1 et R2 ci-dessous. L'accès OAuth aux abonnements est refusé (HTTP 403) : aucun changement d'abonnement effectué et le plan Free n'a pas pu être reconfirmé par cette API.
+- Correction en production : seule l'échéance a été renouvelée au **27 novembre 2026 à 00:00 UTC** (01:00 à Paris), par mise à jour conditionnelle sur l'ancienne échéance et sur les compteurs sous leurs plafonds. Aucun compteur remis à zéro, aucun seuil relevé.
+- Vérification publique après correction : catalogue HTTP 200, 25 familles compatibles Revit 2025 ; téléchargement RFA HTTP 200 (1 093 632 octets), taille et SHA-256 conformes ; aperçu PNG HTTP 200 (62 180 octets). Ces lectures de contrôle consomment normalement leurs réservations et le téléchargement incrémente son compteur.
+- Le prochain renouvellement exige un nouveau rapprochement du compte. Choix final de l'utilisateur : conserver le blocage à 80 % et la validation mensuelle via Codex, sans contrôle autonome sur Cloudflare. Le suivi « Contrôle bibliothèque BIMaestro », identifiant `contr-le-biblioth-que-bimaestro`, est actif dans ce chat le **20 de chaque mois à 09:00 Europe/Paris**. Il vérifie les usages de tout le compte et les tarifs, puis prolonge la validation jusqu'au **27 du mois suivant à 00:00 UTC** uniquement si les marges de sécurité le permettent, sans raccourcir une échéance existante plus lointaine. Cela laisse une semaine après le contrôle suivant, même pour les mois de 31 jours. Aucun compteur ni plafond n'est modifié. Il signale les renouvellements, les anomalies et les interventions nécessaires ; les contrôles inchangés restent silencieux. Ce suivi dépend de l'exécution de l'application Codex et de l'accès Cloudflare existant ; aucun Cron Trigger ni nouveau jeton n'a été déployé.
+
 ## État au 20 septembre 2026
 
 - Service déployé : https://bimaestro-family-library.bimaestro-community.workers.dev
@@ -44,7 +54,7 @@ Budget demandé : **0 EUR**. Refuser une opération avant de dépasser **80 %** 
 
 Les sources effectives sont `quota_policy` et `quota_state`. `library_configuration.budget_policy` est un historique descriptif. L'ouverture nécessite `LIBRARY_ENABLED=true`, `enabled=1` et une vérification non expirée. Un seul bucket et une seule base étaient présents à la vérification initiale.
 
-La vérification expire le **20 octobre 2026 à 00:00 UTC** : le service se fermera sans renouvellement après contrôle du compte et des tarifs. Aucun moniteur récurrent n'est installé. Ne jamais remettre les compteurs à zéro ou reporter l'échéance sans rapprocher l'usage réel de tout le compte.
+La vérification expire le **27 novembre 2026 à 00:00 UTC** après renouvellement du 27 octobre décrit ci-dessus : le service se fermera sans renouvellement après contrôle du compte et des tarifs. Le suivi Codex décrit ci-dessus doit examiner le renouvellement dès le 20 novembre. Ne jamais remettre les compteurs à zéro ou reporter l'échéance sans rapprocher l'usage réel de tout le compte.
 
 ## Tests
 

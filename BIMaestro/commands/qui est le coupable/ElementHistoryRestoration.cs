@@ -21,6 +21,9 @@ namespace Analyse
         public HistoryDeletionElementAudit DeletionAudit { get; set; }
         // Runtime-only: a native retry must not choose the direct recipe again.
         internal bool ForceNativeOpeningRestore { get; set; }
+        internal HistoryOpeningClassification OpeningClassification;
+        internal bool ClassificationOnly;
+        internal bool NativeGeneration;
     }
 
     internal sealed class HistoryRestoreItem
@@ -82,7 +85,7 @@ namespace Analyse
         public List<string> RepairFailures { get; } = new List<string>();
     }
 
-    internal static class ElementHistoryRestoration
+    internal static partial class ElementHistoryRestoration
     {
         // Insulation remains deliberately deleted, including generic families
         // named calorifuge and older histories without reconstruction recipes.
@@ -113,6 +116,7 @@ namespace Analyse
 
         internal static List<string> GetOrigins(Element element)
         {
+            if (element == null || !element.IsValidObject) return null;
             var schema = Schema.Lookup(OriginSchemaId);
             if (schema == null) return null;
             var entity = element.GetEntity(schema);
@@ -1233,7 +1237,7 @@ namespace Analyse
                                 if (a.Origin.DistanceTo(b.Origin) > 1e-4) throw new InvalidOperationException("Les connecteurs ne coïncident plus.");
                                 a.ConnectTo(b);
                                 doc.Regenerate();
-                                ElementHistoryNetwork.VerifyConnectionGuard(doc, connectionGuard);
+                                ElementHistoryNetwork.VerifyConnectionGuard(doc, connectionGuard, verifyHistoricalEndpoints: false);
                                 // A direct historical edge must not silently become an extra fitting.
                                 a = ElementHistoryNetwork.Match(doc.GetElement(uid), link.Port);
                                 b = ElementHistoryNetwork.Match(doc.GetElement(peerUid), link.PeerPort);

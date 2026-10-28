@@ -240,6 +240,20 @@ namespace Analyse
                 allowHeavyTerrain: allowHeavyTerrain) : recipe;
         }
 
+        // Point-based hosted families can be described independently by their
+        // retained type, host UID and placement. Native ownership traversal also
+        // climbs to that host, but does not make an ordinary door an aggregate.
+        private static bool CanCaptureIndependentHostedFamily(Element element)
+        {
+            if (!(element is FamilyInstance instance) || instance.GroupId != ElementId.InvalidElementId
+                || instance.SuperComponent != null || instance.Category?.Id.GetIdLongValue() == -2000127
+                || !(instance.Location is LocationPoint) || !(instance.Host is HostObject host)
+                || host.GroupId != ElementId.InvalidElementId || instance.Symbol?.Family == null
+                || instance.Symbol.Family.IsInPlace
+                || instance.Symbol.Family.FamilyPlacementType != FamilyPlacementType.OneLevelBasedHosted) return false;
+            return !(host is Wall wall) || wall.WallType.Kind == WallKind.Basic;
+        }
+
         // A transaction may be followed immediately by Delete. Keep the supported
         // object's current recipe and relationships in that transaction callback;
         // never open/create/copy a Revit archive or triangulate geometry here.
@@ -251,7 +265,8 @@ namespace Analyse
             try
             {
                 if (ElementHistoryNativeArchive.RequiresAggregate(element)
-                    || ElementHistoryNativeArchive.OpeningRoot(element).Id != element.Id)
+                    || ElementHistoryNativeArchive.OpeningRoot(element).Id != element.Id
+                        && !CanCaptureIndependentHostedFamily(element))
                 {
                     diagnostic?.Invoke("Le dernier état de cet ensemble nécessite une capture native préalable.");
                     return null;
@@ -278,7 +293,8 @@ namespace Analyse
             try
             {
                 if (ElementHistoryNativeArchive.RequiresAggregate(element)
-                    || ElementHistoryNativeArchive.OpeningRoot(element).Id != element.Id)
+                    || ElementHistoryNativeArchive.OpeningRoot(element).Id != element.Id
+                        && !CanCaptureIndependentHostedFamily(element))
                 {
                     diagnostic?.Invoke("Élément dépendant d’un ensemble : copie native requise.");
                     return null;

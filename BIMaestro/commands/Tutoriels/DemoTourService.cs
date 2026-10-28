@@ -88,6 +88,20 @@ namespace BIMaestro.Tutorials
     // New tours only add metadata and a window hook. The controls keep their native handlers.
     internal static class DemoTourCatalog
     {
+        internal static readonly IReadOnlyDictionary<string, string> EstimatedDurations = new Dictionary<string, string>
+        {
+            ["reservation"] = "4 à 6 min",
+            ["history"] = "6 à 10 min",
+            ["colors"] = "8 à 12 min",
+            ["pipe-calculation"] = "2 à 4 min",
+            ["organizer"] = "5 à 8 min",
+            ["view-template"] = "3 à 5 min",
+            ["excel"] = "5 à 8 min",
+            ["family-browser"] = "12 à 20 min",
+            ["mep-booster"] = "3 à 5 min",
+            ["clash-3d"] = "6 à 10 min"
+        };
+
         internal static readonly IReadOnlyDictionary<string, string> Views = new Dictionary<string, string>
         {
             ["reservation"] = "BIMaestro - 01 Auto réservation",
@@ -1916,7 +1930,7 @@ namespace BIMaestro.Tutorials
             int index = Array.IndexOf(Order, completed);
             int next = index < 0 || index + 1 == Order.Length ? 0 : index + 1;
             bool continueTour = DemoTourMessage.Show(owner, "Tutoriel terminé",
-                summary + "\n\nD’autres tutoriels sont disponibles. Veux-tu passer au suivant : « " + Labels[next] + " » ?",
+                summary + "\n\nD’autres tutoriels sont disponibles. Veux-tu passer au suivant : « " + Labels[next] + " » ?\nDurée estimée : " + DemoTourCatalog.EstimatedDurations[Order[next]] + ".",
                 "Tutoriel suivant", "Terminer pour l’instant", primaryButtonIsAction: true);
             if (!continueTour) return;
             beforeNext?.Invoke();
@@ -1973,6 +1987,8 @@ namespace BIMaestro.Tutorials
         }
         private Button AddChoice(Panel panel, string label, string id)
         {
+            if (DemoTourCatalog.EstimatedDurations.TryGetValue(id, out string duration))
+                label += " · " + duration;
             var button = new Button { Content = label, Margin = new Thickness(0, 0, 0, 7),
                 Padding = new Thickness(10, 6, 10, 6), HorizontalContentAlignment = HorizontalAlignment.Left };
             button.Click += (_, __) => { Choice = id; Close(); };
@@ -1997,7 +2013,7 @@ namespace BIMaestro.Tutorials
             scroll.Content = stack;
             stack.Children.Add(new TextBlock { Text = "Choisir un parcours guidé", FontSize = 21,
                 FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 8) });
-            stack.Children.Add(new TextBlock { Text = "Choisis un tutoriel : clique directement sur sa carte pour commencer dans la maquette de formation.",
+            stack.Children.Add(new TextBlock { Text = "Choisis un tutoriel : clique directement sur sa carte pour commencer dans la maquette de formation. Les durées sont indicatives, lecture et manipulations comprises, selon ton rythme.",
                 TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 16) });
             AddCard(stack, "1 · Auto réservation",
                 "Quand un réseau traverse un mur, BIMaestro place une famille de réservation au croisement. Dans l'exercice, tu choisis toi-même la canalisation puis le mur et tu examines le résultat.");
@@ -2045,6 +2061,8 @@ namespace BIMaestro.Tutorials
             row.Children.Add(image);
             var body = new StackPanel(); Grid.SetColumn(body, 1); row.Children.Add(body);
             body.Children.Add(new TextBlock { Text = title, FontSize = 16, FontWeight = FontWeights.SemiBold, Foreground = DemoTourPalette.Accent });
+            body.Children.Add(new TextBlock { Text = "Durée estimée : " + DemoTourCatalog.EstimatedDurations[ids[index]],
+                Foreground = Brushes.DimGray, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 0) });
             body.Children.Add(new TextBlock { Text = description, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 7, 0, 8) });
             body.Children.Add(new TextBlock { Text = "Commencer ce tutoriel →", FontWeight = FontWeights.SemiBold, Foreground = DemoTourPalette.Accent });
             var button = new Button { Content = row, Padding = new Thickness(14), Margin = new Thickness(0, 0, 0, 12), HorizontalContentAlignment = HorizontalAlignment.Stretch, BorderBrush = DemoTourPalette.Accent, BorderThickness = new Thickness(1), Background = Brushes.White };

@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net9.0</TargetFramework><OutputType>Exe</OutputType><NuGetAudit>false</NuGetAudit></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../BIMaestro/commands/qui est le coupable/ElementHistoryBridgeCache.cs" Link="Cache.cs" />
+    <Compile Include="../../BIMaestro/commands/qui est le coupable/ElementHistoryClock.cs" Link="Clock.cs" />
+  </ItemGroup>
+</Project>

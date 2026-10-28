@@ -20,6 +20,12 @@ namespace BIMaestro.PropertiesAppearance
                 if (!_collapsedGroups.Remove(key)) _collapsedGroups.Add(key);
             }
             Select(row);
+            if (row.Header && !row.ReadOnly && (row.GroupKey ?? "").StartsWith("custom:", StringComparison.Ordinal))
+            {
+                _groupRenameName.BringIntoView();
+                _groupRenameName.Focus();
+                _groupRenameName.SelectAll();
+            }
         }
         private UIElement BuildResetConfirmation()
         {

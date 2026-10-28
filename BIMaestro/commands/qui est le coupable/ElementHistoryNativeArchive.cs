@@ -16,6 +16,37 @@ namespace Analyse
     internal static class HistoryBackgroundWork
     {
         [StructLayout(LayoutKind.Sequential)]
+        private struct GuiThreadInfo
+        {
+            internal uint Size, Flags;
+            internal IntPtr Active, Focus, Capture, MenuOwner, MoveSize, Caret;
+            internal int Left, Top, Right, Bottom;
+        }
+        [DllImport("user32.dll")]
+        private static extern bool GetGUIThreadInfo(uint threadId, ref GuiThreadInfo info);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern int GetClassName(IntPtr window, System.Text.StringBuilder name, int capacity);
+
+        // Check before raising an ExternalEvent: entering its API context can itself
+        // end a ribbon edit, even if Execute subsequently decides to do no work.
+        internal static bool IsTextInputActive()
+        {
+            var foreground = GetForegroundWindow();
+            uint thread = GetWindowThreadProcessId(foreground, out var process);
+            if (foreground == IntPtr.Zero || process != ProcessId) return false;
+            var info = new GuiThreadInfo { Size = (uint)Marshal.SizeOf(typeof(GuiThreadInfo)) };
+            if (!GetGUIThreadInfo(thread, ref info)) return true;
+            if (info.Caret != IntPtr.Zero) return true;
+            var name = new System.Text.StringBuilder(256);
+            GetClassName(info.Focus, name, name.Capacity);
+            string className = name.ToString();
+            if (className.IndexOf("Edit", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            var focused = System.Windows.Input.Keyboard.FocusedElement;
+            return focused is System.Windows.Controls.Primitives.TextBoxBase
+                || focused is System.Windows.Controls.PasswordBox
+                || (focused is System.Windows.Controls.ComboBox combo && combo.IsEditable);
+        }
+        [StructLayout(LayoutKind.Sequential)]
         private struct LastInput { internal uint Size; internal uint Tick; }
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
@@ -33,6 +64,7 @@ namespace Analyse
             => foreground && requested && !paused;
         internal static bool SelectionCanRun()
         {
+            if (IsTextInputActive()) return false;
             var window = GetForegroundWindow();
             GetWindowThreadProcessId(window, out var foregroundProcess);
             return CanStartSelection(window != IntPtr.Zero && foregroundProcess == ProcessId, SelectionRequested, Paused);
@@ -48,14 +80,14 @@ namespace Analyse
 
         internal static bool PreparationCanRun()
         {
-            if (Paused) return false;
+            if (Paused || IsTextInputActive()) return false;
             var window = GetForegroundWindow();
             GetWindowThreadProcessId(window, out var foregroundProcess);
             return window == IntPtr.Zero || foregroundProcess != ProcessId || UserIsIdle(15000);
         }
         internal static bool UserIsIdle(uint minimumIdleMilliseconds = 1000)
         {
-            if (Paused) return false;
+            if (Paused || IsTextInputActive()) return false;
             var input = new LastInput { Size = (uint)Marshal.SizeOf(typeof(LastInput)) };
             var window = GetForegroundWindow();
             GetWindowThreadProcessId(window, out var foregroundProcess);
@@ -71,7 +103,7 @@ namespace Analyse
 
         internal static bool InventoryCanRun()
         {
-            if (Paused) return false;
+            if (Paused || IsTextInputActive()) return false;
             var input = new LastInput { Size = (uint)Marshal.SizeOf(typeof(LastInput)) };
             var window = GetForegroundWindow();
             GetWindowThreadProcessId(window, out var foregroundProcess);
@@ -99,6 +131,8 @@ namespace Analyse
         public DateTime? ReadyUtc { get; set; }
         [Newtonsoft.Json.JsonProperty(DefaultValueHandling = Newtonsoft.Json.DefaultValueHandling.Ignore)]
         public bool WholeModel { get; set; }
+        [Newtonsoft.Json.JsonProperty(DefaultValueHandling = Newtonsoft.Json.DefaultValueHandling.Ignore)]
+        public bool PreserveLogicalSystemIdentities { get; set; }
         [Newtonsoft.Json.JsonProperty(DefaultValueHandling = Newtonsoft.Json.DefaultValueHandling.Ignore)]
         public int SourceElementId { get; set; }
         [Newtonsoft.Json.JsonProperty(DefaultValueHandling = Newtonsoft.Json.DefaultValueHandling.Ignore)]
@@ -615,6 +649,9 @@ namespace Analyse
                     && DateTime.UtcNow>s.ArchiveUsedUtc.AddSeconds(30)).ToList()) Retire(idleState);
                 CloseRetired();
             }
+            // Ordinary selection and idle time never authorize native document creation/copy/save.
+            // Closing retired archives above remains available to release their memory.
+            if (!ElementHistoryDurableBridge.IsManualPreparing) return;
             if (source == null || !TryGetState(source, out var state) || state.Pending.Count == 0) return;
             var now = DateTime.UtcNow;
             state.LastBackgroundCheckUtc = now;
@@ -744,12 +781,78 @@ namespace Analyse
         private sealed class Failures : IFailuresPreprocessor
         {
             internal string Message;
+            internal List<object> Warnings = new List<object>();
+            internal List<object> Errors = new List<object>();
+            // Capture identities while the failed transaction still owns its
+            // copied elements. A rollback invalidates their target ElementIds.
+            private static T Evidence<T>(Func<T> read)
+            {
+                try { return read(); }
+                catch (Exception) { return default; }
+            }
+            private static object ElementEvidence(Document document, ElementId id)
+            {
+                var element = Evidence(() => document.GetElement(id));
+                if (element == null) return new { TargetId = id.GetIdLongValue(), Unavailable = true };
+                var type = Evidence(() => document.GetElement(element.GetTypeId()));
+                var ports = new List<object>();
+                string portError = null;
+                try
+                {
+                    foreach (var connector in ElementHistoryNetwork.Ports(element).Take(32))
+                    {
+                        var system = Evidence(() => connector.MEPSystem);
+                        var systemType = system == null ? null : Evidence(() => document.GetElement(system.GetTypeId()));
+                        var classification = Evidence(() => connector.Domain == Domain.DomainPiping ? connector.PipeSystemType.ToString()
+                            : connector.Domain == Domain.DomainHvac ? connector.DuctSystemType.ToString()
+                            : connector.Domain == Domain.DomainElectrical ? connector.ElectricalSystemType.ToString() : null);
+                        ports.Add(new { Id = Evidence(() => connector.Id), Domain = Evidence(() => connector.Domain.ToString()),
+                            Kind = Evidence(() => connector.ConnectorType.ToString()), Classification = classification,
+                            SystemUniqueId = system == null ? null : Evidence(() => system.UniqueId),
+                            SystemTypeUniqueId = systemType == null ? null : Evidence(() => systemType.UniqueId),
+                            SystemTypeName = systemType == null ? null : Evidence(() => systemType.Name),
+                            SystemClassification = systemType is MEPSystemType mepType ? Evidence(() => mepType.SystemClassification.ToString()) : null });
+                    }
+                }
+                catch (Exception ex) { portError = ex.GetType().Name + ": " + ex.Message; }
+                return new { TargetId = id.GetIdLongValue(), TargetUniqueId = Evidence(() => element.UniqueId),
+                    SourceUniqueId = Evidence(() => ReadCopySourceId(element)),
+                    HistoricalUniqueId = Evidence(() => NativeHistoricalIdentity(element)),
+                    Origins = Evidence(() => (ElementHistoryRestoration.GetOrigins(element) ?? new List<string>()).Take(32).ToArray()),
+                    Class = element.GetType().FullName, Category = Evidence(() => element.Category?.Name),
+                    TypeUniqueId = type == null ? null : Evidence(() => type.UniqueId),
+                    TypeName = type == null ? null : Evidence(() => type.Name),
+                    Name = Evidence(() => element.Name), Ports = ports, PortEvidenceError = portError };
+            }
+            private static object ErrorEvidence(FailuresAccessor accessor, FailureMessageAccessor failure)
+            {
+                var document = accessor.GetDocument();
+                var failing = failure.GetFailingElementIds();
+                var additional = failure.GetAdditionalElementIds();
+                var targets = failing.Concat(additional).Distinct().Take(32).ToList();
+                return new { Id = failure.GetFailureDefinitionId().Guid, Severity = failure.GetSeverity().ToString(),
+                    Message = failure.GetDescriptionText(),
+                    FailingElements = failing.Take(32).Select(id => id.GetIdLongValue()).ToArray(),
+                    AdditionalElements = additional.Take(32).Select(id => id.GetIdLongValue()).ToArray(),
+                    Targets = targets.Select(id => ElementEvidence(document, id)).ToList(),
+                    TargetsTruncated = failing.Concat(additional).Distinct().Skip(32).Any() };
+            }
             public FailureProcessingResult PreprocessFailures(FailuresAccessor accessor)
             {
                 bool errors = false;
                 foreach (var failure in accessor.GetFailureMessages())
-                    if (failure.GetSeverity() == FailureSeverity.Warning) accessor.DeleteWarning(failure);
-                    else { errors = true; Message += failure.GetDescriptionText() + " "; }
+                    if (failure.GetSeverity() == FailureSeverity.Warning)
+                    {
+                        Warnings.Add(new { Id=failure.GetFailureDefinitionId().Guid, Message=failure.GetDescriptionText(),
+                            Elements=failure.GetFailingElementIds().Select(id=>id.GetIdLongValue()).ToArray() });
+                        accessor.DeleteWarning(failure);
+                    }
+                    else
+                    {
+                        errors = true; Message += failure.GetDescriptionText() + " ";
+                        var evidence = Evidence(() => ErrorEvidence(accessor, failure));
+                        if (evidence != null) Errors.Add(evidence);
+                    }
                 return errors ? FailureProcessingResult.ProceedWithRollBack : FailureProcessingResult.Continue;
             }
         }
@@ -1076,6 +1179,7 @@ namespace Analyse
 
         private static string NativeCopyIdentity(Element element)
         {
+            if (element == null) return "aucun";
             try
             {
                 var result = element.UniqueId + "/" + element.GetType().Name + "/category=" + element.Category?.Id.GetIdLongValue()
@@ -1085,6 +1189,10 @@ namespace Analyse
                         .Select(point => string.Join(",", new[] { point.X, point.Y, point.Z }.Select(value => value.ToString("R", System.Globalization.CultureInfo.InvariantCulture)))));
                 var bounds = element.get_BoundingBox(null);
                 if (bounds != null) result += "/bbox=" + bounds.Min + "->" + bounds.Max;
+                if (element is Wall wall) result += "/join0=" + WallUtils.IsWallJoinAllowedAtEnd(wall,0) + "/join1=" + WallUtils.IsWallJoinAllowedAtEnd(wall,1);
+                result += "/createdPhase=" + element.CreatedPhaseId + "/demolishedPhase=" + element.DemolishedPhaseId;
+                if (element is FamilyInstance family) result += "/placement=" + family.Symbol.Family.FamilyPlacementType
+                    + "/hostFace=" + family.HostFace?.ElementId + "/level=" + family.LevelId;
                 return result;
             }
             catch (Exception ex) { return "identity-unavailable:" + ex.GetType().Name + ":" + ex.Message; }
@@ -1193,7 +1301,8 @@ namespace Analyse
                     if (mappedOwner != null) scoped = scoped.Where(candidate => GeneratedRailing(candidate.Element)?.Id == mappedOwner.Id);
                 }
                 var eligible = scoped.ToList();
-                var matches = eligible.Where(candidate => candidate.Origins.Contains(element.UniqueId)).ToList();
+                var matches = eligible.Where(candidate => ReadCopySourceId(candidate.Element) == element.UniqueId).ToList();
+                if (matches.Count == 0) matches = eligible.Where(candidate => candidate.Origins.Contains(element.UniqueId)).ToList();
                 if (matches.Count == 0 && original.Origins.Count > 0)
                     matches = eligible.Where(candidate => candidate.Origins.Overlaps(original.Origins)).ToList();
                 if (matches.Count == 0) matches = eligible.Where(candidate => original.Matches(candidate)).ToList();
@@ -1248,6 +1357,11 @@ namespace Analyse
 
         internal sealed class Sources : IDisposable
         {
+            private static readonly Dictionary<Document, IDisposable> BridgeLeases = new Dictionary<Document, IDisposable>(DocumentReferenceComparer.Instance);
+            internal static void ReleaseBridgeLease(Document document)
+            {
+                if (BridgeLeases.TryGetValue(document, out var lease)) { lease.Dispose(); BridgeLeases.Remove(document); }
+            }
             private readonly Dictionary<string, Document> _documents = new Dictionary<string, Document>(StringComparer.OrdinalIgnoreCase);
             private readonly HashSet<Document> _borrowed = new HashSet<Document>(DocumentReferenceComparer.Instance);
             private readonly Dictionary<string, string> _materialized = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -1294,12 +1408,18 @@ namespace Analyse
                 }
                 if (_documents.TryGetValue(path, out var stale) && !stale.IsValidObject)
                 {
+                    ReleaseBridgeLease(stale);
                     _documents.Remove(path);
                     _borrowed.Remove(stale);
                     OwnedArchives.Remove(stale);
                 }
                 if (!_documents.TryGetValue(path, out var source))
                 {
+                    IDisposable bridgeLease = null;
+                    if (ElementHistoryBridgeCache.IsCopy(ElementHistoryDurableBridge.LocalBridgeDirectory, path))
+                        bridgeLease = ElementHistoryBridgeCache.AcquireLease(ElementHistoryDurableBridge.LocalBridgeDirectory, path);
+                    try
+                    {
                     CloseRetired();
                     var owner = States.Values.FirstOrDefault(state=>state.Archive != null && state.Archive.IsValidObject
                         && string.Equals(state.Archive.PathName,path,StringComparison.OrdinalIgnoreCase));
@@ -1331,6 +1451,9 @@ namespace Analyse
                     }
                     if (owner != null) _borrowed.Add(source);
                     _documents[path] = source;
+                    if (bridgeLease != null) { BridgeLeases.Add(source, bridgeLease); bridgeLease = null; }
+                    }
+                    finally { bridgeLease?.Dispose(); }
                 }
                 return source;
             }

@@ -40,7 +40,10 @@ namespace Analyse
         internal static bool HistoricalSystemTypeMatches(Element actual, string sourceUniqueId, string version)
         {
             if (actual == null || string.IsNullOrWhiteSpace(sourceUniqueId)) return false;
-            if (string.IsNullOrWhiteSpace(version)) return actual.UniqueId == sourceUniqueId;
+            // The unchanged original project type has no capsule version marker.
+            // Version + origin identify only transported copies whose runtime UID differs.
+            if (actual.UniqueId == sourceUniqueId) return true;
+            if (string.IsNullOrWhiteSpace(version)) return false;
             return ElementHistoryNativeArchive.ReadHistoricalTypeVersion(actual) == version
                 && (ElementHistoryRestoration.GetOrigins(actual) ?? new List<string>()).Contains(sourceUniqueId);
         }
@@ -175,7 +178,7 @@ namespace Analyse
                 throw new InvalidOperationException("La connexion déplacerait " + field + ".");
         }
 
-        internal static void VerifyConnectionGuard(Document doc, ConnectionGuard guard)
+        internal static void VerifyConnectionGuard(Document doc, ConnectionGuard guard, bool verifyHistoricalEndpoints = true)
         {
             if (guard == null) throw new ArgumentNullException(nameof(guard));
             foreach (var saved in guard.States)
@@ -207,7 +210,9 @@ namespace Analyse
             {
                 var connector = Match(doc.GetElement(endpoint.Item1), endpoint.Item2);
                 if (connector == null) throw new InvalidOperationException("Connecteur historique déplacé après connexion : " + endpoint.Item1);
-                VerifyPortSemantics(connector, endpoint.Item2, true);
+                // Revit may assign the restored endpoint’s system only when its transaction commits.
+                // Its historical position is checked above in both phases; final semantics remain strict.
+                if (verifyHistoricalEndpoints) VerifyPortSemantics(connector, endpoint.Item2, true);
             }
             foreach (var edge in guard.ExistingConnections)
             {

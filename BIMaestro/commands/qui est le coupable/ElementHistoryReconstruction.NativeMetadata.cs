@@ -108,7 +108,7 @@ namespace Analyse
                         + " [builtIn=" + value.BuiltIn + ", storage=" + (StorageType)value.Storage + "].";
                     return false;
                 }
-            return VerifyHistoricalPlacement(element, recipe, out failure, true);
+            return VerifyHistoricalPlacement(element, recipe, out failure, includeBoundingBox: !(element is Wall));
         }
 
         // Only the creation branch may call this. The caller owns the transaction
@@ -136,7 +136,7 @@ namespace Analyse
                 if (!VerifyNativeMetadata(doc, element, recipe, out var failure)) throw new InvalidOperationException(failure);
                 HistoryPerformanceLog.RecordDetails(doc, "native_metadata", timer.Elapsed.TotalMilliseconds, 1, 0, true,
                     new { ElementId = element.Id.GetIdLongValue(), ElementClass = element.GetType().Name, PrimaryLevelSource = primary,
-                        ActualLevel = FindLevel(element)?.UniqueId, ParameterCount = values.Count, BoundingBoxChecked = true });
+                        ActualLevel = FindLevel(element)?.UniqueId, ParameterCount = values.Count, BoundingBoxChecked = !(element is Wall) });
             }
             catch (Exception ex)
             {

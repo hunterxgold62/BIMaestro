@@ -32,6 +32,38 @@ public class BIMaestroApp : IExternalApplication
     private DateTime _nextHistoryCaptureUtc = DateTime.MinValue;
     private System.Windows.Threading.DispatcherTimer _historyWakeTimer;
     private ExternalEvent _historyWakeEvent;
+    private DateTime _nextHistoryNoticeUtc;
+    private void ShowHistoryCacheWarning()
+    {
+        if (DateTime.UtcNow < _nextHistoryNoticeUtc) return;
+        _nextHistoryNoticeUtc = DateTime.UtcNow.AddMinutes(1);
+        var cache = Analyse.ElementHistoryBridgeCache.Status;
+        var queue = Analyse.ElementHistoryDurableBridge.GetStatus();
+        if (!Analyse.ElementHistoryBridgeCache.NeedsWarning(cache)) return;
+        try
+        {
+            var notice = Path.Combine(Analyse.ElementHistoryDurableBridge.LocalBridgeDirectory, "last-warning.txt");
+            var today = DateTime.UtcNow.ToString("yyyy-MM-dd");
+            if (File.Exists(notice) && File.ReadAllText(notice) == today) return;
+            Directory.CreateDirectory(Path.GetDirectoryName(notice));
+            File.WriteAllText(notice, today);
+            var dialog = new TaskDialog("Qui a fait ça ?") {
+                MainInstruction = "Des données de restauration nécessitent votre attention",
+                MainContent = (cache.Expiring > 0 ? $"{cache.Expiring} copie(s) temporaire(s) arrivent à expiration dans moins de 3 jours.\n"
+                    + (cache.EarliestExpiryUtc.HasValue ? $"Première échéance : {cache.EarliestExpiryUtc.Value.ToLocalTime():dd/MM/yyyy HH:mm}.\n" : "")
+                    + "Préparez les archives natives de ces copies avant leur suppression à 15 jours.\n"
+                    : "La nouvelle copie n’a pas pu être créée : l’espace disque réservé au cache est insuffisant.\n")
+                    + $"{cache.Copies} copie(s) présente(s) sur disque. {queue.PendingJobs} action(s) à préparer.\n"
+                    + (cache.Issue ?? "")
+                    + (Analyse.ElementHistoryMaintenance.IsActive ? "\nL’outil est actuellement en maintenance ; la préparation est suspendue." : ""),
+                CommonButtons = TaskDialogCommonButtons.Close
+            };
+            if (!Analyse.ElementHistoryMaintenance.IsActive)
+                dialog.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, "Préparer les éléments maintenant (peut faire attendre Revit)");
+            if (dialog.Show() == TaskDialogResult.CommandLink1) Analyse.ElementHistoryDurableBridge.RequestPreparation();
+        }
+        catch (Exception ex) { AppendLog("History cache warning: " + ex.Message); }
+    }
     private readonly System.Collections.Generic.Dictionary<int, Tuple<Document, string, string>> _historyClosingDocuments =
         new System.Collections.Generic.Dictionary<int, Tuple<Document, string, string>>();
     private sealed class HistoryWakeHandler : IExternalEventHandler
@@ -48,10 +80,17 @@ public class BIMaestroApp : IExternalApplication
 
     private void ProcessHistoryBackground(UIApplication app)
     {
+        if (Analyse.HistoryBackgroundWork.IsTextInputActive()) return;
+        // Expiration is a disk safety measure and remains active in maintenance.
+        Analyse.ElementHistoryBridgeCache.Tick(Analyse.ElementHistoryDurableBridge.LocalBridgeDirectory);
+        ShowHistoryCacheWarning();
         if (Analyse.ElementHistoryMaintenance.IsActive) return;
         // Conversion and final cleanup also run after the last project closes.
         // They use their own read-only source, never the user's active document.
         Analyse.ElementHistoryDurableBridge.ProcessPending(app?.Application);
+        // Deleted-item preparation already has its own bounded passes. Do not also populate
+        // the live model native inventory during the same user-requested operation.
+        if (Analyse.ElementHistoryDurableBridge.IsManualPreparing) return;
         var doc = app?.ActiveUIDocument?.Document;
         if (doc == null)
         {
@@ -224,8 +263,9 @@ public class BIMaestroApp : IExternalApplication
             _historyWakeTimer.Tick += (sender, args) =>
             {
                 // No model access from a timer: Revit grants the API context through Execute.
-                if (DateTime.UtcNow >= _nextHistoryCaptureUtc
-                    && (Analyse.HistoryBackgroundWork.SelectionCanRun() || Analyse.HistoryBackgroundWork.InventoryCanRun()))
+                if (!Analyse.HistoryBackgroundWork.IsTextInputActive()
+                    && DateTime.UtcNow >= _nextHistoryCaptureUtc
+                    && (Analyse.ElementHistoryDurableBridge.IsManualPreparing || Analyse.HistoryBackgroundWork.SelectionCanRun() || Analyse.HistoryBackgroundWork.InventoryCanRun()))
                     _historyWakeEvent?.Raise();
             };
             _historyWakeTimer.Start();
@@ -500,7 +540,7 @@ public class BIMaestroApp : IExternalApplication
                 if (selectedIds.Count > 0)
                 {
                     _nextHistoryCaptureUtc = DateTime.MinValue;
-                    _historyWakeEvent?.Raise();
+                    if (!Analyse.HistoryBackgroundWork.IsTextInputActive()) _historyWakeEvent?.Raise();
                 }
             }
             var afterHistoryMs = timer.Elapsed.TotalMilliseconds;

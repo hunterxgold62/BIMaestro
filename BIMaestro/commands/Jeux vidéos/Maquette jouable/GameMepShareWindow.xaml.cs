@@ -1,3 +1,4 @@
+﻿using BIMaestro.Localization;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -33,12 +34,12 @@ namespace BIMaestro.VideoGames
             string[] names = scene.Elements.SelectMany(item => item.WebProperties.Keys)
                 .Distinct(StringComparer.CurrentCultureIgnoreCase).OrderBy(item => item).ToArray();
             AuthorizedParametersText.Text = names.Length == 0
-                ? "Aucun paramètre métier"
-                : names.Length + " paramètres sélectionnés";
+                ? UiLanguage.T("Aucun paramètre métier", "No business parameters")
+                : names.Length + UiLanguage.T(" paramètres sélectionnés", " selected parameters");
             AuthorizedParametersText.ToolTip = names.Length == 0
-                ? "Seules les informations techniques minimales du graphe seront publiées."
+                ? UiLanguage.T("Seules les informations techniques minimales du graphe seront publiées.", "Only the minimum technical graph information will be published.")
                 : string.Join(", ", names);
-            EstimatedSizeText.Text = "Calcul de la taille compressée…";
+            EstimatedSizeText.Text = UiLanguage.T("Calcul de la taille compressée…", "Calculating compressed size…");
             ShowState();
             AnalyzeAsync();
         }
@@ -66,8 +67,8 @@ namespace BIMaestro.VideoGames
             {
                 Debug.WriteLine(exception);
                 if (!token.IsCancellationRequested) {
-                    EstimatedSizeText.Text = "Analyse indisponible";
-                    OptimizationText.Text = "L’export original reste disponible. " + exception.Message;
+                    EstimatedSizeText.Text = UiLanguage.T("Analyse indisponible", "Analysis unavailable");
+                    OptimizationText.Text = UiLanguage.T("L’export original reste disponible. ", "The original export remains available. ") + exception.Message;
                 }
             }
             finally { if (!token.IsCancellationRequested) { _analyzing = false; SetBusy(_busy); } }
@@ -75,21 +76,21 @@ namespace BIMaestro.VideoGames
 
         private void RefreshAnalysis()
         {
-            EstimatedSizeText.Text = "Taille compressée : " + FormatBytes(_useLighter ? _lighterSize : _originalSize) + " / 50 Mo";
+            EstimatedSizeText.Text = UiLanguage.T("Taille compressée : ", "Compressed size: ") + FormatBytes(_useLighter ? _lighterSize : _originalSize) + UiLanguage.T(" / 50 Mo", " / 50 MB");
             long gain = Math.Max(0, _originalSize - _lighterSize);
             OptimizationText.Text = gain > 0
-                ? FormatBytes(_originalSize) + " → " + FormatBytes(_lighterSize) + "\nGain calculé : " + FormatBytes(gain) + " (" + (100.0 * gain / _originalSize).ToString("0.0") + " %)"
-                : "Aucun gain utile détecté pour les portes et garde-corps de cette vue.";
-            LightenButton.Content = _useLighter ? "Revenir aux détails d’origine" : "Alléger les détails";
-            EstimatedSizeDetailsText.Text = "Géométrie 3D : " + FormatBytes(ExportScene.WebTiles.Sum(x => x.Size)) +
-                " (" + ExportScene.WebTiles.Count + " fichiers)\n" + BuildGeometryDetails();
+                ? FormatBytes(_originalSize) + " → " + FormatBytes(_lighterSize) + UiLanguage.T("\nGain calculé : ", "\nCalculated reduction: ") + FormatBytes(gain) + " (" + (100.0 * gain / _originalSize).ToString("0.0") + " %)"
+                : UiLanguage.T("Aucun gain utile détecté pour les portes et garde-corps de cette vue.", "No useful size reduction detected for doors and railings in this view.");
+            LightenButton.Content = _useLighter ? UiLanguage.T("Revenir aux détails d’origine", "Restore original details") : UiLanguage.T("Alléger les détails", "Simplify details");
+            EstimatedSizeDetailsText.Text = UiLanguage.T("Géométrie 3D : ", "3D geometry: ") + FormatBytes(ExportScene.WebTiles.Sum(x => x.Size)) +
+                " (" + ExportScene.WebTiles.Count + UiLanguage.T(" fichiers)\n", " files)\n") + BuildGeometryDetails();
         }
 
         private void LightenButton_Click(object sender, RoutedEventArgs e)
         {
             _useLighter = !_useLighter;
             RefreshAnalysis();
-            StatusText.Text = _useLighter ? "Détails allégés pour la prochaine publication." : "Géométrie d’origine pour la prochaine publication.";
+            StatusText.Text = _useLighter ? UiLanguage.T("Détails allégés pour la prochaine publication.", "Simplified details for the next publication.") : UiLanguage.T("Géométrie d’origine pour la prochaine publication.", "Original geometry for the next publication.");
         }
 
         private string BuildGeometryDetails()
@@ -111,7 +112,7 @@ namespace BIMaestro.VideoGames
                 .ToArray();
             var categories = rankedElements
                 .GroupBy(item => string.IsNullOrWhiteSpace(item.Element.Category)
-                    ? "Sans catégorie"
+                    ? UiLanguage.T("Sans catégorie", "Uncategorized")
                     : item.Element.Category)
                 .Select(group => new { Name = group.Key, Bytes = group.Sum(item => item.Bytes) })
                 .OrderByDescending(item => item.Bytes)
@@ -128,25 +129,25 @@ namespace BIMaestro.VideoGames
                 .Select(group => new { Name = group.Key, Bytes = group.Sum(item => item.Bytes), Count = group.Count() })
                 .OrderByDescending(item => item.Bytes).Take(5)
                 .Select(item => item.Name + " (" + item.Count + ") ≈ " + FormatBytes(item.Bytes)));
-            return "\nDIAGNOSTIC DE L’EXPORT D’ORIGINE\nPoids par élément estimé ; nombre de triangles mesuré.\n\nCATÉGORIES LES PLUS LOURDES\n" +
-                categoryDetails + "\n\nTYPES LES PLUS LOURDS\n" + typeDetails + "\n\nÉLÉMENTS LES PLUS LOURDS\n" + elementDetails;
+            return UiLanguage.T("\nDIAGNOSTIC DE L’EXPORT D’ORIGINE\nPoids par élément estimé ; nombre de triangles mesuré.\n\nCATÉGORIES LES PLUS LOURDES\n", "\nORIGINAL EXPORT DIAGNOSTICS\nEstimated size per element; measured triangle count.\n\nLARGEST CATEGORIES\n") +
+                categoryDetails + UiLanguage.T("\n\nTYPES LES PLUS LOURDS\n", "\n\nLARGEST TYPES\n") + typeDetails + UiLanguage.T("\n\nÉLÉMENTS LES PLUS LOURDS\n", "\n\nLARGEST ELEMENTS\n") + elementDetails;
         }
 
         private static string FormatBytes(long bytes)
         {
-            if (bytes >= 1048576) return (bytes / 1048576.0).ToString("0.0") + " Mo";
-            return Math.Max(1, bytes / 1024).ToString() + " Ko";
+            if (bytes >= 1048576) return (bytes / 1048576.0).ToString("0.0") + UiLanguage.T(" Mo", " MB");
+            return Math.Max(1, bytes / 1024).ToString() + UiLanguage.T(" Ko", " KB");
         }
 
         private async void LocalExportButton_Click(object sender, RoutedEventArgs e)
         {
             string name = PublicationNameTextBox.Text.Trim();
-            if (string.IsNullOrWhiteSpace(name)) name = "Maquette MEP";
+            if (string.IsNullOrWhiteSpace(name)) name = UiLanguage.T("Maquette MEP", "MEP model");
             string safeName = new string(name.Select(character =>
                 Path.GetInvalidFileNameChars().Contains(character) ? '_' : character).ToArray());
             var dialog = new Microsoft.Win32.SaveFileDialog
             {
-                Title = "Enregistrer les tuiles GLB en local",
+                Title = UiLanguage.T("Enregistrer les tuiles GLB en local", "Save GLB tiles locally"),
                 Filter = "Archive ZIP (*.zip)|*.zip", DefaultExt = ".zip",
                 AddExtension = true, FileName = safeName + " - GLB.zip"
             };
@@ -156,7 +157,7 @@ namespace BIMaestro.VideoGames
             SetBusy(true);
             _cancellation = new CancellationTokenSource();
             var token = _cancellation.Token;
-            StatusText.Text = "Création du ZIP local…";
+            StatusText.Text = UiLanguage.T("Création du ZIP local…", "Creating local ZIP…");
             PublishProgressBar.Value = 0;
             try
             {
@@ -165,13 +166,13 @@ namespace BIMaestro.VideoGames
                 if (File.Exists(dialog.FileName)) File.Replace(temporaryPath, dialog.FileName, null);
                 else File.Move(temporaryPath, dialog.FileName);
                 PublishProgressBar.Value = 100;
-                StatusText.Text = scene.WebTiles.Count + " tuiles GLB enregistrées : " + dialog.FileName;
+                StatusText.Text = scene.WebTiles.Count + UiLanguage.T(" tuiles GLB enregistrées : ", " GLB tiles saved: ") + dialog.FileName;
             }
-            catch (OperationCanceledException) { StatusText.Text = "Export local annulé."; }
+            catch (OperationCanceledException) { StatusText.Text = UiLanguage.T("Export local annulé.", "Local export canceled."); }
             catch (Exception exception)
             {
                 Debug.WriteLine("Export GLB local impossible : " + exception);
-                StatusText.Text = "Export local impossible : " + exception.Message;
+                StatusText.Text = UiLanguage.T("Export local impossible : ", "Unable to export locally: ") + exception.Message;
             }
             finally
             {
@@ -185,7 +186,7 @@ namespace BIMaestro.VideoGames
         {
             if (string.IsNullOrWhiteSpace(PublicationNameTextBox.Text))
             {
-                StatusText.Text = "Donnez un nom à la publication.";
+                StatusText.Text = UiLanguage.T("Donnez un nom à la publication.", "Enter a publication name.");
                 return;
             }
             SetBusy(true);
@@ -201,16 +202,16 @@ namespace BIMaestro.VideoGames
                     ExportScene, PublicationNameTextBox.Text.Trim(), progress,
                     _cancellation.Token);
                 ShowState();
-                StatusText.Text = "Révision " + _state.Revision +
-                    " publiée. Les liens restent valables.";
+                StatusText.Text = UiLanguage.T("Révision ", "Revision ") + _state.Revision +
+                    UiLanguage.T(" publiée. Les liens restent valables.", " published. The links remain valid.");
             }
-            catch (OperationCanceledException) { StatusText.Text = "Publication annulée."; }
+            catch (OperationCanceledException) { StatusText.Text = UiLanguage.T("Publication annulée.", "Publication canceled."); }
             catch (Exception exception)
             {
                 Debug.WriteLine("Publication MEP impossible : " + exception);
                 _state = GameMepPublishClient.Load(_scene.MepGraph);
                 ShowState();
-                StatusText.Text = "Publication impossible : " + exception.Message;
+                StatusText.Text = UiLanguage.T("Publication impossible : ", "Unable to publish: ") + exception.Message;
             }
             finally { SetBusy(false); }
         }
@@ -223,7 +224,7 @@ namespace BIMaestro.VideoGames
                 await GameMepPublishClient.ExtendAsync(
                     _scene.MepGraph, _state, 30, CancellationToken.None);
                 ShowState();
-                StatusText.Text = "Le partage est prolongé de 30 jours.";
+                StatusText.Text = UiLanguage.T("Le partage est prolongé de 30 jours.", "Sharing has been extended by 30 days.");
             }
             catch (Exception exception) { StatusText.Text = exception.Message; }
             finally { SetBusy(false); }
@@ -234,13 +235,13 @@ namespace BIMaestro.VideoGames
             string scope = (DeletionScopeComboBox.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Tag as string;
             if (string.IsNullOrWhiteSpace(scope)) return;
             string confirmation = scope == "data"
-                ? "Supprimer définitivement les résas, annotations et lots du partage web ? La maquette 3D et les liens sont conservés. Le fichier Revit reste intact."
+                ? UiLanguage.T("Supprimer définitivement les résas, annotations et lots du partage web ? La maquette 3D et les liens sont conservés. Le fichier Revit reste intact.", "Permanently delete openings, annotations and batches from the web publication? The 3D model and links will be kept. The Revit file remains untouched.")
                 : scope == "model"
-                    ? "Supprimer la maquette 3D publiée et désactiver les deux liens ? Les résas et annotations sont conservées pendant 5 mois et seront retrouvées lors d'un nouvel export."
-                    : "Supprimer définitivement la maquette publiée ET ses résas, annotations et lots, puis désactiver les deux liens ? Le fichier Revit reste intact.";
+                    ? UiLanguage.T("Supprimer la maquette 3D publiée et désactiver les deux liens ? Les résas et annotations sont conservées pendant 5 mois et seront retrouvées lors d'un nouvel export.", "Delete the published 3D model and disable both links? Openings and annotations will be kept for 5 months and restored on the next export.")
+                    : UiLanguage.T("Supprimer définitivement la maquette publiée ET ses résas, annotations et lots, puis désactiver les deux liens ? Le fichier Revit reste intact.", "Permanently delete the published model AND its openings, annotations and batches, then disable both links? The Revit file remains untouched.");
             if (MessageBox.Show(this,
                     confirmation,
-                    "Supprimer les données du partage", MessageBoxButton.YesNo,
+                    UiLanguage.T("Supprimer les données du partage", "Delete shared data"), MessageBoxButton.YesNo,
                     MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
             SetBusy(true);
             try
@@ -249,9 +250,9 @@ namespace BIMaestro.VideoGames
                     _scene.MepGraph, _state, scope, CancellationToken.None);
                 ShowState();
                 PublishProgressBar.Value = 0;
-                StatusText.Text = scope == "data" ? "Résas et annotations supprimées. La maquette publiée est conservée."
-                    : scope == "model" ? "Maquette 3D supprimée. Résas et annotations conservées ; publiez une nouvelle révision pour les retrouver."
-                    : "Maquette publiée, résas et annotations supprimées.";
+                StatusText.Text = scope == "data" ? UiLanguage.T("Résas et annotations supprimées. La maquette publiée est conservée.", "Openings and annotations deleted. The published model has been kept.")
+                    : scope == "model" ? UiLanguage.T("Maquette 3D supprimée. Résas et annotations conservées ; publiez une nouvelle révision pour les retrouver.", "3D model deleted. Openings and annotations have been kept; publish a new revision to restore them.")
+                    : UiLanguage.T("Maquette publiée, résas et annotations supprimées.", "Published model, openings and annotations deleted.");
             }
             catch (Exception exception) { StatusText.Text = exception.Message; }
             finally { ShowState(); SetBusy(false); }
@@ -265,7 +266,7 @@ namespace BIMaestro.VideoGames
             LinksPanel.Visibility = !string.IsNullOrWhiteSpace(_state.PublicationId) ? Visibility.Visible : Visibility.Collapsed;
             ViewerUrlTextBox.Text = _state.ViewerUrl;
             EditorUrlTextBox.Text = _state.EditorUrl;
-            PublishButton.Content = available ? "Publier une nouvelle révision" : "Partager sur le web";
+            PublishButton.Content = available ? UiLanguage.T("Publier une nouvelle révision", "Publish a new revision") : UiLanguage.T("Partager sur le web", "Share on the web");
         }
 
         private void SetBusy(bool busy)
@@ -279,9 +280,9 @@ namespace BIMaestro.VideoGames
         }
 
         private void CopyViewerButton_Click(object sender, RoutedEventArgs e) =>
-            Copy(_state.ViewerUrl, "Lien de consultation copié.");
+            Copy(_state.ViewerUrl, UiLanguage.T("Lien de consultation copié.", "Viewer link copied."));
         private void CopyEditorButton_Click(object sender, RoutedEventArgs e) =>
-            Copy(_state.EditorUrl, "Lien d’édition copié.");
+            Copy(_state.EditorUrl, UiLanguage.T("Lien d’édition copié.", "Editor link copied."));
         private void Copy(string value, string message)
         {
             if (string.IsNullOrWhiteSpace(value)) return;

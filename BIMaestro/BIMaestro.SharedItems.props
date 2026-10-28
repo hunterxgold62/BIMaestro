@@ -445,6 +445,18 @@
     </Compile>
     <Compile Include="commands\qui est le coupable\ElementHistoryTracker.cs" />
     <Compile Include="commands\qui est le coupable\ElementHistoryClock.cs" />
+    <Compile Include="commands\qui est le coupable\ElementHistoryPresentationPolicy.cs" />
+    <Compile Include="commands\qui est le coupable\HistoryOpeningClassification.cs" />
+    <Compile Include="commands\qui est le coupable\ElementHistoryNativeArchive.BatchCopy.cs" />
+    <Compile Include="commands\qui est le coupable\ElementHistoryNativeArchive.HostValidation.cs" />
+    <Compile Include="commands\qui est le coupable\ElementHistoryNativeArchive.MepContext.cs" />
+    <Compile Include="commands\qui est le coupable\ElementHistoryNativeArchive.SubsetSnapshot.cs" />
+    <Compile Include="commands\qui est le coupable\ElementHistoryNativeArchive.ConstraintContext.cs" />
+    <Compile Include="commands\qui est le coupable\ElementHistoryNativeArchive.MepTypeReuse.cs" />
+    <Compile Include="commands\qui est le coupable\ElementHistoryRestoration.NativeCopies.cs" />
+    <Compile Include="commands\qui est le coupable\ElementHistoryRestoration.Available.cs" />
+    <Compile Include="commands\qui est le coupable\ElementHistoryDurableBridge.NativeClipboard.cs" />
+    <Compile Include="commands\qui est le coupable\ElementHistoryBridgeCache.cs" />
     <Compile Include="commands\qui est le coupable\ElementHistoryExternalModels.cs" />
     <Compile Include="commands\qui est le coupable\ElementHistoryLocalSpool.cs" />
     <Compile Include="commands\qui est le coupable\ElementHistoryRetryPolicy.cs" />
