@@ -37,21 +37,14 @@ namespace Analyse
         public double? Height { get; set; }
         public int? Id { get; set; }
         public double? Angle { get; set; }
-        public int? ConnectorType { get; set; }
-        public string Classification { get; set; }
-        public string SystemType { get; set; }
-        public string SystemVersion { get; set; }
-        public string SystemSourceUniqueId { get; set; }
-        public bool? SystemSourceCaptured { get; set; }
     }
     internal sealed class HistoryConnection
     {
-        public string SourceMember { get; set; }
         public HistoryPort Port { get; set; }
         public string Peer { get; set; }
         public HistoryPort PeerPort { get; set; }
     }
-    internal static partial class ElementHistoryNetwork
+    internal static class ElementHistoryNetwork
     {
 
         internal static XYZ Vector(double[] p) => new XYZ(p[0], p[1], p[2]);
@@ -66,19 +59,11 @@ namespace Analyse
         private static HistoryPort CapturePort(Connector c) => new HistoryPort
         {
             Point = Pack(c.Origin), Direction = Pack(c.CoordinateSystem.BasisZ), Domain = (int)c.Domain, Shape = (int)c.Shape,
-            Id = c.Id, ConnectorType = (int)c.ConnectorType,
-            Classification = ReadPortClassification(c), SystemType = ReadPortSystemType(c)?.UniqueId,
-            SystemSourceUniqueId = c.Domain == Domain.DomainPiping || c.Domain == Domain.DomainHvac ? c.MEPSystem?.UniqueId : null,
-            SystemSourceCaptured = c.Domain == Domain.DomainPiping || c.Domain == Domain.DomainHvac ? (bool?)true : null,
+            Id = c.Id,
             Diameter = c.Shape == ConnectorProfileType.Round ? (double?)(c.Radius * 2) : null,
-            Width = c.Shape == ConnectorProfileType.Rectangular || c.Shape == ConnectorProfileType.Oval ? (double?)c.Width : null,
-            Height = c.Shape == ConnectorProfileType.Rectangular || c.Shape == ConnectorProfileType.Oval ? (double?)c.Height : null
+            Width = c.Shape != ConnectorProfileType.Round ? (double?)c.Width : null,
+            Height = c.Shape != ConnectorProfileType.Round ? (double?)c.Height : null
         };
-        // Capture the original logical-system identity before a partial native transfer.
-        internal static List<HistoryPort> CaptureNativeSystemPorts(Element element)
-            => Ports(element).Where(port => port.Domain == Domain.DomainPiping || port.Domain == Domain.DomainHvac)
-                .Select(CapturePort).ToList();
-
         internal static List<HistoryPort> CaptureFamilyPorts(FamilyInstance instance)
         {
             return Ports(instance).Where(c => c.Domain == Domain.DomainPiping || c.Domain == Domain.DomainHvac
@@ -96,10 +81,8 @@ namespace Analyse
             var saved = recipe.Ports ?? (recipe.Connections ?? new List<HistoryConnection>()).Select(c => c.Port)
                 .GroupBy(p => Newtonsoft.Json.JsonConvert.SerializeObject(p.Point)).Select(g => g.First()).ToList();
             if (saved.Count == 0) return;
-            if (!HistoricalFamilyFrameMatches(instance, recipe, out _))
-                ElementHistoryReconstruction.RestoreHistoricalPlacement(doc, instance, recipe);
             doc.Regenerate();
-            if (saved.All(p => Match(instance, p) != null) && HistoricalFamilyFrameMatches(instance, recipe, out _)) return;
+            if (saved.All(p => Match(instance, p) != null)) return;
             var current = Ports(instance);
             // Connector IDs are stable within the retained family definition. Old
             // histories have no IDs: test each mapping, commit only an exact geometry match.
@@ -141,17 +124,15 @@ namespace Analyse
                                 doc.Regenerate();
                             }
                         }
-                        if (saved.All(p => Match(instance, p) != null) && HistoricalFamilyFrameMatches(instance, recipe, out lastFailure))
-                        { attempt.Commit(); return; }
+                        if (saved.All(p => Match(instance, p) != null)) { attempt.Commit(); return; }
                     }
                     catch (Autodesk.Revit.Exceptions.RegenerationFailedException) { throw; }
                     catch (Exception ex) { lastFailure = ex.Message; }
                     finally { if (attempt.GetStatus() == TransactionStatus.Started) attempt.RollBack(); }
                 }
             }
-            var unmatched = saved.FirstOrDefault(p => Match(instance, p) == null);
-            throw new InvalidOperationException("La géométrie des connecteurs ou le repère du raccord ne correspond pas à l’historique. "
-                + (unmatched == null ? "Repère historique différent." : DescribeMismatch(instance, unmatched))
+            throw new InvalidOperationException("La géométrie des connecteurs du raccord ne correspond pas à l’historique. "
+                + DescribeMismatch(instance, saved.First(p => Match(instance, p) == null))
                 + (lastFailure == null ? "" : " Paramétrage : " + lastFailure));
         }
 
@@ -226,7 +207,7 @@ namespace Analyse
                         {
                             var type = new FilteredElementCollector(doc).OfClass(typeof(PipeType)).FirstElementId();
                             if (!takeoff) type = SizingType(doc, type, wantedType, part, temporaryTypes);
-                            var system = SizingSystemType(doc, target, recipe);
+                            var system = new FilteredElementCollector(doc).OfClass(typeof(PipingSystemType)).FirstElementId();
                             stub = Pipe.Create(doc, system, type, doc.GetElement(recipe.Level).Id, start, end);
                             stub.get_Parameter(BuiltInParameter.RBS_PIPE_DIAMETER_PARAM).Set(target.Diameter.Value);
                         }
@@ -235,7 +216,7 @@ namespace Analyse
                             var type = new FilteredElementCollector(doc).OfClass(typeof(DuctType)).Cast<DuctType>()
                                 .First(t => (int)t.Shape == target.Shape).Id;
                             if (!takeoff) type = SizingType(doc, type, wantedType, part, temporaryTypes);
-                            var system = SizingSystemType(doc, target, recipe);
+                            var system = new FilteredElementCollector(doc).OfClass(typeof(MechanicalSystemType)).FirstElementId();
                             stub = Duct.Create(doc, system, type, doc.GetElement(recipe.Level).Id, start, end);
                             if (target.Diameter.HasValue) stub.get_Parameter(BuiltInParameter.RBS_CURVE_DIAMETER_PARAM).Set(target.Diameter.Value);
                             else
@@ -296,22 +277,10 @@ namespace Analyse
                         doc.Regenerate();
                     }
                     if (!takeoff && saved.Any(p => Match(created, p) == null)) AlignHistoricalPorts(doc, created, saved);
-                    // Equal endpoint geometry is insufficient for symmetric reducers:
-                    // Revit may swap their insertion point and full local frame.
-                    // Only disconnected candidates may be recalibrated. A takeoff's
-                    // real host remains protected by RestoreHistoricalPlacement.
-                    if (!HistoricalFamilyFrameMatches(created, recipe, out _))
-                    {
-                        ElementHistoryReconstruction.RestoreHistoricalPlacement(doc, created, recipe);
-                        RestoreFamilyPorts(doc, created, recipe);
-                        doc.Regenerate();
-                    }
                     if (created.GetTypeId() != wantedType || saved.Any(p => Match(created, p) == null))
                         throw new InvalidOperationException("Le raccord natif ne reproduit pas exactement les connecteurs historiques. "
                             + string.Join(" / ", saved.Where(p => Match(created, p) == null).Select(p => DescribeMismatch(created, p)))
                             + " Connecteurs actuels : " + JsonConvert.SerializeObject(CaptureFamilyPorts(created)));
-                    if (!HistoricalFamilyFrameMatches(created, recipe, out var placementFailure))
-                        throw new InvalidOperationException("Le raccord natif modifie son repère historique : " + placementFailure);
                     var originalId = original.Id;
                     var dependents = protectDependents ? original.GetDependentElements(null).ToDictionary(id => id, id => doc.GetElement(id)) : null;
                     // Revit owns anonymous centerline/internal nodes beneath a
@@ -384,7 +353,6 @@ namespace Analyse
         internal static List<HistoryConnection> CaptureConnections(Element element, List<string> warnings = null)
         {
             var links = new List<HistoryConnection>();
-            if (IsExcludedInsulation(element)) return links;
             List<Connector> ports;
             try { ports = Ports(element); }
             catch (Exception ex) { warnings?.Add("Connecteurs non enregistrés : " + ex.Message); return links; }
@@ -396,7 +364,7 @@ namespace Analyse
                     {
                         try
                         {
-                            if (peer.Owner.Id != element.Id && !(peer.Owner is MEPSystem) && !IsExcludedInsulation(peer.Owner)
+                            if (peer.Owner.Id != element.Id && !(peer.Owner is MEPSystem)
                                 && (peer.ConnectorType == ConnectorType.End || peer.ConnectorType == ConnectorType.Curve
                                     || peer.ConnectorType == ConnectorType.Physical) && port.IsConnectedTo(peer))
                                 links.Add(new HistoryConnection { Port = CapturePort(port), Peer = peer.Owner.UniqueId, PeerPort = CapturePort(peer) });
@@ -408,7 +376,7 @@ namespace Analyse
             }
             return links;
         }
-        internal static HistoryRecipe Capture(Element element, bool includeDetails = true)
+        internal static HistoryRecipe Capture(Element element)
         {
             var curve = element as MEPCurve;
             string kind = element is Pipe ? "pipe" : element is Duct ? "duct" : element is Conduit ? "conduit" : element is CableTray ? "tray"
@@ -423,9 +391,8 @@ namespace Analyse
             var level = curve.ReferenceLevel ?? ElementHistoryReconstruction.FindLevel(element);
             var type = element.Document.GetElement(element.GetTypeId());
             if (level == null || type == null) throw new InvalidOperationException("Type ou niveau du réseau introuvable à la capture.");
-            var ports = Ports(element);
-            var systemType = CaptureSystemType(curve, kind, ports);
-            var port = ports.Where(c => c.ConnectorType == ConnectorType.End)
+            var systemId = element.get_Parameter(element is Pipe || element is FlexPipe ? BuiltInParameter.RBS_PIPING_SYSTEM_TYPE_PARAM : BuiltInParameter.RBS_DUCT_SYSTEM_TYPE_PARAM)?.AsElementId();
+            var port = Ports(element).Where(c => c.ConnectorType == ConnectorType.End)
                 .OrderBy(c => c.Origin.DistanceTo(start)).FirstOrDefault();
             // Non-round flexible sections need their full twist frame, not just tangents.
             if (points != null && port?.Shape != ConnectorProfileType.Round) throw new InvalidOperationException("Flexible non circulaire non pris en charge.");
@@ -433,16 +400,14 @@ namespace Analyse
             return new HistoryRecipe
             {
                 Kind = "network", Type = type.UniqueId, Level = level.UniqueId, LevelElevation = level.ProjectElevation,
-                RestorationOrigins = ElementHistoryRestoration.GetOrigins(element),
-                Connections = includeDetails ? CaptureConnections(element, warnings) : null, CaptureWarnings = warnings,
+                RestorationOrigins = ElementHistoryRestoration.GetOrigins(element), Connections = CaptureConnections(element, warnings), CaptureWarnings = warnings,
                 // Placement/system built-ins are controlled by the geometry recipe; do
                 // not replay stale offsets over the absolute start/end points.
                 Parameters = ElementHistoryReconstruction.CaptureParameters(element)
-                    .Where(p => p.BuiltIn == 0 || p.BuiltIn == (int)BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS
-                        || p.BuiltIn == -1019000).ToList(), // Stored instance identity, independent of geometry offsets.
+                    .Where(p => p.BuiltIn == 0 || p.BuiltIn == (int)BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS).ToList(),
                 Network = new HistoryNetwork
                 {
-                    Kind = kind, SystemType = systemType?.UniqueId,
+                    Kind = kind, SystemType = systemId == null ? null : element.Document.GetElement(systemId)?.UniqueId,
                     Start = Pack(start), End = Pack(end), Points = points?.Select(Pack).ToList(),
                     StartTangent = points == null ? null : Pack(flexPipe?.StartTangent ?? flexDuct.StartTangent),
                     EndTangent = points == null ? null : Pack(flexPipe?.EndTangent ?? flexDuct.EndTangent),
@@ -454,47 +419,6 @@ namespace Analyse
                 }
             };
         }
-
-        // A disconnected curve can retain its actual system type without belonging
-        // to a live MEPSystem. Conversely, some imported curves have no system type
-        // at all. Such curves require the saved native object; choosing a project's
-        // first type would silently change their historical classification.
-        private static Element CaptureSystemType(MEPCurve curve, string kind, List<Connector> ports)
-        {
-            bool piping = kind == "pipe" || kind == "flexPipe";
-            if (!piping && kind != "duct" && kind != "flexDuct") return null;
-            bool IsExpectedType(Element candidate) => piping ? candidate is PipingSystemType : candidate is MechanicalSystemType;
-            var parameter = curve.get_Parameter(piping ? BuiltInParameter.RBS_PIPING_SYSTEM_TYPE_PARAM
-                : BuiltInParameter.RBS_DUCT_SYSTEM_TYPE_PARAM);
-            if (parameter?.StorageType == StorageType.ElementId)
-            {
-                var candidate = curve.Document.GetElement(parameter.AsElementId());
-                if (IsExpectedType(candidate)) return candidate;
-            }
-            try
-            {
-                var system = curve.MEPSystem;
-                var candidate = system == null ? null : curve.Document.GetElement(system.GetTypeId());
-                if (IsExpectedType(candidate)) return candidate;
-            }
-            catch { }
-            var connectorTypes = new Dictionary<string, Element>(StringComparer.Ordinal);
-            foreach (var port in ports)
-            {
-                try
-                {
-                    var system = port.MEPSystem;
-                    var candidate = system == null ? null : curve.Document.GetElement(system.GetTypeId());
-                    if (IsExpectedType(candidate)) connectorTypes[candidate.UniqueId] = candidate;
-                }
-                catch { }
-            }
-            if (connectorTypes.Count == 1) return connectorTypes.Values.First();
-            throw new InvalidOperationException(connectorTypes.Count > 1
-                ? "Types de système contradictoires à la capture du réseau ; copie native requise."
-                : "Type de système non défini à la capture du réseau ; copie native requise.");
-        }
-
         internal static Element Create(Document doc, HistoryRecipe recipe)
         {
             var n = recipe.Network ?? throw new InvalidOperationException("Missing network geometry.");
@@ -563,12 +487,11 @@ namespace Analyse
         {
             if (element == null || saved == null) return null;
             var matches = Ports(element).Where(c => (int)c.Domain == saved.Domain && (int)c.Shape == saved.Shape
-                && (!saved.ConnectorType.HasValue || (int)c.ConnectorType == saved.ConnectorType.Value)
-                && c.Origin.DistanceTo(Vector(saved.Point)) < 1e-5
+                && c.Origin.DistanceTo(Vector(saved.Point)) < 1e-4
                 && (!saved.Diameter.HasValue || Math.Abs(c.Radius * 2 - saved.Diameter.Value) < 1e-6)
                 && (!saved.Width.HasValue || Math.Abs(c.Width - saved.Width.Value) < 1e-6)
                 && (!saved.Height.HasValue || Math.Abs(c.Height - saved.Height.Value) < 1e-6)
-                && c.CoordinateSystem.BasisZ.DistanceTo(Vector(saved.Direction)) < 1e-5).ToList();
+                && c.CoordinateSystem.BasisZ.DistanceTo(Vector(saved.Direction)) < 1e-4).ToList();
             return matches.Count == 1 ? matches[0] : null;
         }
 

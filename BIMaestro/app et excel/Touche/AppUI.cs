@@ -662,7 +662,6 @@ public partial class AppUI : IExternalApplication
             case "REVITGAMECOMMAND":
             case "RESÉRVATIONAUTO":
             case "CODEXCHAT":
-            case "QUI A FAIT ÇA ?":
             case "TEMPS PAR PROJET":
             case "CLASH 3D":
             case "COULEUR DE PROJET":

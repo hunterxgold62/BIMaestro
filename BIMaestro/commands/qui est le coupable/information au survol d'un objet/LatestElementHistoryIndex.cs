@@ -61,7 +61,8 @@ namespace Analyse
         }
 
         private static readonly string IndexCacheRoot = Path.Combine(
-            global::BIMaestro.Storage.UserDataStorage.Root,
+            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+            "RevitLogs",
             "CacheIndex",
             "QuiAFaitCa");
 

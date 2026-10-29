@@ -196,16 +196,14 @@
                            Foreground="#E7F6EE"
                            TextWrapping="Wrap"/>
                 </StackPanel>
-                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
-                    <Button Content="TUTO" MinWidth="58" Height="34" Margin="0,0,8,0"
-                            FontWeight="Bold" ToolTip="Lancer le guide interactif de l'historique"
-                            Click="TutorialButton_Click"/>
-                    <Button x:Name="HelpButton"
-                            Content="?"
-                            Style="{StaticResource HelpButtonStyle}"
-                            ToolTip="Ouvrir l'aide en ligne"
-                            Click="HelpButton_Click"/>
-                </StackPanel>
+                <Button Grid.Column="1"
+                        x:Name="HelpButton"
+                        Content="?"
+                        VerticalAlignment="Top"
+                        HorizontalAlignment="Right"
+                        Style="{StaticResource HelpButtonStyle}"
+                        ToolTip="Ouvrir l'aide en ligne"
+                        Click="HelpButton_Click"/>
             </Grid>
         </Border>
 
@@ -272,23 +270,23 @@
                     <TextBlock x:Name="ResultText" VerticalAlignment="Center" Foreground="{DynamicResource Text.Secondary}" Text="0 / 0 évènements affichés"/>
                 </WrapPanel>
                 <WrapPanel x:Name="DeletedMeshModePanel" Grid.Row="1" Margin="0,8,0,0">
-                    <TextBlock Text="Préparation des suppressions"
+                    <TextBlock Text="Aperçu suppression"
                                Style="{StaticResource FilterLabel}"
                                VerticalAlignment="Center"
                                Margin="0,0,8,6"/>
                     <RadioButton x:Name="SimpleMeshModeRadio"
-                                 Content="Léger"
+                                 Content="Simple"
                                  GroupName="DeletedMeshMode"
                                  Tag="simple"
                                  Style="{StaticResource ScopeRadioStyle}"
-                                 ToolTip="Recettes simples : murs, sols, portes, fenêtres et tronçons de réseau pris en charge. Priorité à la sélection et à la vue active. Les copies natives, équipements CVC, groupes, escaliers, garde-corps et terrains attendent le mode détaillé."
+                                 ToolTip="Aperçu suppression rapide avec boîte estimative"
                                  Checked="DeletedMeshMode_Checked"/>
                     <RadioButton x:Name="DetailedMeshModeRadio"
                                  Content="Détaillé"
                                  GroupName="DeletedMeshMode"
                                  Tag="detailed"
                                  Style="{StaticResource ScopeRadioStyle}"
-                                 ToolTip="Ajoute les relations et les objets complexes : équipements CVC, groupes, escaliers, garde-corps, terrains et copies natives. Préparation progressive en inactivité, sélection puis vue active prioritaires. Certaines opérations Revit peuvent provoquer une pause. Les captures déjà réalisées sont conservées."
+                                 ToolTip="Reconstitue les suppressions futures depuis les familles et types présents (dans leur état actuel). Conserve le maillage pour les formes non prises en charge. Si le type ou l’hôte manque, utilise l’aperçu simplifié."
                                  Checked="DeletedMeshMode_Checked"/>
                 </WrapPanel>
                 <WrapPanel x:Name="ContextScopePanel" Grid.Row="2" Margin="0,8,0,0" Visibility="Collapsed">
@@ -330,9 +328,6 @@
                     <Button x:Name="DetailsButton" Content="Détails" Width="96" Style="{StaticResource HistoryButton}" Click="DetailsButton_Click"/>
                     <Button x:Name="RestoreParametersButton" Content="Restaurer" Width="108" Style="{StaticResource HistoryButton}" Click="RestoreParametersButton_Click" Visibility="Collapsed"/>
                     <Button x:Name="CleanPreviewsButton" Content="Nettoyer previews" Width="155" Style="{StaticResource HistoryButton}" Click="CleanPreviewsButton_Click"/>
-                    <Button x:Name="PreparePendingButton" Content="Charger les éléments en attente" MinWidth="235" Style="{StaticResource HistoryButton}" Click="PreparePendingButton_Click" ToolTip="Prépare les données de restauration depuis les copies temporaires sans attendre une pause. La maquette courante est prioritaire, puis les autres maquettes sont traitées. Revit peut être occupé pendant la préparation."/>
-                    <TextBlock x:Name="PreparationStatusText" TextWrapping="Wrap" VerticalAlignment="Center" Foreground="{DynamicResource Text.Secondary}" Margin="0,6,8,0"/>
-                    <TextBlock x:Name="RestoreAvailabilityText" TextWrapping="Wrap" VerticalAlignment="Center" Foreground="{DynamicResource Text.Secondary}" Margin="0,6,0,0"/>
                 </WrapPanel>
             </Grid>
         </Border>
@@ -447,14 +442,11 @@
                                                            MaxWidth="142"
                                                            MaxHeight="142"
                                                            Visibility="{Binding ImageVisibility}"/>
-                                                    <TextBlock Text="{Binding PreviewPlaceholder}"
+                                                    <TextBlock Text="{Binding VisualInitials}"
                                                                Foreground="{DynamicResource Text.Primary}"
-                                                               FontSize="14"
-                                                               FontWeight="Normal"
-                                                               Opacity="0.65"
-                                                               Margin="12,38,12,12"
-                                                               TextWrapping="Wrap"
-                                                               TextAlignment="Center"
+                                                               FontSize="34"
+                                                               FontWeight="Bold"
+                                                               Opacity="0.38"
                                                                HorizontalAlignment="Center"
                                                                VerticalAlignment="Center"
                                                                Visibility="{Binding InitialsVisibility}"/>
@@ -608,7 +600,6 @@
                     <Button x:Name="ClusterVisualizeButton" Content="Visualiser sélection" Width="160" Style="{StaticResource HistoryButton}" Click="ClusterVisualizeButton_Click"/>
                     <Button x:Name="ClusterRestoreButton" Content="Restaurer sélection" Width="160" Style="{StaticResource HistoryButton}" Click="ClusterRestoreButton_Click"/>
                     <Button x:Name="ClusterFocusButton" Content="Focus sélection" Width="140" Style="{StaticResource HistoryButton}" Click="ClusterFocusButton_Click"/>
-                    <TextBlock x:Name="ClusterAvailabilityText" TextWrapping="Wrap" VerticalAlignment="Center" Foreground="{DynamicResource Text.Secondary}" Margin="0,6,0,0"/>
                 </WrapPanel>
             </Grid>
         </Border>

@@ -420,7 +420,7 @@ namespace BIMaestro.Tutorials
             }
             Analyse.ElementHistoryTracker.FlushPendingForHistory();
             Analyse.ElementHistoryTracker.ScheduleDeferredPrime(doc);
-            Analyse.ElementHistoryTracker.PrimeExerciseElements(doc, toRemove.Concat(new[] { witness.Id }));
+            Analyse.ElementHistoryTracker.CaptureSelectedElementDetails(doc, toRemove.Concat(new[] { witness.Id }).ToList());
             if (chairCount.AsInteger() != 4)
                 throw new InvalidOperationException("Le mobilier témoin doit avoir 4 chaises avant de préparer son historique.");
             using (var tx = new Transaction(doc, "BIMaestro - Exercice historique : supprimer le mobilier"))
@@ -1356,7 +1356,7 @@ namespace BIMaestro.Tutorials
                 historyWindow.Show(); historyWindow.Activate();
                 if (confirmed)
                 {
-                    if (detailed && historyWindow is Analyse.ElementHistoryWindow history) history.ResetTutorialDeletedMeshMode();
+                    if (detailed && historyWindow is Analyse.ElementHistoryWindow) Analyse.ElementHistoryTracker.CaptureDetailedDeletedMesh = false;
                     ReportAction(historyWindow, observedAction);
                 }
             };
@@ -1890,7 +1890,7 @@ namespace BIMaestro.Tutorials
             {
                 if (_closed) return;
                 _closed = true;
-                if (TourId == "history" && _window is Analyse.ElementHistoryWindow history) history.ResetTutorialDeletedMeshMode();
+                if (TourId == "history" && _window is Analyse.ElementHistoryWindow) Analyse.ElementHistoryTracker.CaptureDetailedDeletedMesh = false;
                 _favoriteHighlightTimer?.Stop(); _favoriteHighlightTimer = null;
                 _window.Loaded -= OnLoaded;
                 _detachAction?.Invoke();

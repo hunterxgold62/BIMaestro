@@ -265,6 +265,7 @@ namespace Couleur
         private static FrameworkElement _bimButton;
         private static List<Border> _bimBorders;
         private static DispatcherTimer _bimWatcher;
+        private static Brush _bimLastTarget;
 
         private static readonly SolidColorBrush _pastelBrush = new SolidColorBrush(Color.FromRgb(242, 255, 242));
         private static readonly SolidColorBrush _whiteBrush = Brushes.White;
@@ -331,9 +332,11 @@ namespace Couleur
 
 
                     // timer WPF sur le même thread UI
-                    _bimWatcher = new DispatcherTimer(DispatcherPriority.Render)
+                    // Background + 250 ms : ne pas concurrencer le rendu du ruban Revit.
+                    _bimLastTarget = null;
+                    _bimWatcher = new DispatcherTimer(DispatcherPriority.Background)
                     {
-                        Interval = TimeSpan.FromMilliseconds(100)
+                        Interval = TimeSpan.FromMilliseconds(250)
                     };
                     _bimWatcher.Tick += (_, __) => UpdateBIMaestroBackground();
                     _bimWatcher.Start();
@@ -362,6 +365,10 @@ namespace Couleur
             else
                 target = _pastelBrush;
 
+            // Rien n'a changé : on évite de reparcourir l'arbre visuel à chaque tick.
+            if (ReferenceEquals(target, _bimLastTarget)) return;
+            _bimLastTarget = target;
+
             foreach (var b in _bimBorders)
                 BimValues.Set(b, Border.BackgroundProperty, target);
             ColorTextBlocks(_bimButton, Brushes.Black, BimValues);
@@ -379,6 +386,7 @@ namespace Couleur
             {
                 _bimWatcher.Stop();
                 _bimWatcher = null;
+                _bimLastTarget = null;
             }
             BimValues.Restore();
             _bimButton = null;

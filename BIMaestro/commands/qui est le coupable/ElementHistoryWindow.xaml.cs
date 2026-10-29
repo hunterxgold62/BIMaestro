@@ -1,4 +1,4 @@
-using Autodesk.Revit.DB;
+﻿using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -24,9 +24,9 @@ namespace Analyse
         private const string MoveOldPreviewPrefix = PreviewPrefix + "MoveOld_";
         private const string MoveNewPreviewPrefix = PreviewPrefix + "MoveNew_";
         private const string MoveArrowPreviewPrefix = PreviewPrefix + "MoveArrow_";
-        private const int MaxVisibleHistoryEvents = ElementHistoryTracker.DefaultHistoryEventLimit;
-        private const int MaxLoadedHistoryEvents = ElementHistoryTracker.DefaultHistoryEventLimit;
-        private const int VirtualizedCardsThreshold = 2000;
+        private const int MaxVisibleHistoryEvents = 2000;
+        private const int MaxLoadedHistoryEvents = 2000;
+        private const int MaxActionSearchHistoryEvents = 10000;
 
         private sealed class RowVm
         {
@@ -53,7 +53,6 @@ namespace Analyse
             public string ClusterBadgeText { get; set; }
             public string ImportanceBadgeText { get; set; }
             public string VisualInitials { get; set; }
-            public string PreviewPlaceholder => UiLanguage.T("Aperçu non enregistré", "No preview recorded");
             public string TileTitle { get; set; }
             public string TileSubtitle { get; set; }
             public string TileCountText { get; set; }
@@ -113,15 +112,12 @@ namespace Analyse
             public bool HasSelection => ElementId > 0 || !string.IsNullOrWhiteSpace(ElementUniqueId);
         }
 
-        private enum UiRequestType { None, Focus, VisualizeEvents, CleanPreviews, RestoreParameters, RestoreDeleted, CaptureSelectedDetails, PreparePending }
+        private enum UiRequestType { None, Focus, VisualizeEvents, CleanPreviews, RestoreParameters, RestoreDeleted, CaptureSelectedDetails }
 
         private sealed class UiRequest
         {
             public UiRequestType Type { get; set; }
             public List<ElementHistoryEvent> Events { get; set; } = new List<ElementHistoryEvent>();
-            public List<ElementHistoryEvent> PreparationEvents { get; set; }
-            public List<HistoryRestoreRequest> RestoreRequests { get; set; }
-            public List<string> RestoreReadWarnings { get; set; } = new List<string>();
             public ElementHistoryEvent Event { get; set; }
             public int? FocusElementId { get; set; }
             public List<int> FocusElementIds { get; set; } = new List<int>();
@@ -146,21 +142,6 @@ namespace Analyse
 
                 try
                 {
-                    if (req.Type == UiRequestType.PreparePending)
-                    {
-                        try
-                        {
-                            ElementHistoryTracker.FlushPendingForHistory();
-                            ElementHistoryDurableBridge.RequestPreparation(ElementHistoryTracker.GetDocumentKeyForHistory(_owner._doc), req.PreparationEvents);
-                        }
-                        finally
-                        {
-                            _owner._preparationStartQueued = false;
-                            _owner.UpdatePreparationStatus();
-                        }
-                        // Return to WPF before the history scheduler starts its next API step.
-                        return;
-                    }
                     if (req.Type == UiRequestType.Focus)
                     {
                         _owner.ExecuteFocus(req.FocusElementIds.Count > 0
@@ -181,7 +162,7 @@ namespace Analyse
 
                     if (req.Type == UiRequestType.RestoreDeleted)
                     {
-                        _owner.ExecuteRestoreDeleted(req.Events, req.RestoreRequests, req.RestoreReadWarnings);
+                        _owner.ExecuteRestoreDeleted(req.Events);
                         return;
                     }
 
@@ -201,15 +182,7 @@ namespace Analyse
                     if (req.Type == UiRequestType.RestoreParameters)
                     {
                         var result = _owner.ExecuteRestoreParameters(req.Event);
-                        if (result.Applied > 0 && BIMaestro.Tutorials.DemoTourService.IsActive(_owner)) {
-                            var witness = _owner._doc.GetElement(req.Event.UniqueId);
-                            if (witness != null) { _owner._uidoc.Selection.SetElementIds(new[] { witness.Id }); _owner._uidoc.ShowElements(witness.Id); _owner._uidoc.RefreshActiveView(); }
-                        }
-                        // Read the document in the Revit external-event context, before dispatching UI feedback.
-                        bool exerciseRestored = BIMaestro.Tutorials.DemoTourService.IsActive(_owner) &&
-                            BIMaestro.Tutorials.DemoHistoryScene.HasRestoredFurniture(_owner._doc) &&
-                            BIMaestro.Tutorials.DemoHistoryScene.HasRestoredParameters(_owner._doc);
-                        _owner.Dispatcher.BeginInvoke(new Action(() => _owner.ShowRestoreResult(result, exerciseRestored)));
+                        _owner.Dispatcher.BeginInvoke(new Action(() => _owner.ShowRestoreResult(result)));
                     }
                 }
                 catch
@@ -229,11 +202,6 @@ namespace Analyse
         private bool _detailsVisible;
         private bool _syncingSelection;
         private bool _restoringDeleted;
-        private int _readinessRefreshQueued;
-        private bool _preparationStartQueued;
-        private int _classificationRevision = -1;
-        private readonly System.Windows.Threading.DispatcherTimer _readinessTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
-        private bool _isClosed;
         private int _loadVersion;
         private string _scopeFilter = "model";
         private bool _showAllLoadedEvents;
@@ -241,10 +209,6 @@ namespace Analyse
         private bool _extendedActionLoadInProgress;
         private bool _loadedHistoryReachedLimit;
         private int _loadedHistoryEventLimit = MaxLoadedHistoryEvents;
-        private DateTime? _loadedHistoryStartDate;
-        private DateTime? _loadedHistoryEndDate;
-        private ItemsPanelTemplate _mosaicItemsPanel;
-        private bool _cardsAreVirtualized;
         private static string AllActionsLabel => UiLanguage.T("Toutes", "All");
         private static string AllUsersLabel => UiLanguage.T("Tous", "All");
 
@@ -257,12 +221,6 @@ namespace Analyse
         {
             ThemeManager.EnsureThemeLoaded();
             InitializeComponent();
-            _mosaicItemsPanel = VisualCardsList.ItemsPanel;
-            HistoryGrid.EnableRowVirtualization = true;
-            HistoryGrid.EnableColumnVirtualization = true;
-            VirtualizingPanel.SetIsVirtualizing(HistoryGrid, true);
-            VirtualizingPanel.SetVirtualizationMode(HistoryGrid, VirtualizationMode.Recycling);
-            ScrollViewer.SetCanContentScroll(HistoryGrid, true);
             _uidoc = uidoc;
             _doc = uidoc?.Document;
             _selectedContext = BuildSelectedContext(_doc, selected);
@@ -270,10 +228,6 @@ namespace Analyse
             _scopeFilter = _selectedContext?.HasSelection == true ? "element" : "model";
             _requestHandler = new UiRequestHandler(this);
             _externalEvent = ExternalEvent.Create(_requestHandler);
-            ElementHistoryDurableBridge.ReadyChanged += OnRestorationReadyChanged;
-            _readinessTimer.Tick += (sender, args) => { if (!_isClosed && IsVisible) UpdateVisualizeButtonLabel(); };
-            _readinessTimer.Start();
-            ClusterListBox.SelectionChanged += (sender, args) => UpdateVisualizeButtonLabel();
             ConfigureScopePanel();
             ConfigureDeletedMeshMode();
             if (HistoryStartDatePicker != null)
@@ -311,11 +265,6 @@ namespace Analyse
             return LoadWindowHistory(modelKeys, uniqueIds, MaxLoadedHistoryEvents);
         }
 
-        private void TutorialButton_Click(object sender, RoutedEventArgs e)
-        {
-            BIMaestro.Tutorials.DemoTourService.StartInWindow("history", this);
-        }
-
         private void HelpButton_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -330,11 +279,6 @@ namespace Analyse
 
         protected override void OnClosed(EventArgs e)
         {
-            _isClosed = true;
-            _preparationStartQueued = false;
-            if (_pendingRequest?.Type == UiRequestType.PreparePending) _pendingRequest = null;
-            _readinessTimer.Stop();
-            ElementHistoryDurableBridge.ReadyChanged -= OnRestorationReadyChanged;
             _loadVersion++;
             try { _externalEvent?.Dispose(); } catch { }
             base.OnClosed(e);
@@ -343,7 +287,6 @@ namespace Analyse
         private void BeginProgressiveLoad(List<string> modelKeys, List<string> uniqueIds, string defaultAction)
         {
             var version = ++_loadVersion;
-            _extendedActionLoadInProgress = false;
             Bind(new List<ElementHistoryEvent>(), defaultAction, false, false);
             ResultText.Text = UiLanguage.T("Chargement des évènements...", "Loading events...");
 
@@ -402,9 +345,7 @@ namespace Analyse
         {
             var modelKeys = ElementHistoryTracker.GetDocumentKeysForHistory(_doc);
             var version = ++_loadVersion;
-            _extendedActionLoadInProgress = true;
-            if (HistoryStartDatePicker != null) HistoryStartDatePicker.SelectedDate = localStartDate.Date;
-            if (HistoryEndDatePicker != null) HistoryEndDatePicker.SelectedDate = localEndDate.Date;
+            _extendedActionLoadInProgress = false;
             Bind(new List<ElementHistoryEvent>(), null, false, true);
             var periodText = localStartDate.Date == localEndDate.Date
                 ? localStartDate.Date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)
@@ -422,7 +363,6 @@ namespace Analyse
                     Dispatcher.BeginInvoke(new Action(() =>
                     {
                         if (version != _loadVersion) return;
-                        _extendedActionLoadInProgress = false;
                         Bind(events, null, false, true);
                     }));
                 }
@@ -431,7 +371,6 @@ namespace Analyse
                     Dispatcher.BeginInvoke(new Action(() =>
                     {
                         if (version != _loadVersion) return;
-                        _extendedActionLoadInProgress = false;
                         if (ResultText != null)
                             ResultText.Text = UiLanguage.T("Historique de la période partiellement chargé.", "The period's history was partially loaded.");
                     }));
@@ -512,14 +451,10 @@ namespace Analyse
 
         private void Bind(List<ElementHistoryEvent> eventsData, string defaultAction = null, bool preserveFilters = false, bool showAllLoadedEvents = false, int maxLoadedEvents = MaxLoadedHistoryEvents)
         {
-            _loadedHistoryEventLimit = showAllLoadedEvents ? int.MaxValue : Math.Max(1, maxLoadedEvents);
-            _loadedHistoryReachedLimit = !showAllLoadedEvents && (eventsData?.Count ?? 0) >= _loadedHistoryEventLimit;
-            _loadedHistoryStartDate = eventsData?.Count > 0 ? eventsData.Min(ev => ev.Ts).ToLocalTime().Date : (DateTime?)null;
-            _loadedHistoryEndDate = eventsData?.Count > 0 ? eventsData.Max(ev => ev.Ts).ToLocalTime().Date : (DateTime?)null;
-            eventsData = (eventsData ?? new List<ElementHistoryEvent>())
-                .Where(item => !BIMaestro.Tutorials.DemoHistoryScene.IsNestedExerciseDeletion(_doc, item)).ToList();
             _isBinding = true;
             _showAllLoadedEvents = showAllLoadedEvents;
+            _loadedHistoryEventLimit = showAllLoadedEvents ? int.MaxValue : Math.Max(1, maxLoadedEvents);
+            _loadedHistoryReachedLimit = !showAllLoadedEvents && (eventsData?.Count ?? 0) >= _loadedHistoryEventLimit;
             var previousAction = preserveFilters ? ActionFilterCombo?.SelectedItem as string : null;
             var previousUser = preserveFilters ? UserFilterCombo?.SelectedItem as string : null;
             var previousSearch = preserveFilters ? SearchBox?.Text : null;
@@ -640,20 +575,12 @@ namespace Analyse
             row.VisualSubtitle = BuildVisualSubtitle(row, events);
             row.StoryText = BuildStoryText(row, events);
             row.EvidenceText = BuildEvidenceText(row);
-            var deletionBatch = events.Select(ev => ev.DeletionAudit)
-                .FirstOrDefault(audit => audit?.BatchDeletedElementCount > 0);
-            if (deletionBatch != null)
-                row.EvidenceText = UiLanguage.T(
-                    $"Lot : {deletionBatch.BatchDeletedElementCount} suppressions détectées, {deletionBatch.BatchWithSnapshotCount} éléments capturés avant suppression.",
-                    $"Batch: {deletionBatch.BatchDeletedElementCount} deletions detected, {deletionBatch.BatchWithSnapshotCount} elements captured before deletion.");
             row.VisualCueText = GetVisualCueText(row.Action);
             row.PreviewItems = BuildPreviewItems(events);
         }
 
         private static string BuildTileTitle(RowVm row, List<ElementHistoryEvent> events)
         {
-            if (row.IsCluster && string.Equals(row.Action, "delete", StringComparison.OrdinalIgnoreCase))
-                return UiLanguage.T($"{row.EventCount} éléments supprimés", $"{row.EventCount} deleted elements");
             if (row.IsCluster && string.Equals(row.Action, "move", StringComparison.OrdinalIgnoreCase))
                 return UiLanguage.T("Déplacements", "Moves");
 
@@ -681,14 +608,6 @@ namespace Analyse
 
             if (row.IsCluster)
             {
-                if (string.Equals(row.Action, "delete", StringComparison.OrdinalIgnoreCase))
-                {
-                    var categories = events.Select(e => CleanCellText(e.Category))
-                        .Where(value => !string.IsNullOrWhiteSpace(value))
-                        .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-                    return string.Join(" · ", categories.Take(3))
-                        + (categories.Count > 3 ? UiLanguage.T($" · +{categories.Count - 3} catégories", $" · +{categories.Count - 3} categories") : "");
-                }
                 var values = new[]
                     {
                         SummarizeText(events.Select(e => CleanCellText(e.Category)), UiLanguage.T("catégories", "categories")),
@@ -1284,8 +1203,6 @@ namespace Analyse
 
         private static string GetClusterKey(ElementHistoryEvent e)
         {
-            if (e.Action == "delete" && !string.IsNullOrWhiteSpace(e.DeletionAudit?.BatchId))
-                return "delete|" + e.ModelKey + "|" + e.DeletionAudit.BatchId;
             var ticks = e.Ts.ToUniversalTime().Ticks / TimeSpan.FromSeconds(5).Ticks;
             if (string.Equals(e.Action, "create", StringComparison.OrdinalIgnoreCase))
             {
@@ -1466,16 +1383,6 @@ namespace Analyse
 
         private void UpdateVisualizeButtonLabel()
         {
-            var revision = ElementHistoryDurableStore.ClassificationRevision;
-            if (revision != _classificationRevision && !_isBinding)
-            {
-                _classificationRevision = revision;
-                var before = _rows.SelectMany(GetRowEvents).ToList();
-                var categoriesBefore = before.Select(e => e.Category).ToList();
-                var visible = before.Where(ElementHistoryTracker.IsDisplayableHistoryEvent).ToList();
-                if (visible.Count != before.Count || !categoriesBefore.SequenceEqual(before.Select(e => e.Category))) { _rows = BuildRows(visible); ApplyFilters(); }
-            }
-            UpdatePreparationStatus();
             var row = GetPrimarySelectedRow();
             var hasRow = row?.Source != null;
 
@@ -1493,170 +1400,14 @@ namespace Analyse
             UpdateRestoreButtonLabel(row);
             if (RestoreDeletedButton != null)
             {
-                var selectedDeletions = GetSelectedDeletionEvents();
-                UpdateRestorationAvailability(RestoreDeletedButton, selectedDeletions, false);
-                SelectionIsReady(selectedDeletions, out var summary);
-                RestoreAvailabilityText.Text = summary;
+                RestoreDeletedButton.Content = UiLanguage.T("Restaurer les éléments", "Restore elements");
+                RestoreDeletedButton.IsEnabled = !_restoringDeleted && GetSelectedDeletionEvents().Count > 0;
             }
             if (ClusterRestoreButton != null)
             {
-                var clusterEvents = GetSelectedClusterItems().Select(item => item.Source).ToList();
-                UpdateRestorationAvailability(ClusterRestoreButton, clusterEvents, true);
-                SelectionIsReady(clusterEvents, out var summary);
-                ClusterAvailabilityText.Text = summary;
+                ClusterRestoreButton.Content = UiLanguage.T("Restaurer sélection", "Restore selection");
+                ClusterRestoreButton.IsEnabled = !_restoringDeleted;
             }
-        }
-
-        private void OnRestorationReadyChanged()
-        {
-            if (_isClosed || System.Threading.Interlocked.Exchange(ref _readinessRefreshQueued, 1) != 0) return;
-            try
-            {
-                Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() =>
-                {
-                    System.Threading.Interlocked.Exchange(ref _readinessRefreshQueued, 0);
-                    if (!_isClosed) UpdateVisualizeButtonLabel();
-                }));
-            }
-            catch { System.Threading.Interlocked.Exchange(ref _readinessRefreshQueued, 0); }
-        }
-
-        private static List<ElementHistoryEvent> RestorableDeletionEvents(IEnumerable<ElementHistoryEvent> events) =>
-            (events ?? Enumerable.Empty<ElementHistoryEvent>()).Where(IsDeletion)
-                .Where(ElementHistoryTracker.IsDisplayableHistoryEvent)
-                .Where(ev => !ElementHistoryRestoration.IsCalorifuge(ev.Category, ev.Family + " " + ev.TypeName)).ToList();
-
-        private static bool SelectionIsReady(IEnumerable<ElementHistoryEvent> events, out string reason)
-        {
-            var items = RestorableDeletionEvents(events);
-            if (items.Count == 0)
-            { reason = UiLanguage.T("Sélectionnez une suppression à restaurer.", "Select a deletion to restore."); return false; }
-            var states = items.Select(ElementHistoryDurableBridge.GetReadiness).ToList();
-            int excluded = states.Count(state => state.Excluded);
-            states = states.Where(state => !state.Excluded).ToList();
-            if (states.Count == 0)
-            { reason = UiLanguage.T($"{excluded} dépendance(s) exclue(s) ; aucun élément à restaurer.", $"{excluded} excluded dependency record(s); no elements to restore."); return false; }
-            int ready = states.Count(state => state.State == ElementHistoryDurableBridge.ReadinessState.Ready);
-            int unavailable = states.Count(state => state.State == ElementHistoryDurableBridge.ReadinessState.Unavailable);
-            int preparing = states.Count(state => state.State == ElementHistoryDurableBridge.ReadinessState.Preparing);
-            reason = UiLanguage.T($"{ready}/{states.Count} prêt(s)", $"{ready}/{states.Count} ready");
-            if (preparing > 0)
-                reason += UiLanguage.T($" ; {preparing} en préparation", $"; {preparing} preparing");
-            if (unavailable > 0)
-                reason += UiLanguage.T($" ; {unavailable} indisponible(s).",
-                    $"; {unavailable} unavailable.");
-            if (excluded > 0)
-                reason += UiLanguage.T($" ; {excluded} dépendance(s) exclue(s)", $"; {excluded} excluded dependency record(s)");
-            return ready == states.Count;
-        }
-
-        private void PreparePendingButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (ElementHistoryDurableBridge.IsManualPreparing || _preparationStartQueued)
-            {
-                _preparationStartQueued = false;
-                if (_pendingRequest?.Type == UiRequestType.PreparePending) _pendingRequest = null;
-                ElementHistoryDurableBridge.CancelPreparation();
-                UpdatePreparationStatus();
-                return;
-            }
-            var selectedEvents = GetSelectedDeletionEvents();
-            var hasSelection = HasHistorySelection();
-            if (hasSelection && selectedEvents.Count == 0) return;
-            var preparationEvents = hasSelection ? selectedEvents : null;
-            _preparationStartQueued = true;
-            UpdatePreparationStatus();
-            // ContextIdle runs after input/render work, so feedback is visible before Revit work.
-            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ContextIdle, new Action(() =>
-            {
-                if (_isClosed || !_preparationStartQueued) return;
-                if (RaiseRequest(new UiRequest { Type = UiRequestType.PreparePending, PreparationEvents = preparationEvents })) return;
-                _preparationStartQueued = false;
-                UpdatePreparationStatus();
-                MessageBox.Show(this, UiLanguage.T("Revit est occupé. Réessayez lorsque la commande en cours est terminée.", "Revit is busy. Try again after the current command finishes."));
-            }));
-        }
-
-        private void UpdatePreparationStatus()
-        {
-            if (PreparationStatusText == null || PreparePendingButton == null) return;
-            var queue = ElementHistoryDurableBridge.GetStatus();
-            var cache = ElementHistoryBridgeCache.Status;
-            var manual = ElementHistoryDurableBridge.IsManualPreparing;
-            var selectedEvents = GetSelectedDeletionEvents();
-            var hasSelection = HasHistorySelection();
-            PreparePendingButton.Content = manual || _preparationStartQueued ? UiLanguage.T("Arrêter la préparation", "Stop preparation")
-                : UiLanguage.T("Charger les éléments en attente", "Load pending elements");
-            PreparePendingButton.IsEnabled = manual || _preparationStartQueued || !hasSelection || selectedEvents.Count > 0;
-            PreparePendingButton.ToolTip = manual || _preparationStartQueued
-                ? UiLanguage.T("Arrête la préparation à la fin de l’étape en cours.", "Stops preparation after the current step.")
-                : hasSelection
-                    ? selectedEvents.Count > 0
-                        ? UiLanguage.T("Prépare uniquement les suppressions sélectionnées. L’avancement s’affiche dans cette fenêtre.", "Prepares only the selected deletions. Progress appears in this window.")
-                        : UiLanguage.T("Sélectionnez une suppression à préparer.", "Select a deletion to prepare.")
-                    : UiLanguage.T("Aucune sélection : prépare tous les éléments en attente de cette maquette. L’avancement s’affiche dans cette fenêtre.", "No selection: prepares all pending elements in this model. Progress appears in this window.");
-            System.Windows.Controls.ToolTipService.SetShowOnDisabled(PreparePendingButton, true);
-            var selected = RestorableDeletionEvents(selectedEvents);
-            var states = selected.Select(ElementHistoryDurableBridge.GetReadiness).ToList();
-            var excluded = states.Count(s => s.Excluded);
-            states = states.Where(s => !s.Excluded).ToList();
-            var ready = states.Count(s => s.State == ElementHistoryDurableBridge.ReadinessState.Ready);
-            var waiting = states.Count(s => s.State == ElementHistoryDurableBridge.ReadinessState.Preparing);
-            var unavailable = states.Count(s => s.State == ElementHistoryDurableBridge.ReadinessState.Unavailable);
-            const double gib = 1024d * 1024 * 1024;
-            var progressPrefix = _preparationStartQueued
-                ? UiLanguage.T("Préparation demandée… ", "Preparation requested… ")
-                : manual ? (string.IsNullOrWhiteSpace(queue.ProgressLabel)
-                    ? UiLanguage.T("Préparation en cours…", "Preparing…") : queue.ProgressLabel)
-                    + (queue.ProgressTotal > 0 ? UiLanguage.T(
-                        $" {Math.Max(0, Math.Min(queue.ProgressCompleted, queue.ProgressTotal))}/{queue.ProgressTotal} élément(s)",
-                        $" {Math.Max(0, Math.Min(queue.ProgressCompleted, queue.ProgressTotal))}/{queue.ProgressTotal} element(s)") : "")
-                    + UiLanguage.T($" (étape : {FormatPreparationDuration(queue.ProgressElapsedSeconds)} ; total : {FormatPreparationDuration(queue.PreparationElapsedSeconds)}). ",
-                        $" (step: {FormatPreparationDuration(queue.ProgressElapsedSeconds)}; total: {FormatPreparationDuration(queue.PreparationElapsedSeconds)}). ")
-                    : queue.PreparationElapsedSeconds > 0 ? UiLanguage.T(
-                        $"Dernière préparation : {FormatPreparationDuration(queue.PreparationElapsedSeconds)}. ",
-                        $"Last preparation: {FormatPreparationDuration(queue.PreparationElapsedSeconds)}. ") : "";
-            PreparationStatusText.Text = progressPrefix + (selected.Count == 0 ? "" : UiLanguage.T(
-                $"Sélection : {ready} prêt(s), {waiting} en attente, {unavailable} indisponible(s). ",
-                $"Selection: {ready} ready, {waiting} pending, {unavailable} unavailable. "))
-                + (excluded > 0 ? UiLanguage.T($"{excluded} dépendance(s) exclue(s). ", $"{excluded} excluded dependency record(s). ") : "")
-                + UiLanguage.T($"À préparer : {queue.PendingJobs} action(s) dans les historiques. Échecs d’archive, tous historiques : {queue.FailedJobs}. ",
-                    $"Pending: {queue.PendingJobs} history action(s). Archive failures across all history: {queue.FailedJobs}. ")
-                + UiLanguage.T($"Copies présentes sur disque : {cache.Copies}. Cache : {cache.Bytes / gib:0.0} / {cache.LimitBytes / gib:0.0} Go ; libre : {cache.FreeBytes / gib:0.0} Go.",
-                    $"Copies present on disk: {cache.Copies}. Cache: {cache.Bytes / gib:0.0} / {cache.LimitBytes / gib:0.0} GiB; free: {cache.FreeBytes / gib:0.0} GiB.")
-                + (cache.EarliestExpiryUtc.HasValue ? UiLanguage.T($" Première expiration : {cache.EarliestExpiryUtc.Value.ToLocalTime():dd/MM/yyyy HH:mm}.",
-                    $" First expiry: {cache.EarliestExpiryUtc.Value.ToLocalTime():yyyy-MM-dd HH:mm}.") : "")
-                + (cache.Issue == null ? "" : "\n" + cache.Issue);
-            PreparationStatusText.ToolTip = string.Join("\n", queue.Failures.Take(12));
-        }
-
-        private static string FormatPreparationDuration(double seconds)
-        {
-            var elapsed = TimeSpan.FromSeconds(Math.Max(0, seconds));
-            return elapsed.TotalMinutes < 1 ? $"{(int)elapsed.TotalSeconds} s"
-                : $"{(int)elapsed.TotalMinutes} min {elapsed.Seconds:00} s";
-        }
-
-        private void UpdateRestorationAvailability(Button button, IEnumerable<ElementHistoryEvent> events, bool cluster)
-        {
-            var items = RestorableDeletionEvents(events);
-            bool ready = SelectionIsReady(items, out var reason);
-            var states = items.Select(ElementHistoryDurableBridge.GetReadiness).Where(state => !state.Excluded).ToList();
-            int readyCount = states.Count(state => state.State == ElementHistoryDurableBridge.ReadinessState.Ready);
-            bool partial = readyCount > 0 && !ready;
-            ready |= partial;
-            if (partial) reason += UiLanguage.T(" Seuls les éléments prêts seront restaurés.", " Only ready elements will be restored.");
-            var failure = states.FirstOrDefault(state => state.State == ElementHistoryDurableBridge.ReadinessState.Unavailable);
-            if (failure != null) reason += "\n" + failure.Reason;
-            button.IsEnabled = !_restoringDeleted && ready;
-            button.Content = _restoringDeleted ? UiLanguage.T("Restauration…", "Restoring…")
-                : partial ? UiLanguage.T($"Restaurer les {readyCount} élément(s) prêts", $"Restore {readyCount} ready element(s)")
-                : ready ? UiLanguage.T(cluster ? "Restaurer sélection" : "Restaurer les éléments", cluster ? "Restore selection" : "Restore elements")
-                : states.Count == 0 && items.Count > 0 ? UiLanguage.T("Aucun élément à restaurer", "No elements to restore")
-                : failure != null && states.All(state => state.State == ElementHistoryDurableBridge.ReadinessState.Unavailable) ? UiLanguage.T("Restauration indisponible", "Restoration unavailable")
-                : UiLanguage.T("Restauration en attente", "Restoration pending");
-            button.ToolTip = reason;
-            System.Windows.Controls.ToolTipService.SetShowOnDisabled(button, true);
         }
 
         private static string GetPrimaryActionText(RowVm row)
@@ -1698,30 +1449,52 @@ namespace Analyse
 
         private void UpdateExtendedActionSearchOffer()
         {
+            var action = ActionFilterCombo?.SelectedItem as string;
             var canExtend = !_showAllLoadedEvents
                 && !_extendedActionLoadInProgress
                 && _loadedHistoryReachedLimit
-                && _loadedHistoryStartDate.HasValue
-                && _loadedHistoryEndDate.HasValue;
+                && _loadedHistoryEventLimit < MaxActionSearchHistoryEvents
+                && !string.IsNullOrWhiteSpace(action)
+                && !string.Equals(action, AllActionsLabel, StringComparison.OrdinalIgnoreCase);
 
             if (ExtendActionSearchButton != null)
-            {
-                ExtendActionSearchButton.Content = UiLanguage.T("Compléter la période", "Load full period");
-                ExtendActionSearchButton.Width = 165;
-                ExtendActionSearchButton.ToolTip = UiLanguage.T(
-                    "Charger tous les évènements des dates déjà affichées, sans limite de nombre. Utilise Charger période pour d’autres dates.",
-                    "Load every event on the dates already displayed, with no count limit. Use Load period for other dates.");
                 ExtendActionSearchButton.Visibility = canExtend ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
-            }
         }
 
         private void ExtendActionSearchButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_extendedActionLoadInProgress || _showAllLoadedEvents || !_loadedHistoryReachedLimit
-                || !_loadedHistoryStartDate.HasValue || !_loadedHistoryEndDate.HasValue)
+            if (_extendedActionLoadInProgress || _loadedHistoryEventLimit >= MaxActionSearchHistoryEvents)
                 return;
 
-            BeginRangeLoad(_loadedHistoryStartDate.Value, _loadedHistoryEndDate.Value);
+            var modelKeys = ElementHistoryTracker.GetDocumentKeysForHistory(_doc);
+            var version = ++_loadVersion;
+            _extendedActionLoadInProgress = true;
+            UpdateExtendedActionSearchOffer();
+            ResultText.Text = UiLanguage.T("Recherche étendue dans 10 000 évènements...", "Extended search across 10,000 events...");
+
+            Task.Run(() =>
+            {
+                try
+                {
+                    var events = LoadWindowHistory(modelKeys, _initialUniqueIds, MaxActionSearchHistoryEvents);
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        _extendedActionLoadInProgress = false;
+                        if (version != _loadVersion) return;
+                        Bind(events, null, true, false, MaxActionSearchHistoryEvents);
+                    }));
+                }
+                catch
+                {
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        _extendedActionLoadInProgress = false;
+                        if (version != _loadVersion) return;
+                        UpdateExtendedActionSearchOffer();
+                        ResultText.Text = UiLanguage.T("Recherche étendue partiellement chargée.", "Extended search partially loaded.");
+                    }));
+                }
+            });
         }
 
         private void UserFilterCombo_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
@@ -1763,13 +1536,6 @@ namespace Analyse
                 SimpleMeshModeRadio.IsChecked = !detailed;
             if (DetailedMeshModeRadio != null)
                 DetailedMeshModeRadio.IsChecked = detailed;
-        }
-
-        internal void ResetTutorialDeletedMeshMode()
-        {
-            if (_pendingRequest?.Type == UiRequestType.CaptureSelectedDetails) _pendingRequest = null;
-            ElementHistoryTracker.CaptureDetailedDeletedMesh = false;
-            if (!_isClosed) ConfigureDeletedMeshMode();
         }
 
         private void ScopeFilter_Checked(object sender, RoutedEventArgs e)
@@ -1903,11 +1669,12 @@ namespace Analyse
             }
 
             var matching = rows.ToList();
+            var hasActionFilter = !string.Equals(action, AllActionsLabel, StringComparison.OrdinalIgnoreCase);
+            var visibleLimit = hasActionFilter ? MaxActionSearchHistoryEvents : MaxVisibleHistoryEvents;
             var filtered = _showAllLoadedEvents
                 ? matching.ToList()
-                : matching.Take(MaxVisibleHistoryEvents).ToList();
+                : matching.Take(visibleLimit).ToList();
             HistoryGrid.ItemsSource = filtered;
-            ConfigureCardVirtualization(filtered.Count);
             VisualCardsList.ItemsSource = BuildTimelineItems(filtered);
             if (filtered.Count > 0 && GetPrimarySelectedRow() == null)
             {
@@ -1918,23 +1685,6 @@ namespace Analyse
             UpdateVisualizeButtonLabel();
             UpdateDetailsLayout();
             UpdateDetails();
-        }
-
-        private void ConfigureCardVirtualization(int rowCount)
-        {
-            var virtualize = rowCount > VirtualizedCardsThreshold;
-            if (virtualize == _cardsAreVirtualized) return;
-            _cardsAreVirtualized = virtualize;
-            VisualCardsList.ItemsSource = null;
-            if (virtualize)
-            {
-                var panel = new FrameworkElementFactory(typeof(VirtualizingStackPanel));
-                VisualCardsList.ItemsPanel = new ItemsPanelTemplate(panel);
-            }
-            else VisualCardsList.ItemsPanel = _mosaicItemsPanel;
-            ScrollViewer.SetCanContentScroll(VisualCardsList, virtualize);
-            VirtualizingPanel.SetIsVirtualizing(VisualCardsList, virtualize);
-            VirtualizingPanel.SetVirtualizationMode(VisualCardsList, VirtualizationMode.Recycling);
         }
 
         private bool AreFilterControlsReady()
@@ -2037,9 +1787,6 @@ namespace Analyse
                 ResultText.Text = events.Count == total
                     ? total.ToString(CultureInfo.InvariantCulture) + UiLanguage.T(" évènements affichés", " events displayed")
                     : events.Count.ToString(CultureInfo.InvariantCulture) + " / " + total.ToString(CultureInfo.InvariantCulture) + UiLanguage.T(" évènements affichés", " events displayed");
-                if (_loadedHistoryReachedLimit)
-                    ResultText.Text += UiLanguage.T(" · Historique récent limité : complète la période pour inclure tous ses évènements.",
-                        " · Recent history is limited: load the full period to include all its events.");
             }
         }
 
@@ -2123,14 +1870,6 @@ namespace Analyse
         private static bool IsDeletion(ElementHistoryEvent ev) =>
             string.Equals(ev?.Action, "delete", StringComparison.OrdinalIgnoreCase);
 
-        private bool HasHistorySelection()
-        {
-            if (HistoryTabs?.SelectedIndex == 1)
-                return HistoryGrid?.SelectedItems.Cast<RowVm>().Any(row => row != null && !row.IsTimelineSeparator) == true;
-            var row = GetPrimarySelectedRow();
-            return row != null && !row.IsTimelineSeparator;
-        }
-
         private List<ElementHistoryEvent> GetSelectedDeletionEvents()
         {
             var rows = HistoryTabs?.SelectedIndex == 1
@@ -2142,64 +1881,17 @@ namespace Analyse
 
         private static HistoryRestoreRequest ToRestoreRequest(ElementHistoryEvent ev)
         {
-            // Resolve again here: a conversion can finish after this window loaded.
-            return ElementHistoryDurableBridge.ToRequest(ev);
-        }
-
-        private static bool HasTemporaryReceipt(HistoryRecipe recipe) => recipe != null &&
-            (new[] { recipe.Native, recipe.OpeningFallback }.Any(artifact => artifact != null &&
-                (artifact.WholeModel || !string.IsNullOrWhiteSpace(artifact.File)))
-             || (recipe.ElectricalCircuits?.Any(circuit => HasTemporaryReceipt(circuit?.Recipe)) ?? false));
-
-        // Read the actual stored data again on the IO worker. Readiness is an
-        // indication for the UI, never permission to use missing/invalid data.
-        private static HistoryRestoreRequest ReadReadyRequest(ElementHistoryEvent ev)
-        {
-            var archived = ElementHistoryDurableBridge.ResolvePreparedRequest(ElementHistoryDurableBridge.EventId(ev));
-            if (ElementHistoryDurableBridge.IsReadyDirectRequest(archived))
-                return JObject.FromObject(archived).ToObject<HistoryRestoreRequest>();
-            if (ElementHistoryDurableBridge.IsReadyNativeRequest(archived))
-                return JObject.FromObject(archived).ToObject<HistoryRestoreRequest>();
-            // A valid original copy remains preferable to recreating an instance.
-            var native = ElementHistoryDurableBridge.TryGetOpeningNativeRequest(ev);
-            if (native != null) return JObject.FromObject(native).ToObject<HistoryRestoreRequest>();
-            if (ElementHistoryDurableBridge.IsReadyDirectRequest(archived))
-                return JObject.FromObject(archived).ToObject<HistoryRestoreRequest>();
-            var state = ElementHistoryDurableBridge.GetReadiness(ev);
-            var request = state.Legacy ? ElementHistoryDurableBridge.NormalizeLegacyDirectRequest(
-                ElementHistoryDurableBridge.ToRequest(ev)) : archived;
-            if (ElementHistoryDurableBridge.IsReadyDirectRequest(request))
-                return JObject.FromObject(request).ToObject<HistoryRestoreRequest>();
-            if (state.State != ElementHistoryDurableBridge.ReadinessState.Ready)
-                throw new InvalidOperationException(state.Reason);
-            if (request?.Recipe?.Native == null || request.Recipe.Native.DefinitionOnly
-                || !state.Legacy && HasTemporaryReceipt(request.Recipe))
-                throw new InvalidOperationException("Les données de restauration sont absentes ou ne contiennent pas une recette compatible.");
-            return JObject.FromObject(request).ToObject<HistoryRestoreRequest>();
-        }
-
-        private sealed class PreparedRestoreData
-        {
-            internal readonly List<ElementHistoryEvent> Events = new List<ElementHistoryEvent>();
-            internal readonly List<HistoryRestoreRequest> Requests = new List<HistoryRestoreRequest>();
-            internal readonly List<string> Warnings = new List<string>();
-        }
-        private static PreparedRestoreData ReadReadyRequests(IEnumerable<ElementHistoryEvent> events)
-        {
-            var prepared = new PreparedRestoreData();
-            foreach (var ev in events ?? Enumerable.Empty<ElementHistoryEvent>())
+            object source = null, raw = null, captureFailure = null;
+            ev.Delta?.TryGetValue("deletedUniqueId", out source);
+            ev.Delta?.TryGetValue("recipe", out raw);
+            ev.Delta?.TryGetValue("captureFailure", out captureFailure);
+            return new HistoryRestoreRequest
             {
-                try
-                {
-                    var request = ReadReadyRequest(ev);
-                    prepared.Events.Add(ev); prepared.Requests.Add(request);
-                }
-                catch (Exception ex)
-                {
-                    prepared.Warnings.Add("Élément " + ev.ElementId.ToString(CultureInfo.InvariantCulture) + " : " + ex.Message);
-                }
-            }
-            return prepared;
+                SourceUniqueId = Convert.ToString(source),
+                Label = (ev.Family + " " + ev.TypeName).Trim() + " [" + ev.ElementId + "]",
+                Recipe = ElementHistoryReconstruction.ReadRecipe(raw),
+                CaptureFailure = captureFailure == null ? null : Convert.ToString(captureFailure), Category = ev.Category
+            };
         }
 
         private void RestoreDeletedButton_Click(object sender, RoutedEventArgs e) => RequestRestoreDeleted(GetSelectedDeletionEvents());
@@ -2207,91 +1899,39 @@ namespace Analyse
         private void ClusterRestoreButton_Click(object sender, RoutedEventArgs e) =>
             RequestRestoreDeleted(GetSelectedClusterItems().Select(item => item.Source).Where(IsDeletion).ToList());
 
-        private async void RequestRestoreDeleted(List<ElementHistoryEvent> events)
+        private void RequestRestoreDeleted(List<ElementHistoryEvent> events)
         {
-            events = RestorableDeletionEvents(events);
+            events = events.Where(ev => !ElementHistoryRestoration.IsCalorifuge(ev.Category, ev.Family + " " + ev.TypeName)).ToList();
             if (events.Count == 0)
             {
                 MessageBox.Show(this, UiLanguage.T("Aucun élément à restaurer : le calorifuge est exclu.", "No elements to restore: insulation is excluded."));
                 return;
             }
             if (_restoringDeleted || events.Count == 0) return;
-            int selectedCount = events.Count(ev => !ElementHistoryDurableBridge.GetReadiness(ev).Excluded);
-            var readyEvents = events.Where(ev => ElementHistoryDurableBridge.GetReadiness(ev).State == ElementHistoryDurableBridge.ReadinessState.Ready).ToList();
-            if (readyEvents.Count == 0)
-            {
-                SelectionIsReady(events, out var blockedReason);
-                UpdateVisualizeButtonLabel(); MessageBox.Show(this, blockedReason); return;
-            }
-            events = readyEvents;
-            if (!SelectionIsReady(events, out var readinessReason))
-            { UpdateVisualizeButtonLabel(); MessageBox.Show(this, readinessReason); return; }
-            int count = events.Select(ev => ev.UniqueId ?? ev.ElementId.ToString(CultureInfo.InvariantCulture)).Distinct().Count();
+            int count = events.Select(ev => ToRestoreRequest(ev)).Select(r => string.IsNullOrEmpty(r.SourceUniqueId) ? r.Label : r.SourceUniqueId).Distinct().Count();
             var repairNotice = UiLanguage.T(
                 "\n\nLes raccords déjà recréés par BIMaestro pourront être redimensionnés ou remplacés pour retrouver leurs connecteurs historiques. Les raccords déplacés, réorientés ou reliés à de nouveaux voisins seront conservés sans modification.",
                 "\n\nFittings previously recreated by BIMaestro may be resized or replaced to recover their recorded connectors. Moved, reoriented fittings or fittings connected to new neighbors will be left unchanged.");
             var confirm = MessageBox.Show(this, UiLanguage.T(
                 $"Restaurer {count} élément(s) dans la maquette à leur emplacement enregistré ?\n\nIls resteront dans le projet et seront modifiables normalement. Les connexions enregistrées seront rétablies si leurs deux extrémités sont disponibles et inchangées. Sélectionnez aussi les raccords et tronçons supprimés du réseau. Les éléments déjà présents ne seront pas dupliqués.\n\nLes anciennes suppressions sans données de reconstruction ne peuvent pas être restaurées.",
                 $"Restore {count} element(s) in the model at their recorded location?\n\nThey will remain in the project and be editable normally. Recorded connections will be restored when both ends are available and unchanged. Also select deleted network fittings and segments. Existing elements will not be duplicated.\n\nOlder deletions without reconstruction data cannot be restored.")
-                + (selectedCount > events.Count ? UiLanguage.T($"\n\n{selectedCount - events.Count} enregistrement(s) non prêt(s) restent exclus de cette restauration.", $"\n\n{selectedCount - events.Count} record(s) that are not ready remain excluded from this restoration.") : "")
                 + repairNotice, UiLanguage.T("Restaurer les éléments", "Restore elements"), MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (confirm != MessageBoxResult.Yes) return;
             _restoringDeleted = true;
             UpdateVisualizeButtonLabel();
-            string preparationFailure = null;
-            try
-            {
-                var prepared = await Task.Run(() => ReadReadyRequests(events));
-                if (_isClosed) return;
-                if (prepared.Requests.Count == 0)
-                    throw new InvalidOperationException(string.Join("\n", prepared.Warnings.Take(3)));
-                events = prepared.Events;
-                var requests = prepared.Requests;
-                // Hide only after IO completes. No data capture is started here.
-                Hide();
-                if (RaiseRequest(new UiRequest { Type = UiRequestType.RestoreDeleted, Events = events, RestoreRequests = requests, RestoreReadWarnings = prepared.Warnings })) return;
-            }
-            catch (Exception ex) { _pendingRequest = null; preparationFailure = ex.Message; }
-            _restoringDeleted = false;
-            if (_isClosed) return;
-            Show();
-            UpdateVisualizeButtonLabel();
-            MessageBox.Show(this, preparationFailure ?? UiLanguage.T("Revit n’a pas pu démarrer la restauration. Réessayez lorsque Revit est disponible.",
-                "Revit could not start restoration. Try again when Revit is available."),
-                UiLanguage.T("Restaurer les éléments", "Restore elements"), MessageBoxButton.OK, MessageBoxImage.Warning);
+            RaiseRequest(new UiRequest { Type = UiRequestType.RestoreDeleted, Events = events });
         }
 
-        private void ExecuteRestoreDeleted(List<ElementHistoryEvent> events, List<HistoryRestoreRequest> requests, List<string> readWarnings = null)
+        private void ExecuteRestoreDeleted(List<ElementHistoryEvent> events)
         {
             string message;
-            bool restoredForTutorial = false;
-            bool furnitureRestored = false;
             try
             {
-                if (requests == null || requests.Count != events.Count || requests.Any(request => request?.Recipe == null))
-                    throw new InvalidOperationException(UiLanguage.T("Les données préparées de restauration sont incomplètes.", "The prepared restoration data is incomplete."));
-                if (events.Zip(requests, (ev, request) => request.Recipe?.Native?.WholeModel != true
-                    && !ElementHistoryDurableBridge.GetReadiness(ev).Legacy && HasTemporaryReceipt(request.Recipe)).Any(temporary => temporary))
-                    throw new InvalidOperationException(UiLanguage.T("Ces données dépendent encore d’une passerelle temporaire.", "This data still depends on a temporary bridge."));
-                if (requests.Any(r => !ElementHistoryDurableBridge.IsReadyDirectRequest(r)
-                    && (r.Recipe?.Native == null || r.Recipe.Native.DefinitionOnly)))
-                    throw new InvalidOperationException(UiLanguage.T("Certaines données ne contiennent ni copie native complète ni recette compatible.", "Some data contains neither a complete native copy nor a compatible recipe."));
-                ElementHistoryDurableBridge.ReleasePreparationSourcesForRestore();
-                var result = ElementHistoryRestoration.RestoreAvailable(_doc, requests);
-                if (readWarnings != null) result.CaptureWarnings.AddRange(readWarnings);
-                restoredForTutorial = result.Created > 0 || result.Existing > 0;
-                if (BIMaestro.Tutorials.DemoTourService.IsActive(this))
-                    furnitureRestored = BIMaestro.Tutorials.DemoHistoryScene.HasRestoredFurniture(_doc);
+                var result = ElementHistoryRestoration.Restore(_doc, events.Where(IsDeletion).Select(ToRestoreRequest));
                 message = UiLanguage.T(
                     $"{result.Created} élément(s) restauré(s).\n{result.Existing} déjà présent(s).\n{result.Failed} non restauré(s).",
                     $"{result.Created} element(s) restored.\n{result.Existing} already present.\n{result.Failed} not restored.");
-                var failures = result.Items.Where(i => !i.Created && !i.Existing && !i.IncludedInParent).ToList();
-                if (readWarnings?.Count > 0)
-                    message += UiLanguage.T($"\n{readWarnings.Count} élément(s) écarté(s) car leurs données ne peuvent pas être relues.",
-                        $"\n{readWarnings.Count} element(s) skipped because their saved data could not be read.");
-                if (result.IncludedInParent > 0)
-                    message += UiLanguage.T($"\n{result.IncludedInParent} composant(s) recréé(s) avec leur élément parent.",
-                        $"\n{result.IncludedInParent} component(s) recreated with their parent element.");
+                var failures = result.Items.Where(i => !i.Created && !i.Existing).ToList();
                 if (result.Repaired > 0 || result.RepairFailures.Count > 0)
                     message += UiLanguage.T($"\nParmi les éléments déjà présents : {result.Repaired} raccord(s) corrigé(s), {result.RepairFailures.Count} correction(s) impossible(s).",
                         $"\nAmong existing elements: {result.Repaired} fitting(s) repaired, {result.RepairFailures.Count} repair(s) failed.");
@@ -2300,14 +1940,6 @@ namespace Analyse
                     $"\n\nConnexions : {result.ConnectionsRestored} rétablie(s), {result.ConnectionsExisting} déjà présente(s), {result.ConnectionFailures.Count} non rétablie(s).",
                     $"\n\nConnections: {result.ConnectionsRestored} restored, {result.ConnectionsExisting} already present, {result.ConnectionFailures.Count} not restored.");
                 foreach (var failure in result.ConnectionFailures.Take(3)) message += "\n" + ShortRestoreDetail(failure);
-                if (result.RelationsRestored > 0 || result.RelationsExisting > 0 || result.RelationFailures.Count > 0)
-                    message += UiLanguage.T($"\n\nRelations géométriques : {result.RelationsRestored} rétablies, {result.RelationsExisting} déjà présentes, {result.RelationFailures.Count} non rétablies.",
-                        $"\n\nGeometry relations: {result.RelationsRestored} restored, {result.RelationsExisting} already present, {result.RelationFailures.Count} not restored.");
-                var changedWallJoinOrder = result.RelationAudit.Count(a => a.Kind == "wall_auto_join" && a.JoinOrderMatches == false);
-                if (changedWallJoinOrder > 0)
-                    message += UiLanguage.T($"\nJonctions de murs présentes avec un ordre différent : {changedWallJoinOrder} (détails dans le rapport).",
-                        $"\nWall joins present with a different order: {changedWallJoinOrder} (details in the report).");
-                foreach (var failure in result.RelationFailures.Take(3)) message += "\n" + ShortRestoreDetail(failure);
                 foreach (var failure in failures.Take(4))
                     message += "\n\n" + failure.Label + (string.IsNullOrWhiteSpace(failure.Category) ? "" : " (" + failure.Category + ")") + " : " + RestoreFailureText(failure.Reason)
                         + (string.IsNullOrWhiteSpace(failure.Detail) ? "" : "\n" + ShortRestoreDetail(failure.Detail));
@@ -2315,44 +1947,21 @@ namespace Analyse
                 var warnings = result.Items.Where(i => i.Created && !string.IsNullOrWhiteSpace(i.Detail)).Select(i => i.Detail).Distinct().Take(4).ToList();
                 if (warnings.Count > 0) message += "\n\n" + string.Join("\n", warnings);
                 if (result.CaptureWarnings.Count > 0)
-                {
-                    message += UiLanguage.T($"\n\n{result.CaptureWarnings.Count} avertissement(s) de restauration : voir le rapport complet.",
-                        $"\n\n{result.CaptureWarnings.Count} restoration warning(s): see the full report.");
-                    foreach (var warning in result.CaptureWarnings.Take(2)) message += "\n" + ShortRestoreDetail(warning);
-                }
+                    message += UiLanguage.T("\n\nCertaines connexions n’avaient pas pu être enregistrées : voir le rapport complet.",
+                        "\n\nSome connections could not be recorded: see the full report.");
                 // Preserve every failure, not only the twelve shown in the summary.
                 // Report I/O must never turn a successful restore into a reported rollback.
                 try
                 {
-                    ElementHistoryTracker.FlushPendingForHistory();
                     var folder = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BIMaestro", "HistoryReports");
                     System.IO.Directory.CreateDirectory(folder);
                     var path = System.IO.Path.Combine(folder, "restauration-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + "-" + Guid.NewGuid().ToString("N").Substring(0, 8) + ".json");
-                    var deletionAuditPaths = result.Items.Select(i => i.DeletionAudit?.BatchReportPath)
-                        .Where(p => !string.IsNullOrWhiteSpace(p)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
                     System.IO.File.WriteAllText(path, Newtonsoft.Json.JsonConvert.SerializeObject(new
                     {
-                        ReportVersion = 2, GeneratedUtc = DateTime.UtcNow, RevitVersion = _doc.Application.VersionNumber,
-                        AuditSummary = new
-                        {
-                            DeletionAuditPaths = deletionAuditPaths,
-                            ItemsWithoutDeletionAudit = result.Items.Count(i => i.DeletionAudit == null),
-                            FailedByCategoryAndReason = result.Items.Where(i => !i.Created && !i.Existing && !i.IncludedInParent)
-                                .GroupBy(i => new { i.Category, i.Reason, i.RecipeKind })
-                                .Select(g => new { g.Key.Category, g.Key.Reason, g.Key.RecipeKind, Count = g.Count() })
-                                .OrderByDescending(g => g.Count).ToList(),
-                            NativeArchiveNotReadyAtDeletion = result.Items.Count(i => i.DeletionAudit?.NativeArchiveReadyAtDeletion == false),
-                            MissingSnapshotAtDeletion = result.Items.Count(i => i.DeletionAudit?.SnapshotFound == false),
-                            MissingSnapshotStillQueuedInPreload = result.Items.Count(i =>
-                                i.DeletionAudit?.SnapshotFound == false && i.DeletionAudit.PreloadStillQueuedAtDeletion == true)
-                        },
+                        ReportVersion = 1, GeneratedUtc = DateTime.UtcNow, RevitVersion = _doc.Application.VersionNumber,
                         Result = result
                     }, Newtonsoft.Json.Formatting.Indented));
                     message += UiLanguage.T("\n\nRapport complet (tous les éléments et connexions) :\n", "\n\nFull report (all elements and connections):\n") + path;
-                    if (deletionAuditPaths.Count > 0)
-                        message += UiLanguage.T("\nAudit de suppression :\n", "\nDeletion audit:\n")
-                            + string.Join("\n", deletionAuditPaths.Take(2))
-                            + (deletionAuditPaths.Count > 2 ? "\n+" + (deletionAuditPaths.Count - 2) : "");
                 }
                 catch (Exception reportError)
                 {
@@ -2361,7 +1970,7 @@ namespace Analyse
                 // Selection/navigation failures must not misreport a successful commit.
                 try
                 {
-                    var ids = result.Items.Where(i => i.Created || i.Existing || i.IncludedInParent).Select(i => _doc.GetElement(i.UniqueId)?.Id)
+                    var ids = result.Items.Where(i => i.Created || i.Existing).Select(i => _doc.GetElement(i.UniqueId)?.Id)
                         .Where(id => id != null).Distinct().ToList();
                     if (ids.Count > 0) { _uidoc.Selection.SetElementIds(ids); _uidoc.ShowElements(ids); }
                 }
@@ -2370,33 +1979,12 @@ namespace Analyse
             catch (Exception ex)
             {
                 message = UiLanguage.T("La restauration a été annulée.\n", "Restoration was rolled back.\n") + ex.Message;
-                try
-                {
-                    var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BIMaestro", "HistoryReports");
-                    Directory.CreateDirectory(folder);
-                    var report = Path.Combine(folder, "restauration-erreur-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + "-" + Guid.NewGuid().ToString("N").Substring(0, 8) + ".json");
-                    File.WriteAllText(report, Newtonsoft.Json.JsonConvert.SerializeObject(new {
-                        GeneratedUtc = DateTime.UtcNow, Exception = ex.ToString(),
-                        Events = events?.Select(item => new { item.EventId, item.ElementId, item.Category, Batch = item.DeletionAudit?.BatchId })
-                    }, Newtonsoft.Json.Formatting.Indented));
-                    message += UiLanguage.T("\n\nDiagnostic complet :\n", "\n\nFull diagnostic:\n") + report;
-                }
-                catch { }
             }
             _restoringDeleted = false;
             Dispatcher.BeginInvoke(new Action(() =>
             {
-                if (_isClosed) return;
-                Show();
                 UpdateVisualizeButtonLabel();
-                if (restoredForTutorial && BIMaestro.Tutorials.DemoTourService.IsActive(this))
-                {
-                    BIMaestro.Tutorials.DemoTourService.ObserveHistoryResult(this, _uidoc.Application.MainWindowHandle,
-                        "Les meubles réapparaissent", "Observe les tables restaurées dans la vue 3D. Confirme lorsque tu as vu le résultat ; nous passerons ensuite aux paramètres du mobilier témoin.",
-                        () => BIMaestro.Tutorials.DemoTourService.ReportRestoration(this, furnitureRestored));
-                }
-                else
-                    MessageBox.Show(this, message, UiLanguage.T("Restaurer les éléments", "Restore elements"), MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(this, message, UiLanguage.T("Restaurer les éléments", "Restore elements"), MessageBoxButton.OK, MessageBoxImage.Information);
             }));
         }
 
@@ -2405,7 +1993,6 @@ namespace Analyse
             switch (reason)
             {
                 case "identity": case "recipe": return UiLanguage.T("Données de reconstruction absentes ou forme non prise en charge.", "Reconstruction data missing or unsupported shape.");
-                case "archive": return UiLanguage.T("Archive native indisponible.", "Native archive unavailable.");
                 case "type": return UiLanguage.T("La famille ou le type n’est plus présent dans le projet.", "The family or type is no longer in the project.");
                 case "level": return UiLanguage.T("Le niveau d’origine n’est plus présent.", "The original level is no longer present.");
                 case "host": return UiLanguage.T("Le support manque : restaurer aussi le mur, sol, tuyau, gaine ou raccord concerné.", "The host is missing: also restore the corresponding wall, floor, pipe, duct or fitting.");
@@ -2615,16 +2202,13 @@ namespace Analyse
             return selected;
         }
 
-        private bool RaiseRequest(UiRequest request)
+        private void RaiseRequest(UiRequest request)
         {
             // Do not replace a confirmed restoration with a subsequent focus/preview
             // click while Revit is waiting to dispatch the external event.
-            if (_pendingRequest?.Type == UiRequestType.RestoreDeleted) return false;
+            if (_pendingRequest?.Type == UiRequestType.RestoreDeleted) return;
             _pendingRequest = request;
-            var status = _externalEvent?.Raise();
-            if (status == ExternalEventRequest.Accepted || status == ExternalEventRequest.Pending) return true;
-            _pendingRequest = null;
-            return false;
+            _externalEvent?.Raise();
         }
 
         private void UpdateDetails()
@@ -3050,16 +2634,9 @@ namespace Analyse
                 : text;
         }
 
-        private void ShowRestoreResult(RestoreResult result, bool exerciseRestored)
+        private void ShowRestoreResult(RestoreResult result)
         {
             if (result == null) return;
-            if (result.Applied > 0 && result.Failed == 0 && BIMaestro.Tutorials.DemoTourService.IsActive(this))
-            {
-                BIMaestro.Tutorials.DemoTourService.ObserveHistoryResult(this, _uidoc.Application.MainWindowHandle,
-                    "Le témoin retrouve ses 4 chaises", "Observe le mobilier dans la vue 3D : le nombre de chaises est revenu de 2 à 4. Confirme lorsque tu as vu la différence.",
-                    () => BIMaestro.Tutorials.DemoTourService.ReportParameterRestoration(this, exerciseRestored));
-                return;
-            }
             MessageBox.Show(
                 result.Applied > 0
                     ? UiLanguage.T($"{result.Applied} valeur(s) restaurée(s).", $"{result.Applied} value(s) restored.") + (result.Failed > 0 ? UiLanguage.T($"\n{result.Failed} valeur(s) n'ont pas pu être restaurée(s).", $"\n{result.Failed} value(s) could not be restored.") : "")
@@ -3160,24 +2737,12 @@ namespace Analyse
                 _uidoc.Selection.SetElementIds(originals.Distinct().ToList());
                 _uidoc.ShowElements(originals.Distinct().ToList());
             }
-            var previewIds = GetPreviewElements(_doc).Select(element => element.Id).ToList();
-            if (previewIds.Count > 0)
-            {
-                try { _uidoc.ShowElements(previewIds); } catch { }
-                _uidoc.RefreshActiveView();
-                Dispatcher.BeginInvoke(new Action(() => BIMaestro.Tutorials.DemoTourService.ObserveHistoryPreview(this,
-                    new System.Windows.Interop.WindowInteropHelper(this).Owner)));
-            }
         }
 
         private void ExecuteCleanPreviews()
         {
             var ids = GetPreviewElements(_doc).Select(e => e.Id).ToList();
-            if (ids.Count == 0)
-            {
-                BIMaestro.Tutorials.DemoTourService.ReportAction(this, "history-preview-cleaned");
-                return;
-            }
+            if (ids.Count == 0) return;
 
             using (var t = new Transaction(_doc, "BIMaestro - Nettoyer previews historique"))
             {
@@ -3185,8 +2750,6 @@ namespace Analyse
                 _doc.Delete(ids);
                 t.Commit();
             }
-            _uidoc.RefreshActiveView();
-            Dispatcher.BeginInvoke(new Action(() => BIMaestro.Tutorials.DemoTourService.ReportAction(this, "history-preview-cleaned")));
         }
 
         private void ExecuteCaptureSelectedDetails()
@@ -3288,16 +2851,16 @@ namespace Analyse
             if (!string.IsNullOrWhiteSpace(readableDelta))
                 return readableDelta.Replace("Avant / après: ", string.Empty);
             if (ev.Delta.TryGetValue("lastKnown", out var lastKnown))
-                return UiLanguage.T("Supprimé @ ", "Deleted @ ") + CompactPoint(lastKnown);
+                return "Supprimé @ " + CompactPoint(lastKnown);
             if (ev.Delta.TryGetValue("new", out var newPos) && ev.Delta.TryGetValue("old", out var oldPos))
                 return $"{CompactPoint(oldPos)} -> {CompactPoint(newPos)}";
             if (ev.Delta.TryGetValue("parameters", out var parameters))
             {
                 var names = ReadParameterNames(parameters).Take(2).ToList();
-                if (names.Count > 0) return UiLanguage.T("Paramètre: ", "Parameter: ") + string.Join(", ", names);
+                if (names.Count > 0) return "Paramètre: " + string.Join(", ", names);
             }
             if (ev.Delta.ContainsKey("oldBox") && ev.Delta.ContainsKey("newBox"))
-                return UiLanguage.T("Géométrie modifiée", "Geometry changed");
+                return "Géométrie modifiée";
             return "-";
         }
 
