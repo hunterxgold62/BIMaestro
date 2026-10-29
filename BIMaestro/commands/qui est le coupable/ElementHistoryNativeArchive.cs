@@ -85,6 +85,25 @@ namespace Analyse
             GetWindowThreadProcessId(window, out var foregroundProcess);
             return window == IntPtr.Zero || foregroundProcess != ProcessId || UserIsIdle(15000);
         }
+        // Automatic deleted-item preparation: Revit counts as inactive when it has
+        // been in the background for 30 s, or in front with no input for 30 s.
+        private static bool _automaticWasBackground;
+        private static uint _automaticBackgroundSince;
+        internal static bool AutomaticPreparationCanRun(uint minimumIdleMilliseconds = 30000)
+        {
+            if (Paused || IsTextInputActive()) return false;
+            var window = GetForegroundWindow();
+            GetWindowThreadProcessId(window, out var foregroundProcess);
+            uint now = (uint)Environment.TickCount;
+            if (window == IntPtr.Zero || foregroundProcess != ProcessId)
+            {
+                if (!_automaticWasBackground) { _automaticWasBackground = true; _automaticBackgroundSince = now; }
+                return unchecked(now - _automaticBackgroundSince) >= minimumIdleMilliseconds;
+            }
+            _automaticWasBackground = false;
+            var input = new LastInput { Size = (uint)Marshal.SizeOf(typeof(LastInput)) };
+            return GetLastInputInfo(ref input) && unchecked(now - input.Tick) >= minimumIdleMilliseconds;
+        }
         internal static bool UserIsIdle(uint minimumIdleMilliseconds = 1000)
         {
             if (Paused || IsTextInputActive()) return false;

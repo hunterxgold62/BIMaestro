@@ -471,6 +471,8 @@
     <Compile Include="commands\qui est le coupable\ElementHistoryDurableBridge.cs" />
     <Compile Include="commands\qui est le coupable\ElementHistoryDurableBridge.Readiness.cs" />
     <Compile Include="commands\qui est le coupable\ElementHistoryDurableBridge.Direct.cs" />
+    <Compile Include="commands\qui est le coupable\ElementHistoryDurableBridge.Housekeeping.cs" />
+    <Compile Include="commands\qui est le coupable\ElementHistoryRestoration.Geometry.cs" />
     <Compile Include="commands\qui est le coupable\ElementHistoryDefinitionRevisions.cs" />
     <Compile Include="commands\qui est le coupable\ElementHistoryNativeArchive.Durable.cs" />
     <Compile Include="commands\qui est le coupable\ElementHistoryNetwork.cs" />

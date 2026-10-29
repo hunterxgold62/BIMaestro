@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net8.0-windows</TargetFramework><UseWPF>true</UseWPF><PlatformTarget>x64</PlatformTarget><AssemblyName>BIMaestro.History.OpeningProbe</AssemblyName><AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../BIMaestro/commands/qui est le coupable/HistoryOpeningClassification.cs" Link="Classification.cs" />
+    <Reference Include="RevitAPI"><HintPath>C:/Program Files/Autodesk/Revit 2025/RevitAPI.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="RevitAPIUI"><HintPath>C:/Program Files/Autodesk/Revit 2025/RevitAPIUI.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+</Project>

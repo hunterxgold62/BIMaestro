@@ -109,6 +109,10 @@ namespace Analyse
             NextClosedCleanupUtc = DateTime.UtcNow.AddMinutes(1);
             Io = Task.Run(() => { try { CleanupClosedSessions(); } catch (Exception ex) { RecordFailure("cleanup", ex); } });
         }
+        private static bool AutomaticPass;
+        private static DateTime AutomaticSourceUsedUtc = DateTime.MinValue;
+        private static readonly TimeSpan AutomaticSourceRetention = TimeSpan.FromMinutes(3);
+        internal static bool IsAutomaticPreparing => AutomaticPass && (NativePass != null || Sources != null);
         private static string CurrentStore;
         private static bool IsolatedAutomaticPreparation;
         private static bool ManualPreparation;
@@ -117,6 +121,11 @@ namespace Analyse
         private static string PriorityModel;
         // Null is an explicit model-wide request; an empty set must stay empty.
         private static HashSet<string> PreparationEventIds;
+        // A selected deletion row only lists the events journaled when the window
+        // refreshed. Its batch also covers members that reach the queue later.
+        private static HashSet<string> PreparationBatchKeys;
+        private static string PreparationBatchKey(ElementHistoryEvent ev)
+            => string.IsNullOrWhiteSpace(ev?.DeletionAudit?.BatchId) ? null : (ev.ModelKey ?? "") + "|" + ev.DeletionAudit.BatchId;
         private static long PreparationGeneration;
         private static string PreparationLabel;
         private static int PreparationCompleted, PreparationTotal;
@@ -135,11 +144,12 @@ namespace Analyse
         // Call while holding Sync; use event IDs rather than mutable UI objects.
         private static bool InPreparationScope(ElementHistoryEvent ev)
             => ev != null && (PriorityModel == null || string.Equals(ev.ModelKey, PriorityModel, StringComparison.OrdinalIgnoreCase))
-                && (PreparationEventIds == null || PreparationEventIds.Contains(EventId(ev)));
+                && (PreparationEventIds == null || PreparationEventIds.Contains(EventId(ev))
+                    || PreparationBatchKeys?.Contains(PreparationBatchKey(ev) ?? "") == true);
         private static void FinishPreparationLocked()
         {
             ManualPreparation = false;
-            PriorityModel = null; PreparationEventIds = null;
+            PriorityModel = null; PreparationEventIds = null; PreparationBatchKeys = null;
             PreparationLabel = null; PreparationCompleted = PreparationTotal = 0;
             PreparationClock.Stop(); PreparationStepClock.Stop();
         }
@@ -150,6 +160,8 @@ namespace Analyse
             if (compatibilityIssue != null) throw new InvalidOperationException(compatibilityIssue);
             var selectedEvents = selection?.Where(ev => ev?.Action == "delete").ToList();
             var selectedIds = selectedEvents == null ? null : new HashSet<string>(selectedEvents.Select(EventId), StringComparer.Ordinal);
+            var selectedBatches = selectedEvents == null ? null : new HashSet<string>(selectedEvents.Select(PreparationBatchKey)
+                .Where(key => key != null), StringComparer.OrdinalIgnoreCase);
             List<string> retrying;
             lock (Sync)
             {
@@ -158,18 +170,18 @@ namespace Analyse
                 ManualRequestedUtc = DateTime.UtcNow;
                 PreparationClock.Restart(); PreparationStepClock.Restart();
                 PreparationLabel = "Préparation demandée…"; PreparationCompleted = 0; PreparationTotal = 0;
-                PriorityModel = modelKey; PreparationEventIds = selectedIds;
+                PriorityModel = modelKey; PreparationEventIds = selectedIds; PreparationBatchKeys = selectedBatches;
                 NextPassUtc = DateTime.MinValue;
                 retrying = Pending.Where(p => InPreparationScope(p.Value)
                     && (!Errors.ContainsKey(p.Key) || TransportRetries.ContainsKey(p.Key))).Select(p => p.Key).ToList();
                 foreach (var id in retrying) { Errors.Remove(id); TransportRetries.Remove(id); }
             }
             foreach (var id in retrying) SetReadiness(id, ReadinessState.Preparing, "Préparation demandée par l’utilisateur…");
-            QueueAutonomousPreparation(modelKey, selectedIds);
+            QueueAutonomousPreparation(modelKey, selectedIds, selectedBatches);
         }
         // Explicit preparation also upgrades older, already-loaded native records to
         // independent JSON. Journal IO never runs in the Revit API callback.
-        private static void QueueAutonomousPreparation(string modelKey, HashSet<string> selectedIds)
+        private static void QueueAutonomousPreparation(string modelKey, HashSet<string> selectedIds, HashSet<string> selectedBatches)
         {
             lock (Sync)
             {
@@ -181,7 +193,8 @@ namespace Analyse
                         if (preceding != null) await preceding.ConfigureAwait(false);
                         foreach (var ev in ReadJournal().Where(ev => ev.Action == "delete"
                             && (modelKey == null || string.Equals(ev.ModelKey, modelKey, StringComparison.OrdinalIgnoreCase))
-                            && (selectedIds == null || selectedIds.Contains(EventId(ev)))))
+                            && (selectedIds == null || selectedIds.Contains(EventId(ev))
+                                || selectedBatches?.Contains(PreparationBatchKey(ev) ?? "") == true)))
                         {
                             var id = EventId(ev);
                             try
@@ -288,6 +301,16 @@ namespace Analyse
                 finally { if (File.Exists(temp)) File.Delete(temp); }
             }
         }
+        // Once its copy is gone a session record has no further use.
+        private static void ForgetSession(Session session)
+        {
+            lock (Sync) { session.Deleted = true; Sessions.Remove(session.Id); }
+            lock (session)
+            {
+                var path = Path.Combine(SessionDirectory, session.Id + ".json");
+                if (File.Exists(path)) File.Delete(path);
+            }
+        }
         internal static string EventId(ElementHistoryEvent ev)
         {
             if (!string.IsNullOrWhiteSpace(ev.EventId)) return ev.EventId;
@@ -392,6 +415,7 @@ namespace Analyse
                 if (referencedChanged) SaveSession(used);
                 var conversion = ResolvePreparedRequest(ev.EventId);
                 if (conversion != null && !NeedsOpeningClassification(ev, request, conversion) && !NeedsNativeUpgrade(ev, conversion)) continue;
+                if (conversion == null && IsUnrecoverable(ev, request)) { DropUnrecoverable(ev); continue; }
                 ElementHistoryDurableStore.WriteJob(ev);
                 lock (Sync) Pending[ev.EventId] = ev;
                 }
@@ -443,6 +467,7 @@ namespace Analyse
                     ElementHistoryDurableStore.DeleteJob(id);
                     lock (Sync) { Pending.Remove(id); Converted++; }
                 }
+                else if (converted == null && IsUnrecoverable(ev, ToRequest(ev, false))) DropUnrecoverable(ev);
                 else lock (Sync) Pending[id] = ev;
                 }
                 catch (Exception ex) { RecordFailure(id, ex); }
@@ -453,6 +478,7 @@ namespace Analyse
                     var session = JsonConvert.DeserializeObject<Session>(File.ReadAllText(file));
                     if (session?.Version != 1 || string.IsNullOrWhiteSpace(session.Id) || string.IsNullOrWhiteSpace(session.BridgeFile))
                         throw new InvalidDataException("Propriétaire de passerelle inconnu.");
+                    if (session.Deleted) { ForgetSession(session); continue; }
                     if (!session.Closed && IsOwnerGone(session))
                     { session.Closed = true; SaveSession(session); }
                     lock (Sync) if (!Sessions.ContainsKey(session.Id)) Sessions[session.Id] = session;
@@ -479,6 +505,7 @@ namespace Analyse
             catch (ArgumentException) { return true; }
             catch { return false; }
         }
+        private static readonly HashSet<string> DiagnosedFailures = new HashSet<string>(StringComparer.Ordinal);
         private static void RecordFailure(string id, Exception ex)
         {
             var concise = ex.Message.Split(new[] { '\r', '\n' }, 2)[0];
@@ -496,6 +523,8 @@ namespace Analyse
             }
             SetReadiness(id, ReadinessState.Unavailable, concise);
             Trace.WriteLine("History durable " + id + ": " + ex);
+            // A repeated failure (retries, restarts) is the same diagnostic: write it once.
+            lock (DiagnosedFailures) if (!DiagnosedFailures.Add(id + "|" + concise)) return;
             Task.Run(() =>
             {
                 try
@@ -619,7 +648,15 @@ namespace Analyse
             // redirecting the history store. Never touch the real store first.
             if (!force && Environment.GetEnvironmentVariable("BIMAESTRO_HISTORY_MANUAL_TEST") == "1" && !IsolatedAutomaticPreparation) return;
             if (application == null || HistoryBackgroundWork.Paused && !force) return;
-            if(!force && (NativePass!=null || Sources!=null))ResetNativePreparation();
+            // After 30 s without any input, prepare every pending model step by
+            // step so copies empty themselves before expiry. Any input stops the
+            // next step; the open copy is kept briefly to resume without reopening.
+            bool automatic = !force && HistoryBackgroundWork.AutomaticPreparationCanRun();
+            AutomaticPass = automatic;
+            if (automatic) AutomaticSourceUsedUtc = DateTime.UtcNow;
+            bool retainAutomaticSource = !force && DateTime.UtcNow - AutomaticSourceUsedUtc < AutomaticSourceRetention;
+            if(!force && !retainAutomaticSource && (NativePass!=null || Sources!=null))ResetNativePreparation();
+            force |= automatic;
             bool liveSession;
             lock (Sync) liveSession = Live.Count > 0;
             // Unsaved/cloud projects may have no opening-copy session. They are
@@ -650,6 +687,12 @@ namespace Analyse
                         catch (Exception ex) { RecordFailure("load", ex); }
                     }); return;
                 }
+                if (DateTime.UtcNow >= NextHousekeepingUtc)
+                {
+                    NextHousekeepingUtc = DateTime.UtcNow.Add(HousekeepingInterval);
+                    Io = Task.Run(() => Housekeeping());
+                    return;
+                }
             }
             List<ElementHistoryEvent> jobs;
             lock (Sync) jobs = Pending.Values.Where(e => !ManualPreparation || InPreparationScope(e)).ToList();
@@ -659,6 +702,12 @@ namespace Analyse
                 .Select(ElementHistoryTracker.GetDocumentKeyForHistory).ToList();
             lock (Sync) activeKeys.AddRange(Live.Values.Select(session => session.ModelKey));
             jobs = OrderPendingJobs(jobs, activeKeys);
+            // A large deletion reaches the journal in several spool deliveries.
+            // Do not close an explicit request before its last members are queued.
+            bool spoolDelivering = false;
+            if (IsManualPreparing)
+                try { spoolDelivering = ElementHistoryLocalSpool.Default.HasPending(CollaborativeModelTrackerStore.ActiveDirectory); }
+                catch (Exception ex) { Trace.WriteLine("History spool status: " + ex.Message); }
             bool noRunnableJobs;
             lock (Sync)
             {
@@ -668,11 +717,12 @@ namespace Analyse
                 // A just-recorded deletion may still be travelling through the
                 // local spool when the user clicks the button. Keep the request
                 // alive briefly so the asynchronous journal can deliver it.
-                if (noRunnableJobs && (jobs.Count > 0 || DateTime.UtcNow - ManualRequestedUtc > TimeSpan.FromSeconds(5)))
+                if (noRunnableJobs && (jobs.Count > 0 || !spoolDelivering && DateTime.UtcNow - ManualRequestedUtc > TimeSpan.FromSeconds(5)))
                 { FinishPreparationLocked(); }
             }
-            if (noRunnableJobs || !force && liveSession && !HistoryBackgroundWork.PreparationCanRun())
+            if (noRunnableJobs || !force && !retainAutomaticSource && liveSession && !HistoryBackgroundWork.PreparationCanRun())
             { Sources?.Dispose(); Sources = null; OpenBridgeFile = null; }
+            if (noRunnableJobs) NativePass = null;
             if (noRunnableJobs && jobs.Count > 0)
             {
                 ScheduleClosedCleanup();
@@ -732,8 +782,7 @@ namespace Analyse
                 catch (Exception ex) { RecordFailure(EventId(direct), ex); }
                 return;
             }
-            // A quiet/home/background Revit session is not permission to open and convert models.
-            // Keep pending work intact until the user presses the preparation button.
+            // Opening and converting copies needs the button or 30 s without any input.
             if (!force) { ScheduleClosedCleanup(); return; }
             string processingId = null;
             try
@@ -748,8 +797,8 @@ namespace Analyse
                 if (receipt.WholeModel && !File.Exists(receipt.File)
                     && !File.Exists(Path.Combine(CollaborativeModelTrackerStore.ActiveDirectory, "native-history", Path.GetFileName(receipt.File)))
                     && DateTime.UtcNow - first.Ts < TimeSpan.FromMinutes(1)) return;
-                if (receipt.WholeModel && ElementHistoryBridgeCache.IsCopy(LocalBridgeDirectory, receipt.File) && !File.Exists(receipt.File))
-                    throw new InvalidDataException("La copie temporaire a expiré après 15 jours, a été supprimée ou n’a pas pu être créée. Cet élément ne peut plus être préparé depuis cette copie.");
+                if (ResolvePreparedRequest(processingId) == null && IsUnrecoverable(first, firstRequest))
+                { DropUnrecoverable(first); return; }
                 if (!receipt.WholeModel)
                 {
                     Io = Task.Run(() => { try { ConvertSmallNative(first, firstRequest); } catch (Exception ex) { RecordFailure(EventId(first), ex); } });
@@ -773,8 +822,8 @@ namespace Analyse
                 }).ToList();
                 var prepared = new List<Prepared>();
                 var preparation = Stopwatch.StartNew();
-                int preparationLimit = force || !liveSession ? 32 : 2;
-                int preparationBudgetMs = force || !liveSession ? 250 : 25;
+                int preparationLimit = AutomaticPass ? 8 : force || !liveSession ? 32 : 2;
+                int preparationBudgetMs = AutomaticPass ? 50 : force || !liveSession ? 250 : 25;
                 foreach (var ev in sameSource)
                 {
                     if (prepared.Count > 0 && (preparation.ElapsedMilliseconds >= preparationBudgetMs || prepared.Count >= preparationLimit)) break;
@@ -924,10 +973,22 @@ namespace Analyse
             var references = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var ev in ReadJournal().Where(e => e.Action == "delete"))
             {
-                var request = FinalizeClosedFailure(ev, ToRequest(ev), closed);
+                HistoryRestoreRequest request;
+                // One damaged record must not keep every other copy forever: it
+                // protects every copy of its own model, cleanup continues elsewhere.
+                try { request = FinalizeClosedFailure(ev, ToRequest(ev), closed); }
+                catch (InvalidDataException ex)
+                {
+                    Trace.WriteLine("History cleanup kept copies for " + EventId(ev) + ": " + ex.Message);
+                    foreach (var session in closed.Where(s => string.Equals(s.ModelKey, ev.ModelKey, StringComparison.OrdinalIgnoreCase)))
+                        references.Add(Path.GetFileName(session.BridgeFile));
+                    continue;
+                }
                 // Completed direct/native requests and durable final failures no
                 // longer depend on the opening RVT. Native payloads remain stored.
                 if (IsCompletedBridgeRequest(request)) continue;
+                // A deletion whose source is already gone cannot protect other copies.
+                if (ResolvePreparedRequest(EventId(ev)) == null && IsUnrecoverable(ev, ToRequest(ev, false))) continue;
                 if (!HasLiveExclusion(ev))
                 {
                     var classification = ElementHistoryDurableStore.ResolveOpeningClassification(EventId(ev));
@@ -937,8 +998,10 @@ namespace Analyse
                 }
                 foreach (var a in Artifacts(request.Recipe).Where(a => a.WholeModel))
                     references.Add(Path.GetFileName(a.File));
+                // Only a deletion without a known source copy keeps every copy of its model.
                 if (!string.IsNullOrWhiteSpace(ev.EventId) && !ev.EventId.StartsWith("legacy-", StringComparison.Ordinal)
-                    && ResolvePreparedRequest(EventId(ev)) == null)
+                    && ResolvePreparedRequest(EventId(ev)) == null
+                    && !Artifacts(ToRequest(ev, false).Recipe).Concat(Artifacts(request.Recipe)).Any(a => a.WholeModel && !string.IsNullOrWhiteSpace(a.File)))
                     foreach (var session in closed.Where(s => string.Equals(s.ModelKey, ev.ModelKey, StringComparison.OrdinalIgnoreCase)))
                         references.Add(Path.GetFileName(session.BridgeFile));
             }
@@ -952,8 +1015,7 @@ namespace Analyse
                     throw new InvalidDataException("Chemin de passerelle hors du cache local : suppression refusée.");
                 try { ElementHistoryBridgeCache.Delete(LocalBridgeDirectory, path); }
                 catch (IOException) { continue; }
-                lock (Sync) session.Deleted = true;
-                SaveSession(session);
+                ForgetSession(session);
             }
         }
         internal static void Shutdown()

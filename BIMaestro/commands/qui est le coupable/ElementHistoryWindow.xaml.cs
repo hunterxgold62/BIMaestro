@@ -151,7 +151,9 @@ namespace Analyse
                         try
                         {
                             ElementHistoryTracker.FlushPendingForHistory();
-                            ElementHistoryDurableBridge.RequestPreparation(ElementHistoryTracker.GetDocumentKeyForHistory(_owner._doc), req.PreparationEvents);
+                            // Opening copies expire after 15 days: one request prepares every
+                            // pending deletion of every model. Open models are processed first.
+                            ElementHistoryDurableBridge.RequestPreparation();
                         }
                         finally
                         {
@@ -1560,17 +1562,13 @@ namespace Analyse
                 UpdatePreparationStatus();
                 return;
             }
-            var selectedEvents = GetSelectedDeletionEvents();
-            var hasSelection = HasHistorySelection();
-            if (hasSelection && selectedEvents.Count == 0) return;
-            var preparationEvents = hasSelection ? selectedEvents : null;
             _preparationStartQueued = true;
             UpdatePreparationStatus();
             // ContextIdle runs after input/render work, so feedback is visible before Revit work.
             Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ContextIdle, new Action(() =>
             {
                 if (_isClosed || !_preparationStartQueued) return;
-                if (RaiseRequest(new UiRequest { Type = UiRequestType.PreparePending, PreparationEvents = preparationEvents })) return;
+                if (RaiseRequest(new UiRequest { Type = UiRequestType.PreparePending })) return;
                 _preparationStartQueued = false;
                 UpdatePreparationStatus();
                 MessageBox.Show(this, UiLanguage.T("Revit est occupé. Réessayez lorsque la commande en cours est terminée.", "Revit is busy. Try again after the current command finishes."));
@@ -1584,17 +1582,13 @@ namespace Analyse
             var cache = ElementHistoryBridgeCache.Status;
             var manual = ElementHistoryDurableBridge.IsManualPreparing;
             var selectedEvents = GetSelectedDeletionEvents();
-            var hasSelection = HasHistorySelection();
             PreparePendingButton.Content = manual || _preparationStartQueued ? UiLanguage.T("Arrêter la préparation", "Stop preparation")
-                : UiLanguage.T("Charger les éléments en attente", "Load pending elements");
-            PreparePendingButton.IsEnabled = manual || _preparationStartQueued || !hasSelection || selectedEvents.Count > 0;
+                : UiLanguage.T("Charger toutes les suppressions en attente", "Load all pending deletions");
+            PreparePendingButton.IsEnabled = true;
             PreparePendingButton.ToolTip = manual || _preparationStartQueued
                 ? UiLanguage.T("Arrête la préparation à la fin de l’étape en cours.", "Stops preparation after the current step.")
-                : hasSelection
-                    ? selectedEvents.Count > 0
-                        ? UiLanguage.T("Prépare uniquement les suppressions sélectionnées. L’avancement s’affiche dans cette fenêtre.", "Prepares only the selected deletions. Progress appears in this window.")
-                        : UiLanguage.T("Sélectionnez une suppression à préparer.", "Select a deletion to prepare.")
-                    : UiLanguage.T("Aucune sélection : prépare tous les éléments en attente de cette maquette. L’avancement s’affiche dans cette fenêtre.", "No selection: prepares all pending elements in this model. Progress appears in this window.");
+                : UiLanguage.T("Prépare toutes les suppressions en attente de toutes les maquettes, en commençant par les maquettes ouvertes. Les copies temporaires deviennent ensuite inutiles et sont supprimées. L’avancement s’affiche dans cette fenêtre.",
+                    "Prepares every pending deletion of every model, open models first. Temporary copies are then no longer needed and are removed. Progress appears in this window.");
             System.Windows.Controls.ToolTipService.SetShowOnDisabled(PreparePendingButton, true);
             var selected = RestorableDeletionEvents(selectedEvents);
             var states = selected.Select(ElementHistoryDurableBridge.GetReadiness).ToList();
@@ -2207,8 +2201,74 @@ namespace Analyse
         private void ClusterRestoreButton_Click(object sender, RoutedEventArgs e) =>
             RequestRestoreDeleted(GetSelectedClusterItems().Select(item => item.Source).Where(IsDeletion).ToList());
 
+        // This window loads history once. A batch selected as a whole is completed
+        // from the journal; a partial selection of its members stays partial.
+        private List<string> WholeSelectedDeletionBatches(List<ElementHistoryEvent> events)
+        {
+            var known = (_rows ?? new List<RowVm>()).SelectMany(GetRowEvents).Where(IsDeletion)
+                .Where(ev => ev.DeletionAudit?.BatchId != null)
+                .GroupBy(ev => ev.DeletionAudit.BatchId, StringComparer.Ordinal)
+                .ToDictionary(g => g.Key, g => new HashSet<string>(g.Select(BuildHistoryEventKey), StringComparer.OrdinalIgnoreCase), StringComparer.Ordinal);
+            return events.Where(ev => ev.DeletionAudit?.BatchId != null)
+                .GroupBy(ev => ev.DeletionAudit.BatchId, StringComparer.Ordinal)
+                .Where(g => known.TryGetValue(g.Key, out var all) && all.IsSubsetOf(g.Select(BuildHistoryEventKey)))
+                .Select(g => g.Key).ToList();
+        }
+
+        private static List<ElementHistoryEvent> CompleteDeletionBatches(List<ElementHistoryEvent> events, IEnumerable<string> modelKeys, List<string> batches)
+        {
+            if (batches.Count == 0) return events;
+            var present = new HashSet<string>(events.Select(BuildHistoryEventKey), StringComparer.OrdinalIgnoreCase);
+            var missing = ElementHistoryTracker.LoadDeletionBatches(modelKeys, new HashSet<string>(batches, StringComparer.Ordinal))
+                .Where(ev => present.Add(BuildHistoryEventKey(ev)));
+            return events.Concat(missing).ToList();
+        }
+
+        private static int CountPreparing(IEnumerable<ElementHistoryEvent> events)
+            => events.Select(ElementHistoryDurableBridge.GetReadiness)
+                .Count(state => !state.Excluded && state.State == ElementHistoryDurableBridge.ReadinessState.Preparing);
+
+        // Returns false when the user cancels. Otherwise the caller continues with
+        // whatever is ready: everything, or the ready part the user chose.
+        private async Task<bool> FinishPreparationBeforeRestore(List<ElementHistoryEvent> events)
+        {
+            int preparing = CountPreparing(events);
+            if (preparing == 0) return true;
+            int ready = events.Select(ElementHistoryDurableBridge.GetReadiness)
+                .Count(state => !state.Excluded && state.State == ElementHistoryDurableBridge.ReadinessState.Ready);
+            var choice = MessageBox.Show(this, UiLanguage.T(
+                $"{preparing} élément(s) de cette suppression sont encore en préparation (objets hébergés, réservations, raccords…).\n\nOui : terminer leur préparation puis restaurer l’ensemble.\nNon : restaurer seulement les {ready} élément(s) déjà prêts.",
+                $"{preparing} element(s) of this deletion are still being prepared (hosted objects, openings, fittings…).\n\nYes: finish preparing them, then restore everything.\nNo: restore only the {ready} element(s) already ready."),
+                UiLanguage.T("Restaurer les éléments", "Restore elements"), MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+            if (choice == MessageBoxResult.Cancel) return false;
+            if (choice == MessageBoxResult.No) return true;
+            _restoringDeleted = true;
+            UpdateVisualizeButtonLabel();
+            try
+            {
+                ElementHistoryDurableBridge.RequestPreparation(null, events);
+                // Preparation runs in Revit's idle passes; the window stays responsive.
+                var deadline = DateTime.UtcNow.AddMinutes(15);
+                while (!_isClosed && ElementHistoryDurableBridge.IsManualPreparing
+                    && CountPreparing(events) > 0 && DateTime.UtcNow < deadline)
+                    await Task.Delay(1000);
+            }
+            catch (InvalidOperationException ex) { MessageBox.Show(this, ex.Message); return false; }
+            finally { _restoringDeleted = false; UpdateVisualizeButtonLabel(); }
+            return true;
+        }
+
         private async void RequestRestoreDeleted(List<ElementHistoryEvent> events)
         {
+            if (_restoringDeleted) return;
+            var wholeBatches = WholeSelectedDeletionBatches(events ?? new List<ElementHistoryEvent>());
+            if (wholeBatches.Count > 0)
+            {
+                var modelKeys = ElementHistoryTracker.GetDocumentKeysForHistory(_doc);
+                try { events = await Task.Run(() => CompleteDeletionBatches(events, modelKeys, wholeBatches)); }
+                catch (Exception ex) { System.Diagnostics.Trace.WriteLine("History batch completion: " + ex.Message); }
+                if (_isClosed) return;
+            }
             events = RestorableDeletionEvents(events);
             if (events.Count == 0)
             {
@@ -2216,6 +2276,9 @@ namespace Analyse
                 return;
             }
             if (_restoringDeleted || events.Count == 0) return;
+            // Hosted objects (doors, openings, fittings) often need the opening copy and
+            // finish later than their walls or pipes. Never split a deletion silently.
+            if (!await FinishPreparationBeforeRestore(events) || _isClosed) return;
             int selectedCount = events.Count(ev => !ElementHistoryDurableBridge.GetReadiness(ev).Excluded);
             var readyEvents = events.Where(ev => ElementHistoryDurableBridge.GetReadiness(ev).State == ElementHistoryDurableBridge.ReadinessState.Ready).ToList();
             if (readyEvents.Count == 0)

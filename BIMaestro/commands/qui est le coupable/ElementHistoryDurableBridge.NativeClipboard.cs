@@ -175,6 +175,8 @@ namespace Analyse
                     var roots=new HashSet<string>(StringComparer.Ordinal);
                     pass.Selected.Clear();
                     int rootLimit=networks.Count>0 ? NativeNetworkRootLimit() : 32;
+                    // Unattended waves keep each export short so the user regains Revit quickly.
+                    if (AutomaticPass) rootLimit=Math.Min(rootLimit,32);
                     foreach (var candidate in candidates)
                     {
                         try

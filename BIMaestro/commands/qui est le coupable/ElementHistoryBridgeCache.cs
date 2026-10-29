@@ -101,6 +101,7 @@ namespace Analyse
             using (new FileStream(Path.Combine(root, "cache.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None))
             {
                 var now = ElementHistoryClock.UtcNow;
+                RemoveOrphanMarkers(root);
                 foreach (var path in Copies(root))
                 {
                     if (now - CreatedUtc(path) < TimeSpan.FromDays(RetentionDays)) continue;
@@ -115,16 +116,48 @@ namespace Analyse
                     EarliestExpiryUtc = expiries.Count == 0 ? (DateTime?)null : expiries.Min(), Issue = LastIssue };
             }
         }
+        private static string[] Parts(string path) => new[] { path, path + ".partial", path + ".reservation", path + ".age" };
         internal static void Delete(string root, string path)
         {
+            // Nothing left: do not create a lease just to delete nothing.
+            if (!Parts(path).Any(File.Exists)) { RemoveLease(path); return; }
             using (AcquireLease(root, path))
             {
-                foreach (var file in new[] { path, path + ".partial", path + ".reservation", path + ".age" })
+                foreach (var file in Parts(path))
                 {
                     if (File.Exists(file) && (File.GetAttributes(file) & FileAttributes.ReparsePoint) != 0)
                         throw new IOException("Lien de fichier refusé dans le cache historique.");
                 }
-                foreach (var file in new[] { path, path + ".partial", path + ".reservation", path + ".age" }) File.Delete(file);
+                foreach (var file in Parts(path)) File.Delete(file);
+            }
+            RemoveLease(path);
+        }
+        // A lease left without its copy is an empty marker; one still held is in use.
+        private static void RemoveLease(string path)
+        {
+            try { if (!Parts(path).Any(File.Exists)) File.Delete(path + ".lease"); }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
+        // Copier interrupted (Revit closed or crashed during an export): only the
+        // .age/.reservation markers remain. They are not a copy and must not be
+        // counted, kept for 15 days or reported as stored data.
+        private static void RemoveOrphanMarkers(string root)
+        {
+            foreach (var marker in Directory.GetFiles(root, "snapshot-opening-*.rvt.*"))
+            {
+                var path = marker.Substring(0, marker.LastIndexOf('.'));
+                if (!IsCopy(root, path) || File.Exists(path) || File.Exists(path + ".partial")) continue;
+                try
+                {
+                    using (AcquireLease(root, path))
+                    {
+                        if (File.Exists(path) || File.Exists(path + ".partial")) continue;
+                        File.Delete(path + ".reservation"); File.Delete(path + ".age");
+                    }
+                    RemoveLease(path);
+                }
+                catch (IOException) { /* A copier still holds the lease: retry next pass. */ }
             }
         }
         internal static IDisposable BeginCopy(string root, string path, long length)

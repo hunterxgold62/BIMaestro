@@ -626,12 +626,13 @@ namespace Analyse
             var ports = recipe.SystemMembers.Select(id => FindOriginal(doc,id)).Where(e => e != null)
                 .SelectMany(ElementHistoryNetwork.Ports).Where(p => p.Domain == domain && p.ConnectorType != ConnectorType.Logical).ToList();
             if (ports.Count == 0 && recipe.SystemMembers.Count > 0) throw new InvalidOperationException("Aucun composant du système n’a pu être retrouvé.");
-            var systems = ports.Select(p => p.MEPSystem).Where(s => s != null && s.GetTypeId() == type.Id)
-                .GroupBy(s => s.UniqueId).Select(g => g.First()).ToList();
-            MEPSystem system = systems.Count == 1 ? systems[0] : recipe.Kind == "pipe_system"
-                ? (MEPSystem)PipingSystem.Create(doc,type.Id) : MechanicalSystem.Create(doc,type.Id);
+            // Revit assigns connected members to a system on its own; a port already
+            // used by a system cannot be added again. Keep the largest matching system.
+            var system = ports.Select(p => p.MEPSystem).Where(s => s != null && s.GetTypeId() == type.Id)
+                .GroupBy(s => s.UniqueId).OrderByDescending(g => g.Count()).Select(g => g.First()).FirstOrDefault()
+                ?? (recipe.Kind == "pipe_system" ? (MEPSystem)PipingSystem.Create(doc, type.Id) : MechanicalSystem.Create(doc, type.Id));
             var connectors = new ConnectorSet();
-            foreach(var port in ports.Where(p => p.MEPSystem == null || p.MEPSystem.Id != system.Id)) connectors.Insert(port);
+            foreach(var port in ports.Where(p => p.MEPSystem == null)) connectors.Insert(port);
             if (connectors.Size > 0) system.Add(connectors);
             if (!string.IsNullOrEmpty(recipe.SystemName)) system.Name = recipe.SystemName;
             return system;

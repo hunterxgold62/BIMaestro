@@ -132,14 +132,13 @@ namespace Analyse
                     && Math.Abs(parameter.AsDouble() - elevation.Number) > 1e-9) parameter.Set(elevation.Number);
             }
             doc.Regenerate();
+            // MEP fittings (reducers, transitions…) refuse flips: their historical
+            // orientation is restored below and the final placement check decides.
+            bool flipRefused = false;
             if (saved.HandFlipped.HasValue && instance.HandFlipped != saved.HandFlipped.Value)
-            {
-                if (!instance.CanFlipHand || !instance.flipHand()) throw new InvalidOperationException("Inversion de main historique impossible.");
-            }
+                flipRefused |= !instance.CanFlipHand || !instance.flipHand();
             if (saved.FacingFlipped.HasValue && instance.FacingFlipped != saved.FacingFlipped.Value)
-            {
-                if (!instance.CanFlipFacing || !instance.flipFacing()) throw new InvalidOperationException("Inversion de face historique impossible.");
-            }
+                flipRefused |= !instance.CanFlipFacing || !instance.flipFacing();
             doc.Regenerate();
             if (saved.Mirrored.HasValue && instance.Mirrored != saved.Mirrored.Value)
             {
@@ -160,7 +159,8 @@ namespace Analyse
             else if (instance.Location is LocationCurve curve && saved.Curve != null)
                 curve.Curve = RestoreCurve(saved.Curve);
             doc.Regenerate();
-            if (!VerifyHistoricalPlacement(instance, recipe, out var failure)) throw new InvalidOperationException(failure);
+            if (!VerifyHistoricalPlacement(instance, recipe, out var failure))
+                throw new InvalidOperationException(flipRefused ? "Inversion historique impossible : " + failure : failure);
         }
 
         private static Parameter HistoricalParameter(Document doc, Element element, HistoryParameter value)

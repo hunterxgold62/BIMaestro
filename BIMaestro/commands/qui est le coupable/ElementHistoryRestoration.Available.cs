@@ -13,6 +13,10 @@ namespace Analyse
         // and reconnect available neighbours after dependency-ordered creation.
         internal static HistoryRestoreBatch RestoreAvailable(Document doc, IEnumerable<HistoryRestoreRequest> requests,
             Action refreshView = null)
+            => ConnectRestoredByGeometry(doc, RestoreAvailableCore(doc, requests, refreshView));
+
+        private static HistoryRestoreBatch RestoreAvailableCore(Document doc, IEnumerable<HistoryRestoreRequest> requests,
+            Action refreshView)
         {
             var selected = (requests ?? Enumerable.Empty<HistoryRestoreRequest>()).Where(request => request != null).ToList();
             if (selected.All(request => request.Recipe?.UsesExistingModelDefinitions == true))

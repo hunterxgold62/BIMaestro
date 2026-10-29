@@ -90,7 +90,7 @@ public class BIMaestroApp : IExternalApplication
         Analyse.ElementHistoryDurableBridge.ProcessPending(app?.Application);
         // Deleted-item preparation already has its own bounded passes. Do not also populate
         // the live model native inventory during the same user-requested operation.
-        if (Analyse.ElementHistoryDurableBridge.IsManualPreparing) return;
+        if (Analyse.ElementHistoryDurableBridge.IsManualPreparing || Analyse.ElementHistoryDurableBridge.IsAutomaticPreparing) return;
         var doc = app?.ActiveUIDocument?.Document;
         if (doc == null)
         {

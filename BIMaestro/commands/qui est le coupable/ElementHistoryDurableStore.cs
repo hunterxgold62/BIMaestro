@@ -407,22 +407,41 @@ namespace Analyse
             try { file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read); }
             catch (FileNotFoundException) { return null; }
             catch (DirectoryNotFoundException) { return null; }
+            string content;
             using (file)
             using (var gzip = new GZipStream(file, CompressionMode.Decompress))
             using (var bounded = new LimitedReadStream(gzip, MaxRecordBytes + 65536L))
-            using (var text = new StreamReader(bounded, Utf8, false, 65536))
-            using (var reader = new JsonTextReader(text) { MaxDepth = 64, DateParseHandling = DateParseHandling.None })
+            using (var text = new StreamReader(bounded, Utf8, false, 65536)) content = text.ReadToEnd();
+            using (var reader = new JsonTextReader(new StringReader(content)) { MaxDepth = 64, DateParseHandling = DateParseHandling.None })
             {
                 var envelope = JObject.Load(reader, new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error });
                 if (reader.Read() || envelope.Properties().Count() != 6 || envelope["Schema"]?.Type != JTokenType.Integer
                     || envelope["Length"]?.Type != JTokenType.Integer || (int?)envelope["Schema"] != 1
                     || (string)envelope["Kind"] != kind || (string)envelope["Id"] != id || !(envelope["Data"] is JObject data))
                     throw new InvalidDataException("Format d’enregistrement durable inconnu.");
-                var bytes = DataBytes(data);
-                if ((long?)envelope["Length"] != bytes.LongLength || (string)envelope["Sha256"] != Hash(bytes))
-                    throw new InvalidDataException("Intégrité de l’enregistrement durable non vérifiée.");
+                // Number formatting differs between .NET Framework (Revit 2024 and
+                // older) and .NET 8, so re-serializing can disagree with the writer.
+                // The Data text stored on disk is exactly what the writer hashed.
+                var stored = StoredDataBytes(content);
+                bool intact = stored != null && (long?)envelope["Length"] == stored.LongLength && (string)envelope["Sha256"] == Hash(stored);
+                if (!intact)
+                {
+                    var bytes = DataBytes(data);
+                    intact = (long?)envelope["Length"] == bytes.LongLength && (string)envelope["Sha256"] == Hash(bytes);
+                }
+                if (!intact) throw new InvalidDataException("Intégrité de l’enregistrement durable non vérifiée.");
                 return data;
             }
+        }
+        // WriteRecord emits a compact envelope whose last property is Data.
+        private static byte[] StoredDataBytes(string content)
+        {
+            const string marker = ",\"Data\":";
+            var start = content.IndexOf(marker, StringComparison.Ordinal);
+            var end = content.TrimEnd().Length - 1;
+            if (start < 0 || end <= start || content[end] != '}') return null;
+            start += marker.Length;
+            return Utf8.GetBytes(content.Substring(start, end - start));
         }
 
         private static void WriteRecord(string root, string kind, string id, JObject data, bool job)
@@ -636,6 +655,16 @@ namespace Analyse
                 ValidateConversion(root, conversion);
             }
             File.Delete(RecordPath(root, "job", id)); InvalidateJobIndex(root);
+        }
+
+        // Only for a deletion whose source data no longer exists anywhere: the job
+        // could never complete, so keeping it would retry and log forever.
+        internal static void DropUnrecoverableJob(string eventId)
+        {
+            var id = EventId(eventId); var root = Root();
+            var path = RecordPath(root, "job", id);
+            if (!File.Exists(path)) return;
+            File.Delete(path); InvalidateJobIndex(root);
         }
 
         private sealed class LimitedReadStream : Stream

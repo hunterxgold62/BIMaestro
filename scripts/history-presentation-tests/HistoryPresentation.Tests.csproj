@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net9.0</TargetFramework><OutputType>Exe</OutputType><NuGetAudit>false</NuGetAudit></PropertyGroup>
+  <ItemGroup><Compile Include="../../BIMaestro/commands/qui est le coupable/ElementHistoryPresentationPolicy.cs" Link="Policy.cs" /></ItemGroup>
+</Project>

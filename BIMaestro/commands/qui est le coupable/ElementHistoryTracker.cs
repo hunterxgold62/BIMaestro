@@ -1179,6 +1179,11 @@ namespace Analyse
             var modifiedIds = e.GetModifiedElementIds().ToList();
             var deletedIds = e.GetDeletedElementIds().ToList();
             ElementHistoryDefinitionRevisions.Changed(doc, addedIds.Concat(modifiedIds), deletedIds);
+            // Restoration creates and discards transient objects (temporary systems,
+            // sizing stubs). Only an element known before the restore is a deletion.
+            if (IsRestorationTransaction(tx))
+                lock (SnapshotByElementId)
+                    deletedIds.RemoveAll(id => !SnapshotByElementId.ContainsKey(BuildElementSnapshotKey(doc, id)));
             if (IsIgnoredTransaction(tx))
             {
                 ElementHistoryOpeningArchive.Invalidate(doc, addedIds.Concat(modifiedIds));
@@ -1472,6 +1477,15 @@ namespace Analyse
         public static List<ElementHistoryEvent> LoadRecentDeletedHistory(Document doc)
         {
             return LoadMatchingHistory(GetDocumentKeysForHistory(doc), null, "delete", DefaultDeletedHistoryTake);
+        }
+
+        // IO worker only. A deletion batch reaches the journal in several spool
+        // deliveries, after a history window may already have listed its first part.
+        internal static List<ElementHistoryEvent> LoadDeletionBatches(IEnumerable<string> modelKeys, ISet<string> batchIds)
+        {
+            if (batchIds == null || batchIds.Count == 0) return new List<ElementHistoryEvent>();
+            return LoadMatchingHistory(modelKeys, null, "delete", DefaultDeletedHistoryTake)
+                .Where(ev => ev.DeletionAudit?.BatchId != null && batchIds.Contains(ev.DeletionAudit.BatchId)).ToList();
         }
 
         internal static bool IsDisplayableHistoryEvent(ElementHistoryEvent ev)
@@ -2946,6 +2960,12 @@ namespace Analyse
 
             return delta.Values.Any(v => v != null) ? delta : null;
         }
+
+        private static readonly string[] RestorationTransactionPrefixes =
+            { "BIMaestro - Restaurer", "BIMaestro - Rétablir", "BIMaestro - Raccorder", "BIMaestro - Réparer" };
+        private static bool IsRestorationTransaction(string transactionName)
+            => transactionName != null && RestorationTransactionPrefixes.Any(prefix =>
+                transactionName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
 
         private static bool IsIgnoredTransaction(string transactionName)
         {

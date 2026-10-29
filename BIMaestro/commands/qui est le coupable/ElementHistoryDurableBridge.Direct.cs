@@ -39,9 +39,71 @@ namespace Analyse
         internal static bool HasCapturedAutonomousRecipe(ElementHistoryEvent ev)
         {
             if (ev?.Action != "delete") return false;
-            try { return HasAutonomousDirectRecipe(ToRequest(ev, false)); }
+            try
+            {
+                // A light capture has no neighbour list, but restoration connects
+                // coincident free ends geometrically: publish it at once.
+                return HasAutonomousDirectRecipe(ToRequest(ev, false));
+            }
             catch (Exception ex) { System.Diagnostics.Trace.WriteLine("History autonomous capture check: " + ex.Message); return false; }
         }
+
+        // The copy or native snapshot this deletion depends on was deleted, expired
+        // or never written. A copy still being written by a live session is not.
+        // Batch members and their opening receipt can reach the journal in separate
+        // spool deliveries; judge an event only once its batch has had time to land.
+        private static readonly TimeSpan SourceGrace = TimeSpan.FromMinutes(5);
+        private static bool SourceDataMissing(ElementHistoryEvent ev, HistoryRecipe recipe)
+        {
+            if (DateTime.UtcNow - ev.Ts < SourceGrace) return false;
+            foreach (var artifact in Artifacts(recipe).Where(a => string.IsNullOrEmpty(a.PayloadId) && !string.IsNullOrWhiteSpace(a.File)))
+            {
+                var name = Path.GetFileName(artifact.File);
+                lock (Sync)
+                    if (Sessions.Values.Any(s => s.CopyTask?.IsCompleted == false
+                        && string.Equals(Path.GetFileName(s.BridgeFile), name, StringComparison.OrdinalIgnoreCase))) return false;
+                if (!SourceFilePresent(artifact)) return true;
+            }
+            return false;
+        }
+        // Checked for every queued job on frequent passes: cache each answer briefly.
+        private static readonly Dictionary<string, Tuple<bool, DateTime>> SourcePresence = new Dictionary<string, Tuple<bool, DateTime>>(StringComparer.OrdinalIgnoreCase);
+        private static bool SourceFilePresent(HistoryNativeArtifact artifact)
+        {
+            var key = (artifact.WholeModel ? "w|" : "s|") + artifact.File;
+            lock (SourcePresence)
+                if (SourcePresence.TryGetValue(key, out var known) && DateTime.UtcNow - known.Item2 < TimeSpan.FromSeconds(30)) return known.Item1;
+            bool present = File.Exists(Path.Combine(CollaborativeModelTrackerStore.ActiveDirectory, "native-history", Path.GetFileName(artifact.File)))
+                || artifact.WholeModel && (File.Exists(artifact.File) || File.Exists(artifact.File + ".partial"));
+            lock (SourcePresence) SourcePresence[key] = Tuple.Create(present, DateTime.UtcNow);
+            return present;
+        }
+
+        // Nothing left to prepare from: no job, no retry, no diagnostic file.
+        // The journal stays the record; the row simply shows as unavailable.
+        // Without a recipe the only source is its batch's opening copy, if any.
+        private static bool IsUnrecoverable(ElementHistoryEvent ev, HistoryRestoreRequest request)
+        {
+            if (request == null) return false;
+            if (request.Recipe == null)
+                return DateTime.UtcNow - ev.Ts >= SourceGrace && TryGetOpeningNativeRequest(ev) == null;
+            return !HasAutonomousDirectRecipe(request) && SourceDataMissing(ev, request.Recipe);
+        }
+
+        private const string UnrecoverableReason = "Copie temporaire supprimée ou expirée : cet élément n’a pas été préparé à temps et ne peut plus être récupéré.";
+        private static void DropUnrecoverable(ElementHistoryEvent ev)
+        {
+            var id = EventId(ev);
+            var original = ToRequest(ev, false);
+            var reason = original.Recipe == null && !string.IsNullOrWhiteSpace(original.CaptureFailure)
+                ? "Non récupérable : " + original.CaptureFailure : UnrecoverableReason;
+            ElementHistoryDurableStore.DropUnrecoverableJob(id);
+            lock (Sync) { Pending.Remove(id); Errors.Remove(id); TransportRetries.Remove(id); }
+            SetReadiness(id, ReadinessState.Unavailable, reason);
+        }
+
+        private static bool LacksConnections(HistoryRecipe recipe)
+            => recipe != null && (recipe.Kind == "network" || recipe.Kind == "family") && recipe.Connections == null;
 
         // Only the requested element is read, using the already open historical
         // source. CaptureDirectForRestore owns the supported-host/group rules.
@@ -56,7 +118,16 @@ namespace Analyse
                     && original.SourceUniqueId != expected) return null;
                 HistoryRecipe direct;
                 Element element = null;
-                if (HasAutonomousDirectRecipe(original)) direct = CompactDirectRecipe(original.Recipe);
+                if (HasAutonomousDirectRecipe(original))
+                {
+                    direct = CompactDirectRecipe(original.Recipe);
+                    if (LacksConnections(direct) && source.GetElement(expected) is Element copied && copied.IsValidObject)
+                    {
+                        var fromCopy = ElementHistoryReconstruction.CaptureDirectForRestore(copied);
+                        if (fromCopy?.Connections != null) direct.Connections = fromCopy.Connections;
+                        if (direct.Ports == null && fromCopy?.Ports != null) direct.Ports = fromCopy.Ports;
+                    }
+                }
                 else
                 {
                     element = source.GetElement(expected);

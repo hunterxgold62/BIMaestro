@@ -226,6 +226,14 @@ namespace Analyse
                     foreach (var warning in request.Recipe?.CaptureWarnings ?? new List<string>())
                         batch.CaptureWarnings.Add(request.Label + " : " + warning);
                     if (string.IsNullOrEmpty(request.SourceUniqueId)) { result.Reason = "identity"; continue; }
+                    // Revit forms piping/duct systems from connected members; recreating
+                    // one splits the network. Members reconnect and rejoin it instead.
+                    if (request.Recipe?.Kind == "pipe_system" || request.Recipe?.Kind == "duct_system")
+                    {
+                        result.IncludedInParent = true;
+                        result.Detail = "Système recomposé par Revit à partir des raccords rétablis.";
+                        continue;
+                    }
                     var existing = Resolve(doc, index, request.SourceUniqueId);
                     if (existing != null && request.Recipe?.Kind != "electrical_system")
                     {
