@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using BIMaestro.Localization;
 using Grid = System.Windows.Controls.Grid;
 
 namespace BIMaestro.Home
@@ -41,11 +42,11 @@ namespace BIMaestro.Home
         private readonly TextBlock _description;
         private readonly string[] _keys = { "native", "2023", "2024", "2025", "2026" };
         private readonly string[] _descriptions = {
-            "La présentation d’origine de Revit, avec vos habitudes et vos repères.",
-            "Des cartes sobres et des projets séparés des familles, pour aller à l’essentiel.",
-            "Un registre organisé avec les noms, dates et dossiers de vos fichiers.",
-            "Des cartes horizontales et des aperçus pour reconnaître vos fichiers au premier regard.",
-            "Une liste compacte et des colonnes alignées pour parcourir rapidement vos fichiers."
+            UiLanguage.T("La présentation d’origine de Revit, avec vos habitudes et vos repères.", "Revit's original layout, with your usual habits and landmarks."),
+            UiLanguage.T("Des cartes sobres et des projets séparés des familles, pour aller à l’essentiel.", "Clean cards with projects separated from families, to focus on what matters."),
+            UiLanguage.T("Un registre organisé avec les noms, dates et dossiers de vos fichiers.", "An organized register with the names, dates and folders of your files."),
+            UiLanguage.T("Des cartes horizontales et des aperçus pour reconnaître vos fichiers au premier regard.", "Horizontal cards and previews to recognize your files at a glance."),
+            UiLanguage.T("Une liste compacte et des colonnes alignées pour parcourir rapidement vos fichiers.", "A compact list with aligned columns to browse your files quickly.")
         };
         internal event Action ShowHomeRequested;
         internal bool HasChanges => _keys[_selectedIndex] != HomeAppearanceService.CurrentStyle || (_history.IsChecked == true) != HomeAppearanceService.HistoryEnabled;
@@ -54,14 +55,14 @@ namespace BIMaestro.Home
             var root = new StackPanel();
             Content = new ScrollViewer { Content = root, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Margin = new Thickness(0, 8, 4, 4) };
-            root.Children.Add(Text("Accueil Revit", "H2"));
-            var intro = Text("Choisissez votre présentation et les fichiers à retrouver dès l’ouverture de Revit. Les couleurs suivent automatiquement son thème clair ou sombre.", "Hint");
+            root.Children.Add(Text(UiLanguage.T("Accueil Revit", "Revit Home"), "H2"));
+            var intro = Text(UiLanguage.T("Choisissez votre présentation et les fichiers à retrouver dès l’ouverture de Revit. Les couleurs suivent automatiquement son thème clair ou sombre.", "Choose your layout and the files to find as soon as Revit opens. Colors automatically follow its light or dark theme."), "Hint");
             intro.Margin = new Thickness(0, 0, 0, 14); root.Children.Add(intro);
             var body = new Grid(); body.ColumnDefinitions.Add(new ColumnDefinition()); body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(16) }); body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(310) }); root.Children.Add(body);
-            var styles = new StackPanel(); styles.Children.Add(Text("La présentation de votre accueil", "H2"));
+            var styles = new StackPanel(); styles.Children.Add(Text(UiLanguage.T("La présentation de votre accueil", "Your Home layout"), "H2"));
             _selectedIndex = Math.Max(0, Array.IndexOf(_keys, HomeAppearanceService.CurrentStyle));
             _description = Text(_descriptions[_selectedIndex], "Hint");
-            var labels = new[] { "Autodesk", "Atelier essentiel", "Bureau de projets", "Bibliothèque", "Index" };
+            var labels = new[] { "Autodesk", UiLanguage.T("Atelier essentiel", "Essential Studio"), UiLanguage.T("Bureau de projets", "Project Office"), UiLanguage.T("Bibliothèque", "Library"), "Index" };
             for (int i = 0; i < labels.Length; i++)
             {
                 int index = i;
@@ -78,15 +79,15 @@ namespace BIMaestro.Home
             }
             var stylesCard = Card(styles); body.Children.Add(stylesCard);
             var side = new StackPanel(); Grid.SetColumn(side, 2); body.Children.Add(side);
-            var journal = new StackPanel(); journal.Children.Add(Text("Vos fichiers récents", "H2"));
-            _history = new CheckBox { Content = new TextBlock { Text = "Retrouver les projets et familles du journal Excel", TextWrapping = TextWrapping.Wrap }, IsChecked = HomeAppearanceService.HistoryEnabled, Margin = new Thickness(0, 6, 0, 12) };
+            var journal = new StackPanel(); journal.Children.Add(Text(UiLanguage.T("Vos fichiers récents", "Your recent files"), "H2"));
+            _history = new CheckBox { Content = new TextBlock { Text = UiLanguage.T("Retrouver les projets et familles du journal Excel", "Show projects and families from the Excel journal"), TextWrapping = TextWrapping.Wrap }, IsChecked = HomeAppearanceService.HistoryEnabled, Margin = new Thickness(0, 6, 0, 12) };
             _history.SetResourceReference(ForegroundProperty, "Text.Primary"); journal.Children.Add(_history);
-            journal.Children.Add(Text("Recherchez un fichier par son nom ou son dossier, puis ouvrez-le directement depuis l’accueil.", "Hint"));
+            journal.Children.Add(Text(UiLanguage.T("Recherchez un fichier par son nom ou son dossier, puis ouvrez-le directement depuis l’accueil.", "Search for a file by name or folder, then open it directly from Home."), "Hint"));
             side.Children.Add(Card(journal));
-            var actions = new StackPanel(); actions.Children.Add(Text("Votre accueil, à votre façon", "H2"));
+            var actions = new StackPanel(); actions.Children.Add(Text(UiLanguage.T("Votre accueil, à votre façon", "Your Home, your way"), "H2"));
             _description.Margin = new Thickness(0, 4, 0, 12); actions.Children.Add(_description);
-            actions.Children.Add(Text("Enregistrez vos réglages avec le bouton en bas de la fenêtre, ou affichez votre accueil dès maintenant.", "Hint"));
-            var show = new Button { Content = "Enregistrer et afficher l’accueil", HorizontalAlignment = HorizontalAlignment.Stretch, Margin = new Thickness(0, 14, 0, 0) };
+            actions.Children.Add(Text(UiLanguage.T("Enregistrez vos réglages avec le bouton en bas de la fenêtre, ou affichez votre accueil dès maintenant.", "Save your settings with the button at the bottom of the window, or show your Home right now."), "Hint"));
+            var show = new Button { Content = UiLanguage.T("Enregistrer et afficher l’accueil", "Save and show Home"), HorizontalAlignment = HorizontalAlignment.Stretch, Margin = new Thickness(0, 14, 0, 0) };
             show.SetResourceReference(StyleProperty, "PrimaryButton"); show.Click += (_, __) => ShowHomeRequested?.Invoke(); actions.Children.Add(show);
             side.Children.Add(Card(actions)); RefreshChoices();
         }

@@ -36,6 +36,7 @@ namespace Analyse
             }
 
             var win = new ElementHistoryWindow(uidoc, selected, initialEvents, defaultAction);
+            BIMaestro.Tutorials.DemoTourService.AttachIfRequested("history", win);
             new WindowInteropHelper(win) { Owner = data.Application.MainWindowHandle };
             win.Show();
 

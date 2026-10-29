@@ -16,13 +16,13 @@ namespace Analyse
             var ui = data.Application;
             if (ui.ActiveUIDocument == null || ui.ActiveUIDocument.Document.IsFamilyDocument)
             {
-                TaskDialog.Show("Clash 3D", "Ouvrez une maquette de projet pour analyser les conflits.");
+                TaskDialog.Show("Clash 3D", BIMaestro.Localization.UiLanguage.T("Ouvrez une maquette de projet pour analyser les conflits.", "Open a project model to analyze clashes."));
                 return Result.Cancelled;
             }
             if (_window != null && _window.IsVisible && _window.OwnerDocument.IsValidObject && _window.OwnerDocument.Equals(ui.ActiveUIDocument.Document))
             {
                 if (Couleur.AppearanceOnboarding.IsTourPending("clash-3d") && !_window.RestartPreparedTutorial(SmartScanSetup.Capture(ui.ActiveUIDocument)))
-                { TaskDialog.Show("Clash 3D", "Attendez la fin de l'action en cours, puis cliquez à nouveau sur Clash 3D pour démarrer le guide."); return Result.Cancelled; }
+                { TaskDialog.Show("Clash 3D", BIMaestro.Localization.UiLanguage.T("Attendez la fin de l'action en cours, puis cliquez à nouveau sur Clash 3D pour démarrer le guide.", "Wait for the current action to finish, then click Clash 3D again to start the guide.")); return Result.Cancelled; }
                 _window.Activate(); return Result.Succeeded;
             }
             _window?.Close();

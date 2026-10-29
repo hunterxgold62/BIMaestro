@@ -1,4 +1,5 @@
-﻿using System;
+﻿using BIMaestro.Localization;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -61,7 +62,7 @@ namespace Famille
             try
             {
                 IsReady = false;
-                UpdateStatus("Recherche des familles…");
+                UpdateStatus(UiLanguage.T("Recherche des familles…", "Searching for families…"));
 
                 var list = new List<Entry>(capacity: 8192);
                 int n = 0;
@@ -77,19 +78,19 @@ namespace Famille
                     if (n == 1 || n % 25 == 0)
                     {
                         lock (_lock) _items = list.ToList();
-                        UpdateStatus($"Familles trouvées : {n}…");
+                        UpdateStatus(UiLanguage.T($"Familles trouvées : {n}…", $"Families found: {n}…"));
                     }
                 }
 
                 lock (_lock) _items = list;
                 IsReady = true;
-                UpdateStatus($"Recherche prête ({_items.Count} familles).");
+                UpdateStatus(UiLanguage.T($"Recherche prête ({_items.Count} familles).", $"Search ready ({_items.Count} families)."));
 
                 EnrichIndexMetadata(list, ct);
             }
             catch (Exception ex)
             {
-                UpdateStatus("Index erreur : " + ex.Message);
+                UpdateStatus(UiLanguage.T("Index erreur : ", "Index error: ") + ex.Message);
             }
         }
 
@@ -152,7 +153,7 @@ namespace Famille
             }
 
             lock (_lock) _items = list.ToList();
-            UpdateStatus($"Index complet ({list.Count} familles).");
+            UpdateStatus(UiLanguage.T($"Index complet ({list.Count} familles).", $"Index complete ({list.Count} families)."));
         }
 
         public bool RefreshSearchMetadata(string familyPath, bool notify = true)

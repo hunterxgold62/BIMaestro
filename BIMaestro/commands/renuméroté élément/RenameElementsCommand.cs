@@ -39,7 +39,7 @@ namespace Modification
             if (selectedElements.Any(element => element is ViewSheet) &&
                 !selectedElements.All(element => element is ViewSheet))
             {
-                TaskDialog.Show("Sélection", "Sélectionne uniquement des feuilles pour les renuméroter.");
+                TaskDialog.Show(UiLanguage.T("Sélection", "Selection"), UiLanguage.T("Sélectionne uniquement des feuilles pour les renuméroter.", "Select only sheets to renumber them."));
                 return Result.Cancelled;
             }
             int viewportCount = selectedElements.Count(element => element is Viewport);
@@ -88,7 +88,7 @@ namespace Modification
                 string selectedParameter = renamerWindow.SelectedParameter;
                 var valuesBefore = SnapshotTextValues(doc, selectedIds, selectedParameter);
 
-                using (Transaction tx = new Transaction(doc, "Mettre à jour ou réinitialiser les éléments"))
+                using (Transaction tx = new Transaction(doc, UiLanguage.T("Mettre à jour ou réinitialiser les éléments", "Update or reset elements")))
                 {
                     try
                     {
@@ -155,7 +155,7 @@ namespace Modification
                             var sheets = selectedElements.OfType<ViewSheet>().ToList();
                             bool renumberSheets = sheets.Count == selectedElements.Count;
                             if (renumberSheets && renamerWindow.IsSortByLevelEnabled)
-                                throw new InvalidOperationException("Décoche Trier par niveau pour renuméroter des feuilles.");
+                                throw new InvalidOperationException(UiLanguage.T("Décoche Trier par niveau pour renuméroter des feuilles.", "Uncheck Sort by level to renumber sheets."));
                             // Obtenir les éléments avec leurs positions transformées selon la vue active
                             var elementLocations = GetElementsWithLocations(doc, selectedIds, uiDoc.ActiveView);
 
@@ -192,11 +192,11 @@ namespace Modification
                                 var targets = Enumerable.Range(0, sheets.Count).Select(index => prefix +
                                     (currentNumber + index).ToString(renamerWindow.SelectedNumberFormat == "001,002,003..." ? "D3" :
                                         renamerWindow.SelectedNumberFormat == "0001,0002,0003..." ? "D4" : "D") + suffix).ToList();
-                                if (!isNumeric) throw new InvalidOperationException("Pour les numéros de feuilles, choisis un format numérique.");
+                                if (!isNumeric) throw new InvalidOperationException(UiLanguage.T("Pour les numéros de feuilles, choisis un format numérique.", "For sheet numbers, choose a numeric format."));
                                 var selectedSet = new HashSet<ElementId>(selectedIds);
                                 if (new FilteredElementCollector(doc).OfClass(typeof(ViewSheet)).Cast<ViewSheet>()
                                     .Any(sheet => !selectedSet.Contains(sheet.Id) && targets.Contains(sheet.SheetNumber)))
-                                    throw new InvalidOperationException("Un numéro demandé appartient déjà à une feuille hors sélection.");
+                                    throw new InvalidOperationException(UiLanguage.T("Un numéro demandé appartient déjà à une feuille hors sélection.", "A requested number is already used by a sheet outside the selection."));
                                 // Temporary unique values allow overlapping source/target sequences.
                                 foreach (ViewSheet sheet in sheets) sheet.SheetNumber = "BIMaestro-" + Guid.NewGuid().ToString("N");
                             }
@@ -284,7 +284,7 @@ namespace Modification
             if (activeSheet == null)
             {
                 TaskDialog.Show(
-                    "Feuille requise",
+                    UiLanguage.T("Feuille requise", "Sheet required"),
                     UiLanguage.T("Pour numéroter des fenêtres de vue, ouvrez leur feuille puis relancez Organisateur.", "To Number Viewports, Open Their Sheet and Run Organizer Again."));
                 return Result.Cancelled;
             }
@@ -336,7 +336,7 @@ namespace Modification
             }
 
             var viewportValuesBefore = SnapshotViewportValues(doc, sortedViewports, renamerWindow.SelectedParameter);
-            using (var transaction = new Transaction(doc, "Organiser les fenêtres de vue"))
+            using (var transaction = new Transaction(doc, UiLanguage.T("Organiser les fenêtres de vue", "Organize viewports")))
             {
                 try
                 {
@@ -370,8 +370,8 @@ namespace Modification
                     }
 
                     TaskDialog.Show(
-                        "Organisateur",
-                        "La numérotation des fenêtres de vue n'a pas pu être appliquée.\n\n" +
+                        UiLanguage.T("Organisateur", "Organizer"),
+                        UiLanguage.T("La numérotation des fenêtres de vue n'a pas pu être appliquée.\n\n", "Viewport numbering could not be applied.\n\n") +
                         ex.Message);
                     return Result.Failed;
                 }

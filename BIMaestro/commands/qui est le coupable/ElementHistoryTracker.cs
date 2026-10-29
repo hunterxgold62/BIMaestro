@@ -608,7 +608,10 @@ namespace Analyse
             var addedIds = e.GetAddedElementIds().ToList();
             var modifiedIds = e.GetModifiedElementIds().ToList();
             var deletedIds = e.GetDeletedElementIds().ToList();
-            var suppressSecondaryModifications = deletedIds.Count > 0;
+            bool chairExercise = tx == "BIMaestro - Exercice historique : modifier les paramètres du témoin";
+            // Changing a parametric chair array can delete nested members. Its parent
+            // parameter change remains an intentional user action, not deletion noise.
+            var suppressSecondaryModifications = deletedIds.Count > 0 && !chairExercise;
             var deadlineUtc = DateTime.UtcNow.AddMilliseconds(DocumentChangedTimeBudgetMs);
             var relatedTypeParameterDeltaCache = new Dictionary<int, Dictionary<string, object>>();
             var processedChanges = 0;
@@ -628,7 +631,9 @@ namespace Analyse
                 capturedIds.Add(id);
             }
 
-            foreach (var id in modifiedIds.OrderBy(id => IsFamilySymbolElementId(doc, id) ? 1 : 0))
+            foreach (var id in modifiedIds.OrderBy(id => chairExercise && doc.GetElement(id) is FamilyInstance instance &&
+                (instance.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString() ?? "").EndsWith("HISTORIQUE_TEMOIN", StringComparison.Ordinal) ? -1 :
+                IsFamilySymbolElementId(doc, id) ? 1 : 0))
             {
                 if (!CanContinueDocumentChangedCapture(deadlineUtc, processedChanges, MaxChangedElementSnapshotsPerTransaction))
                     break;

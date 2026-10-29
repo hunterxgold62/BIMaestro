@@ -73,7 +73,7 @@ namespace Couleur
             {
                 _propertiesEditor = BIMaestro.PropertiesAppearance.PropertiesAppearanceCommand.CreateEditor(application);
                 _propertiesEditor.SaveBackupRequested = () => ExportCurrentPack(false, false,
-                    "Sauvegarder mes propriétés avant réinitialisation", "Mes propriétés avant réinitialisation.bimaestro-style.json", true, false);
+                    UiLanguage.T("Sauvegarder mes propriétés avant réinitialisation", "Back up my properties before reset"), UiLanguage.T("Mes propriétés avant réinitialisation.bimaestro-style.json", "My properties before reset.bimaestro-style.json"), true, false);
                 PropertiesEditorHost.Content = _propertiesEditor;
                 _homeEditor = new BIMaestro.Home.HomeAppearanceEditor();
                 HomeEditorHost.Content = _homeEditor;
@@ -123,7 +123,7 @@ namespace Couleur
                 if (_projectWriteHandler.HasPending || _savingAppearance)
                 {
                     args.Cancel = true;
-                    MessageBox.Show(this, "Patientez : Revit termine l’enregistrement des réglages.", "Enregistrement en cours", MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show(this, UiLanguage.T("Patientez : Revit termine l’enregistrement des réglages.", "Please wait: Revit is finishing saving the settings."), UiLanguage.T("Enregistrement en cours", "Saving in progress"), MessageBoxButton.OK, MessageBoxImage.Information);
                 }
             };
             Closed += (_, __) =>
@@ -169,7 +169,7 @@ namespace Couleur
                         SetSavingAppearance(false);
                         if (!app.CanPostCommand(command))
                         {
-                            MessageBox.Show(this, "Vos réglages sont enregistrés. Revit ne peut pas afficher l’accueil pour le moment.", "Accueil Revit", MessageBoxButton.OK, MessageBoxImage.Information);
+                            MessageBox.Show(this, UiLanguage.T("Vos réglages sont enregistrés. Revit ne peut pas afficher l’accueil pour le moment.", "Your settings are saved. Revit cannot display Home right now."), UiLanguage.T("Accueil Revit", "Revit Home"), MessageBoxButton.OK, MessageBoxImage.Information);
                             return;
                         }
                         app.PostCommand(command);
@@ -241,7 +241,7 @@ namespace Couleur
                 {
                     Document active = app.ActiveUIDocument?.Document;
                     if (active == null || !active.Equals(request.Document))
-                        throw new System.InvalidOperationException("Le projet actif a changé. Revenez au projet initial puis réessayez.");
+                        throw new System.InvalidOperationException(UiLanguage.T("Le projet actif a changé. Revenez au projet initial puis réessayez.", "The active project has changed. Return to the original project and try again."));
                     if (request.ApiAction != null)
                         request.ApiAction(app);
                     else if (request.Clear)
@@ -267,7 +267,7 @@ namespace Couleur
         {
             if (_projectWriteHandler.HasPending)
             {
-                completed(new System.InvalidOperationException("Une modification du projet est déjà en cours. Patientez un instant."));
+                completed(new System.InvalidOperationException(UiLanguage.T("Une modification du projet est déjà en cours. Patientez un instant.", "A project change is already in progress. Please wait a moment.")));
                 return false;
             }
             var request = new BrowserProjectWriteRequest
@@ -298,7 +298,7 @@ namespace Couleur
         {
             if (_projectWriteHandler.HasPending)
             {
-                request.Completed(new System.InvalidOperationException("Une opération Revit est déjà en cours. Patientez un instant."));
+                request.Completed(new System.InvalidOperationException(UiLanguage.T("Une opération Revit est déjà en cours. Patientez un instant.", "A Revit operation is already in progress. Please wait a moment.")));
                 return false;
             }
             _projectWriteHandler.Pending = request;
@@ -306,7 +306,7 @@ namespace Couleur
             if (response == ExternalEventRequest.Accepted || response == ExternalEventRequest.Pending)
                 return true;
             _projectWriteHandler.Pending = null;
-            request.Completed(new System.InvalidOperationException("Revit n’a pas accepté la demande. Réessayez lorsqu’il est disponible."));
+            request.Completed(new System.InvalidOperationException(UiLanguage.T("Revit n’a pas accepté la demande. Réessayez lorsqu’il est disponible.", "Revit did not accept the request. Try again when it is available.")));
             return false;
         }
 
@@ -316,11 +316,11 @@ namespace Couleur
         public bool CanApplyBrowserToProject => _canApplyBrowserToProject;
         public bool HasSharedBrowserAppearance => _hasSharedBrowserAppearance;
         public string BrowserSourceLabel => HasSharedBrowserAppearance
-            ? "Style partagé dans la maquette"
-            : "Mes réglages personnels";
+            ? UiLanguage.T("Style partagé dans la maquette", "Style shared in the model")
+            : UiLanguage.T("Mes réglages personnels", "My personal settings");
         public string BrowserSourceStatus => HasSharedBrowserAppearance
-            ? "Source actuelle : style partagé dans cette maquette. « Enregistrer mes réglages » met aussi à jour les vues, dossiers et icônes de ce projet."
-            : "Source actuelle : mes réglages personnels. Pour les partager, utilisez « Appliquer au projet ».";
+            ? UiLanguage.T("Source actuelle : style partagé dans cette maquette. « Enregistrer mes réglages » met aussi à jour les vues, dossiers et icônes de ce projet.", "Current source: style shared in this model. “Save my settings” also updates the views, folders and icons of this project.")
+            : UiLanguage.T("Source actuelle : mes réglages personnels. Pour les partager, utilisez « Appliquer au projet ».", "Current source: my personal settings. To share them, use “Apply to project”.");
 
         private void NotifyBrowserSourceChanged(bool shared)
         {
@@ -329,7 +329,7 @@ namespace Couleur
             OnPropertyChanged(nameof(BrowserSourceLabel));
             OnPropertyChanged(nameof(BrowserSourceStatus));
         }
-        private string _packStatus = "Sauvegardez ou restaurez les panneaux BIMaestro, l’arborescence et ses icônes, les propriétés et l’accueil Revit. Les profils et groupes personnalisés sont inclus.";
+        private string _packStatus = UiLanguage.T("Sauvegardez ou restaurez les panneaux BIMaestro, l’arborescence et ses icônes, les propriétés et l’accueil Revit. Les profils et groupes personnalisés sont inclus.", "Back up or restore the BIMaestro panels, the Project Browser and its icons, properties and Revit Home. Profiles and custom groups are included.");
         public string PackStatus { get => _packStatus; private set { _packStatus = value; OnPropertyChanged(); } }
 
         private void ExportPack_Click(object sender, RoutedEventArgs e)
@@ -339,22 +339,22 @@ namespace Couleur
             try
             {
                 ExportCurrentPack(scopeDialog.IncludesRibbon, scopeDialog.IncludesBrowser,
-                    "Exporter un pack d’apparence", "Mon pack.bimaestro-style.json", scopeDialog.IncludesProperties, scopeDialog.IncludesHome);
+                    UiLanguage.T("Exporter un pack d’apparence", "Export an appearance pack"), UiLanguage.T("Mon pack.bimaestro-style.json", "My pack.bimaestro-style.json"), scopeDialog.IncludesProperties, scopeDialog.IncludesHome);
             }
-            catch (System.Exception ex) { MessageBox.Show(this, ex.Message, "Export du pack", MessageBoxButton.OK, MessageBoxImage.Error); }
+            catch (System.Exception ex) { MessageBox.Show(this, ex.Message, UiLanguage.T("Export du pack", "Pack export"), MessageBoxButton.OK, MessageBoxImage.Error); }
         }
 
         private void ImportPack_Click(object sender, RoutedEventArgs e)
         {
-            var dialog = new Microsoft.Win32.OpenFileDialog { Title = "Importer un pack d’apparence",
-                Filter = "Pack BIMaestro|*.bimaestro-style.json|Fichier JSON|*.json", CheckFileExists = true };
+            var dialog = new Microsoft.Win32.OpenFileDialog { Title = UiLanguage.T("Importer un pack d’apparence", "Import an appearance pack"),
+                Filter = UiLanguage.T("Pack BIMaestro|*.bimaestro-style.json|Fichier JSON|*.json", "BIMaestro pack|*.bimaestro-style.json|JSON file|*.json"), CheckFileExists = true };
             if (dialog.ShowDialog(this) != true) return;
             try
             {
                 var pack = AppearancePackFile.Import(dialog.FileName);
                 var scope = new AppearancePackScopeDialog(pack) { Owner = this };
                 if (scope.ShowDialog() != true) return;
-                if (!OfferBackup("Avant l’import, voulez-vous enregistrer vos réglages actuels dans un pack de secours ?", "Import du pack"))
+                if (!OfferBackup(UiLanguage.T("Avant l’import, voulez-vous enregistrer vos réglages actuels dans un pack de secours ?", "Before importing, do you want to save your current settings in a backup pack?"), UiLanguage.T("Import du pack", "Pack import")))
                     return;
                 if (scope.IncludesRibbon)
                 {
@@ -373,19 +373,19 @@ namespace Couleur
                 }
                 if (scope.IncludesProperties) _propertiesEditor.LoadPreferences(pack.Properties);
                 if (scope.IncludesHome) _homeEditor.LoadSettings(pack.Home);
-                PackStatus = "Pack chargé : " + System.IO.Path.GetFileName(dialog.FileName) + ". Vérifiez les onglets puis cliquez sur Enregistrer pour l’appliquer, ou Annuler pour abandonner.";
+                PackStatus = UiLanguage.T("Pack chargé : ", "Pack loaded:") + System.IO.Path.GetFileName(dialog.FileName) + UiLanguage.T(". Vérifiez les onglets puis cliquez sur Enregistrer pour l’appliquer, ou Annuler pour abandonner.", ". Check the tabs, then click Save to apply it, or Cancel to discard it.");
             }
-            catch (System.Exception ex) { MessageBox.Show(this, ex.Message, "Import du pack", MessageBoxButton.OK, MessageBoxImage.Error); }
+            catch (System.Exception ex) { MessageBox.Show(this, ex.Message, UiLanguage.T("Import du pack", "Pack import"), MessageBoxButton.OK, MessageBoxImage.Error); }
         }
 
         private bool OfferBackup(string question, string title)
         {
             var choice = MessageBox.Show(this,
-                question + "\n\nOui : enregistrer un fichier de secours.\nNon : continuer sans sauvegarder.\nAnnuler : ne rien modifier.",
+                question + UiLanguage.T("\n\nOui : enregistrer un fichier de secours.\nNon : continuer sans sauvegarder.\nAnnuler : ne rien modifier.", "\n\nYes: save a backup file.\nNo: continue without backing up.\nCancel: change nothing."),
                 title, MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
             if (choice == MessageBoxResult.Cancel) return false;
             return choice != MessageBoxResult.Yes || ExportCurrentPack(true, true,
-                "Enregistrer mes réglages actuels", "Mes réglages avant modification.bimaestro-style.json", _propertiesEditor != null, _homeEditor != null);
+                UiLanguage.T("Enregistrer mes réglages actuels", "Save my current settings"), UiLanguage.T("Mes réglages avant modification.bimaestro-style.json", "My settings before changes.bimaestro-style.json"), _propertiesEditor != null, _homeEditor != null);
         }
 
         private bool ExportCurrentPack(bool includesRibbon, bool includesBrowser, string title, string fileName,
@@ -404,7 +404,7 @@ namespace Couleur
                 Browser = includesBrowser ? BrowserPreferences : null,
                 Icons = includesBrowser ? BrowserIcons : null
             });
-            PackStatus = "Pack exporté : " + System.IO.Path.GetFileName(dialog.FileName) + ".";
+            PackStatus = UiLanguage.T("Pack exporté : ", "Pack exported:") + System.IO.Path.GetFileName(dialog.FileName) + ".";
             return true;
         }
 
@@ -420,34 +420,34 @@ namespace Couleur
         {
             if (!CanApplyBrowserToProject)
             {
-                PackStatus = "Aucun projet Revit modifiable n’est actif.";
+                PackStatus = UiLanguage.T("Aucun projet Revit modifiable n’est actif.", "No editable Revit project is active.");
                 return;
             }
 
             try
             {
                 BrowserPreferences.IsEnabled = true;
-                PackStatus = "Application au projet en cours…";
+                PackStatus = UiLanguage.T("Application au projet en cours…", "Applying to the project…");
                 QueueProjectWrite(false, BrowserPreferences, BrowserIcons, error =>
                 {
                     if (error != null)
                     {
-                        PackStatus = "Le projet n’a pas été modifié : " + error.Message;
-                        MessageBox.Show(this, error.Message, "Configuration du projet", MessageBoxButton.OK, MessageBoxImage.Error);
+                        PackStatus = UiLanguage.T("Le projet n’a pas été modifié : ", "The project was not modified:") + error.Message;
+                        MessageBox.Show(this, error.Message, UiLanguage.T("Configuration du projet", "Project configuration"), MessageBoxButton.OK, MessageBoxImage.Error);
                         return;
                     }
                     ProjectBrowserColoring.Reset();
                     ProjectBrowserColoring.Apply(_mainWindowHandle);
                     NotifyBrowserSourceChanged(true);
-                    PackStatus = "Arborescence enregistrée dans le projet. Elle sera partagée lors du prochain enregistrement ou de la prochaine synchronisation.";
+                    PackStatus = UiLanguage.T("Arborescence enregistrée dans le projet. Elle sera partagée lors du prochain enregistrement ou de la prochaine synchronisation.", "Project Browser saved in the project. It will be shared at the next save or synchronization.");
                 });
             }
             catch (System.Exception ex)
             {
                 MessageBox.Show(
                     this,
-                    "Impossible d’enregistrer l’arborescence dans le projet.\n\n" + ex.Message,
-                    "Configuration du projet",
+                    UiLanguage.T("Impossible d’enregistrer l’arborescence dans le projet.\n\n", "Unable to save the Project Browser in the project.\n\n") + ex.Message,
+                    UiLanguage.T("Configuration du projet", "Project configuration"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
             }
@@ -471,7 +471,7 @@ namespace Couleur
         {
             var dialog = new Microsoft.Win32.OpenFileDialog
             {
-                Title = "Importer une icône simple (PNG conseillé)",
+                Title = UiLanguage.T("Importer une icône simple (PNG conseillé)", "Import a simple icon (PNG recommended)"),
                 Filter = "Images|*.png;*.jpg;*.jpeg;*.bmp",
                 CheckFileExists = true
             };
@@ -479,7 +479,7 @@ namespace Couleur
             try
             {
                 if (new System.IO.FileInfo(dialog.FileName).Length > 10 * 1024 * 1024)
-                    throw new System.InvalidOperationException("Choisissez une image de moins de 10 Mo.");
+                    throw new System.InvalidOperationException(UiLanguage.T("Choisissez une image de moins de 10 Mo.", "Choose an image smaller than 10 MB."));
                 using (var stream = System.IO.File.OpenRead(dialog.FileName))
                 {
                     var asset = new BrowserIconAsset
@@ -496,8 +496,8 @@ namespace Couleur
             }
             catch (System.Exception ex)
             {
-                MessageBox.Show(this, "Impossible de lire cette image.\n" + ex.Message,
-                    "Icônes", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(this, UiLanguage.T("Impossible de lire cette image.\n", "Unable to read this image.\n") + ex.Message,
+                    UiLanguage.T("Icônes", "Icons"), MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
@@ -871,14 +871,14 @@ namespace Couleur
             if (_document == null)
             {
                 MessageBox.Show(this,
-                    "Ouvrez d’abord un projet Revit pour choisir un dossier.",
-                    "Arborescence du projet", MessageBoxButton.OK, MessageBoxImage.Information);
+                    UiLanguage.T("Ouvrez d’abord un projet Revit pour choisir un dossier.", "First open a Revit project to choose a folder."),
+                    UiLanguage.T("Arborescence du projet", "Project Browser"), MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
             QueueBrowserRead(_ =>
             {
                 if (!int.TryParse(_document.Application.VersionNumber, out int version) || version < 2024)
-                    throw new System.InvalidOperationException("La sélection des dossiers nécessite Revit 2024 ou plus récent.");
+                    throw new System.InvalidOperationException(UiLanguage.T("La sélection des dossiers nécessite Revit 2024 ou plus récent.", "Folder selection requires Revit 2024 or later."));
                 var dialog = new ProjectBrowserRuleWindow(
                     _document, BrowserPreferences,
                     (selected, previous, completed) => ApplyBrowserRule(selected, previous, completed),
@@ -896,7 +896,7 @@ namespace Couleur
                         if (dialog.TextColorTutorialCompleted)
                         {
                             CompleteAppearanceGuideStep(7);
-                            AppearanceGuideText.Text = "La couleur du texte a été appliquée au dossier choisi. Clique sur Suivant pour ajouter les icônes. Tu peux annuler cet essai avec « Annuler la dernière application » dans le choix des dossiers.";
+                            AppearanceGuideText.Text = UiLanguage.T("La couleur du texte a été appliquée au dossier choisi. Clique sur Suivant pour ajouter les icônes. Tu peux annuler cet essai avec « Annuler la dernière application » dans le choix des dossiers.", "The text color has been applied to the selected folder. Click Next to add icons. You can undo this test with “Undo last application” in the folder selection.");
                         }
                     };
                 }
@@ -904,7 +904,7 @@ namespace Couleur
             }, error =>
             {
                 if (error != null)
-                    MessageBox.Show(this, error.Message, "Arborescence du projet", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show(this, error.Message, UiLanguage.T("Arborescence du projet", "Project Browser"), MessageBoxButton.OK, MessageBoxImage.Error);
             });
         }
 
@@ -916,7 +916,7 @@ namespace Couleur
             if (HasSharedBrowserAppearance && !CanApplyBrowserToProject)
             {
                 completed(new System.InvalidOperationException(
-                    "Le style de cette maquette est partagé, mais le projet est en lecture seule. Aucune modification personnelle ne peut le remplacer ici."));
+                    UiLanguage.T("Le style de cette maquette est partagé, mais le projet est en lecture seule. Aucune modification personnelle ne peut le remplacer ici.", "This model's style is shared, but the project is read-only. No personal change can replace it here.")));
                 return;
             }
             var undoState = new BrowserRuleUndoState
@@ -981,7 +981,7 @@ namespace Couleur
         {
             if (_browserRuleUndo.Count == 0)
             {
-                completed(null, false, new System.InvalidOperationException("Aucune application récente à annuler."));
+                completed(null, false, new System.InvalidOperationException(UiLanguage.T("Aucune application récente à annuler.", "No recent application to undo.")));
                 return;
             }
             BrowserRuleUndoState previous = _browserRuleUndo.Peek();
@@ -1026,7 +1026,7 @@ namespace Couleur
             }, error =>
             {
                 if (error != null)
-                    MessageBox.Show(this, error.Message, "Modifier un dossier", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show(this, error.Message, UiLanguage.T("Modifier un dossier", "Edit a folder"), MessageBoxButton.OK, MessageBoxImage.Error);
             });
         }
 
@@ -1054,7 +1054,7 @@ namespace Couleur
             QueueBrowserRead(_ => DetectBrowserCategories(), error =>
             {
                 if (error != null)
-                    MessageBox.Show(this, error.Message, "Actualiser les dossiers", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show(this, error.Message, UiLanguage.T("Actualiser les dossiers", "Refresh folders"), MessageBoxButton.OK, MessageBoxImage.Error);
             });
         }
 
@@ -1250,18 +1250,18 @@ namespace Couleur
         {
             string[] disciplines =
             {
-                "Architecture", "Structure", "Aménagement", "Coordination"
+                "Architecture", "Structure", UiLanguage.T("Aménagement", "Interiors"), "Coordination"
             };
             string[] levels =
             {
-                "RDC", "Niveau 01", "Niveau 02", "Toiture"
+                UiLanguage.T("RDC", "Ground Floor"), UiLanguage.T("Niveau 01", "Level 01"), UiLanguage.T("Niveau 02", "Level 02"), UiLanguage.T("Toiture", "Roof")
             };
             string[] sections =
             {
-                "Coupe AA · Hall central",
-                "Coupe BB · Escalier principal",
-                "Façade · Nord",
-                "Détail · Entrée principale"
+                UiLanguage.T("Coupe AA · Hall central", "Section AA · Main Hall"),
+                UiLanguage.T("Coupe BB · Escalier principal", "Section BB · Main Stair"),
+                UiLanguage.T("Façade · Nord", "Elevation · North"),
+                UiLanguage.T("Détail · Entrée principale", "Detail · Main Entrance")
             };
 
             string level = levels[_previewRandom.Next(levels.Length)];
@@ -1340,12 +1340,12 @@ namespace Couleur
         {
             try
             {
-                if (!OfferBackup("Avant de revenir aux valeurs par défaut, voulez-vous enregistrer vos réglages actuels ?", "Valeurs par défaut"))
+                if (!OfferBackup(UiLanguage.T("Avant de revenir aux valeurs par défaut, voulez-vous enregistrer vos réglages actuels ?", "Before reverting to the default values, do you want to save your current settings?"), UiLanguage.T("Valeurs par défaut", "Default values")))
                     return;
             }
             catch (System.Exception ex)
             {
-                MessageBox.Show(this, ex.Message, "Sauvegarde des réglages", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(this, ex.Message, UiLanguage.T("Sauvegarde des réglages", "Settings backup"), MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
             BrowserIcons.Enabled = false;
@@ -1366,8 +1366,8 @@ namespace Couleur
             AreColoredPanelsEnabled = true;
             UseFullPanelColoring = false;
             PackStatus = HasSharedBrowserAppearance
-                ? "Valeurs par défaut préparées. Si vous enregistrez, elles remplaceront le style partagé de ce projet ; vos préférences personnelles resteront intactes."
-                : "Valeurs personnelles remises à zéro dans cette fenêtre. Cliquez sur « Enregistrer mes réglages » pour les appliquer.";
+                ? UiLanguage.T("Valeurs par défaut préparées. Si vous enregistrez, elles remplaceront le style partagé de ce projet ; vos préférences personnelles resteront intactes.", "Default values prepared. If you save, they will replace this project's shared style; your personal preferences will remain intact.")
+                : UiLanguage.T("Valeurs personnelles remises à zéro dans cette fenêtre. Cliquez sur « Enregistrer mes réglages » pour les appliquer.", "Personal values reset in this window. Click “Save my settings” to apply them.");
         }
 
         private void ResetBrowserDefaultsButton_Click(
@@ -1376,17 +1376,17 @@ namespace Couleur
         {
             try
             {
-                if (!OfferBackup("Avant de restaurer l’arborescence Revit, voulez-vous enregistrer vos réglages actuels ?", "Restaurer Revit"))
+                if (!OfferBackup(UiLanguage.T("Avant de restaurer l’arborescence Revit, voulez-vous enregistrer vos réglages actuels ?", "Before restoring the Revit Project Browser, do you want to save your current settings?"), UiLanguage.T("Restaurer Revit", "Restore Revit")))
                     return;
             }
             catch (System.Exception ex)
             {
-                MessageBox.Show(this, ex.Message, "Sauvegarde des réglages", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(this, ex.Message, UiLanguage.T("Sauvegarde des réglages", "Settings backup"), MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
             if (HasSharedBrowserAppearance && MessageBox.Show(this,
-                "Cette maquette contient un style d’arborescence partagé. Le retirer modifiera la maquette pour toute l’équipe après enregistrement ou synchronisation. Continuer ?",
-                "Retirer le style partagé", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                UiLanguage.T("Cette maquette contient un style d’arborescence partagé. Le retirer modifiera la maquette pour toute l’équipe après enregistrement ou synchronisation. Continuer ?", "This model contains a shared Project Browser style. Removing it will modify the model for the whole team after saving or synchronizing. Continue?"),
+                UiLanguage.T("Retirer le style partagé", "Remove shared style"), MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                 return;
             if (HasSharedBrowserAppearance)
             {
@@ -1394,7 +1394,7 @@ namespace Couleur
                 {
                     if (error != null)
                     {
-                        MessageBox.Show(this, error.Message, "Restaurer l’arborescence Revit", MessageBoxButton.OK, MessageBoxImage.Error);
+                        MessageBox.Show(this, error.Message, UiLanguage.T("Restaurer l’arborescence Revit", "Restore Revit Project Browser"), MessageBoxButton.OK, MessageBoxImage.Error);
                         return;
                     }
                     BrowserPreferences = ProjectBrowserColorPreferences.Load();
@@ -1405,7 +1405,7 @@ namespace Couleur
                     NotifyBrowserSourceChanged(false);
                     ProjectBrowserColoring.Reset();
                     ProjectBrowserColoring.Apply(_mainWindowHandle);
-                    PackStatus = "Style partagé retiré. Ce projet utilise à nouveau vos réglages personnels, sans les modifier.";
+                    PackStatus = UiLanguage.T("Style partagé retiré. Ce projet utilise à nouveau vos réglages personnels, sans les modifier.", "Shared style removed. This project uses your personal settings again, without changing them.");
                 });
                 return;
             }
@@ -1426,7 +1426,7 @@ namespace Couleur
             ProjectBrowserColoring.Reset();
             ProjectBrowserColoring.Apply(_mainWindowHandle);
             NotifyBrowserSourceChanged(false);
-            PackStatus = "Arborescence Revit restaurée. Le style partagé a été retiré du projet s’il était présent.";
+            PackStatus = UiLanguage.T("Arborescence Revit restaurée. Le style partagé a été retiré du projet s’il était présent.", "Revit Project Browser restored. The shared style was removed from the project if it was present.");
         }
 
         private void OpenRevitColorsButton_Click(
@@ -1454,7 +1454,7 @@ namespace Couleur
                 if (guided)
                 {
                     BIMaestro.Tutorials.DemoTourCompletion.Show(_mainWindowHandle, "colors",
-                        "Tes réglages d’apparence sont enregistrés. Tu as terminé le tutoriel Couleurs et vues, avec les onglets Propriétés, Accueil Revit et partage des réglages.");
+                        UiLanguage.T("Tes réglages d’apparence sont enregistrés. Tu as terminé le tutoriel Couleurs et vues, avec les onglets Propriétés, Accueil Revit et partage des réglages.", "Your appearance settings are saved. You have completed the Colors and Views tutorial, including the Properties, Revit Home and settings sharing tabs."));
                 }
             });
         }
@@ -1469,8 +1469,8 @@ namespace Couleur
                 {
                     SetSavingAppearance(false);
                     MessageBox.Show(this,
-                        "Cette maquette partage son apparence, mais elle est en lecture seule. Les changements ne peuvent pas être conservés dans ce projet.",
-                        "Enregistrer mes réglages", MessageBoxButton.OK, MessageBoxImage.Information);
+                        UiLanguage.T("Cette maquette partage son apparence, mais elle est en lecture seule. Les changements ne peuvent pas être conservés dans ce projet.", "This model shares its appearance, but it is read-only. Changes cannot be kept in this project."),
+                        UiLanguage.T("Enregistrer mes réglages", "Save my settings"), MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
                 }
                 QueueProjectWrite(false, BrowserPreferences, BrowserIcons, error =>

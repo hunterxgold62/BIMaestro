@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using BIMaestro.Localization;
 
 namespace BIMaestro.PropertiesAppearance
 {
@@ -34,7 +35,7 @@ namespace BIMaestro.PropertiesAppearance
                 if (grid != null)
                 {
                     var original=PropertiesPaletteLayout.OriginalPreview(grid,context);
-                    if(original!=null){context.PreviewRows=original;context.PreviewHint="Glissez un paramètre vers un bandeau personnalisé.";return context;}
+                    if(original!=null){context.PreviewRows=original;context.PreviewHint=UiLanguage.T("Glissez un paramètre vers un bandeau personnalisé.", "Drag a parameter onto a custom group header.");return context;}
                     string group = null;
                     for (uint row = 1; row <= grid.RowCount; row++)
                     {
@@ -48,12 +49,12 @@ namespace BIMaestro.PropertiesAppearance
                             Header = header, Label = label, Value = header ? "" : parameter?.DisplayValue ?? grid.Value(row, 2),
                             ReadOnly = header ? group == null || group.StartsWith("native:", StringComparison.Ordinal) : parameter == null || parameter.ReadOnly || !grid.CanStyle(row) });
                     }
-                    if (context.PreviewRows.Count > 0) { context.PreviewHint = "Cliquez pour colorer · glissez la poignée pour réorganiser";
+                    if (context.PreviewRows.Count > 0) { context.PreviewHint = UiLanguage.T("Cliquez pour colorer · glissez la poignée pour réorganiser", "Click to color · drag the handle to reorder");
                         context.PreviewRows = PropertiesPaletteLayout.OriginalOrder(context.PreviewRows, context.Signature); return context; }
                 }
             }
             catch { /* The editor stays usable when a native binary is not qualified. */ }
-            context.PreviewHint = "Aperçu indicatif · les valeurs seront visibles avec la palette Propriétés ouverte";
+            context.PreviewHint = UiLanguage.T("Aperçu indicatif · les valeurs seront visibles avec la palette Propriétés ouverte", "Approximate preview · values will be visible with the Properties palette open");
             foreach (var group in context.Groups)
             {
                 context.PreviewRows.Add(new PropertyPreviewRow { Header = true, GroupKey = group.Key, Label = group.Name });
@@ -88,13 +89,13 @@ namespace BIMaestro.PropertiesAppearance
 
         internal static AppearanceContext Capture(UIApplication app, bool displayValues = false)
         {
-            var result = new AppearanceContext { Caption = "Ouvrez un projet et sélectionnez un élément, ou activez une vue.", Signature = "none" };
+            var result = new AppearanceContext { Caption = UiLanguage.T("Ouvrez un projet et sélectionnez un élément, ou activez une vue.", "Open a project and select an element, or activate a view."), Signature = "none" };
             var ui = app.ActiveUIDocument;
             if (ui == null) return result;
             var ids = ui.Selection.GetElementIds();
             var selected=ids.Select(ui.Document.GetElement).Where(e=>e!=null).ToArray();
             if(ids.Count>1 && (selected.Length!=ids.Count || selected.Any(e=>e.Category?.Id!=selected[0].Category?.Id)))
-            {result.Caption="Sélection de catégories différentes : apparence Revit conservée.";return result;}
+            {result.Caption=UiLanguage.T("Sélection de catégories différentes : apparence Revit conservée.", "Selection spans different categories: Revit appearance kept.");return result;}
             Element element = ids.Count > 0 ? selected.FirstOrDefault() : ui.ActiveView;
             if (element == null) return result;
             result.CategoryKey = "cat:" + (element.Category?.Id.ToString() ?? ((int)BuiltInCategory.OST_Views).ToString());
@@ -104,7 +105,7 @@ namespace BIMaestro.PropertiesAppearance
             string typeName = !sameType?null:element is View v ? v.ViewType.ToString() : type == null ? null : type.FamilyName + " / " + type.Name;
             result.TypeKey = typeName == null ? null : result.CategoryKey + "/type:" + typeName;
             result.TypeName = element is View ? type?.Name ?? typeName : typeName;
-            result.Caption = result.CategoryName + " · " + (ids.Count>1?ids.Count+" éléments":element.Name);
+            result.Caption = result.CategoryName + " · " + (ids.Count>1?ids.Count+UiLanguage.T(" éléments", " elements"):element.Name);
             result.Signature = ui.Document.GetHashCode() + "/" + (ids.Count>1?string.Join(",",ids.Select(id=>id.ToString()).OrderBy(id=>id,StringComparer.Ordinal)):element.Id.ToString()) + "/" + result.TypeKey;
             var common=selected.Skip(1).Select(e=>e.Parameters.Cast<Parameter>().GroupBy(p=>p.Id.ToString()).Where(g=>g.Count()==1).ToDictionary(g=>g.Key,g=>g.Single())).ToArray();
             var targets = new List<PropertyTarget>();
@@ -176,7 +177,7 @@ namespace BIMaestro.PropertiesAppearance
         private static DateTime _nextFileCheck;
         private static DateTime _fileStamp;
         private static Exception _nativeRefreshError;
-        internal static string Status { get; private set; } = "Personnalisation désactivée.";
+        internal static string Status { get; private set; } = UiLanguage.T("Personnalisation désactivée.", "Customization disabled.");
 
         internal static bool IsDark
         {
@@ -271,8 +272,8 @@ namespace BIMaestro.PropertiesAppearance
                 bool hasColors = preferences.Enabled && preferences.Profiles.Any(p => p.Rules.Count > 0);
                 bool hasOrder = preferences.Enabled && preferences.Profiles.Any(p => !p.Layout.IsEmpty);
                 if (!hasColors && !hasOrder && !PropertiesPaletteLayout.HasApplied)
-                { if (_renderer != null) { _renderer.Dispose(); _renderer = null; } Status = "Apparence Revit d’origine."; return; }
-                if (app?.ActiveUIDocument == null) { _renderer?.Dispose(); _renderer = null; _cachedGrid = null; PropertiesPaletteLayout.Forget(); Status = "Ouvrez un projet pour afficher vos propriétés."; return; }
+                { if (_renderer != null) { _renderer.Dispose(); _renderer = null; } Status = UiLanguage.T("Apparence Revit d’origine.", "Original Revit appearance."); return; }
+                if (app?.ActiveUIDocument == null) { _renderer?.Dispose(); _renderer = null; _cachedGrid = null; PropertiesPaletteLayout.Forget(); Status = UiLanguage.T("Ouvrez un projet pour afficher vos propriétés.", "Open a project to display your properties."); return; }
                 var grid = _cachedGrid;
                 long findTime = PropertiesAppearanceMetrics.Begin();
                 try
@@ -283,7 +284,7 @@ namespace BIMaestro.PropertiesAppearance
                     _cachedGrid = grid;
                 }
                 finally { PropertiesAppearanceMetrics.End("FindGrid", findTime); }
-                if (grid == null) { _renderer?.Dispose(); _renderer = null; Status = "Affichez la palette Propriétés pour voir vos couleurs."; return; }
+                if (grid == null) { _renderer?.Dispose(); _renderer = null; Status = UiLanguage.T("Affichez la palette Propriétés pour voir vos couleurs.", "Display the Properties palette to see your colors."); return; }
                 long contextTime = PropertiesAppearanceMetrics.Begin();
                 AppearanceContext context;
                 try { context = AppearanceContext.Capture(app); }
@@ -316,8 +317,8 @@ namespace BIMaestro.PropertiesAppearance
                     }
                     finally { PropertiesAppearanceMetrics.End("BeforePaint", refreshTime); }
                 };
-                Status = cellCount == 0 ? "Aucune règle applicable à cette sélection. Les champs grisés gardent leur style Revit." : cellCount + " ligne(s) personnalisée(s) · champs grisés et saisie conservés.";
-                if (!hasColors) { Status = PropertiesPaletteLayout.Status ?? "Apparence Revit d’origine."; return; }
+                Status = cellCount == 0 ? UiLanguage.T("Aucune règle applicable à cette sélection. Les champs grisés gardent leur style Revit.", "No rule applies to this selection. Grayed-out fields keep their Revit style.") : cellCount + UiLanguage.T(" ligne(s) personnalisée(s) · champs grisés et saisie conservés.", " customized row(s) · grayed-out fields and input preserved.");
+                if (!hasColors) { Status = PropertiesPaletteLayout.Status ?? UiLanguage.T("Apparence Revit d’origine.", "Original Revit appearance."); return; }
                 if (_renderer.Error != null) Status = _renderer.Error;
                 else if (PropertiesPaletteLayout.Status != null) Status += " " + PropertiesPaletteLayout.Status;
             }
@@ -329,7 +330,7 @@ namespace BIMaestro.PropertiesAppearance
                 {
                     bool idle=false;
                     try{idle=recoveryGrid!=null&&recoveryGrid.IsCurrent()&&!recoveryGrid.IsEditing;}catch{}
-                    if(!idle){Status="Actualisation différée pour préserver la saisie en cours. Changez de sélection après validation. "+ex.Message;_next=DateTime.UtcNow.AddSeconds(5);return;}
+                    if(!idle){Status=UiLanguage.T("Actualisation différée pour préserver la saisie en cours. Changez de sélection après validation. ", "Refresh postponed to preserve the current input. Change the selection after confirming.")+ex.Message;_next=DateTime.UtcNow.AddSeconds(5);return;}
                     // Idling is on Revit's UI thread: discard uncertain row indices
                     // before returning control to the user. Never write model values.
                     var selection = app.ActiveUIDocument.Selection;
@@ -338,7 +339,7 @@ namespace BIMaestro.PropertiesAppearance
                     selection.SetElementIds(ids);
                     PropertiesPaletteLayout.Forget();
                 }
-                Status = "Palette conservée dans son état Revit : " + ex.Message;
+                Status = UiLanguage.T("Palette conservée dans son état Revit : ", "Palette kept in its Revit state:") + ex.Message;
                 _next = DateTime.UtcNow.AddSeconds(5);
             }
             finally { Presentation.Release();PropertiesAppearanceMetrics.End("Refresh", measured); }

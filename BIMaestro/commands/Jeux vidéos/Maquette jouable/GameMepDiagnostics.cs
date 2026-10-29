@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Windows.Media.Media3D;
+using BIMaestro.Localization;
 
 namespace BIMaestro.VideoGames
 {
@@ -77,9 +78,9 @@ namespace BIMaestro.VideoGames
                 bool nativePair = GameMepEquipmentDirectionPolicy.TryGetNativeFlowDirection(graph, element, out int entry, out int exit);
                 graph.Diagnostics.Add(CreateElementDiagnostic(graph, element,
                     GameMepDiagnosticKind.UnknownPassThroughComponent, nativePair ? GameMepDiagnosticSeverity.Information : GameMepDiagnosticSeverity.Warning,
-                    nativePair ? "Passage principal In/Out reconnu" : "Passages internes à qualifier",
-                    nativePair ? "Les deux seuls ports raccordés définissent le passage In/Out " + entry + " → " + exit + ". Les ports annexes non raccordés ne créent aucun passage supplémentaire." :
-                        "Équipement multivoie : seuls les couples de connecteurs explicitement imposés sont traversables. Vérifier les circuits internes dans la famille Revit.",
+                    nativePair ? UiLanguage.T("Passage principal In/Out reconnu", "Main In/Out passage recognized") : UiLanguage.T("Passages internes à qualifier", "Internal passages to be qualified"),
+                    nativePair ? UiLanguage.T("Les deux seuls ports raccordés définissent le passage In/Out ", "The only two connected ports define the In/Out passage ") + entry + " → " + exit + UiLanguage.T(". Les ports annexes non raccordés ne créent aucun passage supplémentaire.", ". Unconnected auxiliary ports do not create any additional passage.") :
+                        UiLanguage.T("Équipement multivoie : seuls les couples de connecteurs explicitement imposés sont traversables. Vérifier les circuits internes dans la famille Revit.", "Multi-port equipment: only explicitly assigned connector pairs can be traversed. Check the internal circuits in the Revit family."),
                     "passages|" + element.Key));
             }
             AddDisconnectedElements(graph);
@@ -169,10 +170,10 @@ namespace BIMaestro.VideoGames
                     element,
                     GameMepDiagnosticKind.DirectionConflict,
                     GameMepDiagnosticSeverity.Critical,
-                    "Conflit de sens",
+                    UiLanguage.T("Conflit de sens", "Direction conflict"),
                     count == 1
-                        ? "Plusieurs chemins imposent des sens incompatibles sur cet élément."
-                        : count + " chemins de cet élément ont un sens contradictoire.",
+                        ? UiLanguage.T("Plusieurs chemins imposent des sens incompatibles sur cet élément.", "Several paths impose incompatible directions on this element.")
+                        : count + UiLanguage.T(" chemins de cet élément ont un sens contradictoire.", " paths of this element have contradictory directions."),
                     "direction|" + element.Key));
             }
         }
@@ -198,10 +199,10 @@ namespace BIMaestro.VideoGames
                     detailedOnly
                         ? GameMepDiagnosticSeverity.Information
                         : GameMepDiagnosticSeverity.Warning,
-                    "Vanne ou accessoire ambigu",
-                    "La classification automatique est " +
+                    UiLanguage.T("Vanne ou accessoire ambigu", "Ambiguous valve or accessory"),
+                    UiLanguage.T("La classification automatique est ", "Automatic classification confidence is ") +
                         ToConfidenceText(valve.Confidence) +
-                        ". Une validation manuelle est recommandée.",
+                        UiLanguage.T(". Une validation manuelle est recommandée.", ". Manual validation is recommended."),
                     "control|" + element.Key,
                     detailedOnly));
             }
@@ -228,8 +229,8 @@ namespace BIMaestro.VideoGames
                     boundary || element.ConnectorIndices.Count == 1
                         ? GameMepDiagnosticSeverity.Information
                         : GameMepDiagnosticSeverity.Warning,
-                    "Élément déconnecté",
-                    "Aucun connecteur de cet élément n'est raccordé physiquement dans Revit.",
+                    UiLanguage.T("Élément déconnecté", "Disconnected element"),
+                    UiLanguage.T("Aucun connecteur de cet élément n'est raccordé physiquement dans Revit.", "None of this element's connectors is physically connected in Revit."),
                     "disconnected|" + element.Key,
                     boundary || element.ConnectorIndices.Count == 1));
             }
@@ -261,9 +262,9 @@ namespace BIMaestro.VideoGames
                     representative,
                     GameMepDiagnosticKind.BranchWithoutSource,
                     GameMepDiagnosticSeverity.Warning,
-                    "Branche sans source active",
+                    UiLanguage.T("Branche sans source active", "Branch without an active source"),
                     component.Elements.Count +
-                        " élément(s) appartiennent à une branche qui ne contient aucune arrivée active.",
+                        UiLanguage.T(" élément(s) appartiennent à une branche qui ne contient aucune arrivée active.", " element(s) belong to a branch that contains no active supply."),
                     "source|component-" + component.Index,
                     false,
                     component.Elements.Count));
@@ -294,11 +295,11 @@ namespace BIMaestro.VideoGames
                     ConnectorIndex = connector.Index,
                     SystemKey = connector.SystemKey,
                     Title = legitimate
-                        ? "Extrémité ouverte probablement légitime"
-                        : "Connecteur ouvert",
+                        ? UiLanguage.T("Extrémité ouverte probablement légitime", "Open end, probably intentional")
+                        : UiLanguage.T("Connecteur ouvert", "Open connector"),
                     Explanation = legitimate
-                        ? "Cette extrémité correspond probablement à une limite, une source ou un terminal."
-                        : "Ce connecteur n'est relié à aucun autre connecteur Revit.",
+                        ? UiLanguage.T("Cette extrémité correspond probablement à une limite, une source ou un terminal.", "This end probably corresponds to a boundary, a source or a terminal.")
+                        : UiLanguage.T("Ce connecteur n'est relié à aucun autre connecteur Revit.", "This connector is not connected to any other Revit connector."),
                     Position = connector.Position,
                     HasPosition = IsFinite(connector.Position),
                     ShowInSmartMode = false
@@ -333,9 +334,9 @@ namespace BIMaestro.VideoGames
                     ConnectorIndex = first.ConnectorIndex,
                     SystemKey = first.SystemKey,
                     Title = pair.Value.Count == 1
-                        ? "1 connecteur ouvert dans cette branche"
-                        : pair.Value.Count + " connecteurs ouverts dans cette branche",
-                    Explanation = "Le diagnostic intelligent regroupe les extrémités non raccordées de cette branche.",
+                        ? UiLanguage.T("1 connecteur ouvert dans cette branche", "1 open connector in this branch")
+                        : pair.Value.Count + UiLanguage.T(" connecteurs ouverts dans cette branche", " open connectors in this branch"),
+                    Explanation = UiLanguage.T("Le diagnostic intelligent regroupe les extrémités non raccordées de cette branche.", "Smart diagnostics groups the unconnected ends of this branch."),
                     Position = first.Position,
                     HasPosition = first.HasPosition,
                     OccurrenceCount = pair.Value.Count,
@@ -361,8 +362,8 @@ namespace BIMaestro.VideoGames
                     element,
                     GameMepDiagnosticKind.UnknownPassThroughComponent,
                     GameMepDiagnosticSeverity.Information,
-                    "Composant traversant non classé",
-                    "Le fluide traverse cet accessoire, mais son rôle fonctionnel n'est pas reconnu.",
+                    UiLanguage.T("Composant traversant non classé", "Unclassified inline component"),
+                    UiLanguage.T("Le fluide traverse cet accessoire, mais son rôle fonctionnel n'est pas reconnu.", "Fluid flows through this accessory, but its functional role is not recognized."),
                     "unknown|" + element.Key,
                     true);
                 graph.Diagnostics.Add(detailed);
@@ -394,9 +395,9 @@ namespace BIMaestro.VideoGames
                     ElementKey = first.ElementKey,
                     SystemKey = first.SystemKey,
                     Title = pair.Value.Count == 1
-                        ? "1 composant traversant non classé"
-                        : pair.Value.Count + " composants traversants non classés",
-                    Explanation = "Ces composants de même type sont regroupés dans le diagnostic intelligent.",
+                        ? UiLanguage.T("1 composant traversant non classé", "1 unclassified inline component")
+                        : pair.Value.Count + UiLanguage.T(" composants traversants non classés", " unclassified inline components"),
+                    Explanation = UiLanguage.T("Ces composants de même type sont regroupés dans le diagnostic intelligent.", "These components of the same type are grouped in smart diagnostics."),
                     Position = first.Position,
                     HasPosition = first.HasPosition,
                     OccurrenceCount = pair.Value.Count,
@@ -457,8 +458,8 @@ namespace BIMaestro.VideoGames
                     ElementKey = element.Key,
                     ConnectorIndex = firstConnector.Index,
                     SystemKey = firstConnector.SystemKey,
-                    Title = "Changement de système au raccordement",
-                    Explanation = "Deux connecteurs physiquement liés appartiennent à des systèmes Revit différents. Cela peut être normal autour d'un équipement.",
+                    Title = UiLanguage.T("Changement de système au raccordement", "System change at connection"),
+                    Explanation = UiLanguage.T("Deux connecteurs physiquement liés appartiennent à des systèmes Revit différents. Cela peut être normal autour d'un équipement.", "Two physically connected connectors belong to different Revit systems. This can be normal around equipment."),
                     Position = firstConnector.Position,
                     HasPosition = IsFinite(firstConnector.Position),
                     ShowInSmartMode = false
@@ -486,9 +487,9 @@ namespace BIMaestro.VideoGames
                     ConnectorIndex = first.ConnectorIndex,
                     SystemKey = first.SystemKey,
                     Title = pair.Value.Count == 1
-                        ? "1 raccordement entre systèmes différents"
-                        : pair.Value.Count + " raccordements entre systèmes différents",
-                    Explanation = "Vérifie ces transitions si elles ne correspondent pas à un équipement séparant volontairement deux systèmes.",
+                        ? UiLanguage.T("1 raccordement entre systèmes différents", "1 connection between different systems")
+                        : pair.Value.Count + UiLanguage.T(" raccordements entre systèmes différents", " connections between different systems"),
+                    Explanation = UiLanguage.T("Vérifie ces transitions si elles ne correspondent pas à un équipement séparant volontairement deux systèmes.", "Check these transitions if they do not correspond to equipment intentionally separating two systems."),
                     Position = first.Position,
                     HasPosition = first.HasPosition,
                     OccurrenceCount = pair.Value.Count,
@@ -507,9 +508,9 @@ namespace BIMaestro.VideoGames
                 Key = "scenario|invalid-settings",
                 Kind = GameMepDiagnosticKind.InvalidSavedSetting,
                 Severity = GameMepDiagnosticSeverity.Warning,
-                Title = "Ancien réglage devenu invalide",
+                Title = UiLanguage.T("Ancien réglage devenu invalide", "Outdated setting no longer valid"),
                 Explanation = graph.SkippedScenarioEntryCount +
-                    " réglage(s) sauvegardé(s) ne correspondent plus à un élément ou un connecteur compatible de la maquette.",
+                    UiLanguage.T(" réglage(s) sauvegardé(s) ne correspondent plus à un élément ou un connecteur compatible de la maquette.", " saved setting(s) no longer match a compatible element or connector in the model."),
                 OccurrenceCount = graph.SkippedScenarioEntryCount,
                 ShowInSmartMode = true
             });
@@ -649,11 +650,11 @@ namespace BIMaestro.VideoGames
             switch (confidence)
             {
                 case GameMepConfidence.High:
-                    return "élevée";
+                    return UiLanguage.T("élevée", "high");
                 case GameMepConfidence.Medium:
-                    return "moyenne";
+                    return UiLanguage.T("moyenne", "medium");
                 default:
-                    return "faible";
+                    return UiLanguage.T("faible", "low");
             }
         }
     }

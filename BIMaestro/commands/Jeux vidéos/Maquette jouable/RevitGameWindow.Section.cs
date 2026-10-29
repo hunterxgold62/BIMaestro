@@ -7,6 +7,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
 using HelixToolkit.Wpf.SharpDX;
+using BIMaestro.Localization;
 
 namespace BIMaestro.VideoGames
 {
@@ -31,9 +32,9 @@ namespace BIMaestro.VideoGames
         private void SectionAdd_Click(object sender, RoutedEventArgs e)
         {
             if (_sectionVolume.Planes.Count >= GameSectionVolume.MaximumPlanes)
-            { ShowToast("8 coupes maximum : supprimez une coupe avant d'en ajouter une."); return; }
+            { ShowToast(UiLanguage.T("8 coupes maximum : supprimez une coupe avant d'en ajouter une.", "8 sections maximum: delete a section before adding another.")); return; }
             _pickingSectionFace = true;
-            SectionHint.Text = "Cliquez une face du bâtiment · Échap pour annuler";
+            SectionHint.Text = UiLanguage.T("Cliquez une face du bâtiment · Échap pour annuler", "Click a building face · Esc to cancel");
             GameViewport.Cursor = Cursors.Cross;
             GameViewport.Focus();
         }
@@ -41,7 +42,7 @@ namespace BIMaestro.VideoGames
         {
             _pickingSectionFace = false;
             GameViewport.Cursor = Cursors.Arrow;
-            SectionHint.Text = "Ctrl + molette : déplacer la coupe sélectionnée";
+            SectionHint.Text = UiLanguage.T("Ctrl + molette : déplacer la coupe sélectionnée", "Ctrl + wheel: move the selected section");
         }
         private void AddSectionAt(Point screenPoint)
         {
@@ -50,13 +51,13 @@ namespace BIMaestro.VideoGames
             if (!_sectionVolume.ClipRay(ref origin, direction, ref length)) return;
             var hit = _selectionIndex.FindNearest(origin, direction, length);
             if (hit?.Normal == null || hit.Normal.Value.LengthSquared < 1e-12)
-            { ShowToast("Cliquez sur une face visible du bâtiment."); return; }
+            { ShowToast(UiLanguage.T("Cliquez sur une face visible du bâtiment.", "Click a visible face of the building.")); return; }
             var normal = hit.Normal.Value;
             normal.Normalize();
             if (Vector3D.DotProduct(normal, direction) < 0) normal.Negate();
             var section = new GameSectionPlane
             {
-                Name = "Coupe " + ++_sectionSerial, Enabled = true, FaceNormal = normal, Anchor = hit.Position
+                Name = UiLanguage.T("Coupe ", "Section ") + ++_sectionSerial, Enabled = true, FaceNormal = normal, Anchor = hit.Position
             };
             _sectionVolume.Planes.Add(section);
             CancelSectionPick(); BindSections(section); ApplySection();
@@ -85,7 +86,7 @@ namespace BIMaestro.VideoGames
             SectionPosition.Value = (section?.Offset ?? 0) * .3048;
             SectionEnabled.IsChecked = section?.Enabled == true;
             SectionInverted.IsChecked = section?.Inverted == true;
-            SectionPositionText.Text = $"Décalage : {SectionPosition.Value:0.00} m";
+            SectionPositionText.Text = UiLanguage.T($"Décalage : {SectionPosition.Value:0.00} m", $"Offset: {SectionPosition.Value:0.00} m");
             _bindingSections = false;
         }
         private void SectionChanged(object sender, RoutedEventArgs e)
@@ -99,7 +100,7 @@ namespace BIMaestro.VideoGames
         {
             if (_bindingSections || SectionList == null || SelectedSection == null) return;
             SelectedSection.Offset = SectionPosition.Value / .3048;
-            SectionPositionText.Text = $"Décalage : {SectionPosition.Value:0.00} m";
+            SectionPositionText.Text = UiLanguage.T($"Décalage : {SectionPosition.Value:0.00} m", $"Offset: {SectionPosition.Value:0.00} m");
             ApplySection();
         }
         private void SectionDelete_Click(object sender, RoutedEventArgs e)

@@ -613,7 +613,7 @@ namespace Famille
         {
             BreadcrumbItems.Clear();
 
-            var rootName = string.IsNullOrWhiteSpace(RootFolderName) ? "Bibliothèque" : RootFolderName;
+            var rootName = string.IsNullOrWhiteSpace(RootFolderName) ? UiLanguage.T("Bibliothèque", "Library") : RootFolderName;
             BreadcrumbItems.Add(new FolderBreadcrumb
             {
                 Name = rootName,
@@ -1084,8 +1084,8 @@ namespace Famille
                 UpdateCount(_currentResult.Count);
 
                 PagingStatusText.Text = _nextIndex >= _currentResult.Count
-                    ? "Fin de la liste."
-                    : $"Affichés : {displayedFamilies.Count}/{_currentResult.Count}";
+                    ? UiLanguage.T("Fin de la liste.", "End of list.")
+                    : UiLanguage.T($"Affichés : {displayedFamilies.Count}/{_currentResult.Count}", $"Displayed: {displayedFamilies.Count}/{_currentResult.Count}");
             }
             finally
             {
@@ -1206,8 +1206,8 @@ namespace Famille
                 if (PlaceholderText != null && string.IsNullOrWhiteSpace(SearchBox?.Text))
                 {
                     PlaceholderText.Text = global
-                        ? "Rechercher dans toute la bibliothèque…"
-                        : "Rechercher dans le dossier…";
+                        ? UiLanguage.T("Rechercher dans toute la bibliothèque…", "Search the entire library…")
+                        : UiLanguage.T("Rechercher dans le dossier…", "Search in this folder…");
                     PlaceholderText.Visibility = Visibility.Visible;
                 }
             }
@@ -1754,7 +1754,7 @@ namespace Famille
 
             var query = FamilySearchQuery.Parse(normalizedText);
             PagingStatusText.Visibility = Visibility.Visible;
-            PagingStatusText.Text = "Recherche…";
+            PagingStatusText.Text = UiLanguage.T("Recherche…", "Searching…");
 
             List<FamilyItem> items;
             try
@@ -1777,7 +1777,7 @@ namespace Famille
                     return;
 
                 PagingStatusText.Visibility = Visibility.Visible;
-                PagingStatusText.Text = "Recherche impossible : " + ex.Message;
+                PagingStatusText.Text = UiLanguage.T("Recherche impossible : ", "Search failed: ") + ex.Message;
                 return;
             }
 
@@ -1796,8 +1796,8 @@ namespace Famille
                 {
                     PagingStatusText.Visibility = Visibility.Visible;
                     PagingStatusText.Text = items.Count == 0
-                        ? "Recherche en cours…"
-                        : $"Familles affichées : {items.Count}. Les détails se complètent.";
+                        ? UiLanguage.T("Recherche en cours…", "Search in progress…")
+                        : UiLanguage.T($"Familles affichées : {items.Count}. Les détails se complètent.", $"Families displayed: {items.Count}. Details are loading.");
                 }
                 return;
             }
@@ -1933,8 +1933,8 @@ namespace Famille
                     BeginPaging(ApplyInteractiveSorting(indexedItems));
                     PagingStatusText.Visibility = Visibility.Visible;
                     PagingStatusText.Text = indexedItems.Count == 0
-                        ? "Recherche en cours…"
-                        : $"Familles affichées : {indexedItems.Count}. Les détails se complètent.";
+                        ? UiLanguage.T("Recherche en cours…", "Search in progress…")
+                        : UiLanguage.T($"Familles affichées : {indexedItems.Count}. Les détails se complètent.", $"Families displayed: {indexedItems.Count}. Details are loading.");
                     return;
                 }
 
@@ -1976,7 +1976,7 @@ namespace Famille
 
                     BeginPaging(ApplyInteractiveSorting(currentFolderMatchesFallback));
                     PagingStatusText.Visibility = Visibility.Visible;
-                    PagingStatusText.Text = "Recherche ailleurs en préparation…";
+                    PagingStatusText.Text = UiLanguage.T("Recherche ailleurs en préparation…", "Preparing search in other folders…");
                     return;
                 }
 
@@ -2481,7 +2481,7 @@ namespace Famille
             if (_nextIndex >= _currentResult.Count)
             {
                 AddScrollTopActionIfNeeded();
-                PagingStatusText.Text = "Fin de la liste.";
+                PagingStatusText.Text = UiLanguage.T("Fin de la liste.", "End of list.");
                 return;
             }
 
@@ -2506,8 +2506,8 @@ namespace Famille
                 AddScrollTopActionIfNeeded();
 
             PagingStatusText.Text = _nextIndex >= _currentResult.Count
-                ? "Fin de la liste."
-                : $"Affichés : {displayedFamilies.Count}/{_currentResult.Count}";
+                ? UiLanguage.T("Fin de la liste.", "End of list.")
+                : UiLanguage.T($"Affichés : {displayedFamilies.Count}/{_currentResult.Count}", $"Displayed: {displayedFamilies.Count}/{_currentResult.Count}");
         }
 
         private void AddScrollTopActionIfNeeded()
@@ -3457,8 +3457,8 @@ namespace Famille
             if (catalogue == null)
             {
                 if (IsLoaded)
-                    MessageBox.Show(this, "Le catalogue de formation est introuvable. Vérifie que les familles de démonstration sont installées avec BIMaestro.",
-                        "BIMaestro · Formation", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show(this, UiLanguage.T("Le catalogue de formation est introuvable. Vérifie que les familles de démonstration sont installées avec BIMaestro.", "The training catalog was not found. Check that the demo families are installed with BIMaestro."),
+                        UiLanguage.T("BIMaestro · Formation", "BIMaestro · Training"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 return false;
             }
 
@@ -3509,8 +3509,8 @@ namespace Famille
             {
                 _tutorialCatalogActive = false;
                 if (IsLoaded)
-                    MessageBox.Show(this, "Impossible d'ouvrir le catalogue de formation : " + ex.Message,
-                        "BIMaestro · Formation", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show(this, UiLanguage.T("Impossible d'ouvrir le catalogue de formation : ", "Unable to open the training catalog: ") + ex.Message,
+                        UiLanguage.T("BIMaestro · Formation", "BIMaestro · Training"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 return false;
             }
         }
@@ -3737,8 +3737,8 @@ namespace Famille
             if (e.ClickCount != 2) return;
             if (FamilyBrowserCommand.uiapp?.ActiveUIDocument == null)
             {
-                MessageBox.Show(this, "Ouvre d'abord un projet Revit pour charger et placer cette famille.",
-                    "BIMaestro · Navigateur de familles", MessageBoxButton.OK,
+                MessageBox.Show(this, UiLanguage.T("Ouvre d'abord un projet Revit pour charger et placer cette famille.", "Open a Revit project first to load and place this family."),
+                    UiLanguage.T("BIMaestro · Navigateur de familles", "BIMaestro · Family Browser"), MessageBoxButton.OK,
                     MessageBoxImage.Information);
                 return;
             }
@@ -3865,28 +3865,34 @@ namespace Famille
                 if (item is MenuItem menuItem)
                 {
                     var header = menuItem.Header?.ToString();
+                    // Le menu peut déjà avoir été traduit : comparer au texte français et à sa traduction.
+                    bool Is(string french) =>
+                        string.Equals(header, french, StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(header, UiLanguage.T(french), StringComparison.OrdinalIgnoreCase);
+                    const string keywordsHeader = "Mots-clés de recherche…";
+                    const string suggestHeader = "Proposer des mots-clés IA pour la sélection…";
                     if (isFolder)
                     {
-                        menuItem.Visibility = string.Equals(header, "Ouvrir le dossier", StringComparison.OrdinalIgnoreCase)
+                        menuItem.Visibility = Is("Ouvrir le dossier")
                             ? Visibility.Visible
                             : Visibility.Collapsed;
                     }
                     else if (hasMultipleSelection)
                     {
                         bool keepVisible =
-                            string.Equals(header, "Ajouter à la collection active", StringComparison.OrdinalIgnoreCase) ||
-                            string.Equals(header, "Charger la dernière version", StringComparison.OrdinalIgnoreCase) ||
-                            (header?.StartsWith("Mots-clés", StringComparison.OrdinalIgnoreCase) == true ||
-                             header?.StartsWith("Proposer des mots-clés", StringComparison.OrdinalIgnoreCase) == true);
-                        if (header?.StartsWith("Mots-clés", StringComparison.OrdinalIgnoreCase) == true)
-                            menuItem.Header = "Proposer des mots-clés IA pour la sélection…";
+                            Is("Ajouter à la collection active") ||
+                            Is("Charger la dernière version") ||
+                            Is(keywordsHeader) ||
+                            Is(suggestHeader);
+                        if (Is(keywordsHeader))
+                            menuItem.Header = UiLanguage.T(suggestHeader);
                         menuItem.Visibility = keepVisible ? Visibility.Visible : Visibility.Collapsed;
                     }
                     else
                     {
-                        if (header?.StartsWith("Proposer des mots-clés", StringComparison.OrdinalIgnoreCase) == true)
-                            menuItem.Header = "Mots-clés de recherche…";
-                        menuItem.Visibility = string.Equals(header, "Ouvrir le dossier", StringComparison.OrdinalIgnoreCase)
+                        if (Is(suggestHeader))
+                            menuItem.Header = UiLanguage.T(keywordsHeader);
+                        menuItem.Visibility = Is("Ouvrir le dossier")
                             ? Visibility.Collapsed
                             : Visibility.Visible;
                     }
@@ -4124,11 +4130,11 @@ namespace Famille
                 }
 
                 var desiredName = string.IsNullOrWhiteSpace(payload.Name)
-                    ? "Collection importée"
+                    ? UiLanguage.T("Collection importée", "Imported collection")
                     : payload.Name.Trim();
 
                 if (string.Equals(desiredName, FavoritesCollectionName, StringComparison.OrdinalIgnoreCase))
-                    desiredName = desiredName + " (importée)";
+                    desiredName = desiredName + UiLanguage.T(" (importée)", " (imported)");
 
                 var finalName = GenerateUniqueCollectionName(desiredName);
 
@@ -4559,15 +4565,15 @@ namespace Famille
 
             double mb = bytes.Value / (1024d * 1024d);
             if (mb >= 1d)
-                return string.Format(CultureInfo.CurrentCulture, "{0:N2} Mo", mb);
+                return string.Format(CultureInfo.CurrentCulture, UiLanguage.T("{0:N2} Mo", "{0:N2} MB"), mb);
 
             double kb = bytes.Value / 1024d;
             if (kb >= 1d)
-                return string.Format(CultureInfo.CurrentCulture, "{0:N0} Ko", kb);
+                return string.Format(CultureInfo.CurrentCulture, UiLanguage.T("{0:N0} Ko", "{0:N0} KB"), kb);
 
             return string.Format(
                 CultureInfo.CurrentCulture,
-                "{0} octet{1}",
+                UiLanguage.T("{0} octet{1}", "{0} byte{1}"),
                 bytes.Value,
                 bytes.Value > 1 ? "s" : string.Empty);
         }
@@ -4957,8 +4963,8 @@ namespace Famille
             {
                 BIMaestro.Tutorials.DemoTourMessage.Show(
                     new System.Windows.Interop.WindowInteropHelper(this).Handle,
-                    "Bravo ! Tes chemins sont protégés",
-                    "Pendant le tutoriel, BIMaestro utilise un catalogue temporaire sans modifier tes chemins enregistrés. Termine ou quitte le guide, puis reviens dans Paramètres > Modifier les chemins… pour choisir ta propre bibliothèque.");
+                    UiLanguage.T("Bravo ! Tes chemins sont protégés", "Well done! Your paths are protected"),
+                    UiLanguage.T("Pendant le tutoriel, BIMaestro utilise un catalogue temporaire sans modifier tes chemins enregistrés. Termine ou quitte le guide, puis reviens dans Paramètres > Modifier les chemins… pour choisir ta propre bibliothèque.", "During the tutorial, BIMaestro uses a temporary catalog without changing your saved paths. Finish or exit the guide, then go back to Settings > Edit paths… to choose your own library."));
                 return;
             }
 
@@ -5255,9 +5261,9 @@ namespace Famille
                 if (PreviewProgressText != null)
                 {
                     if (progress.IsCanceled)
-                        PreviewProgressText.Text = "Annulé";
+                        PreviewProgressText.Text = UiLanguage.T("Annulé", "Canceled");
                     else if (progress.IsCompleted)
-                        PreviewProgressText.Text = "Terminé";
+                        PreviewProgressText.Text = UiLanguage.T("Terminé", "Completed");
                     else
                         PreviewProgressText.Text = $"{progress.Completed}/{progress.Total}";
                 }
@@ -5550,11 +5556,11 @@ namespace Famille
         private string GenerateUniqueCollectionName(string desiredName)
         {
             if (string.IsNullOrWhiteSpace(desiredName))
-                desiredName = "Collection importée";
+                desiredName = UiLanguage.T("Collection importée", "Imported collection");
 
             var baseName = desiredName.Trim();
             if (string.Equals(baseName, FavoritesCollectionName, StringComparison.OrdinalIgnoreCase))
-                baseName += " (importée)";
+                baseName += UiLanguage.T(" (importée)", " (imported)");
 
             string candidate = baseName;
             int suffix = 2;
@@ -5839,7 +5845,7 @@ namespace Famille
         {
             return new FamilyItem
             {
-                Name = "Retour",
+                Name = UiLanguage.T("Retour", "Back"),
                 Path = parentPath,
                 IsFolder = true,
                 IsBackNavigation = true,
@@ -5854,7 +5860,7 @@ namespace Famille
         {
             return new FamilyItem
             {
-                Name = "Haut de page",
+                Name = UiLanguage.T("Haut de page", "Back to top"),
                 IsFolder = true,
                 IsScrollTopNavigation = true,
                 NormalizedName = "haut de page",
@@ -6100,9 +6106,9 @@ namespace Famille
             get
             {
                 if (IsBackNavigation)
-                    return "RETOUR";
+                    return UiLanguage.T("RETOUR", "BACK");
                 if (IsScrollTopNavigation)
-                    return "HAUT";
+                    return UiLanguage.T("HAUT", "TOP");
 
                 return FolderFamilyCount == 1
                     ? UiLanguage.T("1 famille", "1 family")

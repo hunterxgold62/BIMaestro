@@ -3380,6 +3380,15 @@ __BIMAESTRO_ATMOSPHERE_CSS__
                 return;
             }
 
+            // Interroger Chromium 20 fois/s ralentit toute l'UI Revit :
+            // on ne le fait que si la souris survole l'arborescence.
+            if (!IsCursorOver(_projectBrowserRoot))
+            {
+                if (_visibleViewHoverKey.Length > 0)
+                    HideViewHoverPopup();
+                return;
+            }
+
             _viewHoverPollPending = true;
             long generation = _viewHoverPollGeneration;
             long activeViewGeneration = _activeViewGeneration;
@@ -3410,6 +3419,26 @@ __BIMAESTRO_ATMOSPHERE_CSS__
             {
                 _viewHoverPollPending = false;
                 HideViewHoverPopup();
+            }
+        }
+
+        private static bool IsCursorOver(FrameworkElement element)
+        {
+            try
+            {
+                if (!GetCursorPos(out NativePoint cursor)) return false;
+                if (element.ActualWidth <= 0 || element.ActualHeight <= 0) return false;
+                var source = PresentationSource.FromVisual(element);
+                if (source == null) return false;
+                System.Windows.Point topLeft = element.PointToScreen(new System.Windows.Point(0, 0));
+                System.Windows.Point bottomRight = element.PointToScreen(
+                    new System.Windows.Point(element.ActualWidth, element.ActualHeight));
+                return cursor.X >= topLeft.X && cursor.X <= bottomRight.X &&
+                       cursor.Y >= topLeft.Y && cursor.Y <= bottomRight.Y;
+            }
+            catch
+            {
+                return false;
             }
         }
 

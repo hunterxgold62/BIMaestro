@@ -75,7 +75,7 @@ namespace BIMaestro.RibbonLayout
             }
             catch (System.Exception ex)
             {
-                MessageBox.Show($"Impossible d’ouvrir la page d’aide : {ex.Message}", "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(UiLanguage.T($"Impossible d’ouvrir la page d’aide : {ex.Message}", $"Unable to open the help page: {ex.Message}"), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
@@ -141,7 +141,7 @@ namespace BIMaestro.RibbonLayout
 
         public string RadialHotkeyText
         {
-            get => string.IsNullOrWhiteSpace(_radialHotkeyText) ? "Aucun raccourci" : _radialHotkeyText;
+            get => string.IsNullOrWhiteSpace(_radialHotkeyText) ? UiLanguage.T("Aucun raccourci", "No shortcut") : _radialHotkeyText;
             private set
             {
                 _radialHotkeyText = value;
@@ -233,7 +233,7 @@ namespace BIMaestro.RibbonLayout
             previousPreferences.Hotkey = _radialHotkey;
             if (!RadialButtonsPreferencesManager.Save(previousPreferences))
             {
-                MessageBox.Show("Impossible d’enregistrer le raccourci Rosace Boutons.", "BIMaestro",
+                MessageBox.Show(UiLanguage.T("Impossible d’enregistrer le raccourci Rosace Boutons.", "Unable to save the Radial Buttons shortcut."), "BIMaestro",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
@@ -295,7 +295,7 @@ namespace BIMaestro.RibbonLayout
             if ((modifiers & ModifierKeys.Windows) != 0) nativeModifiers |= 0x0008;
             if (nativeModifiers == 0)
             {
-                MessageBox.Show("Ajoutez Ctrl, Alt, Maj ou Windows à la touche choisie.", "BIMaestro",
+                MessageBox.Show(UiLanguage.T("Ajoutez Ctrl, Alt, Maj ou Windows à la touche choisie.", "Add Ctrl, Alt, Shift or Windows to the selected key."), "BIMaestro",
                     MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
@@ -316,11 +316,11 @@ namespace BIMaestro.RibbonLayout
 
         private static string FormatHotkey(RadialHotkeyPreference hotkey)
         {
-            if (hotkey == null) return "Aucun raccourci";
+            if (hotkey == null) return UiLanguage.T("Aucun raccourci", "No shortcut");
             var parts = new List<string>();
             if ((hotkey.Modifiers & 0x0002) != 0) parts.Add("Ctrl");
             if ((hotkey.Modifiers & 0x0001) != 0) parts.Add("Alt");
-            if ((hotkey.Modifiers & 0x0004) != 0) parts.Add("Maj");
+            if ((hotkey.Modifiers & 0x0004) != 0) parts.Add(UiLanguage.T("Maj", "Shift"));
             if ((hotkey.Modifiers & 0x0008) != 0) parts.Add("Windows");
             parts.Add(KeyInterop.KeyFromVirtualKey(hotkey.VirtualKey).ToString());
             return string.Join(" + ", parts);
@@ -356,7 +356,7 @@ namespace BIMaestro.RibbonLayout
                 if (!File.Exists(documentPath))
                 {
                     MessageBox.Show(
-                        $"Le document est introuvable : {documentPath}",
+                        UiLanguage.T($"Le document est introuvable : {documentPath}", $"Document not found: {documentPath}"),
                         "BIMaestro",
                         MessageBoxButton.OK,
                         MessageBoxImage.Warning);
@@ -368,7 +368,7 @@ namespace BIMaestro.RibbonLayout
             catch (System.Exception ex)
             {
                 MessageBox.Show(
-                    $"Impossible d’ouvrir le document : {ex.Message}",
+                    UiLanguage.T($"Impossible d’ouvrir le document : {ex.Message}", $"Unable to open the document: {ex.Message}"),
                     "BIMaestro",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);

@@ -16,6 +16,7 @@ using System.Windows.Automation;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
+using BIMaestro.Localization;
 
 namespace Couleur
 {
@@ -56,9 +57,9 @@ namespace Couleur
             try
             {
                 bool accepted = BIMaestro.Tutorials.DemoTourMessage.Show(app.MainWindowHandle,
-                    "Personnalise tes couleurs",
-                    "Bulbizarre te guide pour choisir les couleurs de BIMaestro. Il te montrera le bouton Couleurs, puis les réglages dans la fenêtre Apparence BIMaestro.\n\nTu peux quitter le guide à tout moment.",
-                    "Démarrer le guide", "Plus tard", primaryButtonIsAction: true);
+                    UiLanguage.T("Personnalise tes couleurs", "Customize your colors"),
+                    UiLanguage.T("Bulbizarre te guide pour choisir les couleurs de BIMaestro. Il te montrera le bouton Couleurs, puis les réglages dans la fenêtre Apparence BIMaestro.\n\nTu peux quitter le guide à tout moment.", "Bulbasaur will guide you through choosing BIMaestro's colors. It will show you the Colors button, then the settings in the BIMaestro Appearance window.\n\nYou can leave the guide at any time."),
+                    UiLanguage.T("Démarrer le guide", "Start the guide"), UiLanguage.T("Plus tard", "Later"), primaryButtonIsAction: true);
                 try
                 {
                     Directory.CreateDirectory(Path.GetDirectoryName(ChoiceFile));
@@ -136,18 +137,18 @@ namespace Couleur
                     tourId == "mep-booster" ? "MepBooster" :
                     tourId == "clash-3d" ? "Clash 3D" :
                     tourId == "excel" ? "GestionExcelCmd" : "Couleur de projet";
-                _buttonLabel = tourId == "reservation" ? "Auto Réservation" :
-                    tourId == "history" ? "Qui a fait ça ?" :
-                    tourId == "pipe-calculation" ? "Calcul des canalisations" :
-                    tourId == "organizer" ? "Organisateur" :
-                    tourId == "view-template" ? "Gabarit de vue" :
-                    tourId == "family-browser" ? "Navigateur de familles" :
+                _buttonLabel = tourId == "reservation" ? UiLanguage.T("Auto Réservation", "Auto Reservation") :
+                    tourId == "history" ? UiLanguage.T("Qui a fait ça ?", "Who did this?") :
+                    tourId == "pipe-calculation" ? UiLanguage.T("Calcul des canalisations", "Pipe Calculation") :
+                    tourId == "organizer" ? UiLanguage.T("Organisateur", "Organizer") :
+                    tourId == "view-template" ? UiLanguage.T("Gabarit de vue", "View Template") :
+                    tourId == "family-browser" ? UiLanguage.T("Navigateur de familles", "Family Browser") :
                     tourId == "mep-booster" ? "MEP Booster" :
                     tourId == "clash-3d" ? "Clash 3D" :
-                    tourId == "excel" ? "Gestion Excel" : "Couleurs";
+                    tourId == "excel" ? UiLanguage.T("Gestion Excel", "Excel Manager") : UiLanguage.T("Couleurs", "Colors");
                 _menuId = tourId == "colors" ? "Changement de couleur" :
                     tourId == "organizer" ? "OrganisateurSplit" : null;
-                Title = "BIMaestro — Guide " + _buttonLabel;
+                Title = UiLanguage.T("BIMaestro — Guide ", "BIMaestro — Guide: ") + _buttonLabel;
                 Width = 330; Height = 270;
                 WindowStartupLocation = WindowStartupLocation.Manual;
                 Left = SystemParameters.WorkArea.Right - Width - 30;
@@ -162,12 +163,12 @@ namespace Couleur
                     Source = RibbonPanelColorScheme.CreateCompanionImage() };
                 RenderOptions.SetBitmapScalingMode(sprite, BitmapScalingMode.NearestNeighbor);
                 layout.Children.Add(sprite);
-                layout.Children.Add(new TextBlock { Text = "Parcours : " + _buttonLabel, FontSize = 17,
+                layout.Children.Add(new TextBlock { Text = UiLanguage.T("Parcours : ", "Tour: ") + _buttonLabel, FontSize = 17,
                     FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 8, 0, 8) });
-                _hint = new TextBlock { Text = "Clique d’abord sur l’onglet BIMaestro. Bulbizarre te montrera ensuite " + _buttonLabel + ".",
+                _hint = new TextBlock { Text = UiLanguage.T("Clique d’abord sur l’onglet BIMaestro. Bulbizarre te montrera ensuite ", "First click the BIMaestro tab. Bulbasaur will then show you ") + _buttonLabel + ".",
                     TextWrapping = TextWrapping.Wrap, MinHeight = 58 };
                 layout.Children.Add(_hint);
-                var quit = new Button { Content = "Quitter le guide", HorizontalAlignment = HorizontalAlignment.Right,
+                var quit = new Button { Content = UiLanguage.T("Quitter le guide", "Leave the guide"), HorizontalAlignment = HorizontalAlignment.Right,
                     Padding = new Thickness(10, 5, 10, 5), Margin = new Thickness(0, 8, 0, 0) };
                 quit.Click += (_, __) => { BIMaestro.Tutorials.TutorialAnalytics.End(_tourId, "quit"); Close(); };
                 layout.Children.Add(quit);
@@ -204,10 +205,10 @@ namespace Couleur
                         }
                     }
                     _hint.Text = !bimTabSelected
-                        ? "Clique sur l’onglet BIMaestro indiqué par Bulbizarre. Il te montrera ensuite " + _buttonLabel + "."
+                        ? UiLanguage.T("Clique sur l’onglet BIMaestro indiqué par Bulbizarre. Il te montrera ensuite ", "Click the BIMaestro tab shown by Bulbasaur. It will then show you ") + _buttonLabel + "."
                         : target == null
-                            ? "Dans BIMaestro, cherche « " + _buttonLabel + " ». Le guide continuera après le clic."
-                            : "Bulbizarre indique « " + _buttonLabel + " ». Clique dessus pour continuer le parcours.";
+                            ? UiLanguage.T("Dans BIMaestro, cherche « ", "In BIMaestro, look for “") + _buttonLabel + UiLanguage.T(" ». Le guide continuera après le clic.", "”. The guide will continue after the click.")
+                            : UiLanguage.T("Bulbizarre indique « ", "Bulbasaur is pointing at “") + _buttonLabel + UiLanguage.T(" ». Clique dessus pour continuer le parcours.", "”. Click it to continue the tour.");
                 }
                 catch (Exception ex) { System.Diagnostics.Trace.WriteLine("BIMaestro guide ribbon: " + ex.Message); }
             }

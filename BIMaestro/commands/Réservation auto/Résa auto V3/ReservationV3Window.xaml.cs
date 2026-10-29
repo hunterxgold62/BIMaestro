@@ -88,7 +88,7 @@ namespace Modification
             {
                 Symbol = s;
                 IsGenericModel = s?.Category?.Id?.GetIdLongValue() == (int)BuiltInCategory.OST_GenericModel;
-                string category = s?.Category?.Name ?? "Catégorie inconnue";
+                string category = s?.Category?.Name ?? UiLanguage.T("Catégorie inconnue", "Unknown category");
                 Display = $"{s?.Family?.Name} — {s?.Name}  ·  {category}";
             }
         }
@@ -216,12 +216,13 @@ namespace Modification
             }
             else if (!IsReady(selected, SelectedConfigUnhosted))
             {
-                txtSelectedConfigStatus.Text = $"Chargée mais incompatible avec ce mode d'hébergement : {selected.FamilyName}";
+                txtSelectedConfigStatus.Text = UiLanguage.T($"Chargée mais incompatible avec ce mode d'hébergement : {selected.FamilyName}",
+                    $"Loaded but incompatible with this hosting mode: {selected.FamilyName}");
             }
             else
             {
-                string type = string.IsNullOrWhiteSpace(selected.TypeName) ? "type automatique" : selected.TypeName;
-                txtSelectedConfigStatus.Text = $"Prête : {selected.FamilyName} — {type}";
+                string type = string.IsNullOrWhiteSpace(selected.TypeName) ? UiLanguage.T("type automatique", "automatic type") : selected.TypeName;
+                txtSelectedConfigStatus.Text = UiLanguage.T($"Prête : {selected.FamilyName} — {type}", $"Ready: {selected.FamilyName} — {type}");
             }
         }
 
@@ -346,7 +347,7 @@ namespace Modification
                     _selectedShapeBase = ShapeTarget.Rectangulaire;
                     _shapeOptionByLabel.Clear();
                     comboShape.Items.Clear();
-                    comboShape.Items.Add(new ComboBoxItem { Content = "(Aucune famille disponible)" });
+                    comboShape.Items.Add(new ComboBoxItem { Content = UiLanguage.T("(Aucune famille disponible)", "(No family available)") });
                     comboShape.SelectedIndex = 0;
                     comboShape.IsEnabled = false;
                     comboShape.Text = string.Empty;
@@ -371,7 +372,7 @@ namespace Modification
 
                 if (comboShape.Items.Count == 0)
                 {
-                    comboShape.Items.Add(new ComboBoxItem { Content = "(Aucune famille disponible)" });
+                    comboShape.Items.Add(new ComboBoxItem { Content = UiLanguage.T("(Aucune famille disponible)", "(No family available)") });
                     comboShape.SelectedIndex = 0;
                     comboShape.IsEnabled = false;
                     comboShape.Text = string.Empty;
@@ -1049,7 +1050,7 @@ namespace Modification
         {
             var dlg = new OpenFileDialog
             {
-                Filter = "Famille Revit (*.rfa)|*.rfa",
+                Filter = UiLanguage.T("Famille Revit (*.rfa)|*.rfa", "Revit family (*.rfa)|*.rfa"),
                 Title = UiLanguage.T("Sélectionner une famille de réservation (.rfa)", "Select an opening family (.rfa)")
             };
 
@@ -1075,7 +1076,7 @@ namespace Modification
         {
             var dlg = new OpenFileDialog
             {
-                Filter = "Script Dynamo (*.dyn)|*.dyn",
+                Filter = UiLanguage.T("Script Dynamo (*.dyn)|*.dyn", "Dynamo script (*.dyn)|*.dyn"),
                 Title = UiLanguage.T("Sélectionner le script Dynamo", "Select the Dynamo script")
             };
 

@@ -1,5 +1,6 @@
 ﻿using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using BIMaestro.Localization;
 using TextBox = System.Windows.Controls.TextBox;
 using ComboBox = System.Windows.Controls.ComboBox;
 using WpfVisibility = System.Windows.Visibility;
@@ -82,14 +83,14 @@ namespace Analyse
                 _handler.Dispose(); _externalEvent.Dispose();
             };
         }
-        private void UpdateDocumentText() => DocumentText.Text = _setup.Title + " · " + _setup.Selection.Count + " objet(s) sélectionné(s) · "
-            + _setup.Links.Count(l => l.Loaded) + " lien(s) ou import(s) disponible(s)";
+        private void UpdateDocumentText() => DocumentText.Text = _setup.Title + " · " + _setup.Selection.Count + UiLanguage.T(" objet(s) sélectionné(s) · ", " selected element(s) · ")
+            + _setup.Links.Count(l => l.Loaded) + UiLanguage.T(" lien(s) ou import(s) disponible(s)", " available link(s) or import(s)");
         private SmartScanOptions ReadOptions()
         {
             double volume;
             if (!double.TryParse(VolumeBox.Text.Replace(',', '.'), System.Globalization.NumberStyles.Float,
                 System.Globalization.CultureInfo.InvariantCulture, out volume) || double.IsNaN(volume) || double.IsInfinity(volume) || volume < 0 || volume > 1000000000)
-                throw new InvalidOperationException("Le seuil doit être un nombre compris entre 0 et 1 000 000 000 mm³.");
+                throw new InvalidOperationException(UiLanguage.T("Le seuil doit être un nombre compris entre 0 et 1 000 000 000 mm³.", "The threshold must be a number between 0 and 1,000,000,000 mm³."));
             var options = new SmartScanOptions
             {
                 Scope = (SmartScanScope)ScopeCombo.SelectedIndex,
@@ -101,13 +102,13 @@ namespace Analyse
                 OpenConnectors = ConnectorsCheck.IsChecked == true, WallSupports = WallsCheck.IsChecked == true,
                 MinimumVolumeMm3 = volume, LinkIds = _setup.Links.Where(l => l.Selected).Select(l => l.Id).ToList()
             };
-            if (options.SourceCategories().Count == 0 && !options.WallSupports) throw new InvalidOperationException("Choisissez au moins une catégorie à contrôler.");
+            if (options.SourceCategories().Count == 0 && !options.WallSupports) throw new InvalidOperationException(UiLanguage.T("Choisissez au moins une catégorie à contrôler.", "Select at least one category to check."));
             if (!options.LocalClashes && !options.LinkedClashes && !options.OpenConnectors && !options.WallSupports)
-                throw new InvalidOperationException("Activez au moins un contrôle.");
+                throw new InvalidOperationException(UiLanguage.T("Activez au moins un contrôle.", "Enable at least one check."));
             if (options.Scope == SmartScanScope.Selection && _setup.Selection.Count == 0)
-                throw new InvalidOperationException("La sélection est vide. Sélectionnez des objets dans Revit et cliquez sur Actualiser.");
+                throw new InvalidOperationException(UiLanguage.T("La sélection est vide. Sélectionnez des objets dans Revit et cliquez sur Actualiser.", "The selection is empty. Select elements in Revit and click Refresh."));
             if (options.Scope == SmartScanScope.ActiveView && !_setup.ViewSupported)
-                throw new InvalidOperationException("Cette vue ne permet pas l'analyse. Choisissez une vue de modèle puis cliquez sur Actualiser.");
+                throw new InvalidOperationException(UiLanguage.T("Cette vue ne permet pas l'analyse. Choisissez une vue de modèle puis cliquez sur Actualiser.", "This view cannot be analyzed. Choose a model view, then click Refresh."));
             return options;
         }
         private void Analyze_Click(object sender, RoutedEventArgs e)
@@ -115,7 +116,7 @@ namespace Analyse
             if (_busy || _queuedAction.HasValue || Scanning) return;
             // Read the current selection/view in a valid API callback, including changes made after opening this window.
             _startAfterRefresh = true;
-            RunText.Text = "Actualisation du périmètre avant l'analyse…";
+            RunText.Text = UiLanguage.T("Actualisation du périmètre avant l'analyse…", "Refreshing the scope before analysis…");
             Queue(SmartAction.RefreshSetup);
         }
         private void StartScan()
@@ -142,17 +143,17 @@ namespace Analyse
                 _thumbnailFolder = SmartCheckState.GetThumbnailFolder(_setup.DocumentKey);
                 UpdateCategories();
                 _stale = false; StaleText.Visibility = WpfVisibility.Collapsed;
-                SummaryText.Text = "Bilan provisoire · analyse en cours"; FilterPanel.Visibility = WpfVisibility.Visible;
-                ResultCountText.Text = "Les résultats apparaissent au fur et à mesure.";
-                EmptyPanel.Visibility = WpfVisibility.Visible; EmptyTitle.Text = "Analyse en cours";
-                EmptyDescription.Text = "Préparation des objets et des liens. Les résultats apparaîtront dès leur détection, puis leurs aperçus.";
+                SummaryText.Text = UiLanguage.T("Bilan provisoire · analyse en cours", "Provisional summary · analysis in progress"); FilterPanel.Visibility = WpfVisibility.Visible;
+                ResultCountText.Text = UiLanguage.T("Les résultats apparaissent au fur et à mesure.", "Results appear as they are found.");
+                EmptyPanel.Visibility = WpfVisibility.Visible; EmptyTitle.Text = UiLanguage.T("Analyse en cours", "Analysis in progress");
+                EmptyDescription.Text = UiLanguage.T("Préparation des objets et des liens. Les résultats apparaîtront dès leur détection, puis leurs aperçus.", "Preparing elements and links. Results will appear as soon as they are detected, followed by their previews.");
                 RunProgress.Visibility = WpfVisibility.Visible; RunProgress.IsIndeterminate = true;
                 SetScanning(true); Queue(SmartAction.ScanBatch);
             }
             catch (Exception ex) { RunText.Text = ex.Message; SettingsExpander.IsExpanded = true; }
         }
         private void Cancel_Click(object sender, RoutedEventArgs e)
-        { if (_session != null) { _session.CancelRequested = true; RunText.Text = "Annulation demandée…"; CancelButton.IsEnabled = false; } }
+        { if (_session != null) { _session.CancelRequested = true; RunText.Text = UiLanguage.T("Annulation demandée…", "Cancellation requested…"); CancelButton.IsEnabled = false; } }
         private void RefreshScope_Click(object sender, RoutedEventArgs e) => Queue(SmartAction.RefreshSetup);
         private void Setup_Refreshed(SmartScanSetup next)
         {
@@ -162,7 +163,7 @@ namespace Analyse
             var selected = new HashSet<long>(_setup.Links.Where(l => l.Selected).Select(l => l.Id.GetIdLongValue()));
             foreach (var link in next.Links) link.Selected = selected.Contains(link.Id.GetIdLongValue()) && link.Loaded;
             _setup = next; LinksList.ItemsSource = next.Links; UpdateDocumentText();
-            RunText.Text = "Vue, sélection et liens actualisés. Choisissez le périmètre puis lancez l'analyse.";
+            RunText.Text = UiLanguage.T("Vue, sélection et liens actualisés. Choisissez le périmètre puis lancez l'analyse.", "View, selection and links refreshed. Choose the scope, then run the analysis.");
         }
         private void Model_Changed()
         {
@@ -170,7 +171,7 @@ namespace Analyse
             _stale = true; StaleText.Visibility = WpfVisibility.Visible;
             _inspector?.MarkStale();
             UpdateFocusActions();
-            if (_session != null && !_session.Complete) RunText.Text = "La maquette a changé pendant l'analyse. Annulation et conservation des résultats partiels.";
+            if (_session != null && !_session.Complete) RunText.Text = UiLanguage.T("La maquette a changé pendant l'analyse. Annulation et conservation des résultats partiels.", "The model changed during the analysis. Cancelling and keeping partial results.");
         }
         private void Queue(SmartAction action)
         {
@@ -187,7 +188,7 @@ namespace Analyse
             {
                 var request = _externalEvent.Raise();
                 if (request == ExternalEventRequest.Accepted) { _busy = true; _queuedAction = null; _queueTimer.Stop(); }
-                else if (request != ExternalEventRequest.Pending) { _queuedAction = null; _queueTimer.Stop(); Handler_Failed("Revit n'a pas accepté l'action. Réessayez après avoir fermé ses dialogues."); }
+                else if (request != ExternalEventRequest.Pending) { _queuedAction = null; _queueTimer.Stop(); Handler_Failed(UiLanguage.T("Revit n'a pas accepté l'action. Réessayez après avoir fermé ses dialogues.", "Revit did not accept the action. Close any open Revit dialogs and try again.")); }
             }
             catch (Exception ex) { _queuedAction = null; _queueTimer.Stop(); Handler_Failed(ex.Message); }
         }
@@ -212,8 +213,8 @@ namespace Analyse
             {
                 RunProgress.IsIndeterminate = _session.SourceCount == 0 || _session.ProcessedSources == 0;
                 RunProgress.Value = _session.Progress;
-                RunText.Text = _session.Stage + " · " + _session.ProcessedSources + "/" + _session.SourceCount + " objet(s) · "
-                    + _session.CandidateCount + " obstacle(s) · " + _session.Issues.Count + " résultat(s) · " + _session.Seconds.ToString("F1") + " s";
+                RunText.Text = _session.Stage + " · " + _session.ProcessedSources + "/" + _session.SourceCount + UiLanguage.T(" objet(s) · ", " element(s) · ")
+                    + _session.CandidateCount + UiLanguage.T(" obstacle(s) · ", " obstacle(s) · ") + _session.Issues.Count + UiLanguage.T(" résultat(s) · ", " result(s) · ") + _session.Seconds.ToString("F1") + " s";
                 PublishResults();
                 _inspector?.RefreshPreview(); _inspector?.SetScanning(Scanning);
                 if (!_session.Complete) { Queue(SmartAction.ScanBatch); return; }
@@ -253,10 +254,10 @@ namespace Analyse
                     new Dictionary<string, int> { ["analyses_completed"] = 1,
                         ["objects_analyzed"] = _session.SourceCount, ["issues_found"] = _session.Issues.Count });
             }
-            RunText.Text = (partial ? "Analyse interrompue · résultats partiels" : _session.Stage) + " · " + _session.SourceCount + " objet(s) · " + _session.Seconds.ToString("F1") + " s"
-                + (_session.Diagnostics.Count > 0 ? " · " + _session.Diagnostics.Count + " point(s) à consulter dans le bilan" : "");
+            RunText.Text = (partial ? UiLanguage.T("Analyse interrompue · résultats partiels", "Analysis interrupted · partial results") : _session.Stage) + " · " + _session.SourceCount + UiLanguage.T(" objet(s) · ", " element(s) · ") + _session.Seconds.ToString("F1") + " s"
+                + (_session.Diagnostics.Count > 0 ? " · " + _session.Diagnostics.Count + UiLanguage.T(" point(s) à consulter dans le bilan", " item(s) to review in the summary") : "");
             if (_session.Error != null) RunText.Text += " · " + _session.Error;
-            if (absent > 0) RunText.Text += " · " + absent + " résultat(s) absent(s) depuis la précédente analyse du même périmètre";
+            if (absent > 0) RunText.Text += " · " + absent + UiLanguage.T(" résultat(s) absent(s) depuis la précédente analyse du même périmètre", " result(s) no longer present since the previous analysis of the same scope");
             UpdateCategories();
             FilterPanel.Visibility = WpfVisibility.Visible; DiagnosticsButton.IsEnabled = true;
             ApplyFilters();
@@ -330,22 +331,22 @@ namespace Analyse
         }
         private void UpdateResultText()
         {
-            SummaryText.Text = (Scanning ? "Bilan provisoire · " : _session != null && (_session.Cancelled || _session.Error != null) ? "Bilan partiel · " : "")
-                + _activeCount + " à traiter · " + _confirmedCount + " intersection(s) confirmée(s) · " + _approximateCount + " suspicion(s)";
-            ResultCountText.Text = _filtered.Count + " / " + _all.Count + " résultat(s)" + (Scanning ? " · affichage progressif · Entrée : détail" : " · Entrée : détail");
+            SummaryText.Text = (Scanning ? UiLanguage.T("Bilan provisoire · ", "Provisional summary · ") : _session != null && (_session.Cancelled || _session.Error != null) ? UiLanguage.T("Bilan partiel · ", "Partial summary · ") : "")
+                + _activeCount + UiLanguage.T(" à traiter · ", " to resolve · ") + _confirmedCount + UiLanguage.T(" intersection(s) confirmée(s) · ", " confirmed intersection(s) · ") + _approximateCount + UiLanguage.T(" suspicion(s)", " suspected clash(es)");
+            ResultCountText.Text = _filtered.Count + " / " + _all.Count + UiLanguage.T(" résultat(s)", " result(s)") + (Scanning ? UiLanguage.T(" · affichage progressif · Entrée : détail", " · progressive display · Enter: details") : UiLanguage.T(" · Entrée : détail", " · Enter: details"));
             EmptyPanel.Visibility = _filtered.Count == 0 ? WpfVisibility.Visible : WpfVisibility.Collapsed;
             if (_filtered.Count == 0)
             {
                 bool partial = _session == null || _session.Cancelled || _session.Error != null;
-                EmptyTitle.Text = _all.Count > 0 ? "Aucun résultat avec ces filtres" : Scanning ? "Analyse en cours" : _session?.Error != null ? "Analyse interrompue par une erreur" : partial ? "Aucun résultat disponible" : "Aucun conflit détecté dans ce périmètre";
-                EmptyDescription.Text = _all.Count > 0 ? "Changez le statut ou le contrôle, ou effacez la recherche." : Scanning
-                    ? "Les objets et les liens sont préparés, puis les résultats apparaissent dès leur détection. Le bilan reste provisoire jusqu'à la fin."
+                EmptyTitle.Text = _all.Count > 0 ? UiLanguage.T("Aucun résultat avec ces filtres", "No results match these filters") : Scanning ? UiLanguage.T("Analyse en cours", "Analysis in progress") : _session?.Error != null ? UiLanguage.T("Analyse interrompue par une erreur", "Analysis stopped by an error") : partial ? UiLanguage.T("Aucun résultat disponible", "No results available") : UiLanguage.T("Aucun conflit détecté dans ce périmètre", "No clashes detected in this scope");
+                EmptyDescription.Text = _all.Count > 0 ? UiLanguage.T("Changez le statut ou le contrôle, ou effacez la recherche.", "Change the status or check, or clear the search.") : Scanning
+                    ? UiLanguage.T("Les objets et les liens sont préparés, puis les résultats apparaissent dès leur détection. Le bilan reste provisoire jusqu'à la fin.", "Elements and links are prepared first, then results appear as soon as they are detected. The summary remains provisional until the end.")
                     : _session?.Error != null
-                    ? "Ce résultat ne permet pas de conclure à l’absence de conflits. Consultez le bilan pour le détail de l’erreur avant de relancer."
+                    ? UiLanguage.T("Ce résultat ne permet pas de conclure à l’absence de conflits. Consultez le bilan pour le détail de l’erreur avant de relancer.", "This result does not prove that there are no clashes. Check the summary for error details before running again.")
                     : partial
-                    ? "Lancez une analyse complète pour obtenir un bilan." : _session.SourceCount == 0
-                    ? "Aucun objet des catégories choisies n'a été trouvé. Ajustez les catégories ou le périmètre."
-                    : "Consultez le bilan pour connaître les catégories, les liens et les éventuelles limites de l'analyse.";
+                    ? UiLanguage.T("Lancez une analyse complète pour obtenir un bilan.", "Run a full analysis to get a summary.") : _session.SourceCount == 0
+                    ? UiLanguage.T("Aucun objet des catégories choisies n'a été trouvé. Ajustez les catégories ou le périmètre.", "No elements were found in the selected categories. Adjust the categories or the scope.")
+                    : UiLanguage.T("Consultez le bilan pour connaître les catégories, les liens et les éventuelles limites de l'analyse.", "See the summary for the categories, links and any limitations of the analysis.");
             }
             OverviewButton.IsEnabled = !Scanning && _filtered.Count > 0; ExportButton.IsEnabled = !Scanning && _session != null;
         }
@@ -363,15 +364,15 @@ namespace Analyse
             if (issue == null || !issue.CanCreateReservation || issue.IsApproximate || Scanning || _busy || _queuedAction.HasValue || _stale) return;
             _handler.TutorialReservation = _tutorialPrepared;
             _tutorialActionFailed = false;
-            _handler.FocusIssue = issue; RunText.Text = "Création de la réservation avec les réglages d'Autoréservation…";
+            _handler.FocusIssue = issue; RunText.Text = UiLanguage.T("Création de la réservation avec les réglages d'Autoréservation…", "Creating the opening with the Auto-Opening settings…");
             Queue(SmartAction.CreateReservation);
         }
         private void UpdateFocusActions()
         {
             var issue = _handler.DisplayedIssue;
             FocusBar.Visibility = issue == null ? WpfVisibility.Collapsed : WpfVisibility.Visible;
-            FocusBarText.Text = _handler.ContextVisible ? "Contexte sans coupe" : "Conflit isolé dans Revit";
-            ContextButton.Content = _handler.ContextVisible ? "Isoler le conflit" : "Voir autour";
+            FocusBarText.Text = _handler.ContextVisible ? UiLanguage.T("Contexte sans coupe", "Context without section box") : UiLanguage.T("Conflit isolé dans Revit", "Clash isolated in Revit");
+            ContextButton.Content = _handler.ContextVisible ? UiLanguage.T("Isoler le conflit", "Isolate clash") : UiLanguage.T("Voir autour", "Show surroundings");
             ContextButton.IsEnabled = !Scanning && !_busy && !_queuedAction.HasValue;
             ReservationButton.Visibility = issue?.CanCreateReservation == true && !issue.IsApproximate ? WpfVisibility.Visible : WpfVisibility.Collapsed;
             ReservationButton.IsEnabled = !Scanning && !_busy && !_queuedAction.HasValue && !_stale;
@@ -408,11 +409,11 @@ namespace Analyse
         }
         private bool SaveDecision(ModelIssue issue, string status, string comment)
         {
-            if (_stale) { MessageBox.Show(this, "Relancez l'analyse avant d'enregistrer une décision sur une maquette modifiée.", "Clash 3D"); return false; }
+            if (_stale) { MessageBox.Show(this, UiLanguage.T("Relancez l'analyse avant d'enregistrer une décision sur une maquette modifiée.", "Run the analysis again before saving a decision on a modified model."), "Clash 3D"); return false; }
             SmartCheckState.SetIssueStatus(_setup.DocumentKey, issue, status, comment, Environment.UserName);
             ApplyFilters();
-            if (!Scanning) RunText.Text = SmartCheckState.LastSaveError == null ? "Décision enregistrée. « Traité » reste une décision manuelle, sans correction automatique de la maquette."
-                : "Décision mise à jour dans cette session, mais non sauvegardée : " + SmartCheckState.LastSaveError;
+            if (!Scanning) RunText.Text = SmartCheckState.LastSaveError == null ? UiLanguage.T("Décision enregistrée. « Traité » reste une décision manuelle, sans correction automatique de la maquette.", "Decision saved. \"Resolved\" remains a manual decision; the model is not corrected automatically.")
+                : UiLanguage.T("Décision mise à jour dans cette session, mais non sauvegardée : ", "Decision updated in this session but not saved: ") + SmartCheckState.LastSaveError;
             return SmartCheckState.LastSaveError == null;
         }
         private void CapturePreview(ModelIssue issue)
@@ -433,20 +434,20 @@ namespace Analyse
         private void Diagnostics_Click(object sender, RoutedEventArgs e)
         {
             if (_session == null) return;
-            var text = "Périmètre : " + _session.Options.Scope + "\nObjets de départ : " + _session.SourceCount + "\nObstacles indexés : " + _session.CandidateCount
-                + "\nPaires examinées : " + _session.TestedPairs + "\nSeuil : " + _session.Options.MinimumVolumeMm3 + " mm³\n"
-                + "\nLes contacts simples ne sont pas des intersections. Les connexions physiques directes sont exclues. Les maillages et géométries partielles produisent des suspicions."
-                + "\nLes réservations ne sont pas validées par nom de famille ; les intersections de parois restent à coordonner."
-                + "\n\n" + (_session.Error ?? "") + "\n" + (_session.Diagnostics.Count == 0 ? "Aucune anomalie de lecture signalée." : string.Join("\n", _session.Diagnostics));
-            var win = new Window { Title = "Clash 3D · bilan de l'analyse", Owner = this, Width = 680, Height = 520, MinWidth = 420, MinHeight = 300, WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            var text = UiLanguage.T("Périmètre : ", "Scope: ") + _session.Options.Scope + UiLanguage.T("\nObjets de départ : ", "\nSource elements: ") + _session.SourceCount + UiLanguage.T("\nObstacles indexés : ", "\nIndexed obstacles: ") + _session.CandidateCount
+                + UiLanguage.T("\nPaires examinées : ", "\nPairs checked: ") + _session.TestedPairs + UiLanguage.T("\nSeuil : ", "\nThreshold: ") + _session.Options.MinimumVolumeMm3 + " mm³\n"
+                + UiLanguage.T("\nLes contacts simples ne sont pas des intersections. Les connexions physiques directes sont exclues. Les maillages et géométries partielles produisent des suspicions.", "\nSimple contacts are not intersections. Direct physical connections are excluded. Meshes and partial geometry produce suspected clashes.")
+                + UiLanguage.T("\nLes réservations ne sont pas validées par nom de famille ; les intersections de parois restent à coordonner.", "\nOpenings are not validated by family name; wall intersections still need coordination.")
+                + "\n\n" + (_session.Error ?? "") + "\n" + (_session.Diagnostics.Count == 0 ? UiLanguage.T("Aucune anomalie de lecture signalée.", "No read issues reported.") : string.Join("\n", _session.Diagnostics));
+            var win = new Window { Title = UiLanguage.T("Clash 3D · bilan de l'analyse", "Clash 3D · analysis summary"), Owner = this, Width = 680, Height = 520, MinWidth = 420, MinHeight = 300, WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 Content = new TextBox { Text = text, IsReadOnly = true, TextWrapping = TextWrapping.Wrap, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Padding = new Thickness(20), BorderThickness = new Thickness(0) } };
             win.Show();
         }
         private void Export_Click(object sender, RoutedEventArgs e)
         {
             if (_session == null) return;
-            var dialog = new SaveFileDialog { Title = "Exporter les résultats affichés", FileName = "Clash3D_" + DateTime.Now.ToString("yyyyMMdd_HHmmss"),
-                Filter = "Rapport autonome (*.html)|*.html|Tableau CSV (*.csv)|*.csv", AddExtension = true };
+            var dialog = new SaveFileDialog { Title = UiLanguage.T("Exporter les résultats affichés", "Export displayed results"), FileName = "Clash3D_" + DateTime.Now.ToString("yyyyMMdd_HHmmss"),
+                Filter = UiLanguage.T("Rapport autonome (*.html)|*.html|Tableau CSV (*.csv)|*.csv", "Standalone report (*.html)|*.html|CSV table (*.csv)|*.csv"), AddExtension = true };
             if (dialog.ShowDialog(this) != true) return;
             try
             {
@@ -457,7 +458,7 @@ namespace Analyse
         }
         internal void WriteExport(string path, bool csv)
         {
-            if (_session == null) throw new InvalidOperationException("Lancez une analyse avant d'exporter.");
+            if (_session == null) throw new InvalidOperationException(UiLanguage.T("Lancez une analyse avant d'exporter.", "Run an analysis before exporting."));
             var text = csv ? SmartClashReport.Csv(_filtered)
                 : SmartClashReport.Html(_setup.Title, _filtered, _session, _stale, StatusCombo.SelectedItem + " · " + CategoryCombo.SelectedItem + " · " + SearchBox.Text);
             if (_tutorialPrepared && !_stale && DemoClashExerciseExportReady())
@@ -466,7 +467,7 @@ namespace Analyse
             File.WriteAllText(path, text, new UTF8Encoding(csv));
             Licensing.OperationTelemetry.Track("SmartClashCommand", "Clash 3D", csv ? "export_csv" : "export_html",
                 _tutorialPrepared, new Dictionary<string, int> { ["files_exported"] = 1 });
-            RunText.Text = "Export terminé : " + path;
+            RunText.Text = UiLanguage.T("Export terminé : ", "Export complete: ") + path;
             if (_tutorialPrepared && !_stale && DemoClashExerciseExportReady())
             { _tutorialExportWritten = true; BIMaestro.Tutorials.DemoTourService.ReportAction(this, "clash-export-written"); }
         }

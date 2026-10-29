@@ -5,12 +5,13 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
+using BIMaestro.Localization;
 
 namespace BIMaestro.Codex
 {
     internal sealed partial class CodexWindow
     {
-        private readonly Button historyButton = Button("Historique");
+        private readonly Button historyButton = Button(UiLanguage.T("Historique", "History"));
         private CodexDiscussionHistory historyStore;
         private CodexDiscussion discussion;
         private IDisposable discussionLock;
@@ -37,7 +38,7 @@ namespace BIMaestro.Codex
             };
             try { discussionLock = historyStore.Acquire(discussion.Id); }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
-            { status.Text = "Historique non sauvegardé : " + ex.Message; }
+            { status.Text = UiLanguage.T("Historique non sauvegardé : ", "History not saved: ") + ex.Message; }
             SaveHistory();
         }
 
@@ -58,7 +59,7 @@ namespace BIMaestro.Codex
                 historyStore.Save(discussion); return true;
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
-            { status.Text = "Historique non sauvegardé : " + ex.Message; return false; }
+            { status.Text = UiLanguage.T("Historique non sauvegardé : ", "History not saved: ") + ex.Message; return false; }
         }
 
         private bool ReleaseHistory()
@@ -97,7 +98,7 @@ namespace BIMaestro.Codex
                 transcript.Text = saved.Transcript ?? "";
                 input.Text = saved.Draft ?? "";
                 RestoreHistoryModel();
-                status.Text = "Discussion retrouvée · connectez l'assistant pour continuer. Document actuel : " + TargetDocumentTitle + ". Les pièces jointes non envoyées sont à joindre à nouveau.";
+                status.Text = UiLanguage.T("Discussion retrouvée · connectez l'assistant pour continuer. Document actuel : ", "Conversation restored · sign in to the assistant to continue. Current document: ") + TargetDocumentTitle + UiLanguage.T(". Les pièces jointes non envoyées sont à joindre à nouveau.", ". Unsent attachments must be attached again.");
                 transcript.ScrollToEnd(); UpdateControls();
             }
             finally { restoringHistory = false; lease?.Dispose(); }
@@ -167,25 +168,25 @@ namespace BIMaestro.Codex
                 dialog.Owner = this;
                 dialog.ShowDialog();
             }
-            catch (Exception ex) { status.Text = "Historique indisponible : " + ex.Message; }
+            catch (Exception ex) { status.Text = UiLanguage.T("Historique indisponible : ", "History unavailable: ") + ex.Message; }
         }
 
         private Window BuildHistoryDialog(System.Collections.Generic.List<CodexDiscussion> entries, int unreadable)
         {
-            var dialog = new Window { Title = "Historique des discussions", Width = 900, Height = 650,
+            var dialog = new Window { Title = UiLanguage.T("Historique des discussions", "Conversation history"), Width = 900, Height = 650,
                 MinWidth = 650, MinHeight = 450, WindowStartupLocation = WindowStartupLocation.CenterOwner };
             var root = new DockPanel { Margin = new Thickness(16) };
-            var hint = new TextBlock { Text = "Discussions sauvegardées sur ce poste · sélectionnez une discussion pour la relire, puis cliquez sur Reprendre." +
-                (unreadable > 0 ? " " + unreadable + " fichier(s) illisible(s)." : ""), TextWrapping = TextWrapping.Wrap };
+            var hint = new TextBlock { Text = UiLanguage.T("Discussions sauvegardées sur ce poste · sélectionnez une discussion pour la relire, puis cliquez sur Reprendre.", "Conversations saved on this computer · select a conversation to review it, then click Resume.") +
+                (unreadable > 0 ? " " + unreadable + UiLanguage.T(" fichier(s) illisible(s).", " unreadable file(s).") : ""), TextWrapping = TextWrapping.Wrap };
             DockPanel.SetDock(hint, Dock.Top); root.Children.Add(hint);
-            var searchLabel = new TextBlock { Text = "Rechercher une demande, un document ou un RFA", Margin = new Thickness(0, 10, 0, 0) };
+            var searchLabel = new TextBlock { Text = UiLanguage.T("Rechercher une demande, un document ou un RFA", "Search for a request, a document or an RFA"), Margin = new Thickness(0, 10, 0, 0) };
             DockPanel.SetDock(searchLabel, Dock.Top); root.Children.Add(searchLabel);
-            var search = new TextBox { Margin = new Thickness(0, 10, 0, 10), ToolTip = "Rechercher une demande, un document ou un fichier RFA" };
+            var search = new TextBox { Margin = new Thickness(0, 10, 0, 10), ToolTip = UiLanguage.T("Rechercher une demande, un document ou un fichier RFA", "Search for a request, a document or an RFA file") };
             DockPanel.SetDock(search, Dock.Top); root.Children.Add(search);
             var list = new ListBox { Height = 175, DisplayMemberPath = "Label", ItemsSource = entries };
             DockPanel.SetDock(list, Dock.Top); root.Children.Add(list);
             var actions = new StackPanel { Orientation = Orientation.Horizontal };
-            var resume = Button("Reprendre"); var locate = Button("Voir le dossier du RFA");
+            var resume = Button(UiLanguage.T("Reprendre", "Resume")); var locate = Button(UiLanguage.T("Voir le dossier du RFA", "Show RFA folder"));
             actions.Children.Add(resume); actions.Children.Add(locate);
             DockPanel.SetDock(actions, Dock.Bottom); root.Children.Add(actions);
             var families = new ComboBox { Margin = new Thickness(0, 8, 0, 0) };
@@ -202,7 +203,7 @@ namespace BIMaestro.Codex
                 (e.Label + " " + string.Join(" ", e.Families)).IndexOf(search.Text, StringComparison.CurrentCultureIgnoreCase) >= 0).ToList();
             resume.Click += (_, __) => {
                 try { if (list.SelectedItem is CodexDiscussion item) { RestoreHistory(item); dialog.Close(); } }
-                catch (IOException) { hint.Text = "Impossible de reprendre : discussion déjà ouverte dans un autre panneau, ou fichier inaccessible."; }
+                catch (IOException) { hint.Text = UiLanguage.T("Impossible de reprendre : discussion déjà ouverte dans un autre panneau, ou fichier inaccessible.", "Cannot resume: the conversation is already open in another panel, or the file is inaccessible."); }
                 catch (Exception ex) { hint.Text = ex.Message; }
             };
             locate.Click += (_, __) => {
@@ -211,7 +212,7 @@ namespace BIMaestro.Codex
             };
             resume.IsEnabled = locate.IsEnabled = false;
             if (entries.Count > 0) list.SelectedIndex = 0;
-            else hint.Text = "Aucune discussion sauvegardée. Les nouvelles demandes apparaîtront ici automatiquement.";
+            else hint.Text = UiLanguage.T("Aucune discussion sauvegardée. Les nouvelles demandes apparaîtront ici automatiquement.", "No saved conversations. New requests will appear here automatically.");
             dialog.Content = root;
             return dialog;
         }

@@ -40,7 +40,7 @@ namespace BIMaestro.Codex
         internal static async Task<string> SaveDownloadedFamilyAsync(Window owner, JObject item)
         {
             var picker = new SaveFileDialog {
-                Title = L("Enregistrer la famille Revit"), Filter = "Famille Revit (*.rfa)|*.rfa",
+                Title = L("Enregistrer la famille Revit"), Filter = UiLanguage.T("Famille Revit (*.rfa)|*.rfa", "Revit family (*.rfa)|*.rfa"),
                 DefaultExt = ".rfa", AddExtension = true, OverwritePrompt = true,
                 FileName = CodexCommunityLibrary.SuggestedFileName(item)
             };
@@ -63,7 +63,7 @@ namespace BIMaestro.Codex
         private readonly ListBox categories = new ListBox { SelectedValuePath = "Key", BorderThickness = new Thickness(0) };
         private readonly ObservableCollection<KeyValuePair<string, string>> categoryItems = new ObservableCollection<KeyValuePair<string, string>>();
         private readonly ComboBox origin = new ComboBox { MinWidth = 130, Margin = new Thickness(0, 0, 12, 0) };
-        private readonly CheckBox mine = new CheckBox { Content = "Mes publications", VerticalAlignment = VerticalAlignment.Center };
+        private readonly CheckBox mine = new CheckBox { Content = UiLanguage.T("Mes publications", "My publications"), VerticalAlignment = VerticalAlignment.Center };
         private readonly WrapPanel cards = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Center };
         private readonly Dictionary<Button, FrameworkElement> galleryPreviews = new Dictionary<Button, FrameworkElement>();
         private readonly StackPanel details = new StackPanel();
@@ -79,11 +79,11 @@ namespace BIMaestro.Codex
         {
             this.bridge = bridge; this.useAsBase = useAsBase; CommunityStyle.Apply(this);
             if (!string.IsNullOrWhiteSpace(initialQuery)) query.Text = initialQuery;
-            Title = "BIMaestro — Bibliothèque commune"; Width = 1500; Height = 880; MinWidth = 1100; MinHeight = 700;
+            Title = UiLanguage.T("BIMaestro — Bibliothèque commune", "BIMaestro — Shared library"); Width = 1500; Height = 880; MinWidth = 1100; MinHeight = 700;
             var root = new DockPanel { Margin = new Thickness(18) }; Content = root;
             var heading = new DockPanel { Margin = new Thickness(4, 2, 4, 10) }; DockPanel.SetDock(share, Dock.Right); heading.Children.Add(share);
-            var titles = new StackPanel(); var title = CommunityStyle.Text("Bibliothèque commune", 28); title.FontWeight = FontWeights.SemiBold; titles.Children.Add(title); var subtitle = CommunityStyle.Text(CommunityStyle.L("Découvrez, partagez et mettez à jour les familles de la communauté · Revit 2023 à ") + bridge.RevitVersion); subtitle.Opacity = 0.72; titles.Children.Add(subtitle); heading.Children.Add(titles); DockPanel.SetDock(heading, Dock.Top); root.Children.Add(heading);
-            var filters = new DockPanel { Margin = new Thickness(0, 4, 0, 12) }; query.ToolTip = "Rechercher par nom ou description"; DockPanel.SetDock(search, Dock.Right); filters.Children.Add(search);
+            var titles = new StackPanel(); var title = CommunityStyle.Text(UiLanguage.T("Bibliothèque commune", "Shared library"), 28); title.FontWeight = FontWeights.SemiBold; titles.Children.Add(title); var subtitle = CommunityStyle.Text(CommunityStyle.L("Découvrez, partagez et mettez à jour les familles de la communauté · Revit 2023 à ") + bridge.RevitVersion); subtitle.Opacity = 0.72; titles.Children.Add(subtitle); heading.Children.Add(titles); DockPanel.SetDock(heading, Dock.Top); root.Children.Add(heading);
+            var filters = new DockPanel { Margin = new Thickness(0, 4, 0, 12) }; query.ToolTip = UiLanguage.T("Rechercher par nom ou description", "Search by name or description"); DockPanel.SetDock(search, Dock.Right); filters.Children.Add(search);
             var options = new StackPanel { Orientation = Orientation.Horizontal }; origin.Items.Add(CommunityStyle.L("Toutes les origines")); origin.Items.Add(CommunityStyle.L("Personnelles")); origin.Items.Add(CommunityStyle.L("Créées avec IA")); origin.SelectedIndex = 0; options.Children.Add(origin); options.Children.Add(mine); DockPanel.SetDock(options, Dock.Right); filters.Children.Add(options); filters.Children.Add(query);
             var filterCard = CommunityStyle.Card(filters); filterCard.Padding = new Thickness(14, 9, 6, 9); filterCard.Margin = new Thickness(0, 0, 0, 12); DockPanel.SetDock(filterCard, Dock.Top); root.Children.Add(filterCard); status.Margin = new Thickness(6, 8, 0, 0); status.Opacity = 0.72; DockPanel.SetDock(status, Dock.Bottom); root.Children.Add(status);
             var columns = new Grid(); columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(230) }); columns.ColumnDefinitions.Add(new ColumnDefinition()); columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(350) }); root.Children.Add(columns);
@@ -253,7 +253,7 @@ namespace BIMaestro.Codex
         private async Task ChangeCover()
         {
             if (selected?.Value<bool?>("isOwner") != true) return;
-            var picker = new OpenFileDialog { Filter = "Images (*.png;*.jpg;*.jpeg;*.bmp)|*.png;*.jpg;*.jpeg;*.bmp", CheckFileExists = true, Multiselect = false, Title = "Choisir la photo de couverture" };
+            var picker = new OpenFileDialog { Filter = "Images (*.png;*.jpg;*.jpeg;*.bmp)|*.png;*.jpg;*.jpeg;*.bmp", CheckFileExists = true, Multiselect = false, Title = UiLanguage.T("Choisir la photo de couverture", "Choose the cover photo") };
             if (picker.ShowDialog(this) != true) { status.Text = CommunityStyle.L("Modification de la photo annulée."); return; }
             using (var service = new CodexCommunityLibrary()) await service.UpdatePreview(selected, picker.FileName);
             Select(selected); status.Text = CommunityStyle.L("Photo de couverture mise à jour.");
@@ -278,7 +278,7 @@ namespace BIMaestro.Codex
     {
         private readonly TextBox name = new TextBox { MaxLength = 120 }, description = new TextBox { MaxLength = 1000, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, Height = 110 };
         private readonly ComboBox category = new ComboBox { DisplayMemberPath = "Value", SelectedValuePath = "Key" }, origin = new ComboBox();
-        private readonly CheckBox consent = new CheckBox { Content = "Je peux partager ce fichier et j'accepte de le rendre accessible à tous.", Margin = new Thickness(0, 16, 0, 12) };
+        private readonly CheckBox consent = new CheckBox { Content = UiLanguage.T("Je peux partager ce fichier et j'accepte de le rendre accessible à tous.", "I am entitled to share this file and I agree to make it available to everyone."), Margin = new Thickness(0, 16, 0, 12) };
         private readonly TextBlock status = CommunityStyle.Text("");
         private readonly TextBlock coverName = CommunityStyle.Text("");
         private readonly TextBox changeNote = new TextBox { MaxLength = 500, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, Height = 70 };
@@ -289,7 +289,7 @@ namespace BIMaestro.Codex
         private bool sending, published;
         private CodexCommunityPublishWindow(JObject metadata, string source, JObject replaces = null)
         {
-            this.replaces = replaces; CommunityStyle.Apply(this); Title = replaces == null ? "Partager une famille" : "Publier une nouvelle version"; Width = 620; Height = 740; MinWidth = 550; MinHeight = 600;
+            this.replaces = replaces; CommunityStyle.Apply(this); Title = replaces == null ? UiLanguage.T("Partager une famille", "Share a family") : UiLanguage.T("Publier une nouvelle version", "Publish a new version"); Width = 620; Height = 740; MinWidth = 550; MinHeight = 600;
             path = (string)metadata["filePath"]; version = (string)metadata["revitVersion"];
             generatedPreviewPath = (string)metadata["previewPath"]; coverPath = generatedPreviewPath;
             var panel = new StackPanel { Margin = new Thickness(24) }; Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
@@ -301,7 +301,7 @@ namespace BIMaestro.Codex
             if (!CommunityStyle.Categories.ContainsKey(categoryKey)) category.Items.Add(new KeyValuePair<string, string>(categoryKey, categoryKey));
             category.SelectedValue = categoryKey; panel.Children.Add(category);
             panel.Children.Add(CommunityStyle.Text("Origine")); origin.Items.Add(CommunityStyle.L("Famille IA")); origin.Items.Add(CommunityStyle.L("Famille personnelle")); origin.SelectedIndex = source == "personal" ? 1 : 0; panel.Children.Add(origin);
-            panel.Children.Add(CommunityStyle.Text("Photo de couverture")); coverName.Text = string.IsNullOrEmpty(coverPath) ? "Aucune vignette trouvée — choisissez une image." : "Vignette du fichier sélectionné"; panel.Children.Add(coverName); panel.Children.Add(chooseCover);
+            panel.Children.Add(CommunityStyle.Text("Photo de couverture")); coverName.Text = string.IsNullOrEmpty(coverPath) ? UiLanguage.T("Aucune vignette trouvée — choisissez une image.", "No thumbnail found — choose an image.") : UiLanguage.T("Vignette du fichier sélectionné", "Thumbnail of the selected file"); panel.Children.Add(coverName); panel.Children.Add(chooseCover);
             panel.Children.Add(CommunityStyle.Text("Description")); description.Text = (string)replaces?["description"] ?? ""; panel.Children.Add(description); if (replaces != null) { panel.Children.Add(CommunityStyle.Text("Résumé des modifications")); panel.Children.Add(changeNote); } panel.Children.Add(consent);
             panel.Children.Add(CommunityStyle.Text("Sans compte : le droit de retrait est conservé dans ce profil Windows. Il ne sera pas disponible depuis un autre ordinateur ou après la perte de cette identité locale.", 11)); panel.Children.Add(publish); panel.Children.Add(status);
             chooseCover.Click += (_, __) => ChooseCover(); publish.Click += async (_, __) => await Publish(); Closing += (_, e) => { if (sending) { e.Cancel = true; return; } try { if (!string.IsNullOrEmpty(generatedPreviewPath) && File.Exists(generatedPreviewPath)) File.Delete(generatedPreviewPath); } catch { } };
@@ -309,7 +309,7 @@ namespace BIMaestro.Codex
         internal static async Task<bool> ShowAsync(Window owner, CodexRevitBridge bridge, string filePath = null, string origin = "ai", JObject replaces = null)
         {
             if (!BIMaestro.Welcome.WelcomeManager.EnsureCommunityProfile(owner)) return false;
-            if (string.IsNullOrEmpty(filePath)) { var picker = new OpenFileDialog { Filter = "Famille Revit (*.rfa)|*.rfa", CheckFileExists = true, Multiselect = false }; if (picker.ShowDialog(owner) != true) return false; filePath = picker.FileName; }
+            if (string.IsNullOrEmpty(filePath)) { var picker = new OpenFileDialog { Filter = UiLanguage.T("Famille Revit (*.rfa)|*.rfa", "Revit family (*.rfa)|*.rfa"), CheckFileExists = true, Multiselect = false }; if (picker.ShowDialog(owner) != true) return false; filePath = picker.FileName; }
             var metadata = await bridge.InspectCommunityFamilyAsync(filePath);
             metadata["previewPath"] = await Task.Run(() => CreateShellPreview(filePath));
             var dialog = new CodexCommunityPublishWindow(metadata, origin, replaces) { Owner = owner }; dialog.ShowDialog(); return dialog.published;
@@ -353,7 +353,7 @@ namespace BIMaestro.Codex
         }
         private void ChooseCover()
         {
-            var picker = new OpenFileDialog { Filter = "Images (*.png;*.jpg;*.jpeg;*.bmp)|*.png;*.jpg;*.jpeg;*.bmp", CheckFileExists = true, Multiselect = false, Title = "Choisir la photo de couverture" };
+            var picker = new OpenFileDialog { Filter = "Images (*.png;*.jpg;*.jpeg;*.bmp)|*.png;*.jpg;*.jpeg;*.bmp", CheckFileExists = true, Multiselect = false, Title = UiLanguage.T("Choisir la photo de couverture", "Choose the cover photo") };
             if (picker.ShowDialog(this) != true) return;
             coverPath = picker.FileName; coverName.Text = Path.GetFileName(coverPath) + CommunityStyle.L(" · compression automatique si nécessaire");
         }
@@ -362,7 +362,7 @@ namespace BIMaestro.Codex
     internal sealed class CodexCommunityEditWindow : Window
     {
         private readonly JObject item; private readonly TextBox name = new TextBox { MaxLength = 120 }, description = new TextBox { MaxLength = 1000, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, Height = 120 }; private readonly ComboBox category = new ComboBox { DisplayMemberPath = "Value", SelectedValuePath = "Key" }, origin = new ComboBox(); private bool saved;
-        private CodexCommunityEditWindow(JObject item) { this.item = item; CommunityStyle.Apply(this); Title = "Modifier les informations"; Width = 560; Height = 560; var panel = new StackPanel { Margin = new Thickness(24) }; Content = panel; panel.Children.Add(CommunityStyle.Text("Modifier les informations", 24)); panel.Children.Add(CommunityStyle.Text("Nom")); name.Text = (string)item["name"]; panel.Children.Add(name); panel.Children.Add(CommunityStyle.Text("Catégorie")); foreach (var entry in CommunityStyle.Categories) if (entry.Key != "") category.Items.Add(new KeyValuePair<string, string>(entry.Key, CommunityStyle.L(entry.Value))); category.SelectedValue = (string)item["category"]; panel.Children.Add(category); panel.Children.Add(CommunityStyle.Text("Origine")); origin.Items.Add(CommunityStyle.L("Famille IA")); origin.Items.Add(CommunityStyle.L("Famille personnelle")); origin.SelectedIndex = (string)item["origin"] == "personal" ? 1 : 0; panel.Children.Add(origin); panel.Children.Add(CommunityStyle.Text("Description")); description.Text = (string)item["description"] ?? ""; panel.Children.Add(description); var save = CommunityStyle.Button("Enregistrer", true); panel.Children.Add(save); save.Click += async (_, __) => { if (string.IsNullOrWhiteSpace(name.Text) || category.SelectedValue == null) return; save.IsEnabled = false; try { using (var service = new CodexCommunityLibrary()) await service.EditMetadata(item, name.Text.Trim(), (string)category.SelectedValue, description.Text.Trim(), origin.SelectedIndex == 0 ? "ai" : "personal"); saved = true; Close(); } catch (Exception ex) { MessageBox.Show(this, ex.Message, CommunityStyle.L("Modification impossible"), MessageBoxButton.OK, MessageBoxImage.Warning); save.IsEnabled = true; } }; }
+        private CodexCommunityEditWindow(JObject item) { this.item = item; CommunityStyle.Apply(this); Title = UiLanguage.T("Modifier les informations", "Edit information"); Width = 560; Height = 560; var panel = new StackPanel { Margin = new Thickness(24) }; Content = panel; panel.Children.Add(CommunityStyle.Text(UiLanguage.T("Modifier les informations", "Edit information"), 24)); panel.Children.Add(CommunityStyle.Text("Nom")); name.Text = (string)item["name"]; panel.Children.Add(name); panel.Children.Add(CommunityStyle.Text("Catégorie")); foreach (var entry in CommunityStyle.Categories) if (entry.Key != "") category.Items.Add(new KeyValuePair<string, string>(entry.Key, CommunityStyle.L(entry.Value))); category.SelectedValue = (string)item["category"]; panel.Children.Add(category); panel.Children.Add(CommunityStyle.Text("Origine")); origin.Items.Add(CommunityStyle.L("Famille IA")); origin.Items.Add(CommunityStyle.L("Famille personnelle")); origin.SelectedIndex = (string)item["origin"] == "personal" ? 1 : 0; panel.Children.Add(origin); panel.Children.Add(CommunityStyle.Text("Description")); description.Text = (string)item["description"] ?? ""; panel.Children.Add(description); var save = CommunityStyle.Button("Enregistrer", true); panel.Children.Add(save); save.Click += async (_, __) => { if (string.IsNullOrWhiteSpace(name.Text) || category.SelectedValue == null) return; save.IsEnabled = false; try { using (var service = new CodexCommunityLibrary()) await service.EditMetadata(item, name.Text.Trim(), (string)category.SelectedValue, description.Text.Trim(), origin.SelectedIndex == 0 ? "ai" : "personal"); saved = true; Close(); } catch (Exception ex) { MessageBox.Show(this, ex.Message, CommunityStyle.L("Modification impossible"), MessageBoxButton.OK, MessageBoxImage.Warning); save.IsEnabled = true; } }; }
         internal static Task<bool> ShowAsync(Window owner, JObject item) { var dialog = new CodexCommunityEditWindow(item) { Owner = owner }; dialog.ShowDialog(); return Task.FromResult(dialog.saved); }
     }
 
@@ -370,14 +370,14 @@ namespace BIMaestro.Codex
     {
         internal CodexCommunityHistoryWindow(JArray versions)
         {
-            CommunityStyle.Apply(this); Title = "Historique des versions"; Width = 600; Height = 580;
+            CommunityStyle.Apply(this); Title = UiLanguage.T("Historique des versions", "Version history"); Width = 600; Height = 580;
             var panel = new StackPanel { Margin = new Thickness(24) };
             Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
             panel.Children.Add(CommunityStyle.Text("Historique des versions", 24));
             foreach (JObject version in versions)
             {
                 var card = new StackPanel();
-                card.Children.Add(CommunityStyle.Text("Révision " + (version.Value<int?>("revisionNumber") ?? 1) + " · Revit " + version["revitVersion"], 17));
+                card.Children.Add(CommunityStyle.Text(UiLanguage.T("Révision ", "Revision ") + (version.Value<int?>("revisionNumber") ?? 1) + " · Revit " + version["revitVersion"], 17));
                 card.Children.Add(CommunityStyle.Text((string)version["createdAt"], 11));
                 if (!string.IsNullOrWhiteSpace((string)version["changeNote"])) card.Children.Add(CommunityStyle.Text((string)version["changeNote"]));
                 var download = CommunityStyle.Button("Télécharger cette version"); card.Children.Add(download);
@@ -387,9 +387,9 @@ namespace BIMaestro.Codex
                     {
                         if (!BIMaestro.Welcome.WelcomeManager.EnsureCommunityProfile(this)) return;
                         string path = await CommunityStyle.SaveDownloadedFamilyAsync(this, version);
-                        if (path != null) MessageBox.Show(this, "RFA enregistré :\n" + path, "Téléchargement terminé", MessageBoxButton.OK, MessageBoxImage.Information);
+                        if (path != null) MessageBox.Show(this, UiLanguage.T("RFA enregistré :\n", "RFA saved:\n") + path, UiLanguage.T("Téléchargement terminé", "Download complete"), MessageBoxButton.OK, MessageBoxImage.Information);
                     }
-                    catch (Exception ex) { MessageBox.Show(this, ex.Message, "Téléchargement impossible", MessageBoxButton.OK, MessageBoxImage.Warning); }
+                    catch (Exception ex) { MessageBox.Show(this, ex.Message, UiLanguage.T("Téléchargement impossible", "Download failed"), MessageBoxButton.OK, MessageBoxImage.Warning); }
                 };
                 panel.Children.Add(CommunityStyle.Card(card));
             }

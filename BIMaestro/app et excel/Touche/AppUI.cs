@@ -1149,11 +1149,15 @@ public partial class AppUI : IExternalApplication
         if (!ribbonButtonRegistry.TryGetValue("CreateDemoProject", out var info) || info.PushButton == null)
             return;
         string image = tours ? "DemoTours.png" : "DemoProject.png";
-        string text = UiLanguage.T(tours ? "Parcours\nguidés" : "Maquette\nd’essai");
+        string text = tours
+            ? UiLanguage.T("Parcours\nguidés", "Guided\ntours")
+            : UiLanguage.T("Maquette\nd’essai", "Demo\nmodel");
         if (info.ImageResourceName == image && info.PushButton.ItemText == text) return;
         string description = tours
-            ? "Choisissez un parcours pour essayer les outils BIMaestro pas à pas dans cette maquette d’essai."
-            : "Crée et ouvre une nouvelle maquette d’essai BIMaestro dans Documents\\BIMaestro_Revit, puis propose les exercices guidés.";
+            ? UiLanguage.T("Choisissez un parcours pour essayer les outils BIMaestro pas à pas dans cette maquette d’essai.",
+                "Choose a tour to try the BIMaestro tools step by step in this demo model.")
+            : UiLanguage.T("Crée et ouvre une nouvelle maquette d’essai BIMaestro dans Documents\\BIMaestro_Revit, puis propose les exercices guidés.",
+                "Creates and opens a new BIMaestro demo model in Documents\\BIMaestro_Revit, then offers guided exercises.");
         UpdatePushButtonPresentation(info.Id, text, description);
         string badgeLabel = GetRibbonBadgeLabel(info.Id);
         if (badgeLabel != null) info.PushButton.ToolTip = badgeLabel + " · " + UiLanguage.T(description);

@@ -56,7 +56,7 @@ namespace IA
                 FontWeight = FontWeights.Bold,
                 FontSize = 15,
                 Cursor = System.Windows.Input.Cursors.Hand,
-                ToolTip = "Ouvrir l’aide en ligne",
+                ToolTip = UiLanguage.T("Ouvrir l’aide en ligne", "Open Online Help"),
                 HorizontalAlignment = HorizontalAlignment.Right,
                 VerticalAlignment = VerticalAlignment.Top
             };
@@ -162,7 +162,7 @@ namespace IA
                 string resultB64 = ExtractImageBase64(response);
 
                 if (string.IsNullOrWhiteSpace(resultB64))
-                    throw new InvalidOperationException("Réponse IA sans image exploitable.");
+                    throw new InvalidOperationException(UiLanguage.T("Réponse IA sans image exploitable.", "The AI response contains no usable image."));
 
                 byte[] outBytes = Convert.FromBase64String(resultB64);
 
@@ -191,10 +191,10 @@ namespace IA
             catch (Exception ex)
             {
                 TaskDialog.Show(
-                    "IA Image",
-                    "Erreur lors de la génération IA : " + ex.Message +
-                    "\n\nConseil : réessayez dans quelques secondes. " +
-                    "Si l'erreur 500 persiste, le service OpenAI/proxy est temporairement indisponible."
+                    UiLanguage.T("IA Image", "AI Image"),
+                    UiLanguage.T("Erreur lors de la génération IA : ", "AI generation error: ") + ex.Message +
+                    UiLanguage.T("\n\nConseil : réessayez dans quelques secondes. ", "\n\nTip: try again in a few seconds. ") +
+                    UiLanguage.T("Si l'erreur 500 persiste, le service OpenAI/proxy est temporairement indisponible.", "If the 500 error persists, the OpenAI/proxy service is temporarily unavailable.")
                 );
 
                 return Result.Failed;
@@ -474,7 +474,7 @@ namespace IA
             if (TryReadPixelSize(imageBytes, out width, out height))
                 return width + " x " + height + " px";
 
-            return "Dimensions inconnues";
+            return UiLanguage.T("Dimensions inconnues", "Unknown Dimensions");
         }
 
         private static string BuildPrompt(RenderMode mode)
@@ -535,12 +535,26 @@ namespace IA
             return "Présentation";
         }
 
+        private static string GetModeDisplayLabel(RenderMode mode)
+        {
+            if (mode == RenderMode.Auto)
+                return "Auto";
+
+            if (mode == RenderMode.Fidele)
+                return UiLanguage.T("Fidèle", "Faithful");
+
+            if (mode == RenderMode.Ambiance)
+                return UiLanguage.T("Ambiance", "Mood");
+
+            return UiLanguage.T("Présentation", "Presentation");
+        }
+
         private static string GetAutoModeDescription(View view)
         {
             if (view != null && view.ViewType == ViewType.ThreeD)
-                return "Auto : vue 3D détectée → mode Présentation.";
+                return UiLanguage.T("Auto : vue 3D détectée → mode Présentation.", "Auto: 3D view detected → Presentation mode.");
 
-            return "Auto : plan/coupe détecté → mode Fidèle.";
+            return UiLanguage.T("Auto : plan/coupe détecté → mode Fidèle.", "Auto: plan/section detected → Faithful mode.");
         }
 
         private static JObject SendImageRequestWithFallback(
@@ -602,8 +616,8 @@ namespace IA
                         if (isBadPromptError)
                         {
                             throw new InvalidOperationException(
-                                "Le proxy IA attend un couple model/prompt valide pour ce type de requête. " +
-                                "Vérifie la configuration de la fonction ai-proxy côté Supabase.",
+                                UiLanguage.T("Le proxy IA attend un couple model/prompt valide pour ce type de requête. ", "The AI proxy expects a valid model/prompt pair for this type of request. ") +
+                                UiLanguage.T("Vérifie la configuration de la fonction ai-proxy côté Supabase.", "Check the ai-proxy function configuration in Supabase."),
                                 ex
                             );
                         }
@@ -620,7 +634,7 @@ namespace IA
                 }
             }
 
-            throw lastError ?? new InvalidOperationException("Échec de l'appel IA image.");
+            throw lastError ?? new InvalidOperationException(UiLanguage.T("Échec de l'appel IA image.", "The AI image request failed."));
         }
 
         private static string ExtractImageBase64(JObject json)
@@ -831,7 +845,7 @@ namespace IA
             {
                 SelectedRenderMode = RenderMode.Auto;
 
-                Title = "BIMaestro - Rendu IA d'avant-projet";
+                Title = UiLanguage.T("BIMaestro - Rendu IA d'avant-projet", "BIMaestro - AI Concept Rendering");
                 Width = 620;
                 Height = 600;
                 WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -853,7 +867,7 @@ namespace IA
 
                 header.Children.Add(new TextBlock
                 {
-                    Text = "Créer un rendu IA depuis une vue Revit",
+                    Text = UiLanguage.T("Créer un rendu IA depuis une vue Revit", "Create an AI Rendering from a Revit View"),
                     FontSize = 18,
                     FontWeight = FontWeights.SemiBold,
                     Foreground = new SolidColorBrush(Color.FromRgb(25, 35, 55)),
@@ -862,7 +876,7 @@ namespace IA
 
                 header.Children.Add(new TextBlock
                 {
-                    Text = "Choisis une vue puis un style de rendu. Qualité : low — entrée/sortie max 1536 px.",
+                    Text = UiLanguage.T("Choisis une vue puis un style de rendu. Qualité : low — entrée/sortie max 1536 px.", "Choose a view, then a rendering style. Quality: low — input/output max 1536 px."),
                     FontSize = 12,
                     Foreground = new SolidColorBrush(Color.FromRgb(95, 103, 115)),
                     Margin = new Thickness(0, 4, 0, 0),
@@ -913,7 +927,7 @@ namespace IA
 
                 optionsPanel.Children.Add(new TextBlock
                 {
-                    Text = "Style du rendu",
+                    Text = UiLanguage.T("Style du rendu", "Rendering Style"),
                     FontWeight = FontWeights.SemiBold,
                     Foreground = new SolidColorBrush(Color.FromRgb(25, 35, 55)),
                     Margin = new Thickness(0, 0, 0, 8)
@@ -921,35 +935,35 @@ namespace IA
 
                 _rbAuto = new RadioButton
                 {
-                    Content = "Auto recommandé — Fidèle pour plan/coupe, Présentation pour 3D",
+                    Content = UiLanguage.T("Auto recommandé — Fidèle pour plan/coupe, Présentation pour 3D", "Auto (recommended) — Faithful for plans/sections, Presentation for 3D"),
                     GroupName = "RenderMode",
                     IsChecked = true,
                     Margin = new Thickness(0, 0, 0, 6),
-                    ToolTip = "Adapte automatiquement le prompt au type de vue sélectionné."
+                    ToolTip = UiLanguage.T("Adapte automatiquement le prompt au type de vue sélectionné.", "Automatically adapts the prompt to the selected view type.")
                 };
 
                 _rbFidele = new RadioButton
                 {
-                    Content = "Fidèle — rendu sobre, proche de la maquette",
+                    Content = UiLanguage.T("Fidèle — rendu sobre, proche de la maquette", "Faithful — understated rendering, close to the model"),
                     GroupName = "RenderMode",
                     Margin = new Thickness(0, 0, 0, 6),
-                    ToolTip = "Priorise la conformité à la vue Revit."
+                    ToolTip = UiLanguage.T("Priorise la conformité à la vue Revit.", "Prioritizes accuracy to the Revit view.")
                 };
 
                 _rbPresentation = new RadioButton
                 {
-                    Content = "Présentation — rendu propre et valorisant",
+                    Content = UiLanguage.T("Présentation — rendu propre et valorisant", "Presentation — clean, polished rendering"),
                     GroupName = "RenderMode",
                     Margin = new Thickness(0, 0, 0, 6),
-                    ToolTip = "Bon équilibre pour l'avant-projet."
+                    ToolTip = UiLanguage.T("Bon équilibre pour l'avant-projet.", "A good balance for concept design.")
                 };
 
                 _rbAmbiance = new RadioButton
                 {
-                    Content = "Ambiance — rendu plus charmeur",
+                    Content = UiLanguage.T("Ambiance — rendu plus charmeur", "Mood — more appealing rendering"),
                     GroupName = "RenderMode",
                     Margin = new Thickness(0, 0, 0, 10),
-                    ToolTip = "Plus esthétique, avec un peu plus de risque d'interprétation."
+                    ToolTip = UiLanguage.T("Plus esthétique, avec un peu plus de risque d'interprétation.", "More aesthetic, with a slightly higher risk of interpretation.")
                 };
 
                 _rbAuto.Checked += (s, e) => UpdateModeInfo();
@@ -986,7 +1000,7 @@ namespace IA
 
                 var ok = new Button
                 {
-                    Content = "Générer",
+                    Content = UiLanguage.T("Générer", "Generate"),
                     Width = 120,
                     Height = 32,
                     Margin = new Thickness(0, 0, 8, 0)
@@ -996,7 +1010,7 @@ namespace IA
 
                 var cancel = new Button
                 {
-                    Content = "Annuler",
+                    Content = UiLanguage.T("Annuler", "Cancel"),
                     Width = 90,
                     Height = 32
                 };
@@ -1031,12 +1045,12 @@ namespace IA
                 {
                     _modeInfo.Text =
                         GetAutoModeDescription(selectedView) +
-                        " Mode appliqué : " + GetModeLabel(effectiveMode) + ".";
+                        UiLanguage.T(" Mode appliqué : ", " Applied mode: ") + GetModeDisplayLabel(effectiveMode) + ".";
                 }
                 else
                 {
                     _modeInfo.Text =
-                        "Mode appliqué : " + GetModeLabel(effectiveMode) + ".";
+                        UiLanguage.T("Mode appliqué : ", "Applied mode: ") + GetModeDisplayLabel(effectiveMode) + ".";
                 }
             }
 
@@ -1113,16 +1127,16 @@ namespace IA
                     : suggestedFileName;
 
                 _sourceInfo = string.IsNullOrWhiteSpace(sourceInfo)
-                    ? "Dimensions source inconnues"
+                    ? UiLanguage.T("Dimensions source inconnues", "Unknown Source Dimensions")
                     : sourceInfo;
 
                 _resultInfo = string.IsNullOrWhiteSpace(resultInfo)
-                    ? "Dimensions résultat inconnues"
+                    ? UiLanguage.T("Dimensions résultat inconnues", "Unknown Result Dimensions")
                     : resultInfo;
 
                 _historyFolder = historyFolder ?? string.Empty;
 
-                Title = "BIMaestro - Avant / Après rendu IA";
+                Title = UiLanguage.T("BIMaestro - Avant / Après rendu IA", "BIMaestro - AI Rendering Before / After");
                 Width = 1180;
                 Height = 760;
                 MinWidth = 900;
@@ -1150,7 +1164,7 @@ namespace IA
 
                 header.Children.Add(new TextBlock
                 {
-                    Text = "Comparaison avant / après",
+                    Text = UiLanguage.T("Comparaison avant / après", "Before / After Comparison"),
                     FontSize = 18,
                     FontWeight = FontWeights.SemiBold,
                     Foreground = new SolidColorBrush(Color.FromRgb(25, 35, 55))
@@ -1158,7 +1172,7 @@ namespace IA
 
                 header.Children.Add(new TextBlock
                 {
-                    Text = "Source : " + _sourceInfo + " — Rendu IA : " + _resultInfo,
+                    Text = UiLanguage.T("Source : ", "Source: ") + _sourceInfo + UiLanguage.T(" — Rendu IA : ", " — AI Rendering: ") + _resultInfo,
                     FontSize = 12,
                     Foreground = new SolidColorBrush(Color.FromRgb(95, 103, 115)),
                     Margin = new Thickness(0, 4, 0, 0),
@@ -1169,7 +1183,7 @@ namespace IA
                 {
                     header.Children.Add(new TextBlock
                     {
-                        Text = "Historique local : " + _historyFolder,
+                        Text = UiLanguage.T("Historique local : ", "Local History: ") + _historyFolder,
                         FontSize = 11,
                         Foreground = new SolidColorBrush(Color.FromRgb(120, 127, 138)),
                         Margin = new Thickness(0, 4, 0, 0),
@@ -1191,7 +1205,7 @@ namespace IA
                 comparisonGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
                 var sourcePanel = BuildImagePanel(
-                    "Vue Revit source",
+                    UiLanguage.T("Vue Revit source", "Source Revit View"),
                     _sourceBytes,
                     _sourceInfo
                 );
@@ -1200,7 +1214,7 @@ namespace IA
                 comparisonGrid.Children.Add(sourcePanel);
 
                 var resultPanel = BuildImagePanel(
-                    "Rendu IA",
+                    UiLanguage.T("Rendu IA", "AI Rendering"),
                     _resultBytes,
                     _resultInfo
                 );
@@ -1221,7 +1235,7 @@ namespace IA
 
                 var note = new TextBlock
                 {
-                    Text = "Une copie source/résultat/prompt est conservée dans l’historique local. Le bouton Enregistrer permet de choisir un emplacement final.",
+                    Text = UiLanguage.T("Une copie source/résultat/prompt est conservée dans l’historique local. Le bouton Enregistrer permet de choisir un emplacement final.", "A copy of the source, result, and prompt is kept in the local history. Use the Save button to choose a final location."),
                     VerticalAlignment = VerticalAlignment.Center,
                     Foreground = new SolidColorBrush(Color.FromRgb(95, 103, 115)),
                     TextWrapping = TextWrapping.Wrap
@@ -1238,7 +1252,7 @@ namespace IA
 
                 var saveButton = new Button
                 {
-                    Content = "Enregistrer...",
+                    Content = UiLanguage.T("Enregistrer...", "Save..."),
                     Width = 130,
                     Height = 32,
                     Margin = new Thickness(0, 0, 8, 0)
@@ -1248,7 +1262,7 @@ namespace IA
 
                 var closeButton = new Button
                 {
-                    Content = "Fermer",
+                    Content = UiLanguage.T("Fermer", "Close"),
                     Width = 90,
                     Height = 32
                 };
@@ -1333,8 +1347,8 @@ namespace IA
             {
                 var save = new SaveFileDialog
                 {
-                    Title = "Enregistrer l'image réaliste",
-                    Filter = "Image PNG (*.png)|*.png",
+                    Title = UiLanguage.T("Enregistrer l'image réaliste", "Save Realistic Image"),
+                    Filter = UiLanguage.T("Image PNG (*.png)|*.png", "PNG Image (*.png)|*.png"),
                     FileName = _suggestedFileName
                 };
 
@@ -1346,8 +1360,8 @@ namespace IA
 
                     MessageBox.Show(
                         this,
-                        "Image enregistrée.",
-                        "BIMaestro - IA Image",
+                        UiLanguage.T("Image enregistrée.", "Image saved."),
+                        UiLanguage.T("BIMaestro - IA Image", "BIMaestro - AI Image"),
                         MessageBoxButton.OK,
                         MessageBoxImage.Information
                     );

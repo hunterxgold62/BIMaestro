@@ -1,5 +1,6 @@
 ﻿using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using BIMaestro.Localization;
 using Modification;
 using System;
 using System.Collections.Generic;
@@ -113,12 +114,15 @@ namespace BIMaestro.Tutorials
                     sheets.Select(sheet => sheet.SheetNumber).SequenceEqual(new[] { "1", "2", "3", "6" });
                 if (!valid)
                 {
-                    DemoTourMessage.Show(app.MainWindowHandle, "Vérifie les feuilles", "Sélectionne uniquement les trois feuilles d’essai A, B et C. Renumérote Numéro de feuille à partir de 1, sans préfixe ni suffixe. La feuille témoin doit rester 6.");
+                    DemoTourMessage.Show(app.MainWindowHandle, UiLanguage.T("Vérifie les feuilles", "Check the sheets"),
+                        UiLanguage.T("Sélectionne uniquement les trois feuilles d’essai A, B et C. Renumérote Numéro de feuille à partir de 1, sans préfixe ni suffixe. La feuille témoin doit rester 6.",
+                            "Select only the three test sheets A, B and C. Renumber Sheet Number starting from 1, with no prefix or suffix. The control sheet must remain 6."));
                     DemoOrganizerSheetGuide.Start(app);
                     return;
                 }
                 _phase = 0;
-                DemoTourCompletion.Show(app.MainWindowHandle, "organizer", "Les feuilles A, B et C portent maintenant 1, 2 et 3. La feuille témoin reste 6 : seules les feuilles sélectionnées dans l’arborescence ont été modifiées.");
+                DemoTourCompletion.Show(app.MainWindowHandle, "organizer", UiLanguage.T("Les feuilles A, B et C portent maintenant 1, 2 et 3. La feuille témoin reste 6 : seules les feuilles sélectionnées dans l’arborescence ont été modifiées.",
+                    "Sheets A, B and C are now numbered 1, 2 and 3. The control sheet remains 6: only the sheets selected in the Project Browser were changed."));
                 return;
             }
             var places = DemoExerciseElements.Find(document, "ORGANISATEUR_")
@@ -138,7 +142,8 @@ namespace BIMaestro.Tutorials
             if (!allSelected || !numbersValid || selectedParameter != ParkingParameter)
             {
                 Retry(app, uiDocument,
-                    "Sélectionne les huit places et numérote « CML_Numéros de place » de PK-001 à PK-008. Bulbizarre les a resélectionnées pour réessayer.");
+                    UiLanguage.T("Sélectionne les huit places et numérote « CML_Numéros de place » de PK-001 à PK-008. Bulbizarre les a resélectionnées pour réessayer.",
+                        "Select the eight parking spaces and number 'CML_Numéros de place' from PK-001 to PK-008. Bulbizarre has reselected them so you can try again."));
                 return;
             }
 
@@ -157,7 +162,8 @@ namespace BIMaestro.Tutorials
                 if (!sortByLevel || !baseFirst || !upperSecond || !distinctLevels)
                 {
                     Retry(app, uiDocument,
-                        "Pour ce premier passage, coche « Trier par niveau » : les quatre places basses doivent recevoir PK-001 à PK-004, puis les quatre places hautes PK-005 à PK-008.");
+                        UiLanguage.T("Pour ce premier passage, coche « Trier par niveau » : les quatre places basses doivent recevoir PK-001 à PK-004, puis les quatre places hautes PK-005 à PK-008.",
+                            "For this first pass, check 'Sort by level': the four lower spaces must receive PK-001 to PK-004, then the four upper spaces PK-005 to PK-008."));
                     return;
                 }
                 try
@@ -165,15 +171,16 @@ namespace BIMaestro.Tutorials
                     SynchronizeVisibleNumbers(document, places);
                     SelectAndFrame(uiDocument, places);
                     uiDocument.RefreshActiveView();
-                    DemoTourMessage.Show(app.MainWindowHandle, "Bravo ! Tri par niveau validé",
-                        "Les quatre places du niveau de base portent PK-001 à PK-004 ; celles du niveau supérieur portent PK-005 à PK-008. Les numéros sont visibles sur les familles. Observe les deux rangées, puis laisse Bulbizarre tourner cette vue 3D de 90°.",
-                        "Tourner la vue de 90°");
+                    DemoTourMessage.Show(app.MainWindowHandle, UiLanguage.T("Bravo ! Tri par niveau validé", "Well done! Sort by level validated"),
+                        UiLanguage.T("Les quatre places du niveau de base portent PK-001 à PK-004 ; celles du niveau supérieur portent PK-005 à PK-008. Les numéros sont visibles sur les familles. Observe les deux rangées, puis laisse Bulbizarre tourner cette vue 3D de 90°.",
+                            "The four spaces on the base level are numbered PK-001 to PK-004; those on the upper level are numbered PK-005 to PK-008. The numbers are visible on the families. Look at both rows, then let Bulbizarre rotate this 3D view by 90°."),
+                        UiLanguage.T("Tourner la vue de 90°", "Rotate the view 90°"));
                     RotateOrganizerView(document);
                     uiDocument.RefreshActiveView();
                 }
                 catch (Exception ex)
                 {
-                    Retry(app, uiDocument, "La vue n'a pas pu tourner de 90° : " + ex.Message);
+                    Retry(app, uiDocument, UiLanguage.T("La vue n'a pas pu tourner de 90° : ", "The view could not be rotated 90°: ") + ex.Message);
                     return;
                 }
                 _firstPassNumbers = new Dictionary<string, string>(numbers);
@@ -186,7 +193,8 @@ namespace BIMaestro.Tutorials
             if (sortByLevel || _firstPassNumbers == null)
             {
                 Retry(app, uiDocument,
-                    "Dans la vue tournée, laisse « Trier par niveau » décoché pour comparer l'ordre visuel à celui du premier passage.");
+                    UiLanguage.T("Dans la vue tournée, laisse « Trier par niveau » décoché pour comparer l'ordre visuel à celui du premier passage.",
+                        "In the rotated view, leave 'Sort by level' unchecked to compare the visual order with the first pass."));
                 return;
             }
             var changed = numbers.Where(pair => _firstPassNumbers.TryGetValue(pair.Key, out string oldValue) &&
@@ -196,23 +204,28 @@ namespace BIMaestro.Tutorials
             if (changed.Count == 0)
             {
                 Retry(app, uiDocument,
-                    "Aucune place n'a changé de numéro. La vue a été tournée ; relance Organisateur avec « Trier par niveau » décoché et les huit places sélectionnées.");
+                    UiLanguage.T("Aucune place n'a changé de numéro. La vue a été tournée ; relance Organisateur avec « Trier par niveau » décoché et les huit places sélectionnées.",
+                        "No space changed number. The view has been rotated; run Organizer again with 'Sort by level' unchecked and the eight spaces selected."));
                 return;
             }
             try { SynchronizeVisibleNumbers(document, places); }
             catch (Exception ex)
             {
-                Retry(app, uiDocument, "Les numéros sont calculés, mais leur texte visible n'a pas pu être mis à jour : " + ex.Message);
+                Retry(app, uiDocument, UiLanguage.T("Les numéros sont calculés, mais leur texte visible n'a pas pu être mis à jour : ",
+                    "The numbers were calculated, but their visible text could not be updated: ") + ex.Message);
                 return;
             }
             _phase = 3;
             SelectAndFrame(uiDocument, places);
             string firstChange = changed[0].Key.Substring(ParkingPrefix.Length) + " : " +
                 _firstPassNumbers[changed[0].Key] + " → " + changed[0].Value;
-            DemoTourMessage.Show(app.MainWindowHandle, "Bravo ! Ordre de lecture comparé",
-                "Après rotation de la vue et sans tri par niveau, " + changed.Count +
+            DemoTourMessage.Show(app.MainWindowHandle, UiLanguage.T("Bravo ! Ordre de lecture comparé", "Well done! Reading order compared"),
+                UiLanguage.T("Après rotation de la vue et sans tri par niveau, " + changed.Count +
                 " place(s) sur huit ont changé de numéro. Exemple, place " + firstChange +
-                ". Passons aux feuilles : sélectionne les trois feuilles d’essai dans l’arborescence pour les renuméroter.");
+                ". Passons aux feuilles : sélectionne les trois feuilles d’essai dans l’arborescence pour les renuméroter.",
+                "After rotating the view and without sorting by level, " + changed.Count +
+                " of eight space(s) changed number. Example, space " + firstChange +
+                ". Now for the sheets: select the three test sheets in the Project Browser to renumber them."));
             uiDocument.Selection.SetElementIds(new List<ElementId>());
             DemoOrganizerSheetGuide.Start(app);
         }
@@ -263,7 +276,7 @@ namespace BIMaestro.Tutorials
                 .Select(id => uiDocument.Document.GetElement(id) as FamilyInstance)
                 .Where(place => place != null).ToList();
             SelectAndFrame(uiDocument, places);
-            DemoTourMessage.Show(app.MainWindowHandle, "Bulbizarre vérifie les places", message);
+            DemoTourMessage.Show(app.MainWindowHandle, UiLanguage.T("Bulbizarre vérifie les places", "Bulbizarre is checking the spaces"), message);
             Couleur.AppearanceOnboarding.StartIntro(app.MainWindowHandle, "organizer");
         }
 
@@ -316,7 +329,7 @@ namespace BIMaestro.Tutorials
         {
             _owner = app.MainWindowHandle;
             _event = ExternalEvent.Create(this);
-            _card = new System.Windows.Window { Title = "BIMaestro — Guide Organisateur", Width = 420, Height = 290,
+            _card = new System.Windows.Window { Title = UiLanguage.T("BIMaestro — Guide Organisateur", "BIMaestro — Organizer Guide"), Width = 420, Height = 290,
                 ResizeMode = System.Windows.ResizeMode.NoResize, ShowInTaskbar = false,
                 Background = System.Windows.Media.Brushes.White,
                 Left = System.Windows.SystemParameters.WorkArea.Right - 450,
@@ -326,12 +339,13 @@ namespace BIMaestro.Tutorials
             _card.Content = panel;
             panel.Children.Add(new System.Windows.Controls.Image { Source = Couleur.RibbonPanelColorScheme.CreateCompanionImage(),
                 Width = 34, Height = 34, HorizontalAlignment = System.Windows.HorizontalAlignment.Left });
-            panel.Children.Add(new System.Windows.Controls.TextBlock { Text = "Sélectionner les feuilles", FontSize = 18,
+            panel.Children.Add(new System.Windows.Controls.TextBlock { Text = UiLanguage.T("Sélectionner les feuilles", "Select the Sheets"), FontSize = 18,
                 Foreground = DemoTourPalette.Accent, Margin = new System.Windows.Thickness(0, 8, 0, 8) });
-            _hint = new System.Windows.Controls.TextBlock { Text = "Déplie Feuilles dans l’arborescence. Avec Ctrl + clic, sélectionne les feuilles 3, 4 et 5 (essai A, B et C). Laisse la feuille témoin 6 hors sélection.",
+            _hint = new System.Windows.Controls.TextBlock { Text = UiLanguage.T("Déplie Feuilles dans l’arborescence. Avec Ctrl + clic, sélectionne les feuilles 3, 4 et 5 (essai A, B et C). Laisse la feuille témoin 6 hors sélection.",
+                "Expand Sheets in the Project Browser. Using Ctrl + click, select sheets 3, 4 and 5 (test A, B and C). Leave control sheet 6 unselected."),
                 TextWrapping = System.Windows.TextWrapping.Wrap };
             panel.Children.Add(_hint);
-            var next = new System.Windows.Controls.Button { Content = "Vérifier ma sélection", Background = DemoTourPalette.Accent,
+            var next = new System.Windows.Controls.Button { Content = UiLanguage.T("Vérifier ma sélection", "Check My Selection"), Background = DemoTourPalette.Accent,
                 Foreground = System.Windows.Media.Brushes.White, Padding = new System.Windows.Thickness(8), Margin = new System.Windows.Thickness(0, 12, 0, 0) };
             next.Click += (_, __) => _event.Raise();
             panel.Children.Add(next);
@@ -390,7 +404,8 @@ namespace BIMaestro.Tutorials
             if (doc == null) return;
             if (!DemoOrganizerExercise.HasSheetSelection(app.ActiveUIDocument))
             {
-                _hint.Text = "Sélectionne uniquement les trois feuilles d’essai A, B et C avec Ctrl + clic dans l’arborescence, puis vérifie à nouveau.";
+                _hint.Text = UiLanguage.T("Sélectionne uniquement les trois feuilles d’essai A, B et C avec Ctrl + clic dans l’arborescence, puis vérifie à nouveau.",
+                    "Select only the three test sheets A, B and C using Ctrl + click in the Project Browser, then check again.");
                 return;
             }
             Close();

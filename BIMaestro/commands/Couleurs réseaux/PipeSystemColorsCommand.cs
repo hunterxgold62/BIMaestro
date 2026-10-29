@@ -3,6 +3,7 @@ using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.ExtensibleStorage;
 using Autodesk.Revit.DB.Plumbing;
 using Autodesk.Revit.UI;
+using BIMaestro.Localization;
 using Licensing;
 using System;
 using System.Collections.Generic;
@@ -30,14 +31,14 @@ namespace Visualisation
 
             if (document == null || view == null)
             {
-                TaskDialog.Show("BIMaestro", "Aucun document Revit actif.");
+                TaskDialog.Show("BIMaestro", UiLanguage.T("Aucun document Revit actif.", "No active Revit document."));
                 return Result.Cancelled;
             }
 
             string unsupportedReason = GetUnsupportedViewReason(document, view);
             if (unsupportedReason != null)
             {
-                TaskDialog.Show("Couleurs réseaux", unsupportedReason);
+                TaskDialog.Show(UiLanguage.T("Couleurs réseaux", "System Colors"), unsupportedReason);
                 return Result.Cancelled;
             }
 
@@ -47,7 +48,7 @@ namespace Visualisation
 
             if (filtersInView.Count > 0)
             {
-                using (var transaction = new Transaction(document, "BIMaestro - Désactiver les couleurs réseaux"))
+                using (var transaction = new Transaction(document, UiLanguage.T("BIMaestro - Désactiver les couleurs réseaux", "BIMaestro - Disable system colors")))
                 {
                     transaction.Start();
                     foreach (ElementId filterId in filtersInView)
@@ -58,8 +59,8 @@ namespace Visualisation
                 }
 
                 TaskDialog.Show(
-                    "Couleurs réseaux",
-                    "Coloration désactivée et filtres FLU_ retirés de la vue active.");
+                    UiLanguage.T("Couleurs réseaux", "System Colors"),
+                    UiLanguage.T("Coloration désactivée et filtres FLU_ retirés de la vue active.", "Coloring disabled and FLU_ filters removed from the active view."));
                 return Result.Succeeded;
             }
 
@@ -71,14 +72,14 @@ namespace Visualisation
 
             if (systemTypes.Count == 0)
             {
-                TaskDialog.Show("Couleurs réseaux", "Aucun type de système de canalisation n'a été trouvé dans ce projet.");
+                TaskDialog.Show(UiLanguage.T("Couleurs réseaux", "System Colors"), UiLanguage.T("Aucun type de système de canalisation n'a été trouvé dans ce projet.", "No piping system types were found in this project."));
                 return Result.Cancelled;
             }
 
             ElementId solidFillId = FindSolidFillPatternId(document);
             if (solidFillId == ElementId.InvalidElementId)
             {
-                TaskDialog.Show("Couleurs réseaux", "Le motif de remplissage uni (Solid Fill) est introuvable dans le projet.");
+                TaskDialog.Show(UiLanguage.T("Couleurs réseaux", "System Colors"), UiLanguage.T("Le motif de remplissage uni (Solid Fill) est introuvable dans le projet.", "The Solid Fill pattern could not be found in the project."));
                 return Result.Failed;
             }
 
@@ -93,12 +94,12 @@ namespace Visualisation
             if (!commonParameters.Contains(systemTypeParameterId))
             {
                 TaskDialog.Show(
-                    "Couleurs réseaux",
-                    "Cette version de Revit ne permet pas d'utiliser « Type de système » dans un filtre commun aux canalisations et raccords.");
+                    UiLanguage.T("Couleurs réseaux", "System Colors"),
+                    UiLanguage.T("Cette version de Revit ne permet pas d'utiliser « Type de système » dans un filtre commun aux canalisations et raccords.", "This Revit version does not allow \"System Type\" in a filter shared by pipes and pipe fittings."));
                 return Result.Failed;
             }
 
-            using (var transaction = new Transaction(document, "BIMaestro - Activer les couleurs réseaux"))
+            using (var transaction = new Transaction(document, UiLanguage.T("BIMaestro - Activer les couleurs réseaux", "BIMaestro - Enable system colors")))
             {
                 transaction.Start();
                 Schema schema = GetOrCreateMarkerSchema();
@@ -139,7 +140,7 @@ namespace Visualisation
                 transaction.Commit();
             }
 
-            TaskDialog.Show("Couleurs réseaux", "Coloration activée et synchronisée dans la vue active.");
+            TaskDialog.Show(UiLanguage.T("Couleurs réseaux", "System Colors"), UiLanguage.T("Coloration activée et synchronisée dans la vue active.", "Coloring enabled and synchronized in the active view."));
             return Result.Succeeded;
         }
 
@@ -176,17 +177,17 @@ namespace Visualisation
         {
             if (document.IsFamilyDocument)
             {
-                return "Cette commande n’est pas disponible dans un fichier famille Revit (.rfa). Ouvrez un projet Revit (.rvt) pour utiliser les couleurs de réseaux.";
+                return UiLanguage.T("Cette commande n’est pas disponible dans un fichier famille Revit (.rfa). Ouvrez un projet Revit (.rvt) pour utiliser les couleurs de réseaux.", "This command is not available in a Revit family file (.rfa). Open a Revit project (.rvt) to use system colors.");
             }
 
             if (view.IsTemplate)
             {
-                return "La vue active est un gabarit. BIMaestro ne modifie pas les gabarits de vue.";
+                return UiLanguage.T("La vue active est un gabarit. BIMaestro ne modifie pas les gabarits de vue.", "The active view is a view template. BIMaestro does not modify view templates.");
             }
 
             if (!view.AreGraphicsOverridesAllowed())
             {
-                return "La vue active ne prend pas en charge les remplacements graphiques et les filtres.";
+                return UiLanguage.T("La vue active ne prend pas en charge les remplacements graphiques et les filtres.", "The active view does not support graphic overrides and filters.");
             }
 
             if (view.ViewTemplateId != ElementId.InvalidElementId)
@@ -195,7 +196,7 @@ namespace Visualisation
                 ElementId filtersParameterId = new ElementId(BuiltInParameter.VIS_GRAPHICS_FILTERS);
                 if (template != null && !template.GetNonControlledTemplateParameterIds().Contains(filtersParameterId))
                 {
-                    return "Le gabarit appliqué à la vue contrôle les filtres de visibilité/graphisme. Libérez ce paramètre dans le gabarit ou appliquez la commande à une vue non verrouillée.";
+                    return UiLanguage.T("Le gabarit appliqué à la vue contrôle les filtres de visibilité/graphisme. Libérez ce paramètre dans le gabarit ou appliquez la commande à une vue non verrouillée.", "The view template applied to this view controls the Visibility/Graphics filters. Uncheck this parameter in the template or run the command on an unlocked view.");
                 }
             }
 

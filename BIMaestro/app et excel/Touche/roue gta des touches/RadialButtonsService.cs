@@ -1,4 +1,5 @@
 using Autodesk.Revit.UI;
+using BIMaestro.Localization;
 using BIMaestro.RibbonLayout;
 using System;
 using System.Linq;
@@ -30,7 +31,7 @@ namespace BIMaestro.UI
             {
                 if (!RadialButtonsPreferencesManager.SetPinnedButton(index, null))
                 {
-                    TaskDialog.Show("BIMaestro", "Impossible d’enregistrer la modification de la rosace.");
+                    TaskDialog.Show("BIMaestro", UiLanguage.T("Impossible d’enregistrer la modification de la rosace.", "Unable to save the radial menu change."));
                     return;
                 }
                 RefreshWindow(window);
@@ -43,8 +44,8 @@ namespace BIMaestro.UI
                 {
                     var dialog = new TaskDialog("BIMaestro")
                     {
-                        MainInstruction = "Réinitialiser la rosace ?",
-                        MainContent = "Tous les boutons fixés seront supprimés. Les 16 positions afficheront de nouveau les boutons récents.",
+                        MainInstruction = UiLanguage.T("Réinitialiser la rosace ?", "Reset the radial menu?"),
+                        MainContent = UiLanguage.T("Tous les boutons fixés seront supprimés. Les 16 positions afficheront de nouveau les boutons récents.", "All pinned buttons will be removed. The 16 slots will show recent buttons again."),
                         CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No,
                         DefaultButton = TaskDialogResult.No
                     };
@@ -57,7 +58,7 @@ namespace BIMaestro.UI
                 if (answer != TaskDialogResult.Yes) return;
                 if (!RadialButtonsPreferencesManager.ResetPinnedButtons())
                 {
-                    TaskDialog.Show("BIMaestro", "Impossible de réinitialiser la rosace.");
+                    TaskDialog.Show("BIMaestro", UiLanguage.T("Impossible de réinitialiser la rosace.", "Unable to reset the radial menu."));
                     return;
                 }
                 RefreshWindow(window);
@@ -69,7 +70,7 @@ namespace BIMaestro.UI
                 var commandId = AppUI.ResolveRibbonCommandId(info);
                 if (commandId == null)
                 {
-                    TaskDialog.Show("BIMaestro", "Cette commande n’est plus disponible.");
+                    TaskDialog.Show("BIMaestro", UiLanguage.T("Cette commande n’est plus disponible.", "This command is no longer available."));
                     return;
                 }
                 _postHandler.Prepare(commandId, info.DisplayName);
@@ -90,7 +91,7 @@ namespace BIMaestro.UI
                 if (picker.ShowDialog() != true || picker.SelectedButton == null) return;
                 if (!RadialButtonsPreferencesManager.SetPinnedButton(slotIndex, picker.SelectedButton.Id))
                 {
-                    TaskDialog.Show("BIMaestro", "Impossible d’enregistrer le bouton choisi.");
+                    TaskDialog.Show("BIMaestro", UiLanguage.T("Impossible d’enregistrer le bouton choisi.", "Unable to save the selected button."));
                     return;
                 }
                 RefreshWindow(window);
@@ -100,7 +101,7 @@ namespace BIMaestro.UI
             }
             catch (Exception ex)
             {
-                TaskDialog.Show("BIMaestro", $"Impossible de mettre à jour la rosace : {ex.Message}");
+                TaskDialog.Show("BIMaestro", UiLanguage.T($"Impossible de mettre à jour la rosace : {ex.Message}", $"Unable to update the radial menu: {ex.Message}"));
             }
             finally
             {
@@ -147,7 +148,7 @@ namespace BIMaestro.UI
                 ButtonId = info.Id,
                 CommandClass = info.CommandClass,
                 ImagePath = RibbonButtonImageCache.GetOrCreate(info.ImageResourceName),
-                Label = (info.DisplayName ?? string.Empty).Replace("\r", " ").Replace("\n", " "),
+                Label = UiLanguage.T(info.DisplayName ?? string.Empty).Replace("\r", " ").Replace("\n", " "),
                 IsPinned = isPinned
             };
         }
@@ -175,19 +176,19 @@ namespace BIMaestro.UI
                     if (!app.CanPostCommand(commandId))
                     {
                         TaskDialog.Show("BIMaestro",
-                            $"La commande « {Normalize(_displayName)} » n’est pas disponible dans le contexte actif.");
+                            UiLanguage.T($"La commande « {Normalize(_displayName)} » n’est pas disponible dans le contexte actif.", $"The command \"{Normalize(_displayName)}\" is not available in the current context."));
                         return;
                     }
                     app.PostCommand(commandId);
                 }
                 catch (Exception ex)
                 {
-                    TaskDialog.Show("BIMaestro", $"Impossible de lancer cette commande : {ex.Message}");
+                    TaskDialog.Show("BIMaestro", UiLanguage.T($"Impossible de lancer cette commande : {ex.Message}", $"Unable to run this command: {ex.Message}"));
                 }
             }
 
             public string GetName() => "BIMaestro radial command launcher";
-            private static string Normalize(string value) => (value ?? "bouton").Replace("\r", " ").Replace("\n", " ");
+            private static string Normalize(string value) => (value ?? UiLanguage.T("bouton", "button")).Replace("\r", " ").Replace("\n", " ");
         }
     }
 }

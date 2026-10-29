@@ -736,6 +736,7 @@ namespace BIMaestro.Localization
                 ["Aperçu du panneau"] = "Panel Preview",
                 ["Ajouter à la collection active"] = "Add to Active Collection",
                 ["Mots-clés de recherche…"] = "Search keywords…",
+                ["Proposer des mots-clés IA pour la sélection…"] = "Suggest AI keywords for the selection…",
                 ["Arborescence du projet"] = "Project Browser",
                 ["Rentrer dans la famille"] = "Open Family",
                 ["Réinitialiser les filtres"] = "Reset Filters",
@@ -1594,6 +1595,9 @@ namespace BIMaestro.Localization
                 , ["Restaurer cet onglet…"] = "Restore this tab…"
                 , ["Appliquer cette couleur"] = "Apply this color"
                 , ["Maquette et liens : 30 jours\nRésas et annotations : 5 mois"] = "Model and links: 30 days\nOpenings and annotations: 5 months"
+                , ["Plages d’activité"] = "Activity periods"
+                , ["Une session peut contenir plusieurs plages. La date correspond à la fin de la plage enregistrée."] = "A session can contain several periods. The date is the end of the recorded period."
+                , ["État"] = "Status"
             };
 
         static UiTextCatalog()

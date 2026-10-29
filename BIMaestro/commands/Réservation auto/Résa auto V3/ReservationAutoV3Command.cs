@@ -75,9 +75,12 @@ namespace Modification
                 }
 
                 if (guided && !win.AutomatiqueEnabled)
-                    BIMaestro.Tutorials.DemoTourMessage.Show(uiApp.MainWindowHandle, "Bulbizarre te guide",
-                        "Dans la vue 3D, clique d'abord sur la canalisation qui traverse le mur, puis sur ce mur. " +
-                        "BIMaestro placera ta réservation à leur croisement. Appuie sur Échap pour arrêter la sélection.", "Je choisis les éléments");
+                    BIMaestro.Tutorials.DemoTourMessage.Show(uiApp.MainWindowHandle, UiLanguage.T("Bulbizarre te guide", "Bulbizarre will guide you"),
+                        UiLanguage.T("Dans la vue 3D, clique d'abord sur la canalisation qui traverse le mur, puis sur ce mur. " +
+                        "BIMaestro placera ta réservation à leur croisement. Appuie sur Échap pour arrêter la sélection.",
+                        "In the 3D view, first click the pipe that crosses the wall, then click the wall. " +
+                        "BIMaestro will place the opening at their intersection. Press Esc to stop selecting."),
+                        UiLanguage.T("Je choisis les éléments", "Select the elements"));
 
                 var reservationsBefore = new HashSet<string>(FindInstances(doc, reservationSymbol.Id)
                     .Select(instance => instance.UniqueId));
@@ -133,10 +136,12 @@ namespace Modification
                     catch (Exception ex) { System.Diagnostics.Trace.WriteLine("BIMaestro tutorial focus: " + ex.Message); }
                     if (createdForTutorial > 0)
                         BIMaestro.Tutorials.DemoTourCompletion.Show(uiApp.MainWindowHandle, "reservation",
-                            "Tu as créé " + createdForTutorial + " réservation(s). Le tutoriel Auto réservation est terminé.");
+                            UiLanguage.T("Tu as créé " + createdForTutorial + " réservation(s). Le tutoriel Auto réservation est terminé.",
+                                "You created " + createdForTutorial + " opening(s). The Auto Opening tutorial is complete."));
                     else
-                        BIMaestro.Tutorials.DemoTourMessage.Show(uiApp.MainWindowHandle, "Bulbizarre t’aide à réessayer",
-                            "Aucune réservation n’a été créée. Relance le parcours et sélectionne d’abord la canalisation, puis le mur.");
+                        BIMaestro.Tutorials.DemoTourMessage.Show(uiApp.MainWindowHandle, UiLanguage.T("Bulbizarre t’aide à réessayer", "Bulbizarre will help you try again"),
+                            UiLanguage.T("Aucune réservation n’a été créée. Relance le parcours et sélectionne d’abord la canalisation, puis le mur.",
+                                "No opening was created. Restart the tour and select the pipe first, then the wall."));
                 }
 
                 // Dynamo
@@ -876,7 +881,8 @@ namespace Modification
                 try
                 {
                     reference = uiDoc.Selection.PickObject(ObjectType.Element,
-                        "Étape 1/2 : clique sur la canalisation qui traverse le mur (Échap pour arrêter)");
+                        UiLanguage.T("Étape 1/2 : clique sur la canalisation qui traverse le mur (Échap pour arrêter)",
+                            "Step 1/2: click the pipe that crosses the wall (press Esc to stop)"));
                 }
                 catch (Autodesk.Revit.Exceptions.OperationCanceledException) { return new List<MepSelection>(); }
 
@@ -886,9 +892,11 @@ namespace Modification
                     {
                         Element = element, TransformToCurrentDocument = Transform.Identity, IsLinked = false
                     } };
-                TaskDialog.Show("Bulbizarre - Auto réservation", element is Wall
-                    ? "Tu as choisi le mur en premier. Commence par la canalisation qui le traverse ; nous choisirons le mur juste après."
-                    : "Ce n'est pas une canalisation. Clique sur le tuyau de démonstration qui traverse le mur.");
+                TaskDialog.Show(UiLanguage.T("Bulbizarre - Auto réservation", "Bulbizarre - Auto Opening"), element is Wall
+                    ? UiLanguage.T("Tu as choisi le mur en premier. Commence par la canalisation qui le traverse ; nous choisirons le mur juste après.",
+                        "You selected the wall first. Start with the pipe that crosses it; you will select the wall right after.")
+                    : UiLanguage.T("Ce n'est pas une canalisation. Clique sur le tuyau de démonstration qui traverse le mur.",
+                        "This is not a pipe. Click the demo pipe that crosses the wall."));
             }
         }
 
@@ -900,15 +908,18 @@ namespace Modification
                 try
                 {
                     reference = uiDoc.Selection.PickObject(ObjectType.Element,
-                        "Étape 2/2 : clique sur le mur traversé par la canalisation (Échap pour arrêter)");
+                        UiLanguage.T("Étape 2/2 : clique sur le mur traversé par la canalisation (Échap pour arrêter)",
+                            "Step 2/2: click the wall crossed by the pipe (press Esc to stop)"));
                 }
                 catch (Autodesk.Revit.Exceptions.OperationCanceledException) { return null; }
 
                 Element element = doc.GetElement(reference);
                 if (element is Wall) return element;
-                TaskDialog.Show("Bulbizarre - Auto réservation", element is Pipe
-                    ? "Tu as sélectionné une autre canalisation. La première est mémorisée : clique maintenant sur le mur qu'elle traverse."
-                    : "Ce n'est pas un mur. Clique sur le mur que traverse la canalisation sélectionnée.");
+                TaskDialog.Show(UiLanguage.T("Bulbizarre - Auto réservation", "Bulbizarre - Auto Opening"), element is Pipe
+                    ? UiLanguage.T("Tu as sélectionné une autre canalisation. La première est mémorisée : clique maintenant sur le mur qu'elle traverse.",
+                        "You selected another pipe. The first one is kept: now click the wall it crosses.")
+                    : UiLanguage.T("Ce n'est pas un mur. Clique sur le mur que traverse la canalisation sélectionnée.",
+                        "This is not a wall. Click the wall crossed by the selected pipe."));
             }
         }
 

@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.IO;
 using System.Threading.Tasks;
+using BIMaestro.Localization;
 
 namespace BIMaestro.Codex
 {
@@ -44,7 +45,7 @@ namespace BIMaestro.Codex
         internal CodexRevitBridge(Document document, string revitVersion = null)
         {
             this.document = document;
-            DocumentTitle = document?.Title ?? "Aucun document";
+            DocumentTitle = document?.Title ?? UiLanguage.T("Aucun document", "No document");
             RevitVersion = revitVersion ?? document?.Application.VersionNumber ?? "";
         }
         internal async Task<JObject> InspectCommunityFamilyAsync(string path)
@@ -423,7 +424,7 @@ namespace BIMaestro.Codex
             {
                 if (!AllowChanges) throw new InvalidOperationException("Activez les créations et modifications dans le panneau.");
                 if (args["validate_only"]?.Type != JTokenType.Boolean) throw new InvalidOperationException("validate_only doit être un booléen.");
-                if (!(bool)args["validate_only"] && !Confirm("Créer une famille native complète", CodexFamilyDesign.String(args, "description", 1000)))
+                if (!(bool)args["validate_only"] && !Confirm(UiLanguage.T("Créer une famille native complète", "Create a complete native family"), CodexFamilyDesign.String(args, "description", 1000)))
                     throw new InvalidOperationException("Création refusée par l'utilisateur. Ne pas réessayer sans nouvelle demande.");
                 return CodexFamilyProgram.CreateSteps(app, args, FamilyOutputRoot);
             }
@@ -434,8 +435,8 @@ namespace BIMaestro.Codex
                     throw new InvalidOperationException("Le document attaché au panneau n'est plus actif. Revenez à ce document ou rouvrez le panneau.");
                 var design = CodexParametricDesign.Parse(args);
                 if (tool == "revit_validate_parametric_family") return CodexFamilyBuilder.CreateSteps(app, document, design.Metadata, true, design, outputRoot: FamilyOutputRoot);
-                if (!Confirm("Créer une famille paramétrique « " + design.Metadata.Name + " »",
-                    $"{design.Parts.Count} extrusions et {design.Arrays.Count} réseaux natifs ({design.SolidCount} solides au total).\nParamètres dimensionnels : {string.Join(", ", design.Parameters.Select(p => p.Name).Concat(design.Angles.Select(p => p.Name + " = " + p.Value + "°")))}.\nTests de dimensions, de nombre, de visibilité, de formules et d'angle puis restauration des valeurs initiales avant enregistrement dans un nouveau RFA.\nChargement : {design.Metadata.Load}. Placement à l'origine : {design.Metadata.Place}."))
+                if (!Confirm(UiLanguage.T("Créer une famille paramétrique « ", "Create parametric family \"") + design.Metadata.Name + UiLanguage.T(" »", "\""),
+                    UiLanguage.T($"{design.Parts.Count} extrusions et {design.Arrays.Count} réseaux natifs ({design.SolidCount} solides au total).\nParamètres dimensionnels : {string.Join(", ", design.Parameters.Select(p => p.Name).Concat(design.Angles.Select(p => p.Name + " = " + p.Value + "°")))}.\nTests de dimensions, de nombre, de visibilité, de formules et d'angle puis restauration des valeurs initiales avant enregistrement dans un nouveau RFA.\nChargement : {design.Metadata.Load}. Placement à l'origine : {design.Metadata.Place}.", $"{design.Parts.Count} extrusions and {design.Arrays.Count} native arrays ({design.SolidCount} solids in total).\nDimension parameters: {string.Join(", ", design.Parameters.Select(p => p.Name).Concat(design.Angles.Select(p => p.Name + " = " + p.Value + "°")))}.\nDimension, count, visibility, formula and angle tests, then initial values restored before saving to a new RFA.\nLoad: {design.Metadata.Load}. Place at origin: {design.Metadata.Place}.")))
                     throw new InvalidOperationException("Création refusée par l'utilisateur. Ne pas réessayer sans nouvelle demande.");
                 return CodexFamilyBuilder.CreateSteps(app, document, design.Metadata, false, design, outputRoot: FamilyOutputRoot, showDuringCreation: true);
             }
@@ -446,7 +447,7 @@ namespace BIMaestro.Codex
                     throw new InvalidOperationException("Le document attaché au panneau n'est plus actif. Revenez à ce document ou rouvrez le panneau.");
                 var design = CodexFamilyDesign.Parse(args);
                 if (tool == "revit_validate_family") return CodexFamilyBuilder.CreateSteps(app, document, design, true, outputRoot: FamilyOutputRoot);
-                if (!Confirm("Créer la famille « " + design.Name + " »", $"{design.SolidCount} solides, {design.Materials.Count} matériaux.\nCatégorie : {design.Category}.\nUn nouveau fichier RFA sera enregistré dans le dossier des familles BIMaestro.\nChargement dans le projet : {design.Load}. Placement à l'origine : {design.Place}.\nHypothèses : " + string.Join(" ; ", design.Assumptions)))
+                if (!Confirm(UiLanguage.T("Créer la famille « ", "Create family \"") + design.Name + UiLanguage.T(" »", "\""), UiLanguage.T($"{design.SolidCount} solides, {design.Materials.Count} matériaux.\nCatégorie : {design.Category}.\nUn nouveau fichier RFA sera enregistré dans le dossier des familles BIMaestro.\nChargement dans le projet : {design.Load}. Placement à l'origine : {design.Place}.\nHypothèses : ", $"{design.SolidCount} solids, {design.Materials.Count} materials.\nCategory: {design.Category}.\nA new RFA file will be saved in the BIMaestro families folder.\nLoad into project: {design.Load}. Place at origin: {design.Place}.\nAssumptions: ") + string.Join(" ; ", design.Assumptions)))
                     throw new InvalidOperationException("Création de famille refusée. Ne pas réessayer sans nouvelle demande.");
                 return CodexFamilyBuilder.CreateSteps(app, document, design, outputRoot: FamilyOutputRoot, showDuringCreation: true);
             }
@@ -483,7 +484,7 @@ namespace BIMaestro.Codex
                 if (!previewedMepRoutes.Any(route => JToken.DeepEquals(route, args)))
                     throw new InvalidOperationException("Prévisualisez d'abord exactement ce raccordement, puis appliquez le même tracé.");
                 string description = CodexMepTools.Describe(document, args);
-                if (!Confirm("Créer le raccordement MEP", description))
+                if (!Confirm(UiLanguage.T("Créer le raccordement MEP", "Create the MEP connection"), description))
                     throw new InvalidOperationException("Raccordement refusé par l'utilisateur. Ne pas réessayer sans nouvelle demande.");
                 previewedMepRoutes.RemoveAll(route => JToken.DeepEquals(route, args));
                 return CodexMepTools.Apply(document, args);
@@ -563,7 +564,7 @@ namespace BIMaestro.Codex
                 if (!AllowChanges) throw new InvalidOperationException("Mode lecture seule : activez les modifications dans le panneau.");
                 if (document.IsFamilyDocument || document.IsReadOnly || document.IsModifiable) throw new InvalidOperationException("Ouvrez un projet modifiable.");
                 var design = CodexFamilyDesign.ParseProject(args, out var origin, out var rotation);
-                if (!Confirm("Créer une composition libre « " + design.Name + " »", $"{design.SolidCount} solides, {design.Materials.Count} matériaux.\nObjets DirectShape dans le projet ; pas de famille RFA.\nOrigine interne en mm : {string.Join(", ", origin)}. Rotation : {rotation}°.\nUn Ctrl+Z annule le lot."))
+                if (!Confirm(UiLanguage.T("Créer une composition libre « ", "Create free-form composition \"") + design.Name + UiLanguage.T(" »", "\""), UiLanguage.T($"{design.SolidCount} solides, {design.Materials.Count} matériaux.\nObjets DirectShape dans le projet ; pas de famille RFA.\nOrigine interne en mm : {string.Join(", ", origin)}. Rotation : {rotation}°.\nUn Ctrl+Z annule le lot.", $"{design.SolidCount} solids, {design.Materials.Count} materials.\nDirectShape objects in the project; no RFA family.\nInternal origin in mm: {string.Join(", ", origin)}. Rotation: {rotation}°.\nCtrl+Z undoes the batch.")))
                     throw new InvalidOperationException("Création refusée par l'utilisateur. Ne pas réessayer sans nouvelle demande.");
                 return CodexProjectBuilder.Create(document, design, origin, rotation);
             }
@@ -580,8 +581,8 @@ namespace BIMaestro.Codex
                     throw new InvalidOperationException("Sélectionner exactement un sol et une instance de famille contenant le vide à appliquer.");
                 if (InstanceVoidCutUtils.InstanceVoidCutExists(floor, instance))
                     return new { already_cut = true, floor_id = floor.Id.ToString(), instance_id = instance.Id.ToString(), saved = false };
-                if (!Confirm("Découper le sol avec la famille sélectionnée", "Sol : " + floor.Id + ". Famille : " + instance.Symbol.Family.Name +
-                    " (" + instance.Id + "). Tous les vides non attachés de cette instance seront appliqués à ce sol. Un Ctrl+Z annule la découpe."))
+                if (!Confirm(UiLanguage.T("Découper le sol avec la famille sélectionnée", "Cut the floor with the selected family"), UiLanguage.T("Sol : ", "Floor: ") + floor.Id + UiLanguage.T(". Famille : ", ". Family: ") + instance.Symbol.Family.Name +
+                    " (" + instance.Id + UiLanguage.T("). Tous les vides non attachés de cette instance seront appliqués à ce sol. Un Ctrl+Z annule la découpe.", "). All unattached voids of this instance will be applied to this floor. Ctrl+Z undoes the cut.")))
                     throw new InvalidOperationException("Découpe refusée. Ne pas réessayer sans nouvelle demande.");
                 double removed;
                 using (var transaction = NewTransaction("Codex — découpe du sol par la famille"))
@@ -613,11 +614,11 @@ namespace BIMaestro.Codex
                 {
                     if (independent)
                     {
-                        if (!Confirm("Créer une muraille en volumes indépendants", $"{curves.Count} segments, hauteur {height:g} mm, épaisseur {width:g} mm.\nModèles génériques, sans jonctions ni délimitation de pièces.\nUn Ctrl+Z annule le lot."))
+                        if (!Confirm(UiLanguage.T("Créer une muraille en volumes indépendants", "Create a parapet wall from independent volumes"), UiLanguage.T($"{curves.Count} segments, hauteur {height:g} mm, épaisseur {width:g} mm.\nModèles génériques, sans jonctions ni délimitation de pièces.\nUn Ctrl+Z annule le lot.", $"{curves.Count} segments, height {height:g} mm, thickness {width:g} mm.\nGeneric models, without joins or room bounding.\nCtrl+Z undoes the batch.")))
                             throw new InvalidOperationException("Création refusée par l'utilisateur. Ne pas réessayer sans nouvelle demande.");
                         return CodexProjectBuilder.Barrier(document, curves, height, width, offset);
                     }
-                    if (!Confirm("Créer " + curves.Count + " murs sur les contours sélectionnés", $"Type : {wallType.Name}. Hauteur : {height:g} mm. Décalage vertical : {offset:g} mm.\nL'axe des murs suit les limites des sols. Pas de fusion automatique entre les sols.\nUn Ctrl+Z annule tout le lot."))
+                    if (!Confirm(UiLanguage.T("Créer ", "Create ") + curves.Count + UiLanguage.T(" murs sur les contours sélectionnés", " walls on the selected outlines"), UiLanguage.T($"Type : {wallType.Name}. Hauteur : {height:g} mm. Décalage vertical : {offset:g} mm.\nL'axe des murs suit les limites des sols. Pas de fusion automatique entre les sols.\nUn Ctrl+Z annule tout le lot.", $"Type: {wallType.Name}. Height: {height:g} mm. Vertical offset: {offset:g} mm.\nThe wall centerline follows the floor boundaries. Floors are not merged automatically.\nCtrl+Z undoes the whole batch.")))
                         throw new InvalidOperationException("Création refusée par l'utilisateur. Ne pas réessayer sans nouvelle demande.");
                     var ids = new List<string>();
                     using (var transaction = NewTransaction("Codex — murs sur les contours de sols"))
@@ -658,7 +659,7 @@ namespace BIMaestro.Codex
             {
                 var shapes = CodexShapeBatch.Parse(args);
                 string details = string.Join("\n", shapes.Select(s => s.Description));
-                if (!Confirm($"Créer {shapes.Count} formes dans la famille", details))
+                if (!Confirm(UiLanguage.T($"Créer {shapes.Count} formes dans la famille", $"Create {shapes.Count} shapes in the family"), details))
                     throw new InvalidOperationException("Création refusée par l'utilisateur. Ne pas réessayer sans nouvelle demande.");
                 using (var transaction = NewTransaction("Codex — composition de famille"))
                 {
@@ -693,7 +694,7 @@ namespace BIMaestro.Codex
                 RequireKeys(args, "width_mm", "length_mm", "height_mm", "x_mm", "y_mm", "z_mm");
                 double w = ReadNumber(args, "width_mm", 1), l = ReadNumber(args, "length_mm", 1), h = ReadNumber(args, "height_mm", 1);
                 double x = ReadNumber(args, "x_mm"), y = ReadNumber(args, "y_mm"), z = ReadNumber(args, "z_mm");
-                if (!Confirm($"Créer un volume de {w:g} × {l:g} × {h:g} mm", $"Origine : X={x:g}, Y={y:g}, Z={z:g} mm.\nUne extrusion pleine sera ajoutée. Aucun enregistrement automatique."))
+                if (!Confirm(UiLanguage.T($"Créer un volume de {w:g} × {l:g} × {h:g} mm", $"Create a {w:g} × {l:g} × {h:g} mm volume"), UiLanguage.T($"Origine : X={x:g}, Y={y:g}, Z={z:g} mm.\nUne extrusion pleine sera ajoutée. Aucun enregistrement automatique.", $"Origin: X={x:g}, Y={y:g}, Z={z:g} mm.\nA solid extrusion will be added. No automatic save.")))
                     throw new InvalidOperationException("Modification refusée par l'utilisateur. Ne pas réessayer sans nouvelle demande.");
                 using (var transaction = NewTransaction("Codex — extrusion de famille"))
                 {
@@ -722,7 +723,7 @@ namespace BIMaestro.Codex
             if (parameter == null || parameter.IsReadOnly || parameter.IsDeterminedByFormula || parameter.StorageType != StorageType.Double || parameter.Definition.GetDataType() != (isAngle ? SpecTypeId.Angle : SpecTypeId.Length) || manager.CurrentType == null)
                 throw new InvalidOperationException("Ce paramètre n'est pas " + (isAngle ? "un angle" : "une longueur") + " modifiable du type courant.");
             double? oldValue = manager.CurrentType.AsDouble(parameter);
-            if (!Confirm($"Modifier « {name} » : {value:g} {unit}", $"Type : {manager.CurrentType.Name}\nAncienne valeur : {(oldValue.HasValue ? (oldValue.Value * (isAngle ? 180 / Math.PI : 304.8)).ToString("g") : "vide")} {unit}.\nLes géométries associées peuvent être modifiées."))
+            if (!Confirm(UiLanguage.T($"Modifier « {name} » : {value:g} {unit}", $"Change \"{name}\": {value:g} {unit}"), UiLanguage.T($"Type : {manager.CurrentType.Name}\nAncienne valeur : {(oldValue.HasValue ? (oldValue.Value * (isAngle ? 180 / Math.PI : 304.8)).ToString("g") : "vide")} {unit}.\nLes géométries associées peuvent être modifiées.", $"Type: {manager.CurrentType.Name}\nPrevious value: {(oldValue.HasValue ? (oldValue.Value * (isAngle ? 180 / Math.PI : 304.8)).ToString("g") : "empty")} {unit}.\nAssociated geometry may change.")))
                 throw new InvalidOperationException("Modification refusée par l'utilisateur. Ne pas réessayer sans nouvelle demande.");
             using (var transaction = NewTransaction(isAngle ? "Codex — inclinaison de famille" : "Codex — longueur de famille"))
             {
@@ -782,10 +783,10 @@ namespace BIMaestro.Codex
         private bool Confirm(string title, string detail)
         {
             if (ApplyDirectly && AllowChanges && ShareContext) return true;
-            return new TaskDialog("BIMaestro — validation Codex")
+            return new TaskDialog(UiLanguage.T("BIMaestro — validation Codex", "BIMaestro — Codex approval"))
             {
                 MainInstruction = title,
-                MainContent = "Document : " + DocumentTitle + "\n\n" + (detail.Length > 1200 ? "Consultez le détail du lot ci-dessous." : detail) + "\n\nAppliquer cette modification ?",
+                MainContent = UiLanguage.T("Document : ", "Document: ") + DocumentTitle + "\n\n" + (detail.Length > 1200 ? UiLanguage.T("Consultez le détail du lot ci-dessous.", "See the batch details below.") : detail) + UiLanguage.T("\n\nAppliquer cette modification ?", "\n\nApply this change?"),
                 ExpandedContent = detail.Length > 1200 ? detail : "",
                 CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No, DefaultButton = TaskDialogResult.No
             }.Show() == TaskDialogResult.Yes;

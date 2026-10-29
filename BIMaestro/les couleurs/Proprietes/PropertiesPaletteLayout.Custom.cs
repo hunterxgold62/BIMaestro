@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using BIMaestro.Localization;
 
 namespace BIMaestro.PropertiesAppearance
 {
@@ -11,7 +12,7 @@ namespace BIMaestro.PropertiesAppearance
         private static string _customNotice;
         private static string LayoutStatus()
         {
-            string text=string.Join(" ",new[]{HasApplied?"Ordre personnalisé appliqué à la palette Revit.":null,_customNotice}.Where(s=>!string.IsNullOrEmpty(s)));
+            string text=string.Join(" ",new[]{HasApplied?UiLanguage.T("Ordre personnalisé appliqué à la palette Revit.", "Custom order applied to the Revit palette."):null,_customNotice}.Where(s=>!string.IsNullOrEmpty(s)));
             return text.Length>0?text:null;
         }
         private static readonly Dictionary<int,string> _customMembership=new Dictionary<int,string>();

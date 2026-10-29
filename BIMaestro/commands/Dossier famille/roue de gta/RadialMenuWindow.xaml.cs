@@ -422,7 +422,7 @@ namespace BIMaestro.UI
             var cm = new ContextMenu();
             if (ReloadRequested != null)
             {
-                var mi = new MenuItem { Header = "Recharger la dernière version" };
+                var mi = new MenuItem { Header = UiLanguage.T("Recharger la dernière version", "Reload the latest version") };
                 mi.Click += (s, e) =>
                 {
                     var item = _currentPageItems[idx];

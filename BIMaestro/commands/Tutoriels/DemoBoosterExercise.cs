@@ -1,5 +1,6 @@
 ﻿using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using BIMaestro.Localization;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -35,7 +36,7 @@ namespace BIMaestro.Tutorials
             MepBooster.MepBoosterService.TutorialProgress = Report;
             MepBooster.MepBoosterService.TutorialCopy = ReportCopy;
             _step = MepBooster.MepBoosterService.IsEnabled ? 1 : 0;
-            _card = new Window { Title = "BIMaestro — Guide MEP Booster", Width = 430, SizeToContent = SizeToContent.Height, MinHeight = 290,
+            _card = new Window { Title = UiLanguage.T("BIMaestro — Guide MEP Booster", "BIMaestro — MEP Booster Guide"), Width = 430, SizeToContent = SizeToContent.Height, MinHeight = 290,
                 ResizeMode = ResizeMode.NoResize, ShowInTaskbar = false, Background = Brushes.White,
                 Left = SystemParameters.WorkArea.Right - 460, Top = SystemParameters.WorkArea.Bottom - 320 };
             new WindowInteropHelper(_card).Owner = app.MainWindowHandle;
@@ -43,18 +44,19 @@ namespace BIMaestro.Tutorials
             _card.Content = new Border { BorderBrush = DemoTourPalette.Accent, BorderThickness = new Thickness(2), Child = panel };
             panel.Children.Add(new Image { Source = Couleur.RibbonPanelColorScheme.CreateCompanionImage(), Width = 34, Height = 34,
                 HorizontalAlignment = HorizontalAlignment.Left });
-            panel.Children.Add(new TextBlock { Text = "Découvrir MEP Booster", FontSize = 18, Foreground = DemoTourPalette.Accent,
+            panel.Children.Add(new TextBlock { Text = UiLanguage.T("Découvrir MEP Booster", "Discover MEP Booster"), FontSize = 18, Foreground = DemoTourPalette.Accent,
                 Margin = new Thickness(0, 8, 0, 8) });
             _text = new TextBlock { TextWrapping = TextWrapping.Wrap, MinHeight = 95 };
             panel.Children.Add(_text);
-            var quit = new Button { Content = "Quitter le guide", Padding = new Thickness(8), HorizontalAlignment = HorizontalAlignment.Right };
+            var quit = new Button { Content = UiLanguage.T("Quitter le guide", "Exit Guide"), Padding = new Thickness(8), HorizontalAlignment = HorizontalAlignment.Right };
             panel.Children.Add(quit);
             Window card = _card;
             _finish = quit;
             quit.Click += (_, __) => {
                 bool finished = _step == 6;
                 card.Close();
-                if (finished) DemoTourCompletion.Show(app.MainWindowHandle, "mep-booster", "Tu as terminé le tutoriel MEP Booster : rotations et copie d’orientation ont été appliquées.");
+                if (finished) DemoTourCompletion.Show(app.MainWindowHandle, "mep-booster", UiLanguage.T("Tu as terminé le tutoriel MEP Booster : rotations et copie d’orientation ont été appliquées.",
+                    "You have completed the MEP Booster tutorial: rotations and orientation copy have been applied."));
             };
             card.Closed += (_, __) => { if (ReferenceEquals(_card, card)) { _card = null; _document = null; MepBooster.MepBoosterService.TutorialActivation = null; MepBooster.MepBoosterService.TutorialProgress = null; MepBooster.MepBoosterService.TutorialCopy = null; Couleur.AppearanceOnboarding.ConsumeTourClick("mep-booster"); } };
             _card.SizeChanged += (_, __) => { if (_card != null) _card.Top = Math.Max(SystemParameters.WorkArea.Top + 16, SystemParameters.WorkArea.Bottom - _card.ActualHeight - 24); };
@@ -67,7 +69,8 @@ namespace BIMaestro.Tutorials
             if (_card == null) return;
             Couleur.AppearanceOnboarding.ConsumeTourClick("mep-booster");
             if (enabled) { _step = Math.Max(_step, 1); _card.Show(); }
-            else _text.Text = "MEP Booster est OFF. Clique à nouveau sur le bouton pour l’activer, puis sélectionne une vanne dans la vue 09.";
+            else _text.Text = UiLanguage.T("MEP Booster est OFF. Clique à nouveau sur le bouton pour l’activer, puis sélectionne une vanne dans la vue 09.",
+                "MEP Booster is OFF. Click the button again to turn it on, then select a valve in view 09.");
             if (enabled) UpdateText();
         }
         internal static void Report(Document document, IEnumerable<ElementId> ids, string action, double angle = 0)
@@ -95,20 +98,28 @@ namespace BIMaestro.Tutorials
             bool valid = validReference && _copied.Count >= 2;
             if (valid) _step = 6;
             UpdateText();
-            if (!valid) _text.Text += "\nPour valider l’essai, utilise une vanne tournée comme référence et copie sur deux autres vannes, ensemble ou en plusieurs copies. " + _copied.Count + " vanne(s) validée(s) sur 2.";
+            if (!valid) _text.Text += UiLanguage.T("\nPour valider l’essai, utilise une vanne tournée comme référence et copie sur deux autres vannes, ensemble ou en plusieurs copies. " + _copied.Count + " vanne(s) validée(s) sur 2.",
+                "\nTo complete this step, use a rotated valve as the reference and copy to two other valves, together or in several copies. " + _copied.Count + " of 2 valve(s) validated.");
         }
         private static void UpdateText()
         {
             if (_text == null) return;
-            if (_finish != null) _finish.Content = _step == 6 ? "Terminer le tutoriel" : "Quitter le guide";
+            if (_finish != null) _finish.Content = _step == 6 ? UiLanguage.T("Terminer le tutoriel", "Finish Tutorial") : UiLanguage.T("Quitter le guide", "Exit Guide");
             _text.Text = new[] {
-                "1/7 · Active MEP Booster dans l’onglet BIMaestro. Le bouton passe de OFF à ON. La vue 09 contient six vannes, deux filtres à tamis en Y, deux compteurs d’eau et quatre coudes. Commence l’exercice sur les vannes.",
-                "2/7 · Clique sur une seule vanne. Après 0,2 seconde de sélection stable, une pastille MEP apparaît près de la sélection. Tu peux zoomer pour mieux voir sa poignée.",
-                "3/7 · Survole la pastille puis un angle, par exemple 90°. Observe l’aperçu de rotation avant de cliquer. Les angles incompatibles avec les raccordements restent désactivés.",
-                "4/7 · Clique sur un angle disponible pour appliquer la rotation. Observe la poignée de la vanne : la rotation se fait autour de la canalisation, en conservant les raccordements.",
-                "5/7 · Première rotation appliquée ! Clique ailleurs que sur la rosace pour la fermer, puis sélectionne une autre vanne et applique une rotation disponible. Tu peux aussi sélectionner plusieurs vannes compatibles.",
-                "6/7 · Copier l’orientation : clique ailleurs pour fermer la rosace, puis sélectionne une seule vanne que tu viens de tourner. Dans sa rosace, clique sur le bouton « Copier l’orientation ». Sélectionne au moins deux autres vannes encore intactes, clique sur Terminer, observe l’aperçu vert puis confirme la copie.",
-                "7/7 · Copie validée ! Au moins deux vannes encore intactes ont reçu l’orientation et le sens d’une vanne modifiée. Compare leurs poignées avec la référence. Clique hors de la rosace pour la fermer ; le bouton ON/OFF permet de désactiver MEP Booster."
+                UiLanguage.T("1/7 · Active MEP Booster dans l’onglet BIMaestro. Le bouton passe de OFF à ON. La vue 09 contient six vannes, deux filtres à tamis en Y, deux compteurs d’eau et quatre coudes. Commence l’exercice sur les vannes.",
+                    "1/7 · Turn on MEP Booster in the BIMaestro tab. The button switches from OFF to ON. View 09 contains six valves, two Y-strainers, two water meters and four elbows. Start the exercise with the valves."),
+                UiLanguage.T("2/7 · Clique sur une seule vanne. Après 0,2 seconde de sélection stable, une pastille MEP apparaît près de la sélection. Tu peux zoomer pour mieux voir sa poignée.",
+                    "2/7 · Click a single valve. After 0.2 seconds of stable selection, an MEP badge appears near the selection. You can zoom in to see its handle more clearly."),
+                UiLanguage.T("3/7 · Survole la pastille puis un angle, par exemple 90°. Observe l’aperçu de rotation avant de cliquer. Les angles incompatibles avec les raccordements restent désactivés.",
+                    "3/7 · Hover over the badge, then over an angle, for example 90°. Check the rotation preview before clicking. Angles incompatible with the connections remain disabled."),
+                UiLanguage.T("4/7 · Clique sur un angle disponible pour appliquer la rotation. Observe la poignée de la vanne : la rotation se fait autour de la canalisation, en conservant les raccordements.",
+                    "4/7 · Click an available angle to apply the rotation. Watch the valve handle: the rotation is performed around the pipe while keeping the connections."),
+                UiLanguage.T("5/7 · Première rotation appliquée ! Clique ailleurs que sur la rosace pour la fermer, puis sélectionne une autre vanne et applique une rotation disponible. Tu peux aussi sélectionner plusieurs vannes compatibles.",
+                    "5/7 · First rotation applied! Click outside the rosette to close it, then select another valve and apply an available rotation. You can also select several compatible valves."),
+                UiLanguage.T("6/7 · Copier l’orientation : clique ailleurs pour fermer la rosace, puis sélectionne une seule vanne que tu viens de tourner. Dans sa rosace, clique sur le bouton « Copier l’orientation ». Sélectionne au moins deux autres vannes encore intactes, clique sur Terminer, observe l’aperçu vert puis confirme la copie.",
+                    "6/7 · Copy orientation: click elsewhere to close the rosette, then select a single valve you just rotated. In its rosette, click the 'Copy orientation' button. Select at least two other untouched valves, click Finish, check the green preview, then confirm the copy."),
+                UiLanguage.T("7/7 · Copie validée ! Au moins deux vannes encore intactes ont reçu l’orientation et le sens d’une vanne modifiée. Compare leurs poignées avec la référence. Clique hors de la rosace pour la fermer ; le bouton ON/OFF permet de désactiver MEP Booster.",
+                    "7/7 · Copy validated! At least two untouched valves received the orientation and direction of a modified valve. Compare their handles with the reference. Click outside the rosette to close it; the ON/OFF button turns MEP Booster off.")
             }[_step];
         }
     }

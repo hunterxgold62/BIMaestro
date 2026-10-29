@@ -52,12 +52,12 @@ public class BIMaestroApp : IExternalApplication
             var userDataRoot = global::BIMaestro.Storage.UserDataStorage.Root;
             var selectionDataRoot = global::BIMaestro.Storage.UserDataStorage.SelectionPreferencesRoot;
             if (!string.IsNullOrEmpty(global::BIMaestro.Storage.UserDataStorage.MigrationWarning))
-                TaskDialog.Show("BIMaestro — stockage des données",
+                TaskDialog.Show(UiLanguage.T("BIMaestro — stockage des données", "BIMaestro — data storage"),
                     global::BIMaestro.Storage.UserDataStorage.MigrationWarning);
             global::BIMaestro.Storage.PreferenceStorage.Initialize(userDataRoot);
             global::BIMaestro.Storage.PreferenceStorage.Initialize(selectionDataRoot);
             if (!string.IsNullOrEmpty(global::BIMaestro.Storage.PreferenceStorage.MigrationWarning))
-                TaskDialog.Show("BIMaestro — classement des préférences",
+                TaskDialog.Show(UiLanguage.T("BIMaestro — classement des préférences", "BIMaestro — preferences organization"),
                     global::BIMaestro.Storage.PreferenceStorage.MigrationWarning);
             UiLanguage.Initialize(application.ControlledApplication.Language.ToString());
 

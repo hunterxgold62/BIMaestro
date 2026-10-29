@@ -2,6 +2,7 @@ using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using System.Windows.Interop;
+using BIMaestro.Localization;
 
 namespace BIMaestro.Codex
 {
@@ -17,7 +18,7 @@ namespace BIMaestro.Codex
             var document = data.Application.ActiveUIDocument?.Document;
             if (document == null || document.IsFamilyDocument)
             {
-                TaskDialog.Show("BIMaestro — Assistant MEP", "Ouvrez un projet Revit contenant les équipements à raccorder.");
+                TaskDialog.Show(UiLanguage.T("BIMaestro — Assistant MEP", "BIMaestro — MEP Assistant"), UiLanguage.T("Ouvrez un projet Revit contenant les équipements à raccorder.", "Open a Revit project containing the equipment to connect."));
                 return Result.Cancelled;
             }
 

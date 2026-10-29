@@ -9,6 +9,7 @@ using System.Windows.Media;
 using Autodesk.Revit.UI;
 using Autodesk.Revit.UI.Events;
 using Newtonsoft.Json;
+using BIMaestro.Localization;
 
 namespace BIMaestro.Home
 {
@@ -35,7 +36,7 @@ namespace BIMaestro.Home
         static readonly System.Runtime.CompilerServices.ConditionalWeakTable<object, BrowserState> browserStates = new System.Runtime.CompilerServices.ConditionalWeakTable<object, BrowserState>();
         internal static string CurrentStyle { get; private set; } = "native";
         internal static bool HistoryEnabled { get; private set; }
-        internal static string LastStatus { get; private set; } = "Accueil Autodesk conservé.";
+        internal static string LastStatus { get; private set; } = UiLanguage.T("Accueil Autodesk conservé.", "Autodesk Home kept.");
 
         internal static void ConfigureTestSettingsPath(string path) { if (initialized) throw new InvalidOperationException("Configure before Initialize"); settingsPath = path; }
         internal static void Initialize(UIControlledApplication application)
@@ -112,7 +113,7 @@ namespace BIMaestro.Home
                 }
                 // Keep restoration armed until a Home page positively acknowledges it.
             }
-            catch (Exception ex) { LastStatus = "Accueil : " + ex.Message; Log(ex.ToString()); }
+            catch (Exception ex) { LastStatus = UiLanguage.T("Accueil : ", "Home: ") + ex.Message; Log(ex.ToString()); }
         }
         static string ReadResource(string name)
         {
@@ -160,7 +161,7 @@ namespace BIMaestro.Home
                 // Revit performs its normal version, worksharing and missing-file checks.
                 app.OpenAndActivateDocument(path);
             }
-            catch (Exception ex) { error = "Ouverture impossible : " + ex.Message; }
+            catch (Exception ex) { error = UiLanguage.T("Ouverture impossible : ", "Unable to open: ") + ex.Message; }
             lock (requestGate)
             {
                 acknowledgementGeneration++;
@@ -199,7 +200,7 @@ namespace BIMaestro.Home
                         if (response?.Home != true) return;
                         browserStates.GetOrCreateValue(browser).HistoryRevision = response.HistoryRevision;
                         if (HistoryEnabled && response.Thumbnails != null) HomeHistoryCatalog.RequestThumbnails(response.Thumbnails);
-                        LastStatus = response.Waiting ? "Accueil en cours de chargement." : "Affichage appliqué à l’accueil.";
+                        LastStatus = response.Waiting ? UiLanguage.T("Accueil en cours de chargement.", "Home is loading.") : UiLanguage.T("Affichage appliqué à l’accueil.", "Layout applied to Home.");
                         if (response.Restored) restorePending = false;
                         lock (requestGate) { if (response.Ack != 0 && response.Ack == acknowledgementGeneration) acknowledgement = null; }
                         if (response.Request != null && HomeHistoryCatalog.IsKnownPath(response.Request.Path))

@@ -20,6 +20,7 @@ using Grid = System.Windows.Controls.Grid;
 using Point = System.Windows.Point;
 using Line = System.Windows.Shapes.Line;
 using Transform = Autodesk.Revit.DB.Transform;
+using BIMaestro.Localization;
 
 namespace BIMaestro.MepBooster
 {
@@ -43,7 +44,7 @@ namespace BIMaestro.MepBooster
                 var selected = ui.Selection.GetElementIds().Select(ui.Document.GetElement).OfType<FamilyInstance>().ToList();
                 var pump = selected.Count == 1 && PumpFilter.Accept(selected[0]) ? selected[0]
                     : ui.Document.GetElement(ui.Selection.PickObject(ObjectType.Element, new PumpFilter(),
-                        "Sélectionnez la pompe (équipement mécanique).")) as FamilyInstance;
+                        UiLanguage.T("Sélectionnez la pompe (équipement mécanique).", "Select the pump (mechanical equipment)."))) as FamilyInstance;
                 var projection = BoosterProjection.Read(ui);
                 if (pump == null || projection == null) return Result.Cancelled;
                 var state = new MotorExtractionState();
@@ -55,10 +56,10 @@ namespace BIMaestro.MepBooster
                     try
                     {
                         if (dialog.PickRequest == "motor")
-                            state.MotorPoint = ui.Selection.PickObject(ObjectType.PointOnElement, "Cliquez le moteur pour positionner le centre XY du volume.").GlobalPoint;
+                            state.MotorPoint = ui.Selection.PickObject(ObjectType.PointOnElement, UiLanguage.T("Cliquez le moteur pour positionner le centre XY du volume.", "Click the motor to position the XY center of the volume.")).GlobalPoint;
                         else
                         {
-                            var reference = ui.Selection.PickObject(ObjectType.PointOnElement, new DoorFilter(ui.Document), "Cliquez la dernière porte de sortie (maquette ou lien Revit).");
+                            var reference = ui.Selection.PickObject(ObjectType.PointOnElement, new DoorFilter(ui.Document), UiLanguage.T("Cliquez la dernière porte de sortie (maquette ou lien Revit).", "Click the final exit door (model or Revit link)."));
                             var element = ui.Document.GetElement(reference.ElementId);
                             var link = element as RevitLinkInstance;
                             var door = (link == null ? element : link.GetLinkDocument().GetElement(reference.LinkedElementId)) as FamilyInstance;
@@ -215,7 +216,7 @@ namespace BIMaestro.MepBooster
                 foreach (RevitLinkInstance link in new FilteredElementCollector(doc).OfClass(typeof(RevitLinkInstance)))
                 {
                     var linked = link.GetLinkDocument();
-                    if (linked == null) { report.Unknown.Add("Lien non chargé : " + link.Name); continue; }
+                    if (linked == null) { report.Unknown.Add(UiLanguage.T("Lien non chargé : ", "Link not loaded: ") + link.Name); continue; }
                     Scan(linked, link.GetTotalTransform(), link.Name + " / ", false);
                 }
                 void Scan(Document source, Transform transform, string prefix, bool host)
@@ -231,7 +232,7 @@ namespace BIMaestro.MepBooster
                     {
                         if (element is RevitLinkInstance)
                         {
-                            if (!host) report.Unknown.Add(prefix + element.Name + " : lien imbriqué non analysé");
+                            if (!host) report.Unknown.Add(prefix + element.Name + UiLanguage.T(" : lien imbriqué non analysé", ": nested link not analyzed"));
                             continue;
                         }
                         if (element is View || element is SpatialElement || element.Category == null || element.Category.CategoryType != CategoryType.Model
@@ -257,7 +258,7 @@ namespace BIMaestro.MepBooster
                                     }
                                 }
                             }
-                            if (solids.Count == 0 || incomplete) report.Unknown.Add(label + " : géométrie incomplète");
+                            if (solids.Count == 0 || incomplete) report.Unknown.Add(label + UiLanguage.T(" : géométrie incomplète", ": incomplete geometry"));
                             bool Intersects(IEnumerable<Solid> volumes)
                             {
                                 foreach (var volume in volumes)
@@ -281,7 +282,7 @@ namespace BIMaestro.MepBooster
                             report.Obstacles.Add(new MotorObstacle { Label = label, First = high, Box = boxPoints });
                         }
                         catch (Exception ex) when (ex is Autodesk.Revit.Exceptions.ApplicationException || ex is ArgumentException || ex is InvalidOperationException)
-                        { report.Unknown.Add(label + " : contrôle géométrique impossible"); }
+                        { report.Unknown.Add(label + UiLanguage.T(" : contrôle géométrique impossible", ": geometric check failed")); }
                         finally { foreach (var solid in solids) solid.Dispose(); }
                     }
                 }
@@ -357,7 +358,7 @@ namespace BIMaestro.MepBooster
             _canvas.Children.Add(line);
             if (line.Points.Count > 0)
             {
-                var label = new TextBlock { Text = "Sortie · porte supposée ouverte", Background = Brushes.White, Foreground = Brushes.Black, Padding = new Thickness(5) };
+                var label = new TextBlock { Text = UiLanguage.T("Sortie · porte supposée ouverte", "Exit · door assumed open"), Background = Brushes.White, Foreground = Brushes.Black, Padding = new Thickness(5) };
                 var end = line.Points.Last(); Canvas.SetLeft(label, end.X + 8); Canvas.SetTop(label, end.Y + 8); _canvas.Children.Add(label);
             }
         }
@@ -378,20 +379,20 @@ namespace BIMaestro.MepBooster
         private readonly TextBlock _status = new TextBlock { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 10, 0, 10) };
         private readonly TextBlock _distance = new TextBlock();
         private readonly TextBlock _details = new TextBlock { TextWrapping=TextWrapping.Wrap, Margin=new Thickness(0,6,0,6) };
-        private readonly Expander _scope = new Expander { Header="Hypothèses et détails du contrôle", IsExpanded=false };
+        private readonly Expander _scope = new Expander { Header=UiLanguage.T("Hypothèses et détails du contrôle", "Check assumptions and details"), IsExpanded=false };
         private readonly DispatcherTimer _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(40) };
         private MotorEnvelope _envelope;
         private MotorExtractionReport _report;
         private List<MotorRoutePose> _route;
         private StackPanel _settings;
-        private readonly Button _cancel = new Button { Content="Annuler la recherche", Visibility=System.Windows.Visibility.Collapsed };
+        private readonly Button _cancel = new Button { Content=UiLanguage.T("Annuler la recherche", "Cancel the search"), Visibility=System.Windows.Visibility.Collapsed };
         private bool _running, _cancelRequested;
         private string _lastError;
         internal MotorExtractionWindow(UIDocument ui, FamilyInstance pump, BoosterProjection projection, IntPtr owner, MotorExtractionState state)
         {
             _doc = ui.Document; _pump = pump; _projection = projection; _state = state;
             _direction.SelectedIndex = state.Direction;
-            Title = "MEP · Chemin vers la sortie · "+MaintenanceBuildIdentity.Display; Width = 490; Height = 850; MinHeight = 500;
+            Title = UiLanguage.T("MEP · Chemin vers la sortie · ", "MEP · Path to Exit · ")+MaintenanceBuildIdentity.Display; Width = 490; Height = 850; MinHeight = 500;
             ResizeMode = ResizeMode.CanResize; ShowInTaskbar = false;
             new WindowInteropHelper(this).Owner = owner; BoosterTheme.Attach(this);
             Background = (Brush)FindResource("Surface");
@@ -412,15 +413,15 @@ namespace BIMaestro.MepBooster
             resultPanel.Children.Add(_cancel); _cancel.Click += (_,__) => _cancelRequested=true;
             DockPanel.SetDock(resultCard,Dock.Top); layout.Children.Add(resultCard);
             layout.Children.Add(new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto }); Content=layout;
-            panel.Children.Add(new TextBlock { Text = "Du moteur à la porte de sortie", FontSize = 19, FontWeight = FontWeights.SemiBold });
+            panel.Children.Add(new TextBlock { Text = UiLanguage.T("Du moteur à la porte de sortie", "From the motor to the exit door"), FontSize = 19, FontWeight = FontWeights.SemiBold });
             panel.Children.Add(new TextBlock { Text = pump.Name + " · " + BoosterIds.Value(pump.Id), Margin = new Thickness(0, 6, 0, 8) });
-            panel.Children.Add(new TextBlock { Text = profile.Description + " Toutes les valeurs sont en mm.", TextWrapping = TextWrapping.Wrap });
-            Field("X", "Dimension X du moteur", Math.Max(10, size.X * 304.8));
-            Field("Y", "Dimension Y du moteur", Math.Max(10, size.Y * 304.8));
-            Field("Z", "Hauteur Z du moteur", Math.Max(10, size.Z * 304.8));
-            Field("CX", "Centre X / origine famille", center.X * 304.8);
-            Field("CY", "Centre Y / origine famille", center.Y * 304.8);
-            Field("CZ", "Centre Z / origine famille", center.Z * 304.8);
+            panel.Children.Add(new TextBlock { Text = profile.Description + UiLanguage.T(" Toutes les valeurs sont en mm.", " All values are in mm."), TextWrapping = TextWrapping.Wrap });
+            Field("X", UiLanguage.T("Dimension X du moteur", "Motor X dimension"), Math.Max(10, size.X * 304.8));
+            Field("Y", UiLanguage.T("Dimension Y du moteur", "Motor Y dimension"), Math.Max(10, size.Y * 304.8));
+            Field("Z", UiLanguage.T("Hauteur Z du moteur", "Motor Z height"), Math.Max(10, size.Z * 304.8));
+            Field("CX", UiLanguage.T("Centre X / origine famille", "Center X / family origin"), center.X * 304.8);
+            Field("CY", UiLanguage.T("Centre Y / origine famille", "Center Y / family origin"), center.Y * 304.8);
+            Field("CZ", UiLanguage.T("Centre Z / origine famille", "Center Z / family origin"), center.Z * 304.8);
             if (state.MotorPoint != null)
             {
                 var current = _frame.OfPoint(new XYZ(ParseSaved("CX", center.X * 304.8), ParseSaved("CY", center.Y * 304.8), ParseSaved("CZ", center.Z * 304.8)) / 304.8);
@@ -428,30 +429,30 @@ namespace BIMaestro.MepBooster
                 _fields["CX"].Text = (local.X * 304.8).ToString("0.#"); _fields["CY"].Text = (local.Y * 304.8).ToString("0.#");
                 state.MotorPoint = null;
             }
-            var pointMotor = new Button { Content = "Pointer le centre du moteur (XY)", Margin = new Thickness(0, 8, 0, 4), Style = (Style)FindResource("SecondaryButton") };
+            var pointMotor = new Button { Content = UiLanguage.T("Pointer le centre du moteur (XY)", "Pick the motor center (XY)"), Margin = new Thickness(0, 8, 0, 4), Style = (Style)FindResource("SecondaryButton") };
             panel.Children.Add(pointMotor); pointMotor.Click += (_, __) => { PickRequest = "motor"; Close(); };
-            var pickDoor = new Button { Content = state.DoorPoint == null ? "Choisir la porte de sortie…" : "Changer la porte de sortie…", Style = (Style)FindResource("SecondaryButton") };
+            var pickDoor = new Button { Content = state.DoorPoint == null ? UiLanguage.T("Choisir la porte de sortie…", "Choose the exit door…") : UiLanguage.T("Changer la porte de sortie…", "Change the exit door…"), Style = (Style)FindResource("SecondaryButton") };
             panel.Children.Add(pickDoor); pickDoor.Click += (_, __) => { PickRequest = "door"; Close(); };
-            panel.Children.Add(new TextBlock { Text = state.DoorName == null ? "Sélectionnez la dernière porte : le chemin sera recherché automatiquement." : "Sortie : " + state.DoorName,
+            panel.Children.Add(new TextBlock { Text = state.DoorName == null ? UiLanguage.T("Sélectionnez la dernière porte : le chemin sera recherché automatiquement.", "Select the final door: the path will be searched automatically.") : UiLanguage.T("Sortie : ", "Exit: ") + state.DoorName,
                 TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 6) });
-            var openDoors = new CheckBox { Content = "Portes intermédiaires supposées ouvertes", IsChecked = state.AllowIntermediateDoors,
-                Margin = new Thickness(0, 6, 0, 6), ToolTip = "Le trajet peut traverser d’autres portes. Le passage est contrôlé selon les dimensions disponibles ; l’ouverture effective des vantaux reste à confirmer sur site." };
+            var openDoors = new CheckBox { Content = UiLanguage.T("Portes intermédiaires supposées ouvertes", "Intermediate doors assumed open"), IsChecked = state.AllowIntermediateDoors,
+                Margin = new Thickness(0, 6, 0, 6), ToolTip = UiLanguage.T("Le trajet peut traverser d’autres portes. Le passage est contrôlé selon les dimensions disponibles ; l’ouverture effective des vantaux reste à confirmer sur site.", "The route may pass through other doors. The clearance is checked using the available dimensions; actual leaf opening must be confirmed on site.") };
             panel.Children.Add(openDoors);
             openDoors.Checked += (_, __) => { state.AllowIntermediateDoors = true; Invalidate(); };
             openDoors.Unchecked += (_, __) => { state.AllowIntermediateDoors = false; Invalidate(); };
-            Field("Step", "Pas de recherche (50 à 500)", 200);
-            Field("Buffer", "Recherche autour du trajet", 4000);
-            var find = new Button { Content = "Trouver le chemin jusqu’à la sortie", Margin = new Thickness(0, 10, 0, 6), Style = (Style)FindResource("PrimaryButton"), IsEnabled = state.DoorPoint != null };
+            Field("Step", UiLanguage.T("Pas de recherche (50 à 500)", "Search step (50 to 500)"), 200);
+            Field("Buffer", UiLanguage.T("Recherche autour du trajet", "Search around the route"), 4000);
+            var find = new Button { Content = UiLanguage.T("Trouver le chemin jusqu’à la sortie", "Find the path to the exit"), Margin = new Thickness(0, 10, 0, 6), Style = (Style)FindResource("PrimaryButton"), IsEnabled = state.DoorPoint != null };
             panel.Children.Add(find); find.Click += (_, __) => FindRoute();
-            panel.Children.Add(new TextBlock { Text = "Direction d’extraction", Margin = new Thickness(0, 8, 0, 4) });
+            panel.Children.Add(new TextBlock { Text = UiLanguage.T("Direction d’extraction", "Extraction direction"), Margin = new Thickness(0, 8, 0, 4) });
             panel.Children.Add(_direction);
-            Field("Travel", "Distance d’extraction", 600);
-            Field("Margin", "Marge autour du moteur", 10);
-            var check = new Button { Content = "Tester seulement la dépose rectiligne", Margin = new Thickness(0, 12, 0, 8), Style = (Style)FindResource("SecondaryButton") };
+            Field("Travel", UiLanguage.T("Distance d’extraction", "Extraction distance"), 600);
+            Field("Margin", UiLanguage.T("Marge autour du moteur", "Clearance around the motor"), 10);
+            var check = new Button { Content = UiLanguage.T("Tester seulement la dépose rectiligne", "Test straight-line removal only"), Margin = new Thickness(0, 12, 0, 8), Style = (Style)FindResource("SecondaryButton") };
             panel.Children.Add(check);
-            var animate = new Button { Content = "▶ Lire / arrêter l’extraction", Style = (Style)FindResource("SecondaryButton") };
+            var animate = new Button { Content = UiLanguage.T("▶ Lire / arrêter l’extraction", "▶ Play / stop extraction"), Style = (Style)FindResource("SecondaryButton") };
             resultPanel.Children.Insert(0,animate);
-            panel.Children.Add(new TextBlock { Text = "Le chemin vérifie les translations et les virages du volume, avec 16 orientations horizontales. Hauteur constante, sans basculement ni levage. La pompe est exclue ; la porte de sortie et, selon l’option, les portes intermédiaires sont supposées ouvertes. Leurs passages restent contrôlés avec les données disponibles. Le résultat dépend du gabarit réglé et ne valide pas une procédure de manutention.", TextWrapping = TextWrapping.Wrap, FontSize = 11 });
+            panel.Children.Add(new TextBlock { Text = UiLanguage.T("Le chemin vérifie les translations et les virages du volume, avec 16 orientations horizontales. Hauteur constante, sans basculement ni levage. La pompe est exclue ; la porte de sortie et, selon l’option, les portes intermédiaires sont supposées ouvertes. Leurs passages restent contrôlés avec les données disponibles. Le résultat dépend du gabarit réglé et ne valide pas une procédure de manutention.", "The path checks translations and turns of the volume, with 16 horizontal orientations. Constant height, no tilting or lifting. The pump is excluded; the exit door and, depending on the option, intermediate doors are assumed open. Their openings are still checked with the available data. The result depends on the configured template and does not validate a handling procedure."), TextWrapping = TextWrapping.Wrap, FontSize = 11 });
             var close = new Button { Content = "Fermer", Margin = new Thickness(0, 12, 0, 0), IsCancel = true };
             panel.Children.Add(close); close.Click += (_, __) => Close();
             foreach (var input in _fields.Values) input.TextChanged += (_, __) => Invalidate();
@@ -466,18 +467,18 @@ namespace BIMaestro.MepBooster
                     using (new WaitCursor()) _report = MotorExtractionAnalysis.Run(_doc, _pump, _envelope);
                     _position.Value = 0;
                     _status.Text = (_report.First.HasValue
-                        ? "Obstacle rencontré vers " + (_report.First.Value * 304.8).ToString("0") + " mm (précision de recherche ≈ 1 mm).\n"
-                        : "Aucun obstacle détecté sur " + (_envelope.Travel * 304.8).ToString("0") + " mm.\n")
+                        ? UiLanguage.T("Obstacle rencontré vers ", "Obstacle hit at about ") + (_report.First.Value * 304.8).ToString("0") + UiLanguage.T(" mm (précision de recherche ≈ 1 mm).\n", " mm (search accuracy ≈ 1 mm).\n")
+                        : UiLanguage.T("Aucun obstacle détecté sur ", "No obstacle detected over ") + (_envelope.Travel * 304.8).ToString("0") + UiLanguage.T(" mm.\n", " mm.\n"))
                         + string.Join("\n", _report.Obstacles.Take(8).Select(o => "• " + o.Label + " — " + (o.First * 304.8).ToString("0") + " mm"))
-                        + (_report.Unknown.Count == 0 ? "" : "\nContrôle incomplet : " + _report.Unknown.Count + " élément(s) ou lien(s).\n" + string.Join("\n", _report.Unknown.Take(5)));
+                        + (_report.Unknown.Count == 0 ? "" : UiLanguage.T("\nContrôle incomplet : ", "\nIncomplete check: ") + _report.Unknown.Count + UiLanguage.T(" élément(s) ou lien(s).\n", " element(s) or link(s).\n") + string.Join("\n", _report.Unknown.Take(5)));
                     Draw();
                 }
-                catch (Exception ex) { _report = null; _status.Text = "Analyse impossible : " + ex.Message; Draw(); }
+                catch (Exception ex) { _report = null; _status.Text = UiLanguage.T("Analyse impossible : ", "Analysis failed: ") + ex.Message; Draw(); }
             };
             animate.Click += (_, __) =>
             {
                 if (_timer.IsEnabled) _timer.Stop();
-                else if (_report == null) _status.Text = "Lancez une recherche de chemin ou le test de dépose avant la lecture.";
+                else if (_report == null) _status.Text = UiLanguage.T("Lancez une recherche de chemin ou le test de dépose avant la lecture.", "Run a path search or the removal test before playback.");
                 else if (_envelope != null) { if (_position.Value >= 100) _position.Value = 0; _timer.Start(); }
             };
             _timer.Tick += (_, __) => { _position.Value = Math.Min(100, _position.Value + 1); if (_position.Value >= 100) _timer.Stop(); };
@@ -511,10 +512,10 @@ namespace BIMaestro.MepBooster
             {
                 if (!double.TryParse(_fields[key].Text.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out double n)
                     || double.IsNaN(n) || double.IsInfinity(n) || Math.Abs(n) > 1000000 || (positive && n < 2))
-                    throw new InvalidOperationException("Valeur invalide : " + key + ". Dimensions et course : au moins 2 mm.");
+                    throw new InvalidOperationException(UiLanguage.T("Valeur invalide : ", "Invalid value: ") + key + UiLanguage.T(". Dimensions et course : au moins 2 mm.", ". Dimensions and travel: at least 2 mm."));
                 return n / 304.8;
             }
-            var margin = Number("Margin"); if (margin < 0) throw new InvalidOperationException("La marge doit être positive ou nulle.");
+            var margin = Number("Margin"); if (margin < 0) throw new InvalidOperationException(UiLanguage.T("La marge doit être positive ou nulle.", "The margin must be zero or positive."));
             return new MotorEnvelope { Frame = _frame, Center = new XYZ(Number("CX"), Number("CY"), Number("CZ")),
                 Size = new XYZ(Number("X", true), Number("Y", true), Number("Z", true)),
                 Axis = _direction.SelectedIndex / 2, Sign = _direction.SelectedIndex % 2 == 0 ? 1 : -1,
@@ -523,7 +524,7 @@ namespace BIMaestro.MepBooster
         private void Invalidate()
         {
             _timer.Stop(); _report = null; _route = null; _position.Value = 0;
-            try { _envelope = Read(); _status.Text = "Volume modifié : lancez l’analyse du trajet."; Draw(); }
+            try { _envelope = Read(); _status.Text = UiLanguage.T("Volume modifié : lancez l’analyse du trajet.", "Volume changed: run the route analysis."); Draw(); }
             catch (Exception ex) { _envelope = null; _ghost.Hide(); _status.Text = ex.Message; }
         }
         private void Draw()
@@ -544,11 +545,11 @@ namespace BIMaestro.MepBooster
                     a.Yaw + MotorRouteGeometry.AngleDelta(a.Yaw, b.Yaw) * fraction);
                 _ghost.Draw(_projection, MotorRouteGeometry.At(_envelope, pose), 0, _report);
                 _ghost.DrawPath(_projection, _route);
-                _distance.Text = "Chemin vers la sortie : " + _position.Value.ToString("0") + " % · rotation " + (pose.Yaw * 180 / Math.PI).ToString("0") + "°";
+                _distance.Text = UiLanguage.T("Chemin vers la sortie : ", "Path to exit: ") + _position.Value.ToString("0") + UiLanguage.T(" % · rotation ", " % · rotation ") + (pose.Yaw * 180 / Math.PI).ToString("0") + "°";
                 return;
             }
             double distance = _envelope.Travel * _position.Value / 100;
-            _distance.Text = "Position du moteur : " + (distance * 304.8).ToString("0") + " mm / " + (_envelope.Travel * 304.8).ToString("0") + " mm";
+            _distance.Text = UiLanguage.T("Position du moteur : ", "Motor position: ") + (distance * 304.8).ToString("0") + " mm / " + (_envelope.Travel * 304.8).ToString("0") + " mm";
             _ghost.Draw(_projection, _envelope, distance, _report);
         }
         private void FindRoute()
@@ -564,7 +565,7 @@ namespace BIMaestro.MepBooster
                 double stepMm = Input("Step"), bufferMm = Input("Buffer");
                 if (double.IsNaN(stepMm) || double.IsInfinity(stepMm) || stepMm < 50 || stepMm > 500
                     || double.IsNaN(bufferMm) || double.IsInfinity(bufferMm) || bufferMm < 500 || bufferMm > 15000)
-                    throw new InvalidOperationException("Pas : 50 à 500 mm. Périmètre autour du trajet : 500 à 15 000 mm.");
+                    throw new InvalidOperationException(UiLanguage.T("Pas : 50 à 500 mm. Périmètre autour du trajet : 500 à 15 000 mm.", "Step: 50 to 500 mm. Area around the route: 500 to 15,000 mm."));
                 double step = stepMm / 304.8, padding = bufferMm / 304.8;
                 var start = _envelope.Frame.OfPoint(_envelope.Center);
                 var door = new XYZ(_state.DoorPoint.X, _state.DoorPoint.Y, start.Z);
@@ -573,7 +574,7 @@ namespace BIMaestro.MepBooster
                 double standOff = _envelope.Size.GetLength() / 2 + _envelope.Margin + 300 / 304.8;
                 var before = door - normal * standOff;
                 var after = door + normal * standOff;
-                _status.Text = "Recherche automatique du passage et des virages… (jusqu’à 40 s de recherche après lecture de la géométrie)";
+                _status.Text = UiLanguage.T("Recherche automatique du passage et des virages… (jusqu’à 40 s de recherche après lecture de la géométrie)", "Automatic search for the passage and turns… (up to 40 s of search after reading the geometry)");
                 Dispatcher.Invoke(System.Windows.Threading.DispatcherPriority.Render, new Action(() => { }));
                 using (new WaitCursor())
                 using (var geometry = new MotorRouteGeometry(_doc, _pump, _envelope, after, padding, _state.DoorId, _state.DoorLinkId, before, Progress, _state.AllowIntermediateDoors))
@@ -605,7 +606,7 @@ namespace BIMaestro.MepBooster
                     }
                     var result = MotorRouteSearch.FindWithPortals(gates, (int)Math.Floor(padding / step),
                         Math.Max(0.2, _envelope.Size.GetLength() / 2 * Math.PI / 8 / step), Clear,
-                        progress: n=>Progress("Recherche du chemin : "+n+" positions/orientations explorées…"), headingAngles: angles);
+                        progress: n=>Progress(UiLanguage.T("Recherche du chemin : ", "Path search: ")+n+UiLanguage.T(" positions/orientations explorées…", " positions/orientations explored…")), headingAngles: angles);
                     _report = new MotorExtractionReport(); _report.Unknown.AddRange(geometry.Unknown.Distinct());
                     if (result.Points != null)
                     {
@@ -613,29 +614,29 @@ namespace BIMaestro.MepBooster
                         _route=Compact(_route);
                         for(int i=1;i<_route.Count;i++)
                         {
-                            Progress("Vérification des solides Revit : mouvement "+i+" / "+(_route.Count-1)+"…");
+                            Progress(UiLanguage.T("Vérification des solides Revit : mouvement ", "Checking Revit solids: movement ")+i+" / "+(_route.Count-1)+"…");
                             if(!geometry.Clear(_route[i-1],_route[i]))
-                                throw new InvalidOperationException("Le chemin candidat échoue au contrôle précis : "+geometry.LastObstacle+". Aucun trajet validé. Réduisez le pas de recherche.");
+                                throw new InvalidOperationException(UiLanguage.T("Le chemin candidat échoue au contrôle précis : ", "The candidate path fails the precise check: ")+geometry.LastObstacle+UiLanguage.T(". Aucun trajet validé. Réduisez le pas de recherche.", ". No route validated. Reduce the search step."));
                         }
                         double length = Enumerable.Range(1, _route.Count - 1).Sum(i => (_route[i].Center - _route[i - 1].Center).GetLength());
                         int turns = Enumerable.Range(1, _route.Count - 1).Count(i => Math.Abs(MotorRouteGeometry.AngleDelta(_route[i - 1].Yaw, _route[i].Yaw)) > 1e-6);
-                        _status.Text = "Chemin vérifié en "+elapsed.Elapsed.TotalSeconds.ToString("0.0")+" s : " + (length * 0.3048).ToString("0.0") + " m · " + turns + " rotation(s).\n"
-                            + "Passage testé jusqu’au-delà de la porte. Utilisez le curseur ou la lecture pour voir le moteur avancer et tourner.\n";
+                        _status.Text = UiLanguage.T("Chemin vérifié en ", "Path verified in ")+elapsed.Elapsed.TotalSeconds.ToString("0.0")+UiLanguage.T(" s : ", " s: ") + (length * 0.3048).ToString("0.0") + " m · " + turns + UiLanguage.T(" rotation(s).\n", " turn(s).\n")
+                            + UiLanguage.T("Passage testé jusqu’au-delà de la porte. Utilisez le curseur ou la lecture pour voir le moteur avancer et tourner.\n", "Passage tested beyond the door. Use the slider or playback to see the motor move and turn.\n");
                     }
-                    else _status.Text = result.Message + "\n" + (result.Visited <= 1 && geometry.LastObstacle != null ? "Obstacle : " + geometry.LastObstacle + "\n" : "");
-                    _status.Text += result.Visited + " positions/orientations explorées."
-                        + (_report.Unknown.Count==0 ? "" : "\nContrôle incomplet : "+_report.Unknown.Count+" anomalie(s), voir les détails.");
+                    else _status.Text = result.Message + "\n" + (result.Visited <= 1 && geometry.LastObstacle != null ? UiLanguage.T("Obstacle : ", "Obstacle: ") + geometry.LastObstacle + "\n" : "");
+                    _status.Text += result.Visited + UiLanguage.T(" positions/orientations explorées.", " positions/orientations explored.")
+                        + (_report.Unknown.Count==0 ? "" : UiLanguage.T("\nContrôle incomplet : ", "\nIncomplete check: ")+_report.Unknown.Count+UiLanguage.T(" anomalie(s), voir les détails.", " issue(s), see details."));
                     _details.Text=string.Join("\n", geometry.Assumptions)
-                        + (_state.DoorWidth <= 0 || _state.DoorHeight <= 0 ? "\nDimensions nominales de la porte non disponibles : contrôle limité à la géométrie des murs." : "\nLargeur et hauteur nominales de la porte contrôlées, sans déduction des jeux du dormant.")
-                        + (_report.Unknown.Count == 0 ? "" : "\nContrôle incomplet : " + _report.Unknown.Count + " anomalie(s).\n" + string.Join("\n", _report.Unknown.Take(4)));
+                        + (_state.DoorWidth <= 0 || _state.DoorHeight <= 0 ? UiLanguage.T("\nDimensions nominales de la porte non disponibles : contrôle limité à la géométrie des murs.", "\nNominal door dimensions unavailable: check limited to wall geometry.") : UiLanguage.T("\nLargeur et hauteur nominales de la porte contrôlées, sans déduction des jeux du dormant.", "\nNominal door width and height checked, without deducting frame clearances."))
+                        + (_report.Unknown.Count == 0 ? "" : UiLanguage.T("\nContrôle incomplet : ", "\nIncomplete check: ") + _report.Unknown.Count + UiLanguage.T(" anomalie(s).\n", " issue(s).\n") + string.Join("\n", _report.Unknown.Take(4)));
                     _position.Value = 0;
                     if (_route == null) _report = null;
                     Draw();
                     if(_route!=null) _timer.Start();
                 }
             }
-            catch(OperationCanceledException) {_route=null;_report=null;_status.Text="Recherche annulée : aucun trajet validé.";Draw();}
-            catch (Exception ex) { _lastError=ex.ToString(); _route = null; _report = null; _status.Text = "Recherche impossible : " + ex.Message; Draw(); }
+            catch(OperationCanceledException) {_route=null;_report=null;_status.Text=UiLanguage.T("Recherche annulée : aucun trajet validé.", "Search cancelled: no route validated.");Draw();}
+            catch (Exception ex) { _lastError=ex.ToString(); _route = null; _report = null; _status.Text = UiLanguage.T("Recherche impossible : ", "Search failed: ") + ex.Message; Draw(); }
             finally {_running=false;_settings.IsEnabled=true;_cancel.Visibility=System.Windows.Visibility.Collapsed;}
         }
         private void Progress(string message)

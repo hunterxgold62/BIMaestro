@@ -44,7 +44,7 @@ namespace Famille
             foreach (var row in _rows.Take(2)) row.IsSelected = true;
             GenerateButton.BorderBrush = BIMaestro.Tutorials.DemoTourPalette.Accent;
             GenerateButton.BorderThickness = new Thickness(3);
-            GenerateButton.ToolTip = "Proposer une description et des mots-clés pour les familles cochées. Relis les propositions avant de les enregistrer.";
+            GenerateButton.ToolTip = UiLanguage.T("Proposer une description et des mots-clés pour les familles cochées. Relis les propositions avant de les enregistrer.", "Suggest a description and keywords for the selected families. Review the suggestions before saving them.");
             UpdateSummary();
         }
 
@@ -267,7 +267,7 @@ namespace Famille
             _keywordsText = string.Join(", ", metadata.Keywords);
             Source = metadata.Source;
             ExpectedLastWriteUtc = FamilySearchMetadataService.GetLastWriteUtc(entry.Path);
-            _status = metadata.Keywords.Count > 0 ? "Déjà renseignée" : "À enrichir";
+            _status = metadata.Keywords.Count > 0 ? UiLanguage.T("Déjà renseignée", "Already filled in") : UiLanguage.T("À enrichir", "To be enriched");
             _initialized = true;
         }
 
@@ -317,7 +317,7 @@ namespace Famille
             ExpectedLastWriteUtc = newWriteUtc;
             Source = metadata.Source;
             IsDirty = false;
-            Status = "Enregistrée";
+            Status = UiLanguage.T("Enregistrée", "Saved");
             OnPropertyChanged(nameof(IsDirty));
             OnPropertyChanged(nameof(HasKeywords));
         }
@@ -327,7 +327,7 @@ namespace Famille
             if (!_initialized) return;
             IsDirty = true;
             Source = "manual";
-            Status = "Modifiée — non enregistrée";
+            Status = UiLanguage.T("Modifiée — non enregistrée", "Modified — not saved");
             OnPropertyChanged(nameof(IsDirty));
         }
 

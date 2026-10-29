@@ -9,6 +9,7 @@ using Autodesk.Revit.UI;
 using Autodesk.Revit.UI.Events;
 using Autodesk.Revit.DB.Events;
 using Licensing;
+using BIMaestro.Localization;
 
 namespace BIMaestro.MepBooster
 {
@@ -166,7 +167,7 @@ namespace BIMaestro.MepBooster
             service._selectionDirty = true;
             service._suppressed = false;
             service._quietSince = DateTime.UtcNow;
-            service.SetStatus(service._enabled ? "ON — sélectionnez un accessoire dans la vue." : "OFF");
+            service.SetStatus(service._enabled ? UiLanguage.T("ON — sélectionnez un accessoire dans la vue.", "ON — select a pipe accessory in the view.") : "OFF");
             if (service._enabled)
             {
                 service._idlingObserved = false;
@@ -194,7 +195,7 @@ namespace BIMaestro.MepBooster
             _instance._selectionDirty = true;
             _instance._suppressed = false;
             _instance._quietSince = DateTime.UtcNow;
-            _instance.SetStatus("ON — sélectionnez un accessoire dans la vue.");
+            _instance.SetStatus(UiLanguage.T("ON — sélectionnez un accessoire dans la vue.", "ON — select a pipe accessory in the view."));
             _instance._timer.Start();
             UpdateButton();
         }
@@ -205,7 +206,7 @@ namespace BIMaestro.MepBooster
         private void Initialize(UIApplication app)
         {
             _owner = app.MainWindowHandle;
-            SetStatus("Initialisation MEP Booster v6 — copie d’orientation — Revit " + app.Application.VersionNumber + " ; " + typeof(MepBoosterService).Assembly.Location);
+            SetStatus(UiLanguage.T("Initialisation MEP Booster v6 — copie d’orientation — Revit ", "MEP Booster v6 initialization — orientation copy — Revit ") + app.Application.VersionNumber + " ; " + typeof(MepBoosterService).Assembly.Location);
             _event = ExternalEvent.Create(this);
             _palette = new BoosterPalette(_owner);
             _preview = new BoosterPreview(_owner);
@@ -242,7 +243,7 @@ namespace BIMaestro.MepBooster
         {
             if (_copyBusy) return;
             if (!_enabled) return;
-            SetStatus("SélectionChanged reçu — attente du traitement de la sélection.");
+            SetStatus(UiLanguage.T("SélectionChanged reçu — attente du traitement de la sélection.", "SelectionChanged received — waiting for selection processing."));
             // A notification is not proof of a different selection. Compare actual
             // selected IDs in the next API callback before hiding a usable palette.
             _selectionCheckPending = true;
@@ -276,7 +277,7 @@ namespace BIMaestro.MepBooster
             }
             if (!(sender is UIApplication app))
             {
-                SetStatus("Idling sans UIApplication : sélection non traitée.");
+                SetStatus(UiLanguage.T("Idling sans UIApplication : sélection non traitée.", "Idling without UIApplication: selection not processed."));
                 return;
             }
             DateTime now = DateTime.UtcNow;
@@ -324,7 +325,7 @@ namespace BIMaestro.MepBooster
             if (!BoosterNative.IsRevitForeground(_owner)
                 || (BoosterNative.GetForegroundWindow() != _owner && !BoosterNative.IsWindowEnabled(_owner)))
             {
-                SetStatus("Présentation suspendue : fenêtre Revit inactive ou désactivée.");
+                SetStatus(UiLanguage.T("Présentation suspendue : fenêtre Revit inactive ou désactivée.", "Display paused: Revit window inactive or disabled."));
                 Suspend();
                 return;
             }
@@ -358,15 +359,15 @@ namespace BIMaestro.MepBooster
                 || now - _quietSince < TimeSpan.FromMilliseconds(200)) return;
             try
             {
-                SetStatus("Affichage demandé — " + _selectedCount + " accessoire(s).");
+                SetStatus(UiLanguage.T("Affichage demandé — ", "Display requested — ") + _selectedCount + UiLanguage.T(" accessoire(s).", " accessory(ies)."));
                 _palette.ShowPill(_projection, _selectedCount, _unavailable == null && _parts.All(p => p.CanFlip), _unavailable,
                     (degrees, invert) => _parts != null && _parts.All(p => p.CanApply(degrees, invert)));
                 TutorialProgress?.Invoke(_document, _parts?.Select(part => part.Id), "pill", 0);
                 if (_owner != IntPtr.Zero && _mouse == null) _mouse = new BoosterNative.MouseObserver(MouseInput);
-                SetStatus("Pastille affichée — " + _selectedCount + " accessoire(s), x=" + _palette.Left.ToString("0")
-                    + ", y=" + _palette.Top.ToString("0") + (_unavailable == null ? ". Survolez MEP." : ". " + _unavailable));
+                SetStatus(UiLanguage.T("Pastille affichée — ", "Badge displayed — ") + _selectedCount + UiLanguage.T(" accessoire(s), x=", " accessory(ies), x=") + _palette.Left.ToString("0")
+                    + ", y=" + _palette.Top.ToString("0") + (_unavailable == null ? UiLanguage.T(". Survolez MEP.", ". Hover over MEP.") : ". " + _unavailable));
             }
-            catch (Exception ex) { Dismiss(); SetStatus("Erreur d’affichage : " + ex); }
+            catch (Exception ex) { Dismiss(); SetStatus(UiLanguage.T("Erreur d’affichage : ", "Display error: ") + ex); }
         }
 
         public void Execute(UIApplication app) => Poll(app, true);
@@ -379,7 +380,7 @@ namespace BIMaestro.MepBooster
             {
                 bool wasApplying = _apply;
                 Dismiss();
-                SetStatus("Erreur : " + ex);
+                SetStatus(UiLanguage.T("Erreur : ", "Error: ") + ex);
                 if (wasApplying) TaskDialog.Show("MEP Booster — opération annulée", ex.Message);
             }
         }
@@ -392,10 +393,10 @@ namespace BIMaestro.MepBooster
             // They must never permanently suppress presentation, nor gate reads of the selection.
             if (doc == null || doc.IsFamilyDocument || doc.IsModifiable || !BoosterNative.IsRevitForeground(_owner))
             {
-                SetStatus(doc == null ? "Lecture suspendue : aucun document actif."
-                    : doc.IsFamilyDocument ? "Lecture suspendue : document famille."
-                    : doc.IsModifiable ? "Lecture suspendue : document en modification."
-                    : "Lecture suspendue : Revit n’est pas au premier plan.");
+                SetStatus(doc == null ? UiLanguage.T("Lecture suspendue : aucun document actif.", "Reading paused: no active document.")
+                    : doc.IsFamilyDocument ? UiLanguage.T("Lecture suspendue : document famille.", "Reading paused: family document.")
+                    : doc.IsModifiable ? UiLanguage.T("Lecture suspendue : document en modification.", "Reading paused: document being modified.")
+                    : UiLanguage.T("Lecture suspendue : Revit n’est pas au premier plan.", "Reading paused: Revit is not in the foreground."));
                 Suspend(); return;
             }
             var ids = uidoc.Selection.GetElementIds().OrderBy(BoosterIds.Value).ToList();
@@ -408,7 +409,7 @@ namespace BIMaestro.MepBooster
                 _selectionDirty = false; _suppressed = false; _quietSince = DateTime.UtcNow;
                 _parts = null; _projection = null;
                 _selectedCount = ids.Count; _unavailable = null;
-                SetStatus(ids.Count + " élément(s) détecté(s) — stabilisation.");
+                SetStatus(ids.Count + UiLanguage.T(" élément(s) détecté(s) — stabilisation.", " element(s) detected — stabilizing."));
             }
             if (_suppressed || ids.Count == 0) return;
             if (_copyRequested)
@@ -419,7 +420,7 @@ namespace BIMaestro.MepBooster
                 _mouse?.Dispose(); _mouse = null;
                 try
                 {
-                    if (doc.IsReadOnly) throw new InvalidOperationException("Le document est en lecture seule.");
+                    if (doc.IsReadOnly) throw new InvalidOperationException(UiLanguage.T("Le document est en lecture seule.", "The document is read-only."));
                     Licensing.OperationTelemetry.Observe(app, "MepBooster", "MEP Booster", "copy_orientation", false,
                         () => BoosterOrientation.Run(uidoc, ids, _preview));
                 }
@@ -432,7 +433,7 @@ namespace BIMaestro.MepBooster
                 || BoosterNative.Down(0x1B) || BoosterNative.Down(2) || BoosterNative.Down(4))
             ) { _quietSince = DateTime.UtcNow; return; }
             var projection = BoosterProjection.Read(uidoc);
-            if (projection == null) { Dismiss(); SetStatus("Vue non prise en charge : utilisez un plan, une coupe ou une vue 3D non perspective."); return; }
+            if (projection == null) { Dismiss(); SetStatus(UiLanguage.T("Vue non prise en charge : utilisez un plan, une coupe ou une vue 3D non perspective.", "Unsupported view: use a plan, a section or a non-perspective 3D view.")); return; }
             if (_projection != null && !_projection.Same(projection))
             {
                 // Mouse-driven Revit redraws can change the reported projection.
@@ -446,7 +447,7 @@ namespace BIMaestro.MepBooster
             if (_apply)
             {
                 if (!externalEvent) return;
-                if (doc.IsReadOnly) throw new InvalidOperationException("Le document est actuellement en lecture seule.");
+                if (doc.IsReadOnly) throw new InvalidOperationException(UiLanguage.T("Le document est actuellement en lecture seule.", "The document is currently read-only."));
                 double angle = _angle.Value;
                 bool flip = _flip;
                 // Capture local references: DocumentChanged closes the palette during Commit.
@@ -493,7 +494,7 @@ namespace BIMaestro.MepBooster
             // A selection made through the ribbon/Properties still gets a pill in the active view.
             // Placement is clamped to the viewport, so cursor position cannot silently block it.
             if (ids.Any(id => !BoosterPart.SupportsCategory(doc.GetElement(id))))
-            { Dismiss(); SetStatus("Sélection non compatible : accessoires ou raccords de canalisation uniquement."); return; }
+            { Dismiss(); SetStatus(UiLanguage.T("Sélection non compatible : accessoires ou raccords de canalisation uniquement.", "Incompatible selection: pipe accessories or fittings only.")); return; }
             // Keep the visual cost bounded; beyond 20 parts show axes/arcs only for every part.
             _projection = projection;
             try { _parts = ids.Select(id => BoosterPart.Read(doc.GetElement(id) as FamilyInstance, false)).ToList(); }
@@ -508,7 +509,7 @@ namespace BIMaestro.MepBooster
                 && _parts.All(p => p.Motion.Ports.Length == 2 && p.Motion.Ports.All(port =>
                     Math.Abs(System.Windows.Media.Media3D.Vector3D.DotProduct(port.Direction, p.Motion.Axis)) > 0.9999)), ids.Count);
             _ready = true;
-            SetStatus("Sélection préparée — " + ids.Count + " accessoire(s), pastille en attente du délai.");
+            SetStatus(UiLanguage.T("Sélection préparée — ", "Selection prepared — ") + ids.Count + UiLanguage.T(" accessoire(s), pastille en attente du délai.", " accessory(ies), badge waiting for the delay."));
         }
         internal void TryPreview(Action draw)
         {
@@ -518,7 +519,7 @@ namespace BIMaestro.MepBooster
                 // Preview is optional: keep the selection and palette usable. Applying
                 // still goes through the normal transaction and connectivity checks.
                 _preview?.Hide();
-                SetStatus("Erreur d’aperçu (rosace conservée) : " + ex);
+                SetStatus(UiLanguage.T("Erreur d’aperçu (rosace conservée) : ", "Preview error (rotation dial kept): ") + ex);
             }
         }
         private void Suspend()

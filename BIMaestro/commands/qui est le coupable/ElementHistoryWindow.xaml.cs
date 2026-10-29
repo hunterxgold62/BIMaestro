@@ -182,7 +182,15 @@ namespace Analyse
                     if (req.Type == UiRequestType.RestoreParameters)
                     {
                         var result = _owner.ExecuteRestoreParameters(req.Event);
-                        _owner.Dispatcher.BeginInvoke(new Action(() => _owner.ShowRestoreResult(result)));
+                        if (result.Applied > 0 && BIMaestro.Tutorials.DemoTourService.IsActive(_owner)) {
+                            var witness = _owner._doc.GetElement(req.Event.UniqueId);
+                            if (witness != null) { _owner._uidoc.Selection.SetElementIds(new[] { witness.Id }); _owner._uidoc.ShowElements(witness.Id); _owner._uidoc.RefreshActiveView(); }
+                        }
+                        // Read the document in the Revit external-event context, before dispatching UI feedback.
+                        bool exerciseRestored = BIMaestro.Tutorials.DemoTourService.IsActive(_owner) &&
+                            BIMaestro.Tutorials.DemoHistoryScene.HasRestoredFurniture(_owner._doc) &&
+                            BIMaestro.Tutorials.DemoHistoryScene.HasRestoredParameters(_owner._doc);
+                        _owner.Dispatcher.BeginInvoke(new Action(() => _owner.ShowRestoreResult(result, exerciseRestored)));
                     }
                 }
                 catch
@@ -349,7 +357,7 @@ namespace Analyse
             Bind(new List<ElementHistoryEvent>(), null, false, true);
             var periodText = localStartDate.Date == localEndDate.Date
                 ? localStartDate.Date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)
-                : localStartDate.Date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) + " au " + localEndDate.Date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
+                : localStartDate.Date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) + UiLanguage.T(" au ", " to ") + localEndDate.Date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
             ResultText.Text = UiLanguage.T("Chargement complet du ", "Loading full history from ") + periodText + "...";
 
             if (ScopeModelRadio != null)
@@ -927,7 +935,7 @@ namespace Analyse
 
         private static string FormatParameterDisplayValue(string value)
         {
-            return string.IsNullOrWhiteSpace(value) ? "vide" : value.Trim();
+            return string.IsNullOrWhiteSpace(value) ? UiLanguage.T("vide", "empty") : value.Trim();
         }
 
         private static List<ParameterRestoreChange> ReadParameterChanges(object raw)
@@ -1133,7 +1141,7 @@ namespace Analyse
             var categories = events.Select(e => CleanCellText(e.Category)).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             if (categories.Count == 1) return categories[0];
 
-            return "éléments";
+            return UiLanguage.T("éléments", "elements");
         }
 
         private static int CountDistinct(IEnumerable<string> values)
@@ -1153,19 +1161,19 @@ namespace Analyse
         {
             switch ((action ?? string.Empty).Trim().ToLowerInvariant())
             {
-                case "delete": return "SUPPR.";
-                case "move": return "DEPL.";
-                case "create": return "AJOUT";
-                case "type_change": return "TYPE";
-                case "param_change": return "PARAM.";
-                case "geometry_change": return "FORME";
-                default: return "MODIF.";
+                case "delete": return UiLanguage.T("SUPPR.", "DEL.");
+                case "move": return UiLanguage.T("DEPL.", "MOVE");
+                case "create": return UiLanguage.T("AJOUT", "ADD");
+                case "type_change": return UiLanguage.T("TYPE", "TYPE");
+                case "param_change": return UiLanguage.T("PARAM.", "PARAM.");
+                case "geometry_change": return UiLanguage.T("FORME", "SHAPE");
+                default: return UiLanguage.T("MODIF.", "EDIT");
             }
         }
 
         private static string GetVisualCueText(string action)
         {
-            return CanVisualize(new ElementHistoryEvent { Action = action }) ? "Visualisable" : "Données";
+            return CanVisualize(new ElementHistoryEvent { Action = action }) ? UiLanguage.T("Visualisable", "Viewable") : UiLanguage.T("Données", "Data");
         }
 
         private static Brush GetActionBrush(string action, double opacity)
@@ -1434,10 +1442,10 @@ namespace Analyse
             var canRestore = CanRestoreParameters(row?.Source);
             RestoreParametersButton.IsEnabled = canRestore;
             RestoreParametersButton.Visibility = canRestore ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
-            RestoreParametersButton.Content = "Restaurer";
+            RestoreParametersButton.Content = UiLanguage.T("Restaurer", "Restore");
             RestoreParametersButton.ToolTip = canRestore
-                ? "Réappliquer les anciennes valeurs de paramètres enregistrées pour cette ligne"
-                : "Disponible uniquement sur une modification de paramètres avec avant/après";
+                ? UiLanguage.T("Réappliquer les anciennes valeurs de paramètres enregistrées pour cette ligne", "Reapply the previous parameter values recorded for this row")
+                : UiLanguage.T("Disponible uniquement sur une modification de paramètres avec avant/après", "Only available for a parameter change with before/after values");
         }
 
         private void ActionFilterCombo_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
@@ -1517,8 +1525,8 @@ namespace Analyse
 
             if (ContextScopeText != null)
             {
-                var label = FirstNonEmpty(_selectedContext.TypeName, _selectedContext.Family, _selectedContext.Category, "sélection");
-                ContextScopeText.Text = "Portée : " + label;
+                var label = FirstNonEmpty(_selectedContext.TypeName, _selectedContext.Family, _selectedContext.Category, UiLanguage.T("sélection", "selection"));
+                ContextScopeText.Text = UiLanguage.T("Portée : ", "Scope: ") + label;
             }
 
             if (ScopeTypeRadio != null)
@@ -1925,9 +1933,13 @@ namespace Analyse
         private void ExecuteRestoreDeleted(List<ElementHistoryEvent> events)
         {
             string message;
+            bool restoredForTutorial = false, furnitureRestored = false;
             try
             {
                 var result = ElementHistoryRestoration.Restore(_doc, events.Where(IsDeletion).Select(ToRestoreRequest));
+                restoredForTutorial = result.Created > 0 || result.Existing > 0;
+                if (BIMaestro.Tutorials.DemoTourService.IsActive(this))
+                    furnitureRestored = BIMaestro.Tutorials.DemoHistoryScene.HasRestoredFurniture(_doc);
                 message = UiLanguage.T(
                     $"{result.Created} élément(s) restauré(s).\n{result.Existing} déjà présent(s).\n{result.Failed} non restauré(s).",
                     $"{result.Created} element(s) restored.\n{result.Existing} already present.\n{result.Failed} not restored.");
@@ -1984,7 +1996,13 @@ namespace Analyse
             Dispatcher.BeginInvoke(new Action(() =>
             {
                 UpdateVisualizeButtonLabel();
-                MessageBox.Show(this, message, UiLanguage.T("Restaurer les éléments", "Restore elements"), MessageBoxButton.OK, MessageBoxImage.Information);
+                if (restoredForTutorial && BIMaestro.Tutorials.DemoTourService.IsActive(this))
+                    BIMaestro.Tutorials.DemoTourService.ObserveHistoryResult(this, _uidoc.Application.MainWindowHandle,
+                        UiLanguage.T("Les meubles réapparaissent", "The furniture reappears"),
+                        UiLanguage.T("Observe les tables restaurées dans la vue 3D. Confirme lorsque tu as vu le résultat ; nous passerons ensuite aux paramètres du mobilier témoin.", "Look at the restored tables in the 3D view. Confirm once you have seen the result; we will then move on to the reference furniture's parameters."),
+                        () => BIMaestro.Tutorials.DemoTourService.ReportRestoration(this, furnitureRestored));
+                else
+                    MessageBox.Show(this, message, UiLanguage.T("Restaurer les éléments", "Restore elements"), MessageBoxButton.OK, MessageBoxImage.Information);
             }));
         }
 
@@ -2328,7 +2346,7 @@ namespace Analyse
 
             return events.Count.ToString(CultureInfo.InvariantCulture) + " " + action.ToLowerInvariant() +
                    " · " + families.ToString(CultureInfo.InvariantCulture) + UiLanguage.T(" familles", " families") +
-                   " · " + types.ToString(CultureInfo.InvariantCulture) + " types";
+                   " · " + types.ToString(CultureInfo.InvariantCulture) + UiLanguage.T(" types", " types");
         }
 
         private RestoreResult ExecuteRestoreParameters(ElementHistoryEvent ev)
@@ -2339,7 +2357,7 @@ namespace Analyse
             var changes = ReadParameterChanges(ev.Delta["parameters"]);
             if (changes.Count == 0) return result;
 
-            using (var t = new Transaction(_doc, "BIMaestro - Restaurer paramètres historique"))
+            using (var t = new Transaction(_doc, UiLanguage.T("BIMaestro - Restaurer paramètres historique", "BIMaestro - Restore history parameters")))
             {
                 t.Start();
 
@@ -2634,9 +2652,17 @@ namespace Analyse
                 : text;
         }
 
-        private void ShowRestoreResult(RestoreResult result)
+        private void ShowRestoreResult(RestoreResult result, bool exerciseRestored)
         {
             if (result == null) return;
+            if (result.Applied > 0 && result.Failed == 0 && BIMaestro.Tutorials.DemoTourService.IsActive(this))
+            {
+                BIMaestro.Tutorials.DemoTourService.ObserveHistoryResult(this, _uidoc.Application.MainWindowHandle,
+                    UiLanguage.T("Le témoin retrouve ses 4 chaises", "The reference furniture gets its 4 chairs back"),
+                    UiLanguage.T("Observe le mobilier dans la vue 3D : le nombre de chaises est revenu de 2 à 4. Confirme lorsque tu as vu la différence.", "Look at the furniture in the 3D view: the chair count went back from 2 to 4. Confirm once you have seen the difference."),
+                    () => BIMaestro.Tutorials.DemoTourService.ReportParameterRestoration(this, exerciseRestored));
+                return;
+            }
             MessageBox.Show(
                 result.Applied > 0
                     ? UiLanguage.T($"{result.Applied} valeur(s) restaurée(s).", $"{result.Applied} value(s) restored.") + (result.Failed > 0 ? UiLanguage.T($"\n{result.Failed} valeur(s) n'ont pas pu être restaurée(s).", $"\n{result.Failed} value(s) could not be restored.") : "")
@@ -2702,7 +2728,7 @@ namespace Analyse
         private void ExecuteVisualize(List<ElementHistoryEvent> events)
         {
             var originals = new List<ElementId>();
-            using (var t = new Transaction(_doc, "BIMaestro - Visualisation historique"))
+            using (var t = new Transaction(_doc, UiLanguage.T("BIMaestro - Visualisation historique", "BIMaestro - History visualization")))
             {
                 t.Start();
 
@@ -2737,19 +2763,33 @@ namespace Analyse
                 _uidoc.Selection.SetElementIds(originals.Distinct().ToList());
                 _uidoc.ShowElements(originals.Distinct().ToList());
             }
+            var previewIds = GetPreviewElements(_doc).Select(element => element.Id).ToList();
+            if (previewIds.Count > 0 && BIMaestro.Tutorials.DemoTourService.IsActive(this))
+            {
+                try { _uidoc.ShowElements(previewIds); } catch { }
+                _uidoc.RefreshActiveView();
+                Dispatcher.BeginInvoke(new Action(() => BIMaestro.Tutorials.DemoTourService.ObserveHistoryPreview(this,
+                    new System.Windows.Interop.WindowInteropHelper(this).Owner)));
+            }
         }
 
         private void ExecuteCleanPreviews()
         {
             var ids = GetPreviewElements(_doc).Select(e => e.Id).ToList();
-            if (ids.Count == 0) return;
+            if (ids.Count == 0)
+            {
+                BIMaestro.Tutorials.DemoTourService.ReportAction(this, "history-preview-cleaned");
+                return;
+            }
 
-            using (var t = new Transaction(_doc, "BIMaestro - Nettoyer previews historique"))
+            using (var t = new Transaction(_doc, UiLanguage.T("BIMaestro - Nettoyer previews historique", "BIMaestro - Clean up history previews")))
             {
                 t.Start();
                 _doc.Delete(ids);
                 t.Commit();
             }
+            _uidoc.RefreshActiveView();
+            Dispatcher.BeginInvoke(new Action(() => BIMaestro.Tutorials.DemoTourService.ReportAction(this, "history-preview-cleaned")));
         }
 
         private void ExecuteCaptureSelectedDetails()
@@ -2849,18 +2889,18 @@ namespace Analyse
             if (ev?.Delta == null) return "-";
             var readableDelta = GetReadableDeltaSummary(ev);
             if (!string.IsNullOrWhiteSpace(readableDelta))
-                return readableDelta.Replace("Avant / après: ", string.Empty);
+                return readableDelta.Replace(UiLanguage.T("Avant / après : ", "Before / After: "), string.Empty);
             if (ev.Delta.TryGetValue("lastKnown", out var lastKnown))
-                return "Supprimé @ " + CompactPoint(lastKnown);
+                return UiLanguage.T("Supprimé @ ", "Deleted @ ") + CompactPoint(lastKnown);
             if (ev.Delta.TryGetValue("new", out var newPos) && ev.Delta.TryGetValue("old", out var oldPos))
                 return $"{CompactPoint(oldPos)} -> {CompactPoint(newPos)}";
             if (ev.Delta.TryGetValue("parameters", out var parameters))
             {
                 var names = ReadParameterNames(parameters).Take(2).ToList();
-                if (names.Count > 0) return "Paramètre: " + string.Join(", ", names);
+                if (names.Count > 0) return UiLanguage.T("Paramètre : ", "Parameter: ") + string.Join(", ", names);
             }
             if (ev.Delta.ContainsKey("oldBox") && ev.Delta.ContainsKey("newBox"))
-                return "Géométrie modifiée";
+                return UiLanguage.T("Géométrie modifiée", "Geometry modified");
             return "-";
         }
 

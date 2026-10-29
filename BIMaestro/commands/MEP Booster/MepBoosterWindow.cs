@@ -13,6 +13,7 @@ using Point = System.Windows.Point;
 using Line = System.Windows.Shapes.Line;
 using Color = System.Windows.Media.Color;
 using Transform = Autodesk.Revit.DB.Transform;
+using BIMaestro.Localization;
 
 namespace BIMaestro.MepBooster
 {
@@ -234,7 +235,7 @@ namespace BIMaestro.MepBooster
                 var a = Map(pivot - axis * radius);
                 var b = Map(pivot + axis * radius);
                 AddLine(a, b, axisBrush, 2);
-                var label = new TextBlock { Text = (plannedRotation != null ? "Orientation" : flip ? "Inversion" : angle.ToString("+0;-0;0") + "°") + "  ·  aperçu",
+                var label = new TextBlock { Text = (plannedRotation != null ? "Orientation" : flip ? UiLanguage.T("Inversion", "Flip") : angle.ToString("+0;-0;0") + "°") + UiLanguage.T("  ·  aperçu", "  ·  preview"),
                     Foreground = (Brush)FindResource("Text.Primary"), Background = (Brush)FindResource("Surface"),
                     Padding = new Thickness(5, 2, 5, 2), FontSize = 12 };
                 var center = Map(pivot);
@@ -327,19 +328,19 @@ namespace BIMaestro.MepBooster
             close.Click += (_, __) => Dismissed?.Invoke(); _canvas.Children.Add(close);
             var brand = new TextBlock { Text = "BIMaestro", Background = (Brush)FindResource("Surface"), Padding = new Thickness(3, 1, 3, 1), Foreground = (Brush)FindResource("Brand"), FontSize = 11, FontWeight = FontWeights.SemiBold };
             Canvas.SetLeft(brand, 8); Canvas.SetTop(brand, 7); _canvas.Children.Add(brand);
-            var hint = new TextBlock { Text = "Survol : aperçu   ·   Clic : appliquer", Background = (Brush)FindResource("Surface"), Padding = new Thickness(3), Foreground = (Brush)FindResource("Text.Secondary"), FontSize = 11 };
+            var hint = new TextBlock { Text = UiLanguage.T("Survol : aperçu   ·   Clic : appliquer", "Hover: preview   ·   Click: apply"), Background = (Brush)FindResource("Surface"), Padding = new Thickness(3), Foreground = (Brush)FindResource("Text.Secondary"), FontSize = 11 };
             Canvas.SetLeft(hint, 53); Canvas.SetTop(hint, 360); _canvas.Children.Add(hint);
-            _custom = MakeButton("Perso : +22,5°", 158);
-            _custom.MouseEnter += (_, __) => { SetCenter(_customAngle.ToString("+0.##;-0.##") + "°", _count + " pièce(s)\nAperçu"); Preview?.Invoke(_customAngle, false); };
+            _custom = MakeButton(UiLanguage.T("Perso : +22,5°", "Custom: +22.5°"), 158);
+            _custom.MouseEnter += (_, __) => { SetCenter(_customAngle.ToString("+0.##;-0.##") + "°", _count + UiLanguage.T(" pièce(s)\nAperçu", " part(s)\nPreview")); Preview?.Invoke(_customAngle, false); };
             _custom.MouseLeave += (_, __) => { ResetCenter(); Preview?.Invoke(null, false); };
             _custom.Click += (_, __) => Apply?.Invoke(_customAngle, false);
             Canvas.SetLeft(_custom, 46); Canvas.SetTop(_custom, 276); _canvas.Children.Add(_custom);
             var configure = MakeButton("…", 38);
-            configure.ToolTip = "Définir un angle personnalisé positif ou négatif";
+            configure.ToolTip = UiLanguage.T("Définir un angle personnalisé positif ou négatif", "Set a custom positive or negative angle");
             configure.Click += (_, __) => EditAngle();
             Canvas.SetLeft(configure, 210); Canvas.SetTop(configure, 276); _canvas.Children.Add(configure);
-            _copy = MakeButton("Copier l’orientation…", 202);
-            _copy.ToolTip = "Reproduire cet accessoire sur les cibles de la même famille que vous allez sélectionner.";
+            _copy = MakeButton(UiLanguage.T("Copier l’orientation…", "Copy orientation…"), 202);
+            _copy.ToolTip = UiLanguage.T("Reproduire cet accessoire sur les cibles de la même famille que vous allez sélectionner.", "Replicate this accessory onto the targets of the same family that you will select.");
             _copy.Click += (_, __) => CopyOrientation?.Invoke();
             Canvas.SetLeft(_copy, 45); Canvas.SetTop(_copy, 318); _canvas.Children.Add(_copy);
             UpdateCustom();
@@ -351,8 +352,8 @@ namespace BIMaestro.MepBooster
             _copy.IsEnabled = available;
             _copy.Visibility = available ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
             ToolTipService.SetShowOnDisabled(_copy, true);
-            _copy.ToolTip = available ? "Cet accessoire est la référence. Sélectionnez ensuite les cibles : orientation et sens seront reproduits."
-                : "Copie réservée aux accessoires droits de la même famille, non hébergés et non en miroir.";
+            _copy.ToolTip = available ? UiLanguage.T("Cet accessoire est la référence. Sélectionnez ensuite les cibles : orientation et sens seront reproduits.", "This accessory is the reference. Then select the targets: orientation and direction will be replicated.")
+                : UiLanguage.T("Copie réservée aux accessoires droits de la même famille, non hébergés et non en miroir.", "Copy is limited to straight accessories of the same family, not hosted and not mirrored.");
         }
         internal static bool ParseAngle(string text, out double angle) =>
             double.TryParse(text.Trim().Replace(',', '.'), System.Globalization.NumberStyles.Float,
@@ -360,10 +361,10 @@ namespace BIMaestro.MepBooster
             && !double.IsNaN(angle) && !double.IsInfinity(angle) && Math.Abs(angle) > 0 && Math.Abs(angle) <= 180;
         private void UpdateCustom()
         {
-            _custom.Content = "Perso : " + _customAngle.ToString("+0.##;-0.##") + "°";
+            _custom.Content = UiLanguage.T("Perso : ", "Custom: ") + _customAngle.ToString("+0.##;-0.##") + "°";
             _custom.IsEnabled = _supports?.Invoke(_customAngle, false) ?? true;
-            _custom.ToolTip = _custom.IsEnabled ? "Survol : aperçu · clic : appliquer. Le bouton … modifie l’angle."
-                : "Cet angle déplacerait une extrémité raccordée. Le bouton … permet de changer l’angle.";
+            _custom.ToolTip = _custom.IsEnabled ? UiLanguage.T("Survol : aperçu · clic : appliquer. Le bouton … modifie l’angle.", "Hover: preview · click: apply. The … button changes the angle.")
+                : UiLanguage.T("Cet angle déplacerait une extrémité raccordée. Le bouton … permet de changer l’angle.", "This angle would move a connected end. Use the … button to change the angle.");
             ToolTipService.SetShowOnDisabled(_custom, true);
         }
         private void EditAngle()
@@ -377,18 +378,18 @@ namespace BIMaestro.MepBooster
                     ShowInTaskbar = false, Background = (Brush)FindResource("Surface") };
                 BoosterTheme.Attach(dialog);
                 var panel = new StackPanel { Margin = new Thickness(18) };
-                panel.Children.Add(new TextBlock { Text = "Angle en degrés (−180 à +180, sauf 0)", Margin = new Thickness(0, 0, 0, 10) });
+                panel.Children.Add(new TextBlock { Text = UiLanguage.T("Angle en degrés (−180 à +180, sauf 0)", "Angle in degrees (−180 to +180, except 0)"), Margin = new Thickness(0, 0, 0, 10) });
                 var input = new System.Windows.Controls.TextBox { Text = _customAngle.ToString(), Height = 30, FontSize = 15 };
                 panel.Children.Add(input);
-                var error = new TextBlock { Text = "Exemple : 22,5 ou −22,5", Margin = new Thickness(0, 8, 0, 10) };
+                var error = new TextBlock { Text = UiLanguage.T("Exemple : 22,5 ou −22,5", "Example: 22.5 or −22.5"), Margin = new Thickness(0, 8, 0, 10) };
                 panel.Children.Add(error);
-                var save = new System.Windows.Controls.Button { Content = "Enregistrer l’angle", IsDefault = true, Style = (Style)FindResource("PrimaryButton") };
+                var save = new System.Windows.Controls.Button { Content = UiLanguage.T("Enregistrer l’angle", "Save angle"), IsDefault = true, Style = (Style)FindResource("PrimaryButton") };
                 save.Click += (_, __) =>
                 {
-                    if (!ParseAngle(input.Text.Replace('−', '-'), out double value)) { error.Text = "Saisissez un nombre non nul entre −180 et 180."; return; }
+                    if (!ParseAngle(input.Text.Replace('−', '-'), out double value)) { error.Text = UiLanguage.T("Saisissez un nombre non nul entre −180 et 180.", "Enter a non-zero number between −180 and 180."); return; }
                     try { BoosterPreferences.SaveAngle(BoosterPreferences.AnglePath, value); }
                     catch (Exception ex) when (ex is System.IO.IOException || ex is UnauthorizedAccessException)
-                    { error.Text = "Enregistrement impossible : vérifiez vos droits d’accès."; return; }
+                    { error.Text = UiLanguage.T("Enregistrement impossible : vérifiez vos droits d’accès.", "Unable to save: check your access rights."); return; }
                     _customAngle = value; dialog.DialogResult = true;
                 };
                 panel.Children.Add(save); dialog.Content = panel;
@@ -419,8 +420,8 @@ namespace BIMaestro.MepBooster
             _status.Inlines.Add(new System.Windows.Documents.LineBreak());
             _status.Inlines.Add(new System.Windows.Documents.Run(detail) { FontSize = 11 });
         }
-        private void ResetCenter() => SetCenter(_count.ToString(), (_count == 1 ? "pièce sélectionnée" : "pièces sélectionnées")
-            + "\n" + (_count > 20 ? "Aperçu : axes et flèches" : "Survolez un angle"));
+        private void ResetCenter() => SetCenter(_count.ToString(), (_count == 1 ? UiLanguage.T("pièce sélectionnée", "part selected") : UiLanguage.T("pièces sélectionnées", "parts selected"))
+            + "\n" + (_count > 20 ? UiLanguage.T("Aperçu : axes et flèches", "Preview: axes and arrows") : UiLanguage.T("Survolez un angle", "Hover over an angle")));
         internal void RefreshAfterRotation(int count, bool canFlip, Func<double, bool, bool> supports)
         {
             _canFlip = canFlip; _supports = supports;
@@ -432,10 +433,10 @@ namespace BIMaestro.MepBooster
             var button = MakeButton(text, 78);
             button.Tag = flip;
             button.CommandParameter = angle;
-            button.ToolTip = flip ? "Retourner la pièce en conservant les points raccordés. L’aperçu montre l’axe d’inversion propre au droit, au coude ou au té."
-                : "Rotation autour de l’axe jaune. La flèche et l’aperçu indiquent le sens réel dans la vue.";
+            button.ToolTip = flip ? UiLanguage.T("Retourner la pièce en conservant les points raccordés. L’aperçu montre l’axe d’inversion propre au droit, au coude ou au té.", "Flip the part while keeping the connected points. The preview shows the flip axis specific to the straight, elbow or tee.")
+                : UiLanguage.T("Rotation autour de l’axe jaune. La flèche et l’aperçu indiquent le sens réel dans la vue.", "Rotation about the yellow axis. The arrow and preview show the actual direction in the view.");
             Canvas.SetLeft(button, x); Canvas.SetTop(button, y);
-            button.MouseEnter += (_, __) => { SetCenter(flip ? "Inverser" : angle.ToString("+0;-0;0") + "°", _count + " pièce(s)\nAperçu"); Preview?.Invoke(angle, flip); };
+            button.MouseEnter += (_, __) => { SetCenter(flip ? UiLanguage.T("Inverser", "Flip") : angle.ToString("+0;-0;0") + "°", _count + UiLanguage.T(" pièce(s)\nAperçu", " part(s)\nPreview")); Preview?.Invoke(angle, flip); };
             button.MouseLeave += (_, __) => { ResetCenter(); Preview?.Invoke(null, false); };
             button.Click += (_, __) => Apply?.Invoke(angle, flip);
             _actions.Add(button); _canvas.Children.Add(button);
@@ -457,7 +458,7 @@ namespace BIMaestro.MepBooster
             content.Children.Add(icon);
             var label = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
             label.Children.Add(new TextBlock { Text = "MEP Booster", FontSize = 12, FontWeight = FontWeights.SemiBold });
-            label.Children.Add(new TextBlock { Text = unavailable == null ? "Survol : ouvrir" : "Voir les détails",
+            label.Children.Add(new TextBlock { Text = unavailable == null ? UiLanguage.T("Survol : ouvrir", "Hover: open") : UiLanguage.T("Voir les détails", "View details"),
                 FontSize = 10, FontWeight = FontWeights.Normal, Opacity = 0.8 });
             content.Children.Add(label);
             content.Children.Add(new Border
@@ -470,10 +471,10 @@ namespace BIMaestro.MepBooster
                     HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center }
             });
             pill.Content = content;
-            pill.ToolTip = unavailable ?? count + (count == 1 ? " pièce sélectionnée" : " pièces sélectionnées")
-                + " · Survolez ou cliquez pour ouvrir les rotations. Échap pour masquer.";
+            pill.ToolTip = unavailable ?? count + (count == 1 ? UiLanguage.T(" pièce sélectionnée", " part selected") : UiLanguage.T(" pièces sélectionnées", " parts selected"))
+                + UiLanguage.T(" · Survolez ou cliquez pour ouvrir les rotations. Échap pour masquer.", " · Hover or click to open rotations. Esc to hide.");
             System.Windows.Automation.AutomationProperties.SetName(pill,
-                unavailable == null ? "MEP Booster, " + count + " pièces sélectionnées, ouvrir les rotations" : "MEP Booster : " + unavailable);
+                unavailable == null ? "MEP Booster, " + count + UiLanguage.T(" pièces sélectionnées, ouvrir les rotations", " parts selected, open rotations") : "MEP Booster : " + unavailable);
             ToolTipService.SetInitialShowDelay(pill, 350);
             return pill;
         }
@@ -521,7 +522,7 @@ namespace BIMaestro.MepBooster
                 button.IsEnabled = (!(bool)button.Tag || _canFlip) && (_supports?.Invoke((double)button.CommandParameter, (bool)button.Tag) ?? true);
                 button.Opacity = button.IsEnabled ? 1 : 0.6;
                 ToolTipService.SetShowOnDisabled(button, true);
-                if (!button.IsEnabled) button.ToolTip = "Cette action déplacerait une extrémité raccordée ou concerne une pièce hébergée. Libérez la branche concernée avant de la tourner.";
+                if (!button.IsEnabled) button.ToolTip = UiLanguage.T("Cette action déplacerait une extrémité raccordée ou concerne une pièce hébergée. Libérez la branche concernée avant de la tourner.", "This action would move a connected end or involves a hosted part. Free the affected branch before rotating it.");
             }
             _card.Child = _canvas;
         }
