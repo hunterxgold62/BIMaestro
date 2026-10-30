@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Personnaliser la palette Propriétés</title>
+<style>
+:root{--bg:#f4f6f3;--card:#fff;--ink:#1d2420;--muted:#5d6a63;--line:#dfe5e0;--green:#103e32;--accent:#efab32;--soft:#e8f2ec}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121614;--card:#1b211e;--ink:#e8ede9;--muted:#9aa7a0;--line:#2c3530;--green:#1f6b55;--soft:#22302a}}
+:root[data-theme="dark"]{--bg:#121614;--card:#1b211e;--ink:#e8ede9;--muted:#9aa7a0;--line:#2c3530;--green:#1f6b55;--soft:#22302a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 "Segoe UI",system-ui,sans-serif}
+header{background:var(--green);color:#fff;padding:18px 24px}
+header h1{margin:0;font-size:22px}
+header p{margin:4px 0 0;opacity:.85}
+main{max-width:1400px;margin:0 auto;padding:20px 16px;display:grid;grid-template-columns:1fr 340px;gap:20px;align-items:start}
+@media (max-width:900px){main{grid-template-columns:1fr}}
+.player{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+video{display:block;width:100%;background:#000}
+.controls{display:flex;gap:8px;align-items:center;padding:10px 14px;flex-wrap:wrap}
+button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:6px 12px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.on{background:var(--green);color:#fff;border-color:var(--green)}
+.now{margin-left:auto;color:var(--muted)}
+aside{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px}
+aside h2{font-size:14px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:8px 10px}
+ol{list-style:none;margin:0;padding:0}
+li button{width:100%;text-align:left;display:grid;grid-template-columns:34px 1fr auto;gap:8px;align-items:center;border:0;border-left:4px solid transparent;border-radius:6px;padding:9px 10px}
+li button .n{font-weight:700;color:var(--muted)}
+li button .t{font-size:12px;color:var(--muted)}
+li button small{display:block;color:var(--muted);font-size:12.5px}
+li button.done .n{color:var(--accent)}
+li button.cur{background:var(--soft);border-left-color:var(--accent)}
+li button.cur .n{color:var(--accent)}
+.bar{height:6px;background:var(--line);border-radius:3px;margin:4px 10px 10px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+</style>
+</head>
+<body>
+<header>
+  <h1>Personnaliser la palette Propriétés</h1>
+  <p>BIMaestro · 12 étapes · cliquez sur une étape pour y aller directement</p>
+</header>
+<main>
+  <section class="player">
+    <video id="v" src="BIMaestro-Tutoriel-Proprietes-dynamique.mp4" controls preload="metadata"></video>
+    <div class="controls">
+      <button id="prev">◀ Étape précédente</button>
+      <button id="next">Étape suivante ▶</button>
+      <button id="pause" title="Met la vidéo en pause à la fin de chaque étape">Pause à chaque étape</button>
+      <button id="speed">Vitesse ×1</button>
+      <span class="now" id="now"></span>
+    </div>
+  </section>
+  <aside>
+    <h2>Étapes</h2>
+    <div class="bar"><i id="bar"></i></div>
+    <ol id="list"></ol>
+  </aside>
+</main>
+<script>
+const STEPS=[
+ [2.5,"Ouvrir l'onglet BIMaestro","Dans le ruban Revit."],
+ [7.1,"Cliquer sur Couleurs","Ouvre la fenêtre Apparence BIMaestro."],
+ [10.8,"Onglet Propriétés","Personnalise la palette Propriétés."],
+ [15.77,"Créer un groupe personnalisé","Déplie la zone de création."],
+ [17.97,"Créer un groupe","Ajoute un nouveau bandeau."],
+ [21.77,"Nommer le bandeau","Ici : « Mes paramètres »."],
+ [30.97,"Glisser un paramètre","Déposez-le sur votre bandeau."],
+ [37.27,"Choisir une ambiance","Sauge, Bleu, Ambre ou Lavande."],
+ [40.47,"Choisir ses couleurs","Couleurs du texte et du fond."],
+ [41.87,"Couleur du fond","Palette de couleurs rapides."],
+ [44.77,"Enregistrer","Bouton « Enregistrer mes réglages »."],
+ [48.47,"Résultat dans Revit","Le groupe apparaît dans Propriétés."]];
+const v=document.getElementById('v'),list=document.getElementById('list'),now=document.getElementById('now'),bar=document.getElementById('bar');
+const fmt=s=>Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');
+const btns=STEPS.map(([t,l,d],i)=>{const li=document.createElement('li'),b=document.createElement('button');
+ b.innerHTML=`<span class="n">${i+1}</span><span>${l}<small>${d}</small></span><span class="t">${fmt(t)}</span>`;
+ b.onclick=()=>go(i);li.appendChild(b);list.appendChild(li);return b});
+let pauseEach=false,lastIdx=-1;
+const idxAt=t=>{let k=-1;STEPS.forEach(([s],i)=>{if(t>=s-0.05)k=i});return k};
+function go(i){i=Math.max(0,Math.min(STEPS.length-1,i));v.currentTime=STEPS[i][0];lastIdx=i;v.play()}
+function update(){const i=idxAt(v.currentTime);
+ if(pauseEach&&!v.paused&&lastIdx>=0&&i>lastIdx){v.pause();v.currentTime=STEPS[i][0];}
+ lastIdx=i;
+ btns.forEach((b,k)=>{b.classList.toggle('cur',k===i);b.classList.toggle('done',k<i)});
+ now.textContent=i<0?'Introduction':`Étape ${i+1}/${STEPS.length} · ${STEPS[i][1]}`;
+ bar.style.width=(v.duration?v.currentTime/v.duration*100:0)+'%'}
+v.addEventListener('timeupdate',()=>{if(!v.seeking)update()});
+v.addEventListener('seeking',()=>{lastIdx=idxAt(v.currentTime)});
+v.addEventListener('seeked',()=>{lastIdx=idxAt(v.currentTime);update()});
+document.getElementById('prev').onclick=()=>{const i=idxAt(v.currentTime);go(v.currentTime-STEPS[Math.max(i,0)][0]>1.5?i:i-1)};
+document.getElementById('next').onclick=()=>go(idxAt(v.currentTime)+1);
+const pb=document.getElementById('pause');pb.onclick=()=>{pauseEach=!pauseEach;pb.classList.toggle('on',pauseEach)};
+const sp=document.getElementById('speed'),rates=[1,1.25,1.5,0.75];let r=0;
+sp.onclick=()=>{r=(r+1)%rates.length;v.playbackRate=rates[r];sp.textContent='Vitesse ×'+String(rates[r]).replace('.',',')};
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'&&e.shiftKey)go(idxAt(v.currentTime)+1);if(e.key==='ArrowLeft'&&e.shiftKey)go(idxAt(v.currentTime)-1)});
+update();
+</script>
+</body>
+</html>

@@ -1,0 +1,44 @@
+﻿[Script Info]
+ScriptType: v4.00+
+PlayResX: 1920
+PlayResY: 1080
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Segoe UI,26,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 1,0:00:05.70,0:00:06.50,Default,,0,0,0,,{\an7\pos(1204,139)\p1\bord4\shad0\1a&HFF&\3c&H32ABEF&\3a&H00&\fad(100,180)\clip(1196,131,1197,287)\t(0,400,\clip(1196,131,1344,287))}m 12 0 l 120 0 b 132 0 132 0 132 12 l 132 128 b 132 140 132 140 120 140 l 12 140 b 0 140 0 140 0 128 l 0 12 b 0 0 0 0 12 0
+Dialogue: 2,0:00:05.70,0:00:06.50,Default,,0,0,0,,{\an7\pos(1204,110)\p1\bord0\shad0\1c&H323E10&\fad(140,180)}m 8 0 l 182 0 b 190 0 190 0 190 8 l 190 28 b 190 36 190 36 182 36 l 8 36 b 0 36 0 36 0 28 l 0 8 b 0 0 0 0 8 0
+Dialogue: 3,0:00:05.70,0:00:06.50,Default,,0,0,0,,{\an7\pos(1217,114)\fs23\b1\1c&HFFFFFF&\bord0\shad0\fad(140,180)}1  Couleurs
+Dialogue: 1,0:00:06.50,0:00:07.03,Default,,0,0,0,,{\an7\pos(1110,284)\p1\bord4\shad0\1a&HFF&\3c&H32ABEF&\3a&H00&\fad(100,180)\clip(1102,276,1103,367)\t(0,400,\clip(1102,276,1345,367))}m 12 0 l 215 0 b 227 0 227 0 227 12 l 227 63 b 227 75 227 75 215 75 l 12 75 b 0 75 0 75 0 63 l 0 12 b 0 0 0 0 12 0
+Dialogue: 2,0:00:06.50,0:00:07.03,Default,,0,0,0,,{\an7\pos(1110,237)\p1\bord0\shad0\1c&H323E10&\fad(140,180)}m 8 0 l 182 0 b 190 0 190 0 190 8 l 190 28 b 190 36 190 36 182 36 l 8 36 b 0 36 0 36 0 28 l 0 8 b 0 0 0 0 8 0
+Dialogue: 3,0:00:06.50,0:00:07.03,Default,,0,0,0,,{\an7\pos(1123,241)\fs23\b1\1c&HFFFFFF&\bord0\shad0\fad(140,180)}1  Ouvrir
+Dialogue: 4,0:00:06.65,0:00:07.30,Default,,0,0,0,,{\an5\pos(1220,323)\p1\bord3\shad0\1a&HFF&\3c&H32ABEF&\fscx45\fscy45\t(0,600,\fscx190\fscy190)\fad(50,520)}m 0 -20 b 11 -20 20 -11 20 0 b 20 11 11 20 0 20 b -11 20 -20 11 -20 0 b -20 -11 -11 -20 0 -20
+Dialogue: 4,0:00:06.77,0:00:07.42,Default,,0,0,0,,{\an5\pos(1220,323)\p1\bord3\shad0\1a&HFF&\3c&H32ABEF&\fscx45\fscy45\t(0,600,\fscx190\fscy190)\fad(50,520)}m 0 -20 b 11 -20 20 -11 20 0 b 20 11 11 20 0 20 b -11 20 -20 11 -20 0 b -20 -11 -11 -20 0 -20
+Dialogue: 1,0:00:07.85,0:00:10.35,Default,,0,0,0,,{\an7\pos(780,250)\p1\bord4\shad0\1a&HFF&\3c&H32ABEF&\3a&H00&\fad(100,180)\clip(772,242,773,302)\t(0,400,\clip(772,242,925,302))}m 12 0 l 125 0 b 137 0 137 0 137 12 l 137 32 b 137 44 137 44 125 44 l 12 44 b 0 44 0 44 0 32 l 0 12 b 0 0 0 0 12 0
+Dialogue: 2,0:00:07.85,0:00:10.35,Default,,0,0,0,,{\an7\pos(780,203)\p1\bord0\shad0\1c&H323E10&\fad(140,180)}m 8 0 l 247 0 b 255 0 255 0 255 8 l 255 28 b 255 36 255 36 247 36 l 8 36 b 0 36 0 36 0 28 l 0 8 b 0 0 0 0 8 0
+Dialogue: 3,0:00:07.85,0:00:10.35,Default,,0,0,0,,{\an7\pos(793,207)\fs23\b1\1c&HFFFFFF&\bord0\shad0\fad(140,180)}2  Accueil Revit
+Dialogue: 4,0:00:09.75,0:00:10.40,Default,,0,0,0,,{\an5\pos(848,272)\p1\bord3\shad0\1a&HFF&\3c&H32ABEF&\fscx45\fscy45\t(0,600,\fscx190\fscy190)\fad(50,520)}m 0 -20 b 11 -20 20 -11 20 0 b 20 11 11 20 0 20 b -11 20 -20 11 -20 0 b -20 -11 -11 -20 0 -20
+Dialogue: 4,0:00:09.87,0:00:10.52,Default,,0,0,0,,{\an5\pos(848,272)\p1\bord3\shad0\1a&HFF&\3c&H32ABEF&\fscx45\fscy45\t(0,600,\fscx190\fscy190)\fad(50,520)}m 0 -20 b 11 -20 20 -11 20 0 b 20 11 11 20 0 20 b -11 20 -20 11 -20 0 b -20 -11 -11 -20 0 -20
+Dialogue: 1,0:00:13.50,0:00:17.50,Default,,0,0,0,,{\an7\pos(254,692)\p1\bord4\shad0\1a&HFF&\3c&H32ABEF&\3a&H00&\fad(100,180)\clip(246,684,247,787)\t(0,400,\clip(246,684,1254,787))}m 12 0 l 980 0 b 992 0 992 0 992 12 l 992 75 b 992 87 992 87 980 87 l 12 87 b 0 87 0 87 0 75 l 0 12 b 0 0 0 0 12 0
+Dialogue: 2,0:00:13.50,0:00:17.50,Default,,0,0,0,,{\an7\pos(254,645)\p1\bord0\shad0\1c&H323E10&\fad(140,180)}m 8 0 l 352 0 b 360 0 360 0 360 8 l 360 28 b 360 36 360 36 352 36 l 8 36 b 0 36 0 36 0 28 l 0 8 b 0 0 0 0 8 0
+Dialogue: 3,0:00:13.50,0:00:17.50,Default,,0,0,0,,{\an7\pos(267,649)\fs23\b1\1c&HFFFFFF&\bord0\shad0\fad(140,180)}3  Choisir Bibliothèque
+Dialogue: 4,0:00:16.25,0:00:16.90,Default,,0,0,0,,{\an5\pos(282,736)\p1\bord3\shad0\1a&HFF&\3c&H32ABEF&\fscx45\fscy45\t(0,600,\fscx190\fscy190)\fad(50,520)}m 0 -20 b 11 -20 20 -11 20 0 b 20 11 11 20 0 20 b -11 20 -20 11 -20 0 b -20 -11 -11 -20 0 -20
+Dialogue: 4,0:00:16.37,0:00:17.02,Default,,0,0,0,,{\an5\pos(282,736)\p1\bord3\shad0\1a&HFF&\3c&H32ABEF&\fscx45\fscy45\t(0,600,\fscx190\fscy190)\fad(50,520)}m 0 -20 b 11 -20 20 -11 20 0 b 20 11 11 20 0 20 b -11 20 -20 11 -20 0 b -20 -11 -11 -20 0 -20
+Dialogue: 1,0:00:17.55,0:00:18.82,Default,,0,0,0,,{\an7\pos(1304,752)\p1\bord4\shad0\1a&HFF&\3c&H32ABEF&\3a&H00&\fad(100,180)\clip(1296,744,1297,814)\t(0,400,\clip(1296,744,1662,814))}m 12 0 l 338 0 b 350 0 350 0 350 12 l 350 42 b 350 54 350 54 338 54 l 12 54 b 0 54 0 54 0 42 l 0 12 b 0 0 0 0 12 0
+Dialogue: 2,0:00:17.55,0:00:18.82,Default,,0,0,0,,{\an7\pos(1304,705)\p1\bord0\shad0\1c&H323E10&\fad(140,180)}m 8 0 l 187 0 b 195 0 195 0 195 8 l 195 28 b 195 36 195 36 187 36 l 8 36 b 0 36 0 36 0 28 l 0 8 b 0 0 0 0 8 0
+Dialogue: 3,0:00:17.55,0:00:18.82,Default,,0,0,0,,{\an7\pos(1317,709)\fs23\b1\1c&HFFFFFF&\bord0\shad0\fad(140,180)}4  Appliquer
+Dialogue: 4,0:00:18.35,0:00:19.00,Default,,0,0,0,,{\an5\pos(1478,777)\p1\bord3\shad0\1a&HFF&\3c&H32ABEF&\fscx45\fscy45\t(0,600,\fscx190\fscy190)\fad(50,520)}m 0 -20 b 11 -20 20 -11 20 0 b 20 11 11 20 0 20 b -11 20 -20 11 -20 0 b -20 -11 -11 -20 0 -20
+Dialogue: 4,0:00:18.47,0:00:19.12,Default,,0,0,0,,{\an5\pos(1478,777)\p1\bord3\shad0\1a&HFF&\3c&H32ABEF&\fscx45\fscy45\t(0,600,\fscx190\fscy190)\fad(50,520)}m 0 -20 b 11 -20 20 -11 20 0 b 20 11 11 20 0 20 b -11 20 -20 11 -20 0 b -20 -11 -11 -20 0 -20
+Dialogue: 2,0:00:02.80,0:00:07.03,Default,,0,0,0,,{\an7\pos(1690,43)\p1\bord0\1c&H32ABEF&\fad(120,120)}m 2 0 l 44 0 b 46 0 46 0 46 2 l 46 3 b 46 5 46 5 44 5 l 2 5 b 0 5 0 5 0 3 l 0 2 b 0 0 0 0 2 0
+Dialogue: 2,0:00:02.80,0:00:07.03,Default,,0,0,0,,{\an7\pos(1752,43)\p1\bord0\1c&H8BA698&\fad(120,120)}m 2 0 l 44 0 b 46 0 46 0 46 2 l 46 3 b 46 5 46 5 44 5 l 2 5 b 0 5 0 5 0 3 l 0 2 b 0 0 0 0 2 0
+Dialogue: 2,0:00:02.80,0:00:07.03,Default,,0,0,0,,{\an7\pos(1814,43)\p1\bord0\1c&H8BA698&\fad(120,120)}m 2 0 l 44 0 b 46 0 46 0 46 2 l 46 3 b 46 5 46 5 44 5 l 2 5 b 0 5 0 5 0 3 l 0 2 b 0 0 0 0 2 0
+Dialogue: 2,0:00:07.45,0:00:10.60,Default,,0,0,0,,{\an7\pos(1690,43)\p1\bord0\1c&H8BA698&\fad(120,120)}m 2 0 l 44 0 b 46 0 46 0 46 2 l 46 3 b 46 5 46 5 44 5 l 2 5 b 0 5 0 5 0 3 l 0 2 b 0 0 0 0 2 0
+Dialogue: 2,0:00:07.45,0:00:10.60,Default,,0,0,0,,{\an7\pos(1752,43)\p1\bord0\1c&H32ABEF&\fad(120,120)}m 2 0 l 44 0 b 46 0 46 0 46 2 l 46 3 b 46 5 46 5 44 5 l 2 5 b 0 5 0 5 0 3 l 0 2 b 0 0 0 0 2 0
+Dialogue: 2,0:00:07.45,0:00:10.60,Default,,0,0,0,,{\an7\pos(1814,43)\p1\bord0\1c&H8BA698&\fad(120,120)}m 2 0 l 44 0 b 46 0 46 0 46 2 l 46 3 b 46 5 46 5 44 5 l 2 5 b 0 5 0 5 0 3 l 0 2 b 0 0 0 0 2 0
+Dialogue: 2,0:00:11.10,0:00:18.82,Default,,0,0,0,,{\an7\pos(1690,43)\p1\bord0\1c&H8BA698&\fad(120,120)}m 2 0 l 44 0 b 46 0 46 0 46 2 l 46 3 b 46 5 46 5 44 5 l 2 5 b 0 5 0 5 0 3 l 0 2 b 0 0 0 0 2 0
+Dialogue: 2,0:00:11.10,0:00:18.82,Default,,0,0,0,,{\an7\pos(1752,43)\p1\bord0\1c&H8BA698&\fad(120,120)}m 2 0 l 44 0 b 46 0 46 0 46 2 l 46 3 b 46 5 46 5 44 5 l 2 5 b 0 5 0 5 0 3 l 0 2 b 0 0 0 0 2 0
+Dialogue: 2,0:00:11.10,0:00:18.82,Default,,0,0,0,,{\an7\pos(1814,43)\p1\bord0\1c&H32ABEF&\fad(120,120)}m 2 0 l 44 0 b 46 0 46 0 46 2 l 46 3 b 46 5 46 5 44 5 l 2 5 b 0 5 0 5 0 3 l 0 2 b 0 0 0 0 2 0

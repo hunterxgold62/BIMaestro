@@ -1,0 +1,66 @@
+﻿[Script Info]
+ScriptType: v4.00+
+PlayResX: 2560
+PlayResY: 1440
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Segoe UI,30,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 1,0:00:03.40,0:00:04.90,Default,,0,0,0,,{\an7\pos(1178,24)\p1\bord6\shad0\1a&HFF&\3c&H32ABEF&\3a&H00&\fad(100,200)\clip(1168,14,1169,80)\t(0,400,\clip(1168,14,1288,80))}m 14 0 l 86 0 b 100 0 100 0 100 14 l 100 32 b 100 46 100 46 86 46 l 14 46 b 0 46 0 46 0 32 l 0 14 b 0 0 0 0 14 0
+Dialogue: 2,0:00:03.40,0:00:04.90,Default,,0,0,0,,{\an7\pos(1178,80)\p1\bord0\shad0\1c&H323E10&\fad(140,200)}m 10 0 l 353 0 b 363 0 363 0 363 10 l 363 36 b 363 46 363 46 353 46 l 10 46 b 0 46 0 46 0 36 l 0 10 b 0 0 0 0 10 0
+Dialogue: 3,0:00:03.40,0:00:04.90,Default,,0,0,0,,{\an7\pos(1196,87)\fs30\b1\1c&HFFFFFF&\bord0\shad0\fad(140,200)}1  Onglet BIMaestro
+Dialogue: 4,0:00:04.30,0:00:04.95,Default,,0,0,0,,{\an5\pos(1228,46)\p1\bord5\shad0\1a&HFF&\3c&H32ABEF&\fscx45\fscy45\t(0,600,\fscx200\fscy200)\fad(50,520)}m 0 -24 b 13 -24 24 -13 24 0 b 24 13 13 24 0 24 b -13 24 -24 13 -24 0 b -24 -13 -13 -24 0 -24
+Dialogue: 4,0:00:04.42,0:00:05.07,Default,,0,0,0,,{\an5\pos(1228,46)\p1\bord5\shad0\1a&HFF&\3c&H32ABEF&\fscx45\fscy45\t(0,600,\fscx200\fscy200)\fad(50,520)}m 0 -24 b 13 -24 24 -13 24 0 b 24 13 13 24 0 24 b -13 24 -24 13 -24 0 b -24 -13 -13 -24 0 -24
+Dialogue: 1,0:00:07.20,0:00:09.80,Default,,0,0,0,,{\an7\pos(2010,62)\p1\bord6\shad0\1a&HFF&\3c&H32ABEF&\3a&H00&\fad(100,200)\clip(2000,52,2001,156)\t(0,400,\clip(2000,52,2104,156))}m 14 0 l 70 0 b 84 0 84 0 84 14 l 84 70 b 84 84 84 84 70 84 l 14 84 b 0 84 0 84 0 70 l 0 14 b 0 0 0 0 14 0
+Dialogue: 2,0:00:07.20,0:00:09.80,Default,,0,0,0,,{\an7\pos(2010,156)\p1\bord0\shad0\1c&H323E10&\fad(140,200)}m 10 0 l 217 0 b 227 0 227 0 227 10 l 227 36 b 227 46 227 46 217 46 l 10 46 b 0 46 0 46 0 36 l 0 10 b 0 0 0 0 10 0
+Dialogue: 3,0:00:07.20,0:00:09.80,Default,,0,0,0,,{\an7\pos(2028,163)\fs30\b1\1c&HFFFFFF&\bord0\shad0\fad(140,200)}2  Couleurs
+Dialogue: 4,0:00:09.60,0:00:10.25,Default,,0,0,0,,{\an5\pos(2050,100)\p1\bord5\shad0\1a&HFF&\3c&H32ABEF&\fscx45\fscy45\t(0,600,\fscx200\fscy200)\fad(50,520)}m 0 -24 b 13 -24 24 -13 24 0 b 24 13 13 24 0 24 b -13 24 -24 13 -24 0 b -24 -13 -13 -24 0 -24
+Dialogue: 4,0:00:09.72,0:00:10.37,Default,,0,0,0,,{\an5\pos(2050,100)\p1\bord5\shad0\1a&HFF&\3c&H32ABEF&\fscx45\fscy45\t(0,600,\fscx200\fscy200)\fad(50,520)}m 0 -24 b 13 -24 24 -13 24 0 b 24 13 13 24 0 24 b -13 24 -24 13 -24 0 b -24 -13 -13 -24 0 -24
+Dialogue: 1,0:00:12.90,0:00:14.60,Default,,0,0,0,,{\an7\pos(800,290)\p1\bord6\shad0\1a&HFF&\3c&H32ABEF&\3a&H00&\fad(100,200)\clip(790,280,791,348)\t(0,400,\clip(790,280,910,348))}m 14 0 l 86 0 b 100 0 100 0 100 14 l 100 34 b 100 48 100 48 86 48 l 14 48 b 0 48 0 48 0 34 l 0 14 b 0 0 0 0 14 0
+Dialogue: 2,0:00:12.90,0:00:14.60,Default,,0,0,0,,{\an7\pos(800,234)\p1\bord0\shad0\1c&H323E10&\fad(140,200)}m 10 0 l 251 0 b 261 0 261 0 261 10 l 261 36 b 261 46 261 46 251 46 l 10 46 b 0 46 0 46 0 36 l 0 10 b 0 0 0 0 10 0
+Dialogue: 3,0:00:12.90,0:00:14.60,Default,,0,0,0,,{\an7\pos(818,241)\fs30\b1\1c&HFFFFFF&\bord0\shad0\fad(140,200)}3  Propriétés
+Dialogue: 4,0:00:13.60,0:00:14.25,Default,,0,0,0,,{\an5\pos(848,314)\p1\bord5\shad0\1a&HFF&\3c&H32ABEF&\fscx45\fscy45\t(0,600,\fscx200\fscy200)\fad(50,520)}m 0 -24 b 13 -24 24 -13 24 0 b 24 13 13 24 0 24 b -13 24 -24 13 -24 0 b -24 -13 -13 -24 0 -24
+Dialogue: 4,0:00:13.72,0:00:14.37,Default,,0,0,0,,{\an5\pos(848,314)\p1\bord5\shad0\1a&HFF&\3c&H32ABEF&\fscx45\fscy45\t(0,600,\fscx200\fscy200)\fad(50,520)}m 0 -24 b 13 -24 24 -13 24 0 b 24 13 13 24 0 24 b -13 24 -24 13 -24 0 b -24 -13 -13 -24 0 -24
+Dialogue: 1,0:00:21.20,0:00:22.60,Default,,0,0,0,,{\an7\pos(550,672)\p1\bord6\shad0\1a&HFF&\3c&H32ABEF&\3a&H00&\fad(100,200)\clip(540,662,541,728)\t(0,400,\clip(540,662,828,728))}m 14 0 l 254 0 b 268 0 268 0 268 14 l 268 32 b 268 46 268 46 254 46 l 14 46 b 0 46 0 46 0 32 l 0 14 b 0 0 0 0 14 0
+Dialogue: 2,0:00:21.20,0:00:22.60,Default,,0,0,0,,{\an7\pos(550,616)\p1\bord0\shad0\1c&H323E10&\fad(140,200)}m 10 0 l 557 0 b 567 0 567 0 567 10 l 567 36 b 567 46 567 46 557 46 l 10 46 b 0 46 0 46 0 36 l 0 10 b 0 0 0 0 10 0
+Dialogue: 3,0:00:21.20,0:00:22.60,Default,,0,0,0,,{\an7\pos(568,623)\fs30\b1\1c&HFFFFFF&\bord0\shad0\fad(140,200)}4  Créer un groupe personnalisé
+Dialogue: 4,0:00:22.10,0:00:22.75,Default,,0,0,0,,{\an5\pos(568,694)\p1\bord5\shad0\1a&HFF&\3c&H32ABEF&\fscx45\fscy45\t(0,600,\fscx200\fscy200)\fad(50,520)}m 0 -24 b 13 -24 24 -13 24 0 b 24 13 13 24 0 24 b -13 24 -24 13 -24 0 b -24 -13 -13 -24 0 -24
+Dialogue: 4,0:00:22.22,0:00:22.87,Default,,0,0,0,,{\an5\pos(568,694)\p1\bord5\shad0\1a&HFF&\3c&H32ABEF&\fscx45\fscy45\t(0,600,\fscx200\fscy200)\fad(50,520)}m 0 -24 b 13 -24 24 -13 24 0 b 24 13 13 24 0 24 b -13 24 -24 13 -24 0 b -24 -13 -13 -24 0 -24
+Dialogue: 1,0:00:23.40,0:00:25.60,Default,,0,0,0,,{\an7\pos(786,710)\p1\bord6\shad0\1a&HFF&\3c&H32ABEF&\3a&H00&\fad(100,200)\clip(776,700,777,772)\t(0,400,\clip(776,700,984,772))}m 14 0 l 174 0 b 188 0 188 0 188 14 l 188 38 b 188 52 188 52 174 52 l 14 52 b 0 52 0 52 0 38 l 0 14 b 0 0 0 0 14 0
+Dialogue: 2,0:00:23.40,0:00:25.60,Default,,0,0,0,,{\an7\pos(786,654)\p1\bord0\shad0\1c&H323E10&\fad(140,200)}m 10 0 l 336 0 b 346 0 346 0 346 10 l 346 36 b 346 46 346 46 336 46 l 10 46 b 0 46 0 46 0 36 l 0 10 b 0 0 0 0 10 0
+Dialogue: 3,0:00:23.40,0:00:25.60,Default,,0,0,0,,{\an7\pos(804,661)\fs30\b1\1c&HFFFFFF&\bord0\shad0\fad(140,200)}5  Créer un groupe
+Dialogue: 4,0:00:25.00,0:00:25.65,Default,,0,0,0,,{\an5\pos(880,736)\p1\bord5\shad0\1a&HFF&\3c&H32ABEF&\fscx45\fscy45\t(0,600,\fscx200\fscy200)\fad(50,520)}m 0 -24 b 13 -24 24 -13 24 0 b 24 13 13 24 0 24 b -13 24 -24 13 -24 0 b -24 -13 -13 -24 0 -24
+Dialogue: 4,0:00:25.12,0:00:25.77,Default,,0,0,0,,{\an5\pos(880,736)\p1\bord5\shad0\1a&HFF&\3c&H32ABEF&\fscx45\fscy45\t(0,600,\fscx200\fscy200)\fad(50,520)}m 0 -24 b 13 -24 24 -13 24 0 b 24 13 13 24 0 24 b -13 24 -24 13 -24 0 b -24 -13 -13 -24 0 -24
+Dialogue: 1,0:00:27.20,0:00:28.80,Default,,0,0,0,,{\an7\pos(1574,790)\p1\bord6\shad0\1a&HFF&\3c&H32ABEF&\3a&H00&\fad(100,200)\clip(1564,780,1565,856)\t(0,400,\clip(1564,780,1938,856))}m 14 0 l 340 0 b 354 0 354 0 354 14 l 354 42 b 354 56 354 56 340 56 l 14 56 b 0 56 0 56 0 42 l 0 14 b 0 0 0 0 14 0
+Dialogue: 2,0:00:27.20,0:00:28.80,Default,,0,0,0,,{\an7\pos(1574,734)\p1\bord0\shad0\1c&H323E10&\fad(140,200)}m 10 0 l 370 0 b 380 0 380 0 380 10 l 380 36 b 380 46 380 46 370 46 l 10 46 b 0 46 0 46 0 36 l 0 10 b 0 0 0 0 10 0
+Dialogue: 3,0:00:27.20,0:00:28.80,Default,,0,0,0,,{\an7\pos(1592,741)\fs30\b1\1c&HFFFFFF&\bord0\shad0\fad(140,200)}6  Nommer le bandeau
+Dialogue: 1,0:00:46.00,0:00:50.60,Default,,0,0,0,,{\an7\pos(1020,884)\p1\bord6\shad0\1a&HFF&\3c&H32ABEF&\3a&H00&\fad(100,200)\clip(1010,874,1011,942)\t(0,400,\clip(1010,874,1498,942))}m 14 0 l 454 0 b 468 0 468 0 468 14 l 468 34 b 468 48 468 48 454 48 l 14 48 b 0 48 0 48 0 34 l 0 14 b 0 0 0 0 14 0
+Dialogue: 2,0:00:46.00,0:00:50.60,Default,,0,0,0,,{\an7\pos(1020,828)\p1\bord0\shad0\1c&H323E10&\fad(140,200)}m 10 0 l 489 0 b 499 0 499 0 499 10 l 499 36 b 499 46 499 46 489 46 l 10 46 b 0 46 0 46 0 36 l 0 10 b 0 0 0 0 10 0
+Dialogue: 3,0:00:46.00,0:00:50.60,Default,,0,0,0,,{\an7\pos(1038,835)\fs30\b1\1c&HFFFFFF&\bord0\shad0\fad(140,200)}7  Glisser le paramètre ici
+Dialogue: 4,0:00:50.30,0:00:50.95,Default,,0,0,0,,{\an5\pos(1120,908)\p1\bord5\shad0\1a&HFF&\3c&H32ABEF&\fscx45\fscy45\t(0,600,\fscx200\fscy200)\fad(50,520)}m 0 -24 b 13 -24 24 -13 24 0 b 24 13 13 24 0 24 b -13 24 -24 13 -24 0 b -24 -13 -13 -24 0 -24
+Dialogue: 4,0:00:50.42,0:00:51.07,Default,,0,0,0,,{\an5\pos(1120,908)\p1\bord5\shad0\1a&HFF&\3c&H32ABEF&\fscx45\fscy45\t(0,600,\fscx200\fscy200)\fad(50,520)}m 0 -24 b 13 -24 24 -13 24 0 b 24 13 13 24 0 24 b -13 24 -24 13 -24 0 b -24 -13 -13 -24 0 -24
+Dialogue: 1,0:00:50.80,0:00:53.20,Default,,0,0,0,,{\an7\pos(1574,1016)\p1\bord6\shad0\1a&HFF&\3c&H32ABEF&\3a&H00&\fad(100,200)\clip(1564,1006,1565,1084)\t(0,400,\clip(1564,1006,1770,1084))}m 14 0 l 172 0 b 186 0 186 0 186 14 l 186 44 b 186 58 186 58 172 58 l 14 58 b 0 58 0 58 0 44 l 0 14 b 0 0 0 0 14 0
+Dialogue: 2,0:00:50.80,0:00:53.20,Default,,0,0,0,,{\an7\pos(1574,960)\p1\bord0\shad0\1c&H323E10&\fad(140,200)}m 10 0 l 404 0 b 414 0 414 0 414 10 l 414 36 b 414 46 414 46 404 46 l 10 46 b 0 46 0 46 0 36 l 0 10 b 0 0 0 0 10 0
+Dialogue: 3,0:00:50.80,0:00:53.20,Default,,0,0,0,,{\an7\pos(1592,967)\fs30\b1\1c&HFFFFFF&\bord0\shad0\fad(140,200)}8  Ambiance en un clic
+Dialogue: 4,0:00:52.20,0:00:52.85,Default,,0,0,0,,{\an5\pos(1670,1044)\p1\bord5\shad0\1a&HFF&\3c&H32ABEF&\fscx45\fscy45\t(0,600,\fscx200\fscy200)\fad(50,520)}m 0 -24 b 13 -24 24 -13 24 0 b 24 13 13 24 0 24 b -13 24 -24 13 -24 0 b -24 -13 -13 -24 0 -24
+Dialogue: 4,0:00:52.32,0:00:52.97,Default,,0,0,0,,{\an5\pos(1670,1044)\p1\bord5\shad0\1a&HFF&\3c&H32ABEF&\fscx45\fscy45\t(0,600,\fscx200\fscy200)\fad(50,520)}m 0 -24 b 13 -24 24 -13 24 0 b 24 13 13 24 0 24 b -13 24 -24 13 -24 0 b -24 -13 -13 -24 0 -24
+Dialogue: 1,0:00:54.00,0:00:55.20,Default,,0,0,0,,{\an7\pos(1574,966)\p1\bord6\shad0\1a&HFF&\3c&H32ABEF&\3a&H00&\fad(100,200)\clip(1564,956,1565,1020)\t(0,400,\clip(1564,956,1856,1020))}m 14 0 l 258 0 b 272 0 272 0 272 14 l 272 30 b 272 44 272 44 258 44 l 14 44 b 0 44 0 44 0 30 l 0 14 b 0 0 0 0 14 0
+Dialogue: 2,0:00:54.00,0:00:55.20,Default,,0,0,0,,{\an7\pos(1574,910)\p1\bord0\shad0\1c&H323E10&\fad(140,200)}m 10 0 l 557 0 b 567 0 567 0 567 10 l 567 36 b 567 46 567 46 557 46 l 10 46 b 0 46 0 46 0 36 l 0 10 b 0 0 0 0 10 0
+Dialogue: 3,0:00:54.00,0:00:55.20,Default,,0,0,0,,{\an7\pos(1592,917)\fs30\b1\1c&HFFFFFF&\bord0\shad0\fad(140,200)}9  Choisir mes propres couleurs
+Dialogue: 4,0:00:54.20,0:00:54.85,Default,,0,0,0,,{\an5\pos(1594,988)\p1\bord5\shad0\1a&HFF&\3c&H32ABEF&\fscx45\fscy45\t(0,600,\fscx200\fscy200)\fad(50,520)}m 0 -24 b 13 -24 24 -13 24 0 b 24 13 13 24 0 24 b -13 24 -24 13 -24 0 b -24 -13 -13 -24 0 -24
+Dialogue: 4,0:00:54.32,0:00:54.97,Default,,0,0,0,,{\an5\pos(1594,988)\p1\bord5\shad0\1a&HFF&\3c&H32ABEF&\fscx45\fscy45\t(0,600,\fscx200\fscy200)\fad(50,520)}m 0 -24 b 13 -24 24 -13 24 0 b 24 13 13 24 0 24 b -13 24 -24 13 -24 0 b -24 -13 -13 -24 0 -24
+Dialogue: 1,0:00:55.40,0:00:57.60,Default,,0,0,0,,{\an7\pos(1574,922)\p1\bord6\shad0\1a&HFF&\3c&H32ABEF&\3a&H00&\fad(100,200)\clip(1564,912,1565,984)\t(0,400,\clip(1564,912,1938,984))}m 14 0 l 340 0 b 354 0 354 0 354 14 l 354 38 b 354 52 354 52 340 52 l 14 52 b 0 52 0 52 0 38 l 0 14 b 0 0 0 0 14 0
+Dialogue: 2,0:00:55.40,0:00:57.60,Default,,0,0,0,,{\an7\pos(1574,866)\p1\bord0\shad0\1c&H323E10&\fad(140,200)}m 10 0 l 353 0 b 363 0 363 0 363 10 l 363 36 b 363 46 363 46 353 46 l 10 46 b 0 46 0 46 0 36 l 0 10 b 0 0 0 0 10 0
+Dialogue: 3,0:00:55.40,0:00:57.60,Default,,0,0,0,,{\an7\pos(1592,873)\fs30\b1\1c&HFFFFFF&\bord0\shad0\fad(140,200)}10  Couleur du fond
+Dialogue: 1,0:01:03.80,0:01:05.80,Default,,0,0,0,,{\an7\pos(1754,1222)\p1\bord6\shad0\1a&HFF&\3c&H32ABEF&\3a&H00&\fad(100,200)\clip(1744,1212,1745,1290)\t(0,400,\clip(1744,1212,1990,1290))}m 14 0 l 212 0 b 226 0 226 0 226 14 l 226 44 b 226 58 226 58 212 58 l 14 58 b 0 58 0 58 0 44 l 0 14 b 0 0 0 0 14 0
+Dialogue: 2,0:01:03.80,0:01:05.80,Default,,0,0,0,,{\an7\pos(1754,1166)\p1\bord0\shad0\1c&H323E10&\fad(140,200)}m 10 0 l 506 0 b 516 0 516 0 516 10 l 516 36 b 516 46 516 46 506 46 l 10 46 b 0 46 0 46 0 36 l 0 10 b 0 0 0 0 10 0
+Dialogue: 3,0:01:03.80,0:01:05.80,Default,,0,0,0,,{\an7\pos(1772,1173)\fs30\b1\1c&HFFFFFF&\bord0\shad0\fad(140,200)}11  Enregistrer mes réglages
+Dialogue: 4,0:01:05.40,0:01:06.05,Default,,0,0,0,,{\an5\pos(1866,1250)\p1\bord5\shad0\1a&HFF&\3c&H32ABEF&\fscx45\fscy45\t(0,600,\fscx200\fscy200)\fad(50,520)}m 0 -24 b 13 -24 24 -13 24 0 b 24 13 13 24 0 24 b -13 24 -24 13 -24 0 b -24 -13 -13 -24 0 -24
+Dialogue: 4,0:01:05.52,0:01:06.17,Default,,0,0,0,,{\an5\pos(1866,1250)\p1\bord5\shad0\1a&HFF&\3c&H32ABEF&\fscx45\fscy45\t(0,600,\fscx200\fscy200)\fad(50,520)}m 0 -24 b 13 -24 24 -13 24 0 b 24 13 13 24 0 24 b -13 24 -24 13 -24 0 b -24 -13 -13 -24 0 -24
+Dialogue: 1,0:01:07.60,0:01:11.60,Default,,0,0,0,,{\an7\pos(2104,356)\p1\bord6\shad0\1a&HFF&\3c&H32ABEF&\3a&H00&\fad(100,200)\clip(2094,346,2095,426)\t(0,400,\clip(2094,346,2556,426))}m 14 0 l 428 0 b 442 0 442 0 442 14 l 442 46 b 442 60 442 60 428 60 l 14 60 b 0 60 0 60 0 46 l 0 14 b 0 0 0 0 14 0
+Dialogue: 2,0:01:07.60,0:01:11.60,Default,,0,0,0,,{\an7\pos(2024,300)\p1\bord0\shad0\1c&H323E10&\fad(140,200)}m 10 0 l 506 0 b 516 0 516 0 516 10 l 516 36 b 516 46 516 46 506 46 l 10 46 b 0 46 0 46 0 36 l 0 10 b 0 0 0 0 10 0
+Dialogue: 3,0:01:07.60,0:01:11.60,Default,,0,0,0,,{\an7\pos(2042,307)\fs30\b1\1c&HFFFFFF&\bord0\shad0\fad(140,200)}12  Résultat dans Propriétés

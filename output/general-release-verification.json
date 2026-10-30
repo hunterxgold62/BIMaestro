@@ -1,0 +1,32 @@
+[
+  {
+    "Revit": 2023,
+    "ApiMajor": 23,
+    "DLL": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\BIMaestro\\bin\\Release\\BIMaestro.dll",
+    "SHA256": "C04BA9B37F38ABF8D0981170CD10E1BE305F4C38ABC06CEBDF657357E046B93F"
+  },
+  {
+    "Revit": 2024,
+    "ApiMajor": 24,
+    "DLL": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\BIMaestro\\bin\\Release2024\\BIMaestro.dll",
+    "SHA256": "20787047A875B7742EA9553DD62C066C56BA090CC8565A39564E5EBF9D317AF4"
+  },
+  {
+    "Revit": 2025,
+    "ApiMajor": 25,
+    "DLL": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\BIMaestro\\bin\\Revit2025\\Release\\BIMaestro.dll",
+    "SHA256": "7B1EBF5BE887FAA953E889FEBA6A06FF0BEBA8D093929EF317FA28FB24D4481F"
+  },
+  {
+    "Revit": 2026,
+    "ApiMajor": 26,
+    "DLL": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\BIMaestro\\bin\\Revit2026\\Release\\BIMaestro.dll",
+    "SHA256": "8A96F675A745AB4C9D5903174B70F6201AB0BF64EC56D0FBDB02DEFD7DA8273C"
+  },
+  {
+    "Revit": 2027,
+    "ApiMajor": 27,
+    "DLL": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\BIMaestro\\bin\\Revit2027\\Release\\BIMaestro.dll",
+    "SHA256": "AA1324ACF8034E2BB3E47755C7B9F30E4F4C16EA5A50DB3D1C0E0CFFA82CB310"
+  }
+]

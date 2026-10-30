@@ -1,0 +1,15 @@
+{
+  "plugin": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\BIMaestro\\bin\\Release\\BIMaestro.dll",
+  "host": "C:/Program Files/Autodesk/Revit 2026",
+  "checkedMembers": 1310,
+  "missingTypes": [],
+  "missingMembers": [],
+  "callers": [],
+  "runtimeAdapters": {
+    "Floor shape editor": true,
+    "Roof shape editor": true,
+    "Add/Draw shape point": true,
+    "Add/Draw split line": true,
+    "ElementId numeric constructor": true
+  }
+}

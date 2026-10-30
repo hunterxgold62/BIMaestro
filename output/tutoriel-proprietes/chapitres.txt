@@ -1,0 +1,62 @@
+;FFMETADATA1
+title=BIMaestro - Personnaliser la palette Propriétés
+[CHAPTER]
+TIMEBASE=1/1000
+START=0
+END=7100
+title=1. Ouvrir l'onglet BIMaestro
+[CHAPTER]
+TIMEBASE=1/1000
+START=7100
+END=10800
+title=2. Cliquer sur Couleurs
+[CHAPTER]
+TIMEBASE=1/1000
+START=10800
+END=15766
+title=3. Onglet Propriétés
+[CHAPTER]
+TIMEBASE=1/1000
+START=15766
+END=17966
+title=4. Créer un groupe personnalisé
+[CHAPTER]
+TIMEBASE=1/1000
+START=17966
+END=21766
+title=5. Créer un groupe
+[CHAPTER]
+TIMEBASE=1/1000
+START=21766
+END=30966
+title=6. Nommer le bandeau
+[CHAPTER]
+TIMEBASE=1/1000
+START=30966
+END=37266
+title=7. Glisser un paramètre
+[CHAPTER]
+TIMEBASE=1/1000
+START=37266
+END=40466
+title=8. Choisir une ambiance
+[CHAPTER]
+TIMEBASE=1/1000
+START=40466
+END=41866
+title=9. Choisir ses couleurs
+[CHAPTER]
+TIMEBASE=1/1000
+START=41866
+END=44766
+title=10. Couleur du fond
+[CHAPTER]
+TIMEBASE=1/1000
+START=44766
+END=48466
+title=11. Enregistrer
+[CHAPTER]
+TIMEBASE=1/1000
+START=48466
+END=52566
+title=12. Résultat dans Revit

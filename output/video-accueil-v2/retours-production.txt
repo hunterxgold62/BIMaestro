@@ -1,0 +1,17 @@
+Préférences vidéo BIMaestro — retours du 28 octobre 2026
+
+Objectif : tutoriels web, une minute maximum, captures réelles de Revit.
+Charte verte de la V1 appréciée : #103e32, accent #9bdec4.
+Ouvrir immédiatement sur un exemple concret du résultat, pas sur un titre seul.
+Resserrer les pauses de pilotage et conserver les changements visibles.
+Préserver les proportions et la taille du canevas sur tous les plans.
+Garder le même cadrage pendant la sélection et la validation.
+Ne jamais maintenir une flèche ou un repère quand sa cible disparaît.
+Vérifier visuellement les transitions, notamment le passage réglages → résultat.
+Conserver les versions précédentes pour comparaison.
+
+V2 : nouvelle capture depuis Autodesk ; exemple Bibliothèque dès le début ;
+fondus entre plans ; aucun ajout de flèche ; cadrage identique choix/validation.
+Le skill réutilisable reste à formaliser après validation du style.
+
+V3 : montrer rapidement l'interface générale avant un zoom progressif vers la zone utile. Terminer par quatre ou cinq résultats réels, enchaînés rapidement avec des transitions fluides. Ne pas remplacer le panorama final par un exemple unique.
