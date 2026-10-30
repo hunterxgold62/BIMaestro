@@ -6,9 +6,46 @@ namespace Page
     {
         private const string Release1063 = "1.0.6.3";
         private const string Release1064 = "1.0.6.4";
+        private const string Release1065 = "1.0.6.5";
 
         public static IReadOnlyList<ButtonUpdateNote> Notes { get; } = new List<ButtonUpdateNote>
         {
+            Create1065Note("MaintenanceWorkbench", "BIMaestro.MepBooster.MaintenanceWorkbenchCommand", "Maintenance MEP", "MEP Maintenance",
+                "Nouveau : vérifiez qu’une intervention est possible sur place (sortie d’un moteur, manœuvre d’une vanne, retrait d’un filtre ou d’un actionneur), avec l’opérateur et les obstacles.",
+                "New: check whether an intervention is possible on site (motor removal, valve operation, filter or actuator removal), with the operator and obstacles."),
+            Create1065Note("PropertiesAppearance", "BIMaestro.PropertiesAppearance.PropertiesAppearanceCommand", "Propriétés", "Properties",
+                "Nouveau : personnalisez la palette Propriétés de Revit (couleurs des groupes et paramètres, profils par catégorie ou par type, clair/sombre) avec un aperçu réversible.",
+                "New: customize the Revit Properties palette (group and parameter colors, per-category or per-type profiles, light/dark) with a reversible preview."),
+            Create1065Note("HomeAppearanceTest", "BIMaestro.Home.HomeAppearanceCommand", "Accueil Revit", "Revit Home",
+                "Nouveau : personnalisez la présentation de l’écran d’accueil de Revit.",
+                "New: customize the look of the Revit Home screen."),
+            Create1065Note("CreateDemoProject", "BIMaestro.Tutorials.CreateDemoProjectCommand", "Tutoriels", "Tutorials",
+                "Nouveau : choisissez un parcours guidé et essayez les outils BIMaestro étape par étape sur une maquette d’essai.",
+                "New: pick a guided tour and try BIMaestro tools step by step on a sample model."),
+            Create1065Note("CodexChat", "BIMaestro.Codex.CodexCommand", "Famille IA", "AI Families",
+                "Claude construit la famille plus vite et affiche ses étapes au fil de l’eau. Les discussions sont conservées, une pause « Continuer » remplace l’erreur sur les longues demandes et les formes rondes utilisent de vrais cercles.",
+                "Claude builds the family faster and shows its steps as it goes. Conversations are kept, a \"Continue\" pause replaces the error on long requests, and round shapes use real circles."),
+            Create1065Note("RevitGameCommand", "BIMaestro.VideoGames.RevitGameCommand", "Maquette jouable", "Playable Model",
+                "Visitez la maquette à la manette Xbox ou en casque VR, et modifiez les réservations directement pendant la visite.",
+                "Explore the model with an Xbox controller or a VR headset, and edit openings directly during the visit."),
+            Create1065Note("Temps par projet", "BIMaestro.Dashboard.ShowTimeDashboard", "Temps par projet", "Time by Project",
+                "Suivi du temps repensé : aperçu sur 7 ou 15 jours, analyse filtrée et rapport PDF.",
+                "Redesigned time tracking: 7- or 15-day overview, filtered analysis, and PDF report."),
+            Create1065Note("Couleur de projet", "Couleur.ToggleCombinedColoringCommand", "Couleurs", "Colors",
+                "Deux nouveaux onglets : Accueil Revit et palette Propriétés.",
+                "Two new tabs: Revit Home and Properties palette."),
+            Create1065Note("RadialMenuButtonsCommand", "BIMaestro.UI.RadialMenuButtonsCommand", "Rosace boutons", "Radial Menu",
+                "La rosace affiche 16 emplacements : vos favoris fixés et vos boutons BIMaestro récents.",
+                "The radial menu shows 16 slots: your pinned favorites and your recent BIMaestro buttons."),
+            Create1065Note("ViewThumbnailBatch", "BIMaestro.ViewHover.ViewThumbnailBatchCommand", "Miniature", "Thumbnail",
+                "Génération des miniatures de vues plus fiable.",
+                "More reliable view thumbnail generation."),
+            Create1065Note("ResérvationAuto", "Modification.ReservationAutoV3Command", "Auto réservation", "Automatic Openings",
+                "Placement des réservations amélioré et fenêtre de réglage retravaillée.",
+                "Improved opening placement and reworked settings window."),
+            Create1065Note("Clash 3D", "Analyse.SmartClashCommand", "Clash 3D", "3D Clash Analysis",
+                "Rapport et inspection des conflits améliorés, interface traduite en anglais.",
+                "Improved clash report and inspection, interface translated to English."),
             Create1064Note("CodexChat", "BIMaestro.Codex.CodexCommand", "Famille IA", "AI Families",
                 "Créez ou modifiez une famille Revit en décrivant ce que vous voulez. Vous pouvez choisir Codex ou Claude et joindre une image ou un PDF.",
                 "Create or edit a Revit family by describing what you want. Choose Codex or Claude and attach an image or PDF."),
@@ -673,6 +710,26 @@ namespace Page
                 }
             }
         };
+
+        private static ButtonUpdateNote Create1065Note(
+            string buttonId,
+            string commandClass,
+            string title,
+            string englishTitle,
+            string summary,
+            string englishSummary)
+        {
+            return new ButtonUpdateNote
+            {
+                Version = Release1065,
+                ButtonId = buttonId,
+                CommandClass = commandClass,
+                Title = title,
+                EnglishTitle = englishTitle,
+                Summary = summary,
+                EnglishSummary = englishSummary
+            };
+        }
 
         private static ButtonUpdateNote Create1064Note(
             string buttonId,

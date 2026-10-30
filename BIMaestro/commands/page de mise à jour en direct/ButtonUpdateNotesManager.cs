@@ -18,6 +18,7 @@ namespace Page
         private const string Release1062 = "1.0.6.2";
         private const string Release1063 = "1.0.6.3";
         private const string Release1064 = "1.0.6.4";
+        private const string Release1065 = "1.0.6.5";
         private static readonly object Sync = new object();
         private static ButtonUpdateNotesState _state;
 
@@ -118,6 +119,14 @@ namespace Page
                 var release1063 = ParseVersion(Release1063);
                 if (lastKnownVersion == null || lastKnownVersion.CompareTo(release1063) < 0)
                     return Release1063;
+            }
+
+            if (string.Equals(currentVersion.ToString(), Release1065, StringComparison.OrdinalIgnoreCase))
+            {
+                var lastKnownVersion = ParseVersion(state?.LastKnownVersion);
+                var release1064 = ParseVersion(Release1064);
+                if (lastKnownVersion == null || lastKnownVersion.CompareTo(release1064) < 0)
+                    return Release1064;
             }
 
             return state?.LastKnownVersion;
