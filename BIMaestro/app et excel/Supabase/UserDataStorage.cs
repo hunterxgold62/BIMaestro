@@ -69,7 +69,8 @@ namespace BIMaestro.Storage
                     // Old versions may still write to the legacy folder. Retry after closing other hosts.
                     if (checkRevitSessions && System.Diagnostics.Process.GetProcessesByName("Revit").Length > 1)
                         throw new IOException("Close the other Revit sessions before migrating.");
-                    stage = Path.Combine(documents, ".BIMaestro-migration-" + Guid.NewGuid().ToString("N"));
+                    // No longer than "RevitLogs": every source path that fits also fits in the stage.
+                    stage = Path.Combine(documents, ".bim-" + Guid.NewGuid().ToString("N").Substring(0, 4));
                     CopyVerified(oldRoot, stage);
                     // Check again after the complete copy: changing sources must not be committed.
                     VerifyTree(oldRoot, stage);
@@ -170,15 +171,22 @@ namespace BIMaestro.Storage
                     input.CopyTo(output);
                 File.SetLastWriteTimeUtc(dest, File.GetLastWriteTimeUtc(file));
             }
-            foreach (string dir in Directory.GetDirectories(source))
+            foreach (string dir in Directory.GetDirectories(source).Where(d => !IsRegenerableCache(d)))
                 CopyVerified(dir, Path.Combine(target, Path.GetFileName(dir)));
+        }
+
+        // SmartCheck thumbnails are rebuilt on demand and older names can exceed MAX_PATH.
+        // They stay in RevitLogs, untouched, instead of blocking the whole migration.
+        private static bool IsRegenerableCache(string dir)
+        {
+            return dir.EndsWith(@"\Clash3D\Miniatures", StringComparison.OrdinalIgnoreCase);
         }
 
         internal static void VerifyTree(string source, string target)
         {
             RejectLink(source);
             var files = Directory.GetFiles(source);
-            var dirs = Directory.GetDirectories(source);
+            var dirs = Directory.GetDirectories(source).Where(d => !IsRegenerableCache(d)).ToArray();
             if (files.Length != Directory.GetFiles(target).Length || dirs.Length != Directory.GetDirectories(target).Length)
                 throw new IOException("Source changed during migration: " + source);
             foreach (string file in files)

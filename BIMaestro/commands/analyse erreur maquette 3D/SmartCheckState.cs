@@ -161,8 +161,8 @@ namespace Analyse
                 global::BIMaestro.Storage.UserDataStorage.Root, "Clash3D", "Miniatures");
             string suffix;
             using (var hash = SHA256.Create()) suffix = BitConverter.ToString(hash.ComputeHash(Encoding.UTF8.GetBytes(docKey ?? "document"))).Replace("-", "").Substring(0, 16);
-            var safe = MakeSafeFileName(string.IsNullOrWhiteSpace(docKey) ? "document" : docKey) + "_" + suffix;
-            return Path.Combine(root, safe);
+            // Hash only: the document path in the name pushed exported PNGs past MAX_PATH.
+            return Path.Combine(root, suffix);
         }
 
         public static string GetReportFolder()
