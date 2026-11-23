@@ -21,7 +21,7 @@ public class CountElementsCommand : IExternalCommand
         // Vérifier si un élément est sélectionné
         if (selectedIds.Count == 0)
         {
-            TaskDialog.Show(UiLanguage.T("Sélectionner un élément", "Select an Element"), UiLanguage.T("Sélectionne un élément dans le projet.", "Select an element in the project."));
+            TaskDialog.Show(UiLanguage.Get("CountWindowsCommand.SelectAnElement"), UiLanguage.Get("CountWindowsCommand.SelectAnElementInTheProject"));
             return Result.Cancelled;
         }
 
@@ -33,7 +33,7 @@ public class CountElementsCommand : IExternalCommand
 
         if (category == null)
         {
-            TaskDialog.Show(UiLanguage.T("Erreur", "Error"), UiLanguage.T("L'élément sélectionné n'a pas de catégorie valide.", "The selected element has no valid category."));
+            TaskDialog.Show(UiLanguage.Get("CountWindowsCommand.Error"), UiLanguage.Get("CountWindowsCommand.TheSelectedElementHasNoValidCategory"));
             return Result.Failed;
         }
 
@@ -45,7 +45,7 @@ public class CountElementsCommand : IExternalCommand
         int elementCount = collector.Count();
 
         // Afficher le nombre d'éléments dans une boîte de dialogue
-        TaskDialog.Show(UiLanguage.T("Nombre d'Éléments", "Element Count"), UiLanguage.T($"Il y a {elementCount} éléments dans la catégorie '{category.Name}'.", $"There are {elementCount} elements in the '{category.Name}' category."));
+        TaskDialog.Show(UiLanguage.Get("CountWindowsCommand.ElementCount"), UiLanguage.Format("CountWindowsCommand.ThereAre0ElementsInThe1Category", (object)elementCount, (object)category.Name));
 
         return Result.Succeeded;
     }

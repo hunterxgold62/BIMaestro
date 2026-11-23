@@ -1,0 +1,135 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; }
+    .chip { position: absolute; width: 270px; height: 76px; border-radius: 999px; background: #fff; border: 3px solid #D1D5DB; display: flex; align-items: center; gap: 14px; padding: 0 22px; font-weight: 900; font-size: 32px; color: #111827; box-shadow: 0 10px 30px rgba(17,24,39,.08); }
+    .box { width: 30px; height: 30px; border-radius: 9px; border: 3px solid #9CA3AF; background: #fff; flex: none; }
+    #ccard { position: absolute; left: 230px; top: 430px; width: 620px; height: 1250px; border-radius: 28px; overflow: hidden; background: #fff; box-shadow: 0 30px 80px rgba(17,24,39,.18), 0 0 0 2px #E5E7EB; }
+    .cv { position: absolute; left: 0; top: 0; width: 620px; height: 1469px; object-fit: fill; }
+    #cline { position: absolute; left: 0; right: 0; top: 0; height: 8px; background: #0F5132; box-shadow: 0 0 24px #7FD6A6; z-index: 50; opacity: 0; }
+    #cbar { position: absolute; left: 0; top: 0; bottom: 0; width: 10px; background: #0F5132; z-index: 51; }
+    #cur { position: absolute; left: 0; top: 0; width: 64px; height: 64px; z-index: 90; }
+    #ring { position: absolute; left: -40px; top: -40px; width: 80px; height: 80px; border-radius: 50%; border: 6px solid #0F5132; z-index: 89; }
+    #cfin { position: absolute; top: 205px; left: 60px; right: 60px; text-align: center; font-weight: 900; font-size: 64px; line-height: 1.05; letter-spacing: -0.03em; color: #111827; opacity: 0; z-index: 80; text-shadow: 0 0 30px #fff, 0 0 30px #fff; }
+    #cfin b { color: #0F5132; }
+    #more { position: absolute; top: 215px; left: 0; right: 0; margin: 0 auto; width: max-content; padding: 14px 34px; border-radius: 999px; background: #0F5132; color: #fff; font-weight: 900; font-size: 44px; opacity: 0; }
+    .lname { position: absolute; top: 330px; left: 0; right: 0; text-align: center; font-weight: 900; font-size: 50px; letter-spacing: -0.03em; color: #111827; opacity: 0; }
+    #ctitle { position: absolute; top: 130px; left: 0; right: 0; text-align: center; font-weight: 900; font-size: 40px; color: #6B7280; letter-spacing: -0.01em; }
+  </style>
+  <div id="root" data-composition-id="reel" data-width="1080" data-height="1920">
+    <div id="ctitle">Apparence BIMaestro</div>
+    <div id="ch0" class="chip" style="left:95px;top:212px"><i id="cb0" class="box"></i><span>Fond</span></div>
+    <div id="ch1" class="chip" style="left:405px;top:212px"><i id="cb1" class="box"></i><span>Couleurs</span></div>
+    <div id="ch2" class="chip" style="left:715px;top:212px"><i id="cb2" class="box"></i><span>Icônes</span></div>
+    <div id="ch3" class="chip" style="left:250px;top:307px"><i id="cb3" class="box"></i><span>Badges</span></div>
+    <div id="ch4" class="chip" style="left:560px;top:307px"><i id="cb4" class="box"></i><span>Mode nuit</span></div>
+    <div id="more">Ou encore…</div>
+    <div id="ln0" class="lname">Constellation de nuit</div>
+    <div id="ln1" class="lname">Rubans fluides</div>
+    <div id="ln2" class="lname">Lucioles + gras coloré</div>
+    <div id="ln3" class="lname">Plan d'architecte</div>
+    <div id="ln4" class="lname">Dégradé animé</div>
+    <div id="ln5" class="lname">Verre dépoli + icônes</div>
+    <div id="ccard">
+      <video id="cv0" class="clip cv" src="assets/config.mp4" data-start="0" data-duration="2" data-media-start="1.7" muted playsinline style="z-index:1"></video>
+      <video id="cv1" class="clip cv" src="assets/config.mp4" data-start="1.7" data-duration="2" data-media-start="7.7" muted playsinline style="z-index:2"></video>
+      <video id="cv2" class="clip cv" src="assets/config.mp4" data-start="3.4" data-duration="2" data-media-start="12.7" muted playsinline style="z-index:3"></video>
+      <video id="cv3" class="clip cv" src="assets/config.mp4" data-start="5.1" data-duration="2" data-media-start="17.7" muted playsinline style="z-index:4"></video>
+      <video id="cv4" class="clip cv" src="assets/config.mp4" data-start="6.8" data-duration="2" data-media-start="22.7" muted playsinline style="z-index:5"></video>
+      <video id="cv5" class="clip cv" src="assets/config.mp4" data-start="8.5" data-duration="1.9" data-media-start="27.7" muted playsinline style="z-index:6"></video>
+      <video id="lv0" class="clip cv" src="assets/ouencore.mp4" data-start="10.1" data-duration="1.8" data-media-start="8" muted playsinline style="z-index:20"></video>
+      <video id="lv1" class="clip cv" src="assets/ouencore.mp4" data-start="11.6" data-duration="1.8" data-media-start="13" muted playsinline style="z-index:21"></video>
+      <video id="lv2" class="clip cv" src="assets/ouencore.mp4" data-start="13.1" data-duration="1.8" data-media-start="18" muted playsinline style="z-index:22"></video>
+      <video id="lv3" class="clip cv" src="assets/ouencore.mp4" data-start="14.6" data-duration="1.8" data-media-start="23" muted playsinline style="z-index:23"></video>
+      <video id="lv4" class="clip cv" src="assets/ouencore.mp4" data-start="16.1" data-duration="1.8" data-media-start="28" muted playsinline style="z-index:24"></video>
+      <video id="lv5" class="clip cv" src="assets/ouencore.mp4" data-start="17.6" data-duration="2.6" data-media-start="33" muted playsinline style="z-index:25"></video>
+      <div id="cline"></div>
+      <div id="cbar"></div>
+    </div>
+    <div id="cfin">Ton arborescence.<br /><b>Tes règles.</b></div>
+    <div id="ring"></div>
+    <div id="cur"><svg width="64" height="64" viewBox="0 0 24 24"><path d="M3 2l7 19 2.5-7.5L20 11z" fill="#fff" stroke="#111827" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#ccard", { y: 700, rotation: 4 }, { y: 0, rotation: 0, duration: 0.55, ease: "expo.out" }, 0);
+    tl.fromTo(".chip", { opacity: 0, y: -24, scale: 0.8 }, { opacity: 1, y: 0, scale: 1, duration: 0.3, ease: "back.out(2)", stagger: 0.06 }, 0.25);
+    tl.set("#cur", { x: 1200, y: 1500 }, 0);
+    tl.set(["#ring"], { scale: 0, opacity: 0 }, 0);
+    tl.to("#cur", { x: 270, y: 260, duration: 0.45, ease: "power3.inOut" }, 1.15);
+    tl.fromTo("#ring", { x: 270, y: 260, scale: 0.3, opacity: 1 }, { x: 270, y: 260, scale: 1.8, opacity: 0, duration: 0.35, ease: "power2.out", immediateRender: false }, 1.62);
+    tl.to("#ch0", { backgroundColor: "#0F5132", color: "#ffffff", borderColor: "#0F5132", duration: 0.15 }, 1.62);
+    tl.fromTo("#cb0", { scale: 1 }, { scale: 1.35, duration: 0.1, ease: "power2.out" }, 1.62);
+    tl.to("#cb0", { scale: 1, backgroundColor: "#7FD6A6", borderColor: "#7FD6A6", duration: 0.15, ease: "back.out(3)" }, 1.72);
+    tl.fromTo("#cv1", { clipPath: "inset(0% 0% 100% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.3, ease: "power3.inOut" }, 1.7);
+    tl.fromTo("#cline", { y: 0, opacity: 1 }, { y: 1250, opacity: 1, duration: 0.3, ease: "power3.inOut", immediateRender: false }, 1.7);
+    tl.to("#cline", { opacity: 0, duration: 0.03 }, 2);
+    tl.to("#cur", { x: 580, y: 260, duration: 0.45, ease: "power3.inOut" }, 2.85);
+    tl.fromTo("#ring", { x: 580, y: 260, scale: 0.3, opacity: 1 }, { x: 580, y: 260, scale: 1.8, opacity: 0, duration: 0.35, ease: "power2.out", immediateRender: false }, 3.32);
+    tl.to("#ch1", { backgroundColor: "#0F5132", color: "#ffffff", borderColor: "#0F5132", duration: 0.15 }, 3.32);
+    tl.fromTo("#cb1", { scale: 1 }, { scale: 1.35, duration: 0.1, ease: "power2.out" }, 3.32);
+    tl.to("#cb1", { scale: 1, backgroundColor: "#7FD6A6", borderColor: "#7FD6A6", duration: 0.15, ease: "back.out(3)" }, 3.42);
+    tl.fromTo("#cv2", { clipPath: "inset(0% 0% 100% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.3, ease: "power3.inOut" }, 3.4);
+    tl.fromTo("#cline", { y: 0, opacity: 1 }, { y: 1250, opacity: 1, duration: 0.3, ease: "power3.inOut", immediateRender: false }, 3.4);
+    tl.to("#cline", { opacity: 0, duration: 0.03 }, 3.7);
+    tl.to("#cur", { x: 890, y: 260, duration: 0.45, ease: "power3.inOut" }, 4.55);
+    tl.fromTo("#ring", { x: 890, y: 260, scale: 0.3, opacity: 1 }, { x: 890, y: 260, scale: 1.8, opacity: 0, duration: 0.35, ease: "power2.out", immediateRender: false }, 5.02);
+    tl.to("#ch2", { backgroundColor: "#0F5132", color: "#ffffff", borderColor: "#0F5132", duration: 0.15 }, 5.02);
+    tl.fromTo("#cb2", { scale: 1 }, { scale: 1.35, duration: 0.1, ease: "power2.out" }, 5.02);
+    tl.to("#cb2", { scale: 1, backgroundColor: "#7FD6A6", borderColor: "#7FD6A6", duration: 0.15, ease: "back.out(3)" }, 5.12);
+    tl.fromTo("#cv3", { clipPath: "inset(0% 0% 100% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.3, ease: "power3.inOut" }, 5.1);
+    tl.fromTo("#cline", { y: 0, opacity: 1 }, { y: 1250, opacity: 1, duration: 0.3, ease: "power3.inOut", immediateRender: false }, 5.1);
+    tl.to("#cline", { opacity: 0, duration: 0.03 }, 5.4);
+    tl.to("#cur", { x: 425, y: 355, duration: 0.45, ease: "power3.inOut" }, 6.25);
+    tl.fromTo("#ring", { x: 425, y: 355, scale: 0.3, opacity: 1 }, { x: 425, y: 355, scale: 1.8, opacity: 0, duration: 0.35, ease: "power2.out", immediateRender: false }, 6.72);
+    tl.to("#ch3", { backgroundColor: "#0F5132", color: "#ffffff", borderColor: "#0F5132", duration: 0.15 }, 6.72);
+    tl.fromTo("#cb3", { scale: 1 }, { scale: 1.35, duration: 0.1, ease: "power2.out" }, 6.72);
+    tl.to("#cb3", { scale: 1, backgroundColor: "#7FD6A6", borderColor: "#7FD6A6", duration: 0.15, ease: "back.out(3)" }, 6.82);
+    tl.fromTo("#cv4", { clipPath: "inset(0% 0% 100% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.3, ease: "power3.inOut" }, 6.8);
+    tl.fromTo("#cline", { y: 0, opacity: 1 }, { y: 1250, opacity: 1, duration: 0.3, ease: "power3.inOut", immediateRender: false }, 6.8);
+    tl.to("#cline", { opacity: 0, duration: 0.03 }, 7.1);
+    tl.to("#cur", { x: 735, y: 355, duration: 0.45, ease: "power3.inOut" }, 7.95);
+    tl.fromTo("#ring", { x: 735, y: 355, scale: 0.3, opacity: 1 }, { x: 735, y: 355, scale: 1.8, opacity: 0, duration: 0.35, ease: "power2.out", immediateRender: false }, 8.42);
+    tl.to("#ch4", { backgroundColor: "#0F5132", color: "#ffffff", borderColor: "#0F5132", duration: 0.15 }, 8.42);
+    tl.fromTo("#cb4", { scale: 1 }, { scale: 1.35, duration: 0.1, ease: "power2.out" }, 8.42);
+    tl.to("#cb4", { scale: 1, backgroundColor: "#7FD6A6", borderColor: "#7FD6A6", duration: 0.15, ease: "back.out(3)" }, 8.52);
+    tl.fromTo("#cv5", { clipPath: "inset(0% 0% 100% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.3, ease: "power3.inOut" }, 8.5);
+    tl.fromTo("#cline", { y: 0, opacity: 1 }, { y: 1250, opacity: 1, duration: 0.3, ease: "power3.inOut", immediateRender: false }, 8.5);
+    tl.to("#cline", { opacity: 0, duration: 0.03 }, 8.8);
+    tl.to("#cur", { x: 1200, y: 1500, duration: 0.4, ease: "power3.in" }, 8.9);
+    tl.to(".chip", { opacity: 0, y: -20, scale: 0.9, duration: 0.25, ease: "power2.in", stagger: 0.04 }, 9.6);
+    tl.fromTo("#more", { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.3, ease: "back.out(2.5)" }, 9.85);
+    tl.fromTo("#lv0", { clipPath: "inset(0% 0% 100% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.3, ease: "power3.inOut" }, 10.1);
+    tl.fromTo("#cline", { y: 0, opacity: 1 }, { y: 1250, opacity: 1, duration: 0.3, ease: "power3.inOut", immediateRender: false }, 10.1);
+    tl.to("#cline", { opacity: 0, duration: 0.03 }, 10.4);
+    tl.fromTo("#ln0", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.25, ease: "expo.out" }, 10.2);
+    tl.to("#ln0", { opacity: 0, y: -16, duration: 0.15, ease: "power2.in" }, 11.55);
+    tl.fromTo("#lv1", { clipPath: "inset(0% 0% 100% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.3, ease: "power3.inOut" }, 11.6);
+    tl.fromTo("#cline", { y: 0, opacity: 1 }, { y: 1250, opacity: 1, duration: 0.3, ease: "power3.inOut", immediateRender: false }, 11.6);
+    tl.to("#cline", { opacity: 0, duration: 0.03 }, 11.9);
+    tl.fromTo("#ln1", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.25, ease: "expo.out" }, 11.7);
+    tl.to("#ln1", { opacity: 0, y: -16, duration: 0.15, ease: "power2.in" }, 13.05);
+    tl.fromTo("#lv2", { clipPath: "inset(0% 0% 100% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.3, ease: "power3.inOut" }, 13.1);
+    tl.fromTo("#cline", { y: 0, opacity: 1 }, { y: 1250, opacity: 1, duration: 0.3, ease: "power3.inOut", immediateRender: false }, 13.1);
+    tl.to("#cline", { opacity: 0, duration: 0.03 }, 13.4);
+    tl.fromTo("#ln2", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.25, ease: "expo.out" }, 13.2);
+    tl.to("#ln2", { opacity: 0, y: -16, duration: 0.15, ease: "power2.in" }, 14.55);
+    tl.fromTo("#lv3", { clipPath: "inset(0% 0% 100% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.3, ease: "power3.inOut" }, 14.6);
+    tl.fromTo("#cline", { y: 0, opacity: 1 }, { y: 1250, opacity: 1, duration: 0.3, ease: "power3.inOut", immediateRender: false }, 14.6);
+    tl.to("#cline", { opacity: 0, duration: 0.03 }, 14.9);
+    tl.fromTo("#ln3", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.25, ease: "expo.out" }, 14.7);
+    tl.to("#ln3", { opacity: 0, y: -16, duration: 0.15, ease: "power2.in" }, 16.05);
+    tl.fromTo("#lv4", { clipPath: "inset(0% 0% 100% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.3, ease: "power3.inOut" }, 16.1);
+    tl.fromTo("#cline", { y: 0, opacity: 1 }, { y: 1250, opacity: 1, duration: 0.3, ease: "power3.inOut", immediateRender: false }, 16.1);
+    tl.to("#cline", { opacity: 0, duration: 0.03 }, 16.4);
+    tl.fromTo("#ln4", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.25, ease: "expo.out" }, 16.2);
+    tl.to("#ln4", { opacity: 0, y: -16, duration: 0.15, ease: "power2.in" }, 17.55);
+    tl.fromTo("#lv5", { clipPath: "inset(0% 0% 100% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.3, ease: "power3.inOut" }, 17.6);
+    tl.fromTo("#cline", { y: 0, opacity: 1 }, { y: 1250, opacity: 1, duration: 0.3, ease: "power3.inOut", immediateRender: false }, 17.6);
+    tl.to("#cline", { opacity: 0, duration: 0.03 }, 17.9);
+    tl.fromTo("#ln5", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.25, ease: "expo.out" }, 17.7);
+    tl.to(["#more", "#ln5"], { opacity: 0, y: -20, duration: 0.2, ease: "power2.in" }, 18);
+    tl.fromTo("#cfin", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.35, ease: "expo.out" }, 18.2);
+    tl.to(["#ccard", "#more", ".lname", "#cfin"], { y: -60, opacity: 0, duration: 0.35, ease: "power2.in" }, 19.85);
+    window.__timelines["reel"] = tl;
+  </script>
+</template>

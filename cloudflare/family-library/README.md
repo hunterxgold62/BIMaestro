@@ -1,5 +1,17 @@
 # Bibliothèque communautaire Famille IA
 
+## Contrôle mensuel du 20 novembre 2026
+
+- Contrôle effectué dans le tableau de bord Cloudflare connecté, sans PowerShell et sans nouveau jeton. Les accès directs Node/Wrangler restent bloqués par la résolution DNS ; le navigateur permet néanmoins le contrôle et la mise à jour D1.
+- Forfait Workers Free actif confirmé dans les abonnements ; R2 Paid est l'abonnement de stockage existant, avec consommation facturable affichée à 0 USD. Aucun abonnement modifié.
+- Inventaire : deux Workers, une seule base D1 et trois buckets R2. Workers : 828 invocations sur les dernières 24 heures (796 maquette, 32 bibliothèque), zéro erreur sur l'accueil du compte. D1 : 49,15 kB stockés ; l'aperçu des dernières 24 heures indique 281 lignes lues et 18 écrites (les graphiques peuvent présenter un décalage de rafraîchissement).
+- R2 : 135,34 MB stockés actuellement (familles 29,13 MB, maquettes 89,58 MB, maquettes-test 16,63 MB). Facturation novembre : 0,13 GB-month, 16 opérations A et 711 B, 0 USD. L'aperçu R2 du cycle du 20 novembre au 20 décembre indique séparément 191 opérations A et 514 B ; ces périodes et sources ne sont pas assimilées.
+- Compteurs conservateurs avant renouvellement : r2_bytes=37607737 ; r2_a=67 ; r2_b=2058 ; worker_requests=2782 ; d1_reads=712192 ; d1_writes=44512 ; d1_bytes=720896. Tous sous le seuil de 80 % ; le compteur le plus élevé est d1_writes à 44,512 % du quota de référence.
+- Tarifs et limites officiels R2, D1 et Workers revérifiés le 20 novembre : les allocations utilisées par la politique restent compatibles. Les observations du tableau de bord ne constituent pas un plafond global de facturation et ne garantissent pas l'usage futur des autres services.
+- Mise à jour conditionnelle en production de la seule colonne verified_until : ancienne valeur 2026-11-27T00:00:00.000Z, nouvelle valeur **2026-12-27T00:00:00.000Z**. Condition atomique sur enabled=1, threshold_percent=80, ancienne date, types et plafonds des compteurs, avec marge pour une requête de catalogue supplémentaire. Aucun compteur remis à zéro, aucun plafond modifié.
+- Relecture D1 : enabled=1, threshold_percent=80 et nouvelle échéance confirmés. Catalogue public vérifié dans le navigateur après mise à jour : réponse JSON exploitable, 26 familles compatibles Revit 2025, nextCursor=null. Aucun téléchargement de fichier effectué pendant ce contrôle.
+- Prochain contrôle prévu le 20 décembre ; validation jusqu'au 27 décembre 2026 à 00:00 UTC (01:00 à Paris). La section du 27 octobre ci-dessous est l'historique de l'intervention précédente.
+
 ## Intervention du 27 octobre 2026
 
 - Incident confirmé en production : `GET /v1/families` répondait HTTP 429 `quota_exceeded`. La cause était `quota_policy.verified_until = 2026-10-20T00:00:00.000Z`, expiré ; aucun compteur de la bibliothèque n'avait atteint son plafond.
@@ -54,7 +66,7 @@ Budget demandé : **0 EUR**. Refuser une opération avant de dépasser **80 %** 
 
 Les sources effectives sont `quota_policy` et `quota_state`. `library_configuration.budget_policy` est un historique descriptif. L'ouverture nécessite `LIBRARY_ENABLED=true`, `enabled=1` et une vérification non expirée. Un seul bucket et une seule base étaient présents à la vérification initiale.
 
-La vérification expire le **27 novembre 2026 à 00:00 UTC** après renouvellement du 27 octobre décrit ci-dessus : le service se fermera sans renouvellement après contrôle du compte et des tarifs. Le suivi Codex décrit ci-dessus doit examiner le renouvellement dès le 20 novembre. Ne jamais remettre les compteurs à zéro ou reporter l'échéance sans rapprocher l'usage réel de tout le compte.
+La vérification expire le **27 décembre 2026 à 00:00 UTC** après renouvellement du 20 novembre décrit ci-dessus : le service se fermera sans renouvellement après contrôle du compte et des tarifs. Le suivi Codex décrit ci-dessus doit examiner le renouvellement le 20 décembre. Ne jamais remettre les compteurs à zéro ou reporter l'échéance sans rapprocher l'usage réel de tout le compte.
 
 ## Tests
 

@@ -187,7 +187,8 @@ namespace BIMaestro.VideoGames
             }
         }
 
-        public static void PrepareStaticAssets(GameSceneData scene)
+        public static void PrepareStaticAssets(GameSceneData scene, CancellationToken cancellation = default,
+            Action<GameMeshData, double>? reportCompressedShare = null, Action<int>? reportTileCount = null)
         {
             if (scene == null) throw new ArgumentNullException(nameof(scene));
             scene.WebTiles.Clear();
@@ -198,6 +199,7 @@ namespace BIMaestro.VideoGames
             long pendingBytes = 0;
             void Flush(Tuple<int, int, int> key)
             {
+                cancellation.ThrowIfCancellationRequested();
                 var batch = pending[key];
                 var merged = new List<Tuple<GameMeshData, GameDoorData?>>();
                 // Preserve door pivots; merge static meshes sharing their material.
@@ -215,10 +217,24 @@ namespace BIMaestro.VideoGames
                     using (var gzip = new GZipStream(output, CompressionLevel.Optimal, true)) gzip.Write(glb, 0, glb.Length);
                     compressed = output.ToArray();
                 }
-                var points = merged.SelectMany(item => item.Item1.Positions).Select(ToWebPoint).ToList();
+                if (reportCompressedShare != null)
+                {
+                    double compressedRatio = (double)compressed.LongLength / sizes[key];
+                    foreach (var entry in batch)
+                        reportCompressedShare(entry.Item1, MeshPayloadSize(entry.Item1) * compressedRatio);
+                }
+                var bounds = new Rect3D();
+                bool hasBounds = false;
+                foreach (var entry in merged)
+                foreach (var point in entry.Item1.Positions)
+                {
+                    var webPoint = new Point3D(point.X, point.Z, -point.Y);
+                    if (hasBounds) bounds.Union(webPoint);
+                    else { bounds = new Rect3D(webPoint, new Size3D(0, 0, 0)); hasBounds = true; }
+                }
                 scene.WebTiles.Add(new GameMepWebAsset {
                     Name = tileName, Bytes = compressed, Sha256 = Hash(compressed), DecodedBytes = glb.LongLength,
-                    Bounds = new[] { points.Min(v => v[0]), points.Min(v => v[1]), points.Min(v => v[2]), points.Max(v => v[0]), points.Max(v => v[1]), points.Max(v => v[2]) },
+                    Bounds = new[] { bounds.X, bounds.Y, bounds.Z, bounds.X + bounds.SizeX, bounds.Y + bounds.SizeY, bounds.Z + bounds.SizeZ },
                     Elements = merged.SelectMany(item => item.Item1.ElementIndices).Where(i => i >= 0).Distinct().ToArray()
                 });
                 foreach (bool transparent in new[] { false, true })
@@ -229,13 +245,15 @@ namespace BIMaestro.VideoGames
                     overview.Add(Tuple.Create<GameMeshData, GameDoorData?>(coarse, null));
                 }
                 pendingBytes -= sizes[key]; sizes.Remove(key); pending.Remove(key);
+                reportTileCount?.Invoke(scene.WebTiles.Count);
             }
             foreach (var entry in SceneMeshes(scene))
             foreach (var mesh in SplitMesh(entry.Item1))
             {
+                cancellation.ThrowIfCancellationRequested();
                 var a = mesh.Positions[mesh.Indices[0]]; var b = mesh.Positions[mesh.Indices[1]]; var c = mesh.Positions[mesh.Indices[2]];
                 var key = Tuple.Create((int)Math.Floor((a.X + b.X + c.X) / SpatialCellTripleSize), (int)Math.Floor((a.Y + b.Y + c.Y) / SpatialCellTripleSize), (int)Math.Floor((a.Z + b.Z + c.Z) / SpatialCellTripleSize));
-                long bytes = mesh.Positions.Count * 32L + mesh.Indices.Count * 4L;
+                long bytes = MeshPayloadSize(mesh);
                 if (pending.ContainsKey(key) && sizes[key] + bytes > 8 * 1024 * 1024) Flush(key);
                 if (!pending.ContainsKey(key)) { pending[key] = new List<Tuple<GameMeshData, GameDoorData?>>(); sizes[key] = 0; }
                 pending[key].Add(Tuple.Create(mesh, entry.Item2)); sizes[key] += bytes; pendingBytes += bytes;
@@ -270,6 +288,8 @@ namespace BIMaestro.VideoGames
                     }),
                 JsonSettings);
         }
+
+        private static long MeshPayloadSize(GameMeshData mesh) => mesh.Positions.Count * 32L + mesh.Indices.Count * 4L;
 
         public static void WriteLocalTilesZip(GameSceneData scene, string path, string name,
             CancellationToken cancellation)
@@ -522,36 +542,52 @@ namespace BIMaestro.VideoGames
 
         private static IEnumerable<GameMeshData> SplitMesh(GameMeshData source)
         {
-            const int maximumIndices = 90000;
-            // Spatial cells (~24 m), followed by a triangle limit for dense equipment.
-            var cells = Enumerable.Range(0, source.Indices.Count / 3).GroupBy(triangle => {
-                var a = source.Positions[source.Indices[triangle * 3]];
-                var b = source.Positions[source.Indices[triangle * 3 + 1]];
-                var c = source.Positions[source.Indices[triangle * 3 + 2]];
-                return Tuple.Create((int)Math.Floor((a.X + b.X + c.X) / SpatialCellTripleSize), (int)Math.Floor((a.Y + b.Y + c.Y) / SpatialCellTripleSize), (int)Math.Floor((a.Z + b.Z + c.Z) / SpatialCellTripleSize));
+            const int maximumTriangles = 30000;
+            // Group triangle offsets directly, preserving the spatial order and vertex indices.
+            var cells = Enumerable.Range(0, source.Indices.Count / 3).GroupBy(triangle =>
+            {
+                int offset = triangle * 3;
+                var a = source.Positions[source.Indices[offset]];
+                var b = source.Positions[source.Indices[offset + 1]];
+                var c = source.Positions[source.Indices[offset + 2]];
+                return ((int)Math.Floor((a.X + b.X + c.X) / SpatialCellTripleSize),
+                    (int)Math.Floor((a.Y + b.Y + c.Y) / SpatialCellTripleSize),
+                    (int)Math.Floor((a.Z + b.Z + c.Z) / SpatialCellTripleSize));
             });
+
             foreach (var cell in cells)
             {
-            var sourceIndices = cell.SelectMany(triangle => new[] { source.Indices[triangle * 3], source.Indices[triangle * 3 + 1], source.Indices[triangle * 3 + 2] }).ToArray();
-            for (int start = 0; start < sourceIndices.Length; start += maximumIndices)
-            {
-                var part = new GameMeshData { IsTransparent = source.IsTransparent, HasCompleteNormals = source.HasCompleteNormals };
+                GameMeshData part = null!;
                 var indices = new Dictionary<int, int>();
-                for (int i = start; i < Math.Min(sourceIndices.Length, start + maximumIndices); i++)
+                int count = 0;
+                foreach (int triangle in cell)
                 {
-                    int original = sourceIndices[i];
-                    if (!indices.TryGetValue(original, out int mapped))
+                    if (count == 0)
+                        part = new GameMeshData { IsTransparent = source.IsTransparent, HasCompleteNormals = source.HasCompleteNormals };
+
+                    int offset = triangle * 3;
+                    for (int i = offset; i < offset + 3; i++)
                     {
-                        mapped = part.Positions.Count; indices.Add(original, mapped);
-                        part.Positions.Add(source.Positions[original]);
-                        part.VertexColors.Add(source.VertexColors[original]);
-                        part.ElementIndices.Add(source.ElementIndices[original]);
-                        if (original < source.VertexNormals.Count) part.VertexNormals.Add(source.VertexNormals[original]);
+                        int original = source.Indices[i];
+                        if (!indices.TryGetValue(original, out int mapped))
+                        {
+                            mapped = part.Positions.Count;
+                            indices.Add(original, mapped);
+                            part.Positions.Add(source.Positions[original]);
+                            part.VertexColors.Add(source.VertexColors[original]);
+                            part.ElementIndices.Add(source.ElementIndices[original]);
+                            if (original < source.VertexNormals.Count) part.VertexNormals.Add(source.VertexNormals[original]);
+                        }
+                        part.Indices.Add(mapped);
                     }
-                    part.Indices.Add(mapped);
+                    if (++count == maximumTriangles)
+                    {
+                        yield return part;
+                        count = 0;
+                        indices.Clear();
+                    }
                 }
-                yield return part;
-            }
+                if (count > 0) yield return part;
             }
         }
 

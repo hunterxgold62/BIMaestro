@@ -129,7 +129,7 @@ namespace Page
                 LatestChip.Background = (System.Windows.Media.Brush)bc.ConvertFrom("#213428");
                 LatestChip.BorderBrush = (System.Windows.Media.Brush)bc.ConvertFrom("#2B5C3A");
                 LatestText.Foreground = (System.Windows.Media.Brush)bc.ConvertFrom("#B8F5C8");
-                LatestText.Text = UiLanguage.T("À jour (dernière v", "Up to Date (Latest v") + _latest + ")";
+                LatestText.Text = UiLanguage.Get("UpdateWindow.xaml.UpToDateLatestV") + _latest + ")";
             }
             else
             {
@@ -137,7 +137,7 @@ namespace Page
                 LatestChip.Background = (System.Windows.Media.Brush)bc.ConvertFrom("#3A2A1E");
                 LatestChip.BorderBrush = (System.Windows.Media.Brush)bc.ConvertFrom("#6B4A2D");
                 LatestText.Foreground = (System.Windows.Media.Brush)bc.ConvertFrom("#FFD9B3");
-                LatestText.Text = UiLanguage.T("MàJ dispo v", "Update Available v") + _latest;
+                LatestText.Text = UiLanguage.Get("UpdateWindow.xaml.UpdateAvailableV") + _latest;
             }
         }
         private IntPtr WindowProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -385,7 +385,7 @@ namespace Page
             }
             catch (Exception ex)
             {
-                MessageBox.Show(UiLanguage.T("Impossible d'ouvrir le lien : ", "Unable to Open the Link: ") + ex.Message, UiLanguage.T("Ouverture du lien", "Opening Link"),
+                MessageBox.Show(UiLanguage.Get("UpdateWindow.xaml.UnableToOpenTheLink") + ex.Message, UiLanguage.Get("UpdateWindow.xaml.OpeningLink"),
                     MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
@@ -405,9 +405,7 @@ namespace Page
         private void UpdateNow_Click(object sender, RoutedEventArgs e)
         {
             MessageBox.Show(
-                UiLanguage.T(
-                    "Téléchargez la nouvelle version sur le site officiel, puis fermez toutes les fenêtres Revit et lancez l'installateur.",
-                    "Download the new version from the official website, then close all Revit windows and run the installer."),
+                UiLanguage.Get("UpdateWindow.xaml.DownloadTheNewVersionFromTheOfficialWebsite"),
                 "BIMaestro",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
@@ -418,7 +416,7 @@ namespace Page
             catch (Exception ex)
             {
                 MessageBox.Show(
-                    UiLanguage.T("Impossible d'ouvrir la page de téléchargement : ", "Unable to open the download page: ") + ex.Message +
+                    UiLanguage.Get("UpdateWindow.xaml.UnableToOpenTheDownloadPage") + ex.Message +
                     "\n\n" + UpdateCheckService.DownloadPageUrl,
                     "BIMaestro",
                     MessageBoxButton.OK,

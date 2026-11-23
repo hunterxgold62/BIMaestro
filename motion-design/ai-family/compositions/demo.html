@@ -1,0 +1,31 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; }
+    #dm-tag { position: absolute; top: 300px; left: 0; right: 0; margin: 0 auto; width: max-content; padding: 18px 38px; border-radius: 999px; background: #E7F6EE; color: #0F5132; font-weight: 900; font-size: 56px; letter-spacing: -0.02em; }
+    #dm-frame { position: absolute; left: 60px; top: 500px; width: 960px; height: 540px; border-radius: 36px; overflow: hidden; background: #000; box-shadow: 0 40px 120px rgba(0,0,0,.6), 0 0 0 6px #155C42; }
+    #dm-video { position: absolute; left: 0; top: 0; width: 960px; height: 540px; object-fit: cover; }
+    #dm-sub { position: absolute; top: 1090px; left: 130px; right: 190px; text-align: center; color: #fff; font-weight: 700; font-size: 52px; line-height: 1.15; }
+    #dm-sub b { color: #7FD6A6; }
+  </style>
+  <div id="root" data-composition-id="demo" data-width="1080" data-height="1920">
+    <div id="dm-tag" data-var-text="feature">Famille IA</div>
+    <div id="dm-frame">
+      <video id="dm-video" class="clip" src="assets/aifamily.mp4" data-start="0" data-duration="6" muted playsinline></video>
+    </div>
+    <div id="dm-sub">Tu décris. <b>BIMaestro modélise.</b></div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#dm-frame", { y: 600, rotation: -6, scale: 0.8 }, { y: 0, rotation: 0, scale: 1, duration: 0.45, ease: "expo.out" }, 0);
+    tl.fromTo("#dm-tag", { y: -60, opacity: 0, scale: 0.6 }, { y: 0, opacity: 1, scale: 1, duration: 0.35, ease: "back.out(2.5)" }, 0.15);
+    tl.fromTo("#dm-sub", { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.3, ease: "power3.out" }, 0.5);
+    // punch-ins on the footage
+    tl.fromTo("#dm-video", { scale: 1, x: 0, y: 0 }, { scale: 1.45, x: -120, y: -40, duration: 0.35, ease: "power4.out" }, 1.6);
+    tl.to("#dm-video", { scale: 1.45, duration: 1.1, ease: "none" }, 1.95);
+    tl.to("#dm-video", { scale: 1, x: 0, y: 0, duration: 0.35, ease: "power4.inOut" }, 3.05);
+    tl.to("#dm-frame", { scale: 1.08, duration: 0.2, ease: "power2.out" }, 4.3);
+    tl.to("#dm-frame", { scale: 1, duration: 0.2, ease: "power2.in" }, 4.5);
+    tl.to(["#dm-frame", "#dm-tag", "#dm-sub"], { x: -1200, duration: 0.3, ease: "power3.in", stagger: 0.03 }, 5.6);
+    window.__timelines["demo"] = tl;
+  </script>
+</template>

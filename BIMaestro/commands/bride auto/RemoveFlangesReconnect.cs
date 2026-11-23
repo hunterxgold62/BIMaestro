@@ -60,7 +60,7 @@ namespace Modification
 
                 if (targets.Count == 0)
                 {
-                    TaskDialog.Show(UiLanguage.T("Retrait de brides", "Remove Flanges"), UiLanguage.T("Aucun élément MEP (piping/HVAC) valide dans la sélection.", "No valid MEP (piping/HVAC) element was selected."));
+                    TaskDialog.Show(UiLanguage.Get("RemoveFlangesReconnect.RemoveFlanges"), UiLanguage.Get("RemoveFlangesReconnect.NoValidMEPPipingHVACElementWasSelected"));
                     return Result.Cancelled;
                 }
 
@@ -258,9 +258,7 @@ namespace Modification
 
                 try { uiDoc.RefreshActiveView(); } catch { }
 
-                TaskDialog.Show(UiLanguage.T("Retrait de brides", "Remove Flanges"), UiLanguage.T(
-                    $"Brides supprimées : {removedFlanges}\nSkippables supprimés : {removedSkippables}\nRéductions conservées : {keptReducers}\nRéductions déplacées : {movedKeptReducers}\nTransitions neuves créées : {createdTransitions}\nConnexions rétablies : {reconnected}\nIgnorées : {skipped}\nÉchecs (rollback) : {failures}",
-                    $"Flanges removed: {removedFlanges}\nSkippables removed: {removedSkippables}\nReducers kept: {keptReducers}\nReducers moved: {movedKeptReducers}\nNew transitions created: {createdTransitions}\nConnections restored: {reconnected}\nSkipped: {skipped}\nRollback failures: {failures}"));
+                TaskDialog.Show(UiLanguage.Get("RemoveFlangesReconnect.RemoveFlanges"), UiLanguage.Format("RemoveFlangesReconnect.FlangesRemoved0SkippablesRemoved1ReducersKept", (object)removedFlanges, (object)removedSkippables, (object)keptReducers, (object)movedKeptReducers, (object)createdTransitions, (object)reconnected, (object)skipped, (object)failures));
 
                 return Result.Succeeded;
             }

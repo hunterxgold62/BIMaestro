@@ -85,7 +85,7 @@ namespace BIMaestro.UI
             }
             catch (Exception ex)
             {
-                TaskDialog.Show(UiLanguage.T("BIMaestro - Rosace (erreur)", "BIMaestro - Radial Menu Error"), ex.Message);
+                TaskDialog.Show(UiLanguage.Get("RadialPlaceFamilyHandler.BIMaestroRadialMenuError"), ex.Message);
             }
         }
 

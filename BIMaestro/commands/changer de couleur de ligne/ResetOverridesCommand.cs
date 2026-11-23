@@ -19,7 +19,7 @@ namespace Modification
             var selectedIds = uidoc.Selection.GetElementIds();
             if (selectedIds.Count == 0)
             {
-                TaskDialog.Show(UiLanguage.T("Erreur", "Error"), UiLanguage.T("Aucun élément sélectionné. Sélectionnez d’abord les éléments à réinitialiser.", "No Element Selected. First Select the Elements to Reset."));
+                TaskDialog.Show(UiLanguage.Get("ResetOverridesCommand.Error"), UiLanguage.Get("ResetOverridesCommand.NoElementSelectedFirstSelectTheElementsTo"));
                 return Result.Failed;
             }
 

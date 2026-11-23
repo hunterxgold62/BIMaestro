@@ -25,7 +25,7 @@ namespace Visualisation
                 try
                 {
                     // Sélectionner une face
-                    Reference pickedRef = uidoc.Selection.PickObject(ObjectType.Face, UiLanguage.T("Sélectionne une face à orienter", "Select a face to orient the view"));
+                    Reference pickedRef = uidoc.Selection.PickObject(ObjectType.Face, UiLanguage.Get("vuesurface3D.SelectAFaceToOrientTheView"));
                     Element selectedElement = doc.GetElement(pickedRef.ElementId);
                     GeometryObject geomObj = selectedElement?.GetGeometryObjectFromReference(pickedRef);
 
@@ -41,7 +41,7 @@ namespace Visualisation
                     }
                     else
                     {
-                        TaskDialog.Show(UiLanguage.T("Erreur", "Error"), UiLanguage.T("L'objet sélectionné n'est pas une face. Réessaie avec une surface valide.", "The selected object is not a face. Try again with a valid surface."));
+                        TaskDialog.Show(UiLanguage.Get("vuesurface3D.Error"), UiLanguage.Get("vuesurface3D.TheSelectedObjectIsNotAFaceTry"));
                         return Result.Failed;
                     }
 
@@ -69,7 +69,7 @@ namespace Visualisation
             else
             {
                 // Message d'erreur si la vue n'est pas 3D
-                TaskDialog.Show(UiLanguage.T("Oups !", "Oops!"), UiLanguage.T("Heeey, tu dois être sur une vue 3D pour que ça marche !", "Hey, you must be in a 3D view for this to work!"));
+                TaskDialog.Show(UiLanguage.Get("vuesurface3D.Oops"), UiLanguage.Get("vuesurface3D.HeyYouMustBeInA3DView"));
                 return Result.Failed;
             }
         }

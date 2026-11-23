@@ -18,7 +18,7 @@ namespace Analyse
             var uidoc = uiapp.ActiveUIDocument;
             if (uidoc == null || uidoc.Document == null)
             {
-                TaskDialog.Show(UiLanguage.T("Suivi maquette", "Model Tracking"), UiLanguage.T("Aucun document actif.", "No active document."));
+                TaskDialog.Show(UiLanguage.Get("CollaborativeModelTracker.ModelTracking"), UiLanguage.Get("CollaborativeModelTracker.NoActiveDocument"));
                 return Result.Cancelled;
             }
 

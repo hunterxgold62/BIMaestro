@@ -64,7 +64,7 @@ namespace Licensing
             {
                 Source = new Uri("/BIMaestro;component/Themes/BIMaestroTheme.xaml", UriKind.Relative)
             });
-            Title = UiLanguage.T("BIMaestro — Limite IA atteinte", "BIMaestro — AI limit reached");
+            Title = UiLanguage.Get("AiQuotaWindow.BIMaestroAILimitReached");
             Width = 610;
             Height = 620;
             MinWidth = 480;
@@ -75,33 +75,26 @@ namespace Licensing
 
             var content = new StackPanel { Margin = new Thickness(26) };
             Content = new ScrollViewer { Content = content, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
-            var heading = Paragraph(UiLanguage.T("Votre limite IA est atteinte", "You have reached your AI limit"), 25);
+            var heading = Paragraph(UiLanguage.Get("AiQuotaWindow.YouHaveReachedYourAILimit"), 25);
             heading.FontWeight = FontWeights.Bold;
             content.Children.Add(heading);
-            content.Children.Add(Paragraph(UiLanguage.T(
-                "Besoin de continuer ? Contactez-moi.", "Need to continue? Get in touch."), 18));
-            content.Children.Add(Paragraph(UiLanguage.T(
-                "Je ne vérifie pas systématiquement les quotas de chacun et leur augmentation n’est pas automatique. Il vous suffit de me contacter : je pourrai modifier votre limite pour que vous puissiez continuer à utiliser l’IA.",
-                "I don’t systematically review everyone’s quotas, and increases are not automatic. Just contact me: I can adjust your limit so you can keep using AI.")));
-            content.Children.Add(Paragraph(UiLanguage.T(
-                "Les appels à l’IA ont un coût que je prends personnellement en charge. Si vous le souhaitez, un don, même très faible, m’aide à couvrir ces frais et à poursuivre le développement de BIMaestro.",
-                "I personally pay for AI requests. If you wish, even a very small donation helps cover these costs and supports continued development of BIMaestro.")));
-            var reassurance = Paragraph(UiLanguage.T(
-                "Vous ne pouvez pas faire de don ? Aucun souci ! Si vous appréciez mon travail, c’est déjà beaucoup. Contactez-moi quand même pour augmenter votre limite : aucun don n’est nécessaire.",
-                "Can’t donate? No problem! Knowing you appreciate my work already means a lot. Contact me anyway to increase your limit: no donation is required."));
+            content.Children.Add(Paragraph(UiLanguage.Get("AiQuotaWindow.NeedToContinueGetInTouch"), 18));
+            content.Children.Add(Paragraph(UiLanguage.Get("AiQuotaWindow.IDonTSystematicallyReviewEveryoneSQuotas")));
+            content.Children.Add(Paragraph(UiLanguage.Get("AiQuotaWindow.IPersonallyPayForAIRequestsIfYou")));
+            var reassurance = Paragraph(UiLanguage.Get("AiQuotaWindow.CanTDonateNoProblemKnowingYouAppreciate"));
             reassurance.FontWeight = FontWeights.SemiBold;
             content.Children.Add(reassurance);
-            content.Children.Add(Paragraph(UiLanguage.T("Paul — Créateur de BIMaestro", "Paul — Creator of BIMaestro")));
+            content.Children.Add(Paragraph(UiLanguage.Get("AiQuotaWindow.PaulCreatorOfBIMaestro")));
             var contacts = new WrapPanel();
             contacts.Children.Add(LinkButton("LinkedIn", "https://www.linkedin.com/in/paul-lemert-b40921207", true));
-            string subject = UiLanguage.T("BIMaestro — Demande d’augmentation du quota IA", "BIMaestro — AI quota increase request");
-            string body = UiLanguage.T("Bonjour Paul,\r\n\r\nJ’ai atteint ma limite IA et souhaiterais l’augmenter.\r\nMon nom d’utilisateur Revit : \r\n\r\nMerci pour ton travail !", "Hi Paul,\r\n\r\nI have reached my AI limit and would like to increase it.\r\nMy Revit username: \r\n\r\nThanks for your work!");
-            contacts.Children.Add(LinkButton(UiLanguage.T("Envoyer un e-mail", "Send an email"), "mailto:bimaestro.plugin@gmail.com?subject=" + Uri.EscapeDataString(subject) + "&body=" + Uri.EscapeDataString(body), true));
+            string subject = UiLanguage.Get("AiQuotaWindow.BIMaestroAIQuotaIncreaseRequest");
+            string body = UiLanguage.Get("AiQuotaWindow.HiPaulIHaveReachedMyAILimit");
+            contacts.Children.Add(LinkButton(UiLanguage.Get("AiQuotaWindow.SendAnEmail"), "mailto:bimaestro.plugin@gmail.com?subject=" + Uri.EscapeDataString(subject) + "&body=" + Uri.EscapeDataString(body), true));
             content.Children.Add(contacts);
             content.Children.Add(Paragraph("bimaestro.plugin@gmail.com", 12));
             var footer = new WrapPanel();
-            footer.Children.Add(LinkButton(UiLanguage.T("Soutenir (facultatif)", "Support (optional)"), "https://ko-fi.com/bimaestro", false));
-            var close = new Button { Content = UiLanguage.T("Fermer", "Close"), Padding = new Thickness(16, 10, 16, 10), Margin = new Thickness(0, 0, 10, 8) };
+            footer.Children.Add(LinkButton(UiLanguage.Get("AiQuotaWindow.SupportOptional"), "https://ko-fi.com/bimaestro", false));
+            var close = new Button { Content = UiLanguage.Get("AiQuotaWindow.Close"), Padding = new Thickness(16, 10, 16, 10), Margin = new Thickness(0, 0, 10, 8) };
             close.SetResourceReference(StyleProperty, "SecondaryButton");
             close.Click += (_, __) => Close();
             footer.Children.Add(close);
@@ -125,7 +118,7 @@ namespace Licensing
                 try { Process.Start(new ProcessStartInfo { FileName = uri, UseShellExecute = true }); }
                 catch (Exception)
                 {
-                    MessageBox.Show(this, UiLanguage.T("Impossible d’ouvrir ce lien. Vous pouvez me contacter à l’adresse : bimaestro.plugin@gmail.com", "Unable to open this link. You can contact me at: bimaestro.plugin@gmail.com"), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show(this, UiLanguage.Get("AiQuotaWindow.UnableToOpenThisLinkYouCanContact"), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
             };
             return button;

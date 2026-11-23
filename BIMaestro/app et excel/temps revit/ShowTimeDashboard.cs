@@ -59,7 +59,7 @@ namespace BIMaestro.Dashboard
                     }
                     catch (Exception ex)
                     {
-                        TaskDialog.Show("Temps par projet", ex.ToString());
+                        TaskDialog.Show(global::BIMaestro.Localization.UiLanguage.Get("UiDialog.ProjectTime"), ex.ToString());
                     }
                 };
                 _pendingOpen = timer;

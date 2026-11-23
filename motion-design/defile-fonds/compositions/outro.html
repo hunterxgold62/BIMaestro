@@ -1,0 +1,20 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 140px 320px 20px; gap: 26px; }
+    #ot-logo { width: 280px; height: 280px; border-radius: 60px; background: #fff; padding: 26px; object-fit: contain; box-shadow: 0 30px 80px rgba(17,24,39,.18), 0 0 0 2px #E5E7EB; }
+    #ot-name { color: #111827; font-weight: 900; font-size: 96px; letter-spacing: -0.04em; }
+    #ot-sub { color: #fff; background: #0F5132; font-weight: 800; font-size: 40px; padding: 14px 30px; border-radius: 999px; }
+  </style>
+  <div id="root" data-composition-id="outro" data-width="1080" data-height="1920">
+    <img id="ot-logo" src="assets/logo.png" alt="BIMaestro" />
+    <div id="ot-name">BIMaestro</div>
+    <div id="ot-sub">Le plugin Revit qui bosse pour toi</div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#ot-logo", { scale: 0.4, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: "back.out(1.8)" }, 0);
+    tl.fromTo("#ot-name", { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4, ease: "expo.out" }, 0.2);
+    tl.fromTo("#ot-sub", { y: 30, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4, ease: "expo.out" }, 0.35);
+    window.__timelines["outro"] = tl;
+  </script>
+</template>

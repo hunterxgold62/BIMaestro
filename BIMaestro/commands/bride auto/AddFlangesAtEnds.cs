@@ -159,7 +159,7 @@ namespace Modification
                                  .ToList();
                 if (targets.Count == 0)
                 {
-                    TaskDialog.Show(UiLanguage.T("Brides", "Flanges"), UiLanguage.T("Aucun élément MEP (piping) valide dans la sélection.", "No valid MEP (piping) element was selected."));
+                    TaskDialog.Show(UiLanguage.Get("AddFlangesAtEnds.Flanges"), UiLanguage.Get("AddFlangesAtEnds.NoValidMEPPipingElementWasSelected"));
                     return Result.Cancelled;
                 }
 
@@ -167,8 +167,8 @@ namespace Modification
                 var baseFlangeSymbol = FindFlangeSymbol(doc);
                 if (baseFlangeSymbol == null)
                 {
-                    TaskDialog.Show(UiLanguage.T("Brides manquantes", "Missing Flanges"),
-                        UiLanguage.T("Aucun type 'bride' admissible. Charge par ex. 'CML Bride à collerette tous PN2'.", "No eligible flange type was found. Load, for example, 'CML Bride à collerette tous PN2'."));
+                    TaskDialog.Show(UiLanguage.Get("AddFlangesAtEnds.MissingFlanges"),
+                        UiLanguage.Get("AddFlangesAtEnds.NoEligibleFlangeTypeWasFoundLoadFor"));
                     return Result.Cancelled;
                 }
 
@@ -176,9 +176,8 @@ namespace Modification
                 if (fpt != FamilyPlacementType.OneLevelBased &&
                     fpt != FamilyPlacementType.TwoLevelsBased)
                 {
-                    TaskDialog.Show(UiLanguage.T("Bride incompatible", "Incompatible Flange"),
-                        UiLanguage.T($"La famille '{baseFlangeSymbol.FamilyName}' a un type de placement non supporté : {fpt}.\nUtilise une bride OneLevelBased/TwoLevelsBased (non hébergée).",
-                            $"The family '{baseFlangeSymbol.FamilyName}' uses an unsupported placement type: {fpt}.\nUse a OneLevelBased/TwoLevelsBased flange (not hosted)."));
+                    TaskDialog.Show(UiLanguage.Get("AddFlangesAtEnds.IncompatibleFlange"),
+                        UiLanguage.Format("AddFlangesAtEnds.TheFamily0UsesAnUnsupportedPlacementType", (object)baseFlangeSymbol.FamilyName, (object)fpt));
                     return Result.Failed;
                 }
 
@@ -519,11 +518,11 @@ namespace Modification
             if (issues.Count > maxDetailedIssues)
                 details.AppendLine($"… {issues.Count - maxDetailedIssues} autre(s) échec(s) non affiché(s). Les éléments restent sélectionnés.");
 
-            var dialog = new TaskDialog(UiLanguage.T("Rapport des brides", "Flange Report"))
+            var dialog = new TaskDialog(UiLanguage.Get("AddFlangesAtEnds.FlangeReport"))
             {
                 MainInstruction = issues.Count == 0
-                    ? UiLanguage.T("Pose terminée sans erreur", "Placement completed without errors")
-                    : UiLanguage.T($"{issues.Count} bride(s) non installée(s)", $"{issues.Count} flange(s) not installed"),
+                    ? UiLanguage.Get("AddFlangesAtEnds.PlacementCompletedWithoutErrors")
+                    : UiLanguage.Format("AddFlangesAtEnds.0FlangeSNotInstalled", (object)issues.Count),
                 MainContent = summary.ToString().TrimEnd(),
                 ExpandedContent = details.ToString().TrimEnd(),
                 CommonButtons = TaskDialogCommonButtons.Close,

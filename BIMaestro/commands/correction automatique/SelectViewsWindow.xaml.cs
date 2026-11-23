@@ -49,7 +49,7 @@ namespace ScanTextRevit
             }
             catch (System.Exception ex)
             {
-                MessageBox.Show(UiLanguage.T($"Impossible d’ouvrir la page d’aide : {ex.Message}", $"Unable to open the help page: {ex.Message}"), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(UiLanguage.Format("SelectViewsWindow.xaml.UnableToOpenTheHelpPage0", (object)ex.Message), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
@@ -100,7 +100,7 @@ namespace ScanTextRevit
             {
                 var chkGroupVues = new CheckBox
                 {
-                    Content = UiLanguage.T("VUES (cocher/décocher tout)", "VIEWS (select/clear all)"),
+                    Content = UiLanguage.Get("SelectViewsWindow.xaml.VIEWSSelectClearAll"),
                     IsChecked = false,
                     Foreground = this.Foreground
                 };
@@ -144,7 +144,7 @@ namespace ScanTextRevit
             {
                 var chkGroupSheets = new CheckBox
                 {
-                    Content = UiLanguage.T("FEUILLES (cocher/décocher tout)", "SHEETS (select/clear all)"),
+                    Content = UiLanguage.Get("SelectViewsWindow.xaml.SHEETSSelectClearAll"),
                     IsChecked = false,
                     Foreground = this.Foreground
                 };
@@ -169,7 +169,7 @@ namespace ScanTextRevit
                         {
                             var sheetCb = new CheckBox
                             {
-                                Content = UiLanguage.T($"Feuille : {sheet.SheetNumber} - {sheet.Name}", $"Sheet: {sheet.SheetNumber} - {sheet.Name}"),
+                                Content = UiLanguage.Format("SelectViewsWindow.xaml.Sheet01", (object)sheet.SheetNumber, (object)sheet.Name),
                                 Tag = sheet.Id,
                                 Foreground = this.Foreground,
                                 IsChecked = _sheetsGroupCheckBox?.IsChecked == true
@@ -207,7 +207,7 @@ namespace ScanTextRevit
                                     if (!(_doc.GetElement(ssi.ScheduleId) is ViewSchedule vsched)) continue;
                                     var cbChild = new CheckBox
                                     {
-                                        Content = UiLanguage.T($"Nomenclature : {vsched.Name}", $"Schedule: {vsched.Name}"),
+                                        Content = UiLanguage.Format("SelectViewsWindow.xaml.Schedule0", (object)vsched.Name),
                                         Tag = vsched.Id,
                                         Foreground = this.Foreground,
                                         IsChecked = _sheetsGroupCheckBox?.IsChecked == true
@@ -243,9 +243,9 @@ namespace ScanTextRevit
 
         private string GetViewTypeLabel(View view)
         {
-            if (view is ViewSchedule) return UiLanguage.T("Nomenclature", "Schedule");
-            if (view.ViewType == ViewType.Legend) return UiLanguage.T("Légende", "Legend");
-            return UiLanguage.T("Vue", "View");
+            if (view is ViewSchedule) return UiLanguage.Get("SelectViewsWindow.xaml.Schedule");
+            if (view.ViewType == ViewType.Legend) return UiLanguage.Get("SelectViewsWindow.xaml.Legend");
+            return UiLanguage.Get("SelectViewsWindow.xaml.View");
         }
 
         /// <summary>

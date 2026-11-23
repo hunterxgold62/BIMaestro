@@ -1,0 +1,374 @@
+{
+  "version": 1,
+  "historyId": "8f7c32f2-f641-4dbc-88ae-f2efafb3f29c",
+  "currentRevision": "4f5c949f-82ed-40b7-8cc2-5c25151fd1cf",
+  "pendingChanges": false,
+  "files": {
+    "AGENTS.md": {
+      "hash": "729e31835a21c7b42ee006e2aacc63016abc05d26883f871ad3bf206943f2cfb",
+      "content": "C:\\Users\\plemert\\.cache\\hyperframes\\history\\8f7c32f2-f641-4dbc-88ae-f2efafb3f29c\\blobs\\72\\729e31835a21c7b42ee006e2aacc63016abc05d26883f871ad3bf206943f2cfb"
+    },
+    "CLAUDE.md": {
+      "hash": "729e31835a21c7b42ee006e2aacc63016abc05d26883f871ad3bf206943f2cfb",
+      "content": "C:\\Users\\plemert\\.cache\\hyperframes\\history\\8f7c32f2-f641-4dbc-88ae-f2efafb3f29c\\blobs\\72\\729e31835a21c7b42ee006e2aacc63016abc05d26883f871ad3bf206943f2cfb"
+    },
+    "assets/logo.png": {
+      "hash": "99f93fab9623e6e06ea9fb3f589f94ef1baf2942db8272699975b46efd14f62e",
+      "content": "C:\\Users\\plemert\\.cache\\hyperframes\\history\\8f7c32f2-f641-4dbc-88ae-f2efafb3f29c\\blobs\\99\\99f93fab9623e6e06ea9fb3f589f94ef1baf2942db8272699975b46efd14f62e"
+    },
+    "assets/sfx/click.mp3": {
+      "hash": "075e17bdac5c13662a1c9530050e0046f81d4138e00eb3bf30427a7b4404103d",
+      "content": "C:\\Users\\plemert\\.cache\\hyperframes\\history\\8f7c32f2-f641-4dbc-88ae-f2efafb3f29c\\blobs\\07\\075e17bdac5c13662a1c9530050e0046f81d4138e00eb3bf30427a7b4404103d"
+    },
+    "assets/sfx/pop.mp3": {
+      "hash": "19ab7193f626ff57fdeef60b45543bac416fcbcec803cfb417abe4b271c1b352",
+      "content": "C:\\Users\\plemert\\.cache\\hyperframes\\history\\8f7c32f2-f641-4dbc-88ae-f2efafb3f29c\\blobs\\19\\19ab7193f626ff57fdeef60b45543bac416fcbcec803cfb417abe4b271c1b352"
+    },
+    "assets/sfx/whoosh.mp3": {
+      "hash": "c2efd9d902a59bf9ec5019035d7deadd17762136896b6e3cb6dd99ea50997a30",
+      "content": "C:\\Users\\plemert\\.cache\\hyperframes\\history\\8f7c32f2-f641-4dbc-88ae-f2efafb3f29c\\blobs\\c2\\c2efd9d902a59bf9ec5019035d7deadd17762136896b6e3cb6dd99ea50997a30"
+    },
+    "compositions/outro.html": {
+      "hash": "9bcc3cc1cb655f3c2f155b747d5a3bd2dfea7f86990cdbae10289e5a8fc1c171",
+      "content": "C:\\Users\\plemert\\.cache\\hyperframes\\history\\8f7c32f2-f641-4dbc-88ae-f2efafb3f29c\\blobs\\9b\\9bcc3cc1cb655f3c2f155b747d5a3bd2dfea7f86990cdbae10289e5a8fc1c171"
+    },
+    "compositions/reel.html": {
+      "hash": "6082f7e67a0bcc8edb80672ee4be318eb30d00b0d6d2e1677df5ee70e2be57ff",
+      "content": "C:\\Users\\plemert\\.cache\\hyperframes\\history\\8f7c32f2-f641-4dbc-88ae-f2efafb3f29c\\blobs\\60\\6082f7e67a0bcc8edb80672ee4be318eb30d00b0d6d2e1677df5ee70e2be57ff"
+    },
+    "gen.mjs": {
+      "hash": "8813767867e5aebb4451079c57524ca0ad326df411d936fc7334fa7eccbec4fd",
+      "content": "C:\\Users\\plemert\\.cache\\hyperframes\\history\\8f7c32f2-f641-4dbc-88ae-f2efafb3f29c\\blobs\\88\\8813767867e5aebb4451079c57524ca0ad326df411d936fc7334fa7eccbec4fd"
+    },
+    "hyperframes.json": {
+      "hash": "35a6d4ea79ebe911f0d81705f7aace5d8ff0316b745b0311d56af50c9c237cb7",
+      "content": "C:\\Users\\plemert\\.cache\\hyperframes\\history\\8f7c32f2-f641-4dbc-88ae-f2efafb3f29c\\blobs\\35\\35a6d4ea79ebe911f0d81705f7aace5d8ff0316b745b0311d56af50c9c237cb7"
+    },
+    "index.html": {
+      "hash": "b832d60afd5b2a0a603584a0f042a6a7d0389c4eebec6f0826d139a0327b3286",
+      "content": "C:\\Users\\plemert\\.cache\\hyperframes\\history\\8f7c32f2-f641-4dbc-88ae-f2efafb3f29c\\blobs\\b8\\b832d60afd5b2a0a603584a0f042a6a7d0389c4eebec6f0826d139a0327b3286"
+    },
+    "meta.json": {
+      "hash": "f9fc2f3cbe439cb1751b81dde8b91b07bd04ffc9de178216c36610576c263731",
+      "content": "C:\\Users\\plemert\\.cache\\hyperframes\\history\\8f7c32f2-f641-4dbc-88ae-f2efafb3f29c\\blobs\\f9\\f9fc2f3cbe439cb1751b81dde8b91b07bd04ffc9de178216c36610576c263731"
+    },
+    "package.json": {
+      "hash": "e312821cb47a18302a24688f1e687f3aac4afa7e3a27aa6fd52e419c4276379d",
+      "content": "C:\\Users\\plemert\\.cache\\hyperframes\\history\\8f7c32f2-f641-4dbc-88ae-f2efafb3f29c\\blobs\\e3\\e312821cb47a18302a24688f1e687f3aac4afa7e3a27aa6fd52e419c4276379d"
+    },
+    "assets/config.mp4": {
+      "hash": "7c14e2915df57d7c132db5615abde9a689b3262c7e9bbcb542a30573f3ad0622",
+      "content": "C:\\Users\\plemert\\.cache\\hyperframes\\history\\8f7c32f2-f641-4dbc-88ae-f2efafb3f29c\\blobs\\7c\\7c14e2915df57d7c132db5615abde9a689b3262c7e9bbcb542a30573f3ad0622"
+    }
+  },
+  "revisions": {
+    "4f5c949f-82ed-40b7-8cc2-5c25151fd1cf": {
+      "actor": {
+        "kind": "outside",
+        "name": "Outside"
+      },
+      "label": "Changed outside the app",
+      "startedAt": 1795103659978,
+      "endedAt": 1795103660001,
+      "files": {
+        "compositions/reel.html": {
+          "before": "C:\\Users\\plemert\\.cache\\hyperframes\\history\\8f7c32f2-f641-4dbc-88ae-f2efafb3f29c\\blobs\\ea\\eaa61a2f1e72a288aaa735cc0a5195f54f94c69a3784a97c1e2e37023d03955f",
+          "after": "C:\\Users\\plemert\\.cache\\hyperframes\\history\\8f7c32f2-f641-4dbc-88ae-f2efafb3f29c\\blobs\\60\\6082f7e67a0bcc8edb80672ee4be318eb30d00b0d6d2e1677df5ee70e2be57ff"
+        },
+        "gen.mjs": {
+          "before": "C:\\Users\\plemert\\.cache\\hyperframes\\history\\8f7c32f2-f641-4dbc-88ae-f2efafb3f29c\\blobs\\0a\\0adab87bd09922f6b839071a1c43adbc579ea803cdc0dafb1953f666b7b65b95",
+          "after": "C:\\Users\\plemert\\.cache\\hyperframes\\history\\8f7c32f2-f641-4dbc-88ae-f2efafb3f29c\\blobs\\88\\8813767867e5aebb4451079c57524ca0ad326df411d936fc7334fa7eccbec4fd"
+        }
+      }
+    }
+  },
+  "checks": {
+    "latest": {
+      "revision": null,
+      "id": "22083013-9ac6-4d5c-95b3-4fa22f9ced60"
+    },
+    "revisions": {},
+    "unversioned": [
+      {
+        "id": "22083013-9ac6-4d5c-95b3-4fa22f9ced60",
+        "scope": "project",
+        "report": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\motion-design\\configurateur\\.hyperframes\\artifacts\\checks\\22083013-9ac6-4d5c-95b3-4fa22f9ced60.json",
+        "metadata": {
+          "ok": true,
+          "browserSkipped": false,
+          "options": {
+            "samples": 9,
+            "atTransitions": false,
+            "maxIssues": 80,
+            "collapseStatic": true,
+            "tolerance": 2,
+            "timeout": 45000,
+            "cache": true,
+            "contrast": true,
+            "craft": true,
+            "strict": false,
+            "snapshots": false,
+            "safeZones": [
+              "tiktok",
+              "reels",
+              "shorts"
+            ],
+            "browserGpuMode": "auto",
+            "includeUnmounted": false
+          }
+        },
+        "createdAt": 1795103617714,
+        "contentHash": "4a6d839da707c52773bac5af845af0be6045844ae491048fcc745bde41fd4440",
+        "revision": null,
+        "inputFingerprint": "85fdcbf8dcf6ec9bceaefde6232467a5525ca0e118c58aef95c2a6ad961865b1",
+        "inputScope": "local-project-files",
+        "attribution": "unversioned"
+      }
+    ]
+  },
+  "snapshots": {
+    "latest": {
+      "revision": "4f5c949f-82ed-40b7-8cc2-5c25151fd1cf",
+      "id": "4377c12a-f547-475a-b0a8-3d25b03ba557-1"
+    },
+    "revisions": {
+      "4f5c949f-82ed-40b7-8cc2-5c25151fd1cf": [
+        {
+          "scope": "full",
+          "id": "4377c12a-f547-475a-b0a8-3d25b03ba557-0",
+          "image": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\motion-design\\configurateur\\.hyperframes\\artifacts\\snapshots\\8133285b-77ac-425d-84d6-4113a13173a4\\frame-00-at-11.8s.png",
+          "time": 11.8,
+          "metadata": {
+            "width": 1080,
+            "height": 1920,
+            "zoomScale": 1,
+            "browserGpuMode": "auto",
+            "warnings": [],
+            "partial": false
+          },
+          "createdAt": 1795103663662,
+          "contentHash": "17bc222fb7ced974fd8c44ee5e70004fa888c3e92da5da21b65caaf18c0a06b3",
+          "revision": "4f5c949f-82ed-40b7-8cc2-5c25151fd1cf",
+          "inputFingerprint": "103cc2413e971c9e22ee924cce006921dc41d47dabd00839b3130d917998cf2b",
+          "inputScope": "local-project-files",
+          "attribution": "recorded-revision"
+        },
+        {
+          "scope": "full",
+          "id": "4377c12a-f547-475a-b0a8-3d25b03ba557-1",
+          "image": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\motion-design\\configurateur\\.hyperframes\\artifacts\\snapshots\\8133285b-77ac-425d-84d6-4113a13173a4\\frame-01-at-15.25s.png",
+          "time": 15.25,
+          "metadata": {
+            "width": 1080,
+            "height": 1920,
+            "zoomScale": 1,
+            "browserGpuMode": "auto",
+            "warnings": [],
+            "partial": false
+          },
+          "createdAt": 1795103663663,
+          "contentHash": "c7dff55f265210137452ff8d874a0d9db9816ce58348ee2dada4a71f40f0ee0e",
+          "revision": "4f5c949f-82ed-40b7-8cc2-5c25151fd1cf",
+          "inputFingerprint": "103cc2413e971c9e22ee924cce006921dc41d47dabd00839b3130d917998cf2b",
+          "inputScope": "local-project-files",
+          "attribution": "recorded-revision"
+        }
+      ]
+    },
+    "unversioned": [
+      {
+        "scope": "full",
+        "id": "2510c863-2e5f-4843-9e1b-54ebc568485d-0",
+        "image": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\motion-design\\configurateur\\.hyperframes\\artifacts\\snapshots\\8c625784-6df6-4f50-afdf-a6850a715107\\frame-00-at-0.8s.png",
+        "time": 0.8,
+        "metadata": {
+          "width": 1080,
+          "height": 1920,
+          "zoomScale": 1,
+          "browserGpuMode": "auto",
+          "warnings": [],
+          "partial": false
+        },
+        "createdAt": 1795103636355,
+        "contentHash": "93ce7247161acdfac22d7f43b6eccfc947a8885b7c73bf489b9a8b1f91547ec0",
+        "revision": null,
+        "inputFingerprint": "85fdcbf8dcf6ec9bceaefde6232467a5525ca0e118c58aef95c2a6ad961865b1",
+        "inputScope": "local-project-files",
+        "attribution": "unversioned"
+      },
+      {
+        "scope": "full",
+        "id": "2510c863-2e5f-4843-9e1b-54ebc568485d-1",
+        "image": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\motion-design\\configurateur\\.hyperframes\\artifacts\\snapshots\\8c625784-6df6-4f50-afdf-a6850a715107\\frame-01-at-1.5s.png",
+        "time": 1.5,
+        "metadata": {
+          "width": 1080,
+          "height": 1920,
+          "zoomScale": 1,
+          "browserGpuMode": "auto",
+          "warnings": [],
+          "partial": false
+        },
+        "createdAt": 1795103636355,
+        "contentHash": "01fef721861993e22feba63ea4286f3f1e79707fa65d0ddc9d6a3faf9f49d263",
+        "revision": null,
+        "inputFingerprint": "85fdcbf8dcf6ec9bceaefde6232467a5525ca0e118c58aef95c2a6ad961865b1",
+        "inputScope": "local-project-files",
+        "attribution": "unversioned"
+      },
+      {
+        "scope": "full",
+        "id": "2510c863-2e5f-4843-9e1b-54ebc568485d-2",
+        "image": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\motion-design\\configurateur\\.hyperframes\\artifacts\\snapshots\\8c625784-6df6-4f50-afdf-a6850a715107\\frame-02-at-2.2s.png",
+        "time": 2.2,
+        "metadata": {
+          "width": 1080,
+          "height": 1920,
+          "zoomScale": 1,
+          "browserGpuMode": "auto",
+          "warnings": [],
+          "partial": false
+        },
+        "createdAt": 1795103636355,
+        "contentHash": "1ec662750ebd09615d854c640e1337dab30cbec36ec10f1912158946aa377497",
+        "revision": null,
+        "inputFingerprint": "85fdcbf8dcf6ec9bceaefde6232467a5525ca0e118c58aef95c2a6ad961865b1",
+        "inputScope": "local-project-files",
+        "attribution": "unversioned"
+      },
+      {
+        "scope": "full",
+        "id": "2510c863-2e5f-4843-9e1b-54ebc568485d-3",
+        "image": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\motion-design\\configurateur\\.hyperframes\\artifacts\\snapshots\\8c625784-6df6-4f50-afdf-a6850a715107\\frame-03-at-4s.png",
+        "time": 4,
+        "metadata": {
+          "width": 1080,
+          "height": 1920,
+          "zoomScale": 1,
+          "browserGpuMode": "auto",
+          "warnings": [],
+          "partial": false
+        },
+        "createdAt": 1795103636356,
+        "contentHash": "090a7d2ae01d329e6444c97dd5eda34df0b9be036cd6d08ab2ab24f6d823481f",
+        "revision": null,
+        "inputFingerprint": "85fdcbf8dcf6ec9bceaefde6232467a5525ca0e118c58aef95c2a6ad961865b1",
+        "inputScope": "local-project-files",
+        "attribution": "unversioned"
+      },
+      {
+        "scope": "full",
+        "id": "2510c863-2e5f-4843-9e1b-54ebc568485d-4",
+        "image": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\motion-design\\configurateur\\.hyperframes\\artifacts\\snapshots\\8c625784-6df6-4f50-afdf-a6850a715107\\frame-04-at-7.2s.png",
+        "time": 7.2,
+        "metadata": {
+          "width": 1080,
+          "height": 1920,
+          "zoomScale": 1,
+          "browserGpuMode": "auto",
+          "warnings": [],
+          "partial": false
+        },
+        "createdAt": 1795103636356,
+        "contentHash": "4f60150cb578331220dc3ed16750a6a36cd28f227f8f20cddbac8133430c43e5",
+        "revision": null,
+        "inputFingerprint": "85fdcbf8dcf6ec9bceaefde6232467a5525ca0e118c58aef95c2a6ad961865b1",
+        "inputScope": "local-project-files",
+        "attribution": "unversioned"
+      },
+      {
+        "scope": "full",
+        "id": "2510c863-2e5f-4843-9e1b-54ebc568485d-5",
+        "image": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\motion-design\\configurateur\\.hyperframes\\artifacts\\snapshots\\8c625784-6df6-4f50-afdf-a6850a715107\\frame-05-at-9.9s.png",
+        "time": 9.9,
+        "metadata": {
+          "width": 1080,
+          "height": 1920,
+          "zoomScale": 1,
+          "browserGpuMode": "auto",
+          "warnings": [],
+          "partial": false
+        },
+        "createdAt": 1795103636356,
+        "contentHash": "6b8ca30f6be3a6f99224c4ff1a19298410da8e39f24e9c0169f15e0c1ac80861",
+        "revision": null,
+        "inputFingerprint": "85fdcbf8dcf6ec9bceaefde6232467a5525ca0e118c58aef95c2a6ad961865b1",
+        "inputScope": "local-project-files",
+        "attribution": "unversioned"
+      },
+      {
+        "scope": "full",
+        "id": "2510c863-2e5f-4843-9e1b-54ebc568485d-6",
+        "image": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\motion-design\\configurateur\\.hyperframes\\artifacts\\snapshots\\8c625784-6df6-4f50-afdf-a6850a715107\\frame-06-at-11.8s.png",
+        "time": 11.8,
+        "metadata": {
+          "width": 1080,
+          "height": 1920,
+          "zoomScale": 1,
+          "browserGpuMode": "auto",
+          "warnings": [],
+          "partial": false
+        },
+        "createdAt": 1795103636357,
+        "contentHash": "f949c83c1597b443839ecbfebe52339ce973fda9939f4a141f95907a06639460",
+        "revision": null,
+        "inputFingerprint": "85fdcbf8dcf6ec9bceaefde6232467a5525ca0e118c58aef95c2a6ad961865b1",
+        "inputScope": "local-project-files",
+        "attribution": "unversioned"
+      },
+      {
+        "scope": "full",
+        "id": "2510c863-2e5f-4843-9e1b-54ebc568485d-7",
+        "image": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\motion-design\\configurateur\\.hyperframes\\artifacts\\snapshots\\8c625784-6df6-4f50-afdf-a6850a715107\\frame-07-at-14.5s.png",
+        "time": 14.5,
+        "metadata": {
+          "width": 1080,
+          "height": 1920,
+          "zoomScale": 1,
+          "browserGpuMode": "auto",
+          "warnings": [],
+          "partial": false
+        },
+        "createdAt": 1795103636357,
+        "contentHash": "c7dff55f265210137452ff8d874a0d9db9816ce58348ee2dada4a71f40f0ee0e",
+        "revision": null,
+        "inputFingerprint": "85fdcbf8dcf6ec9bceaefde6232467a5525ca0e118c58aef95c2a6ad961865b1",
+        "inputScope": "local-project-files",
+        "attribution": "unversioned"
+      },
+      {
+        "scope": "full",
+        "id": "2510c863-2e5f-4843-9e1b-54ebc568485d-8",
+        "image": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\motion-design\\configurateur\\.hyperframes\\artifacts\\snapshots\\8c625784-6df6-4f50-afdf-a6850a715107\\frame-08-at-15.25s.png",
+        "time": 15.25,
+        "metadata": {
+          "width": 1080,
+          "height": 1920,
+          "zoomScale": 1,
+          "browserGpuMode": "auto",
+          "warnings": [],
+          "partial": false
+        },
+        "createdAt": 1795103636358,
+        "contentHash": "c7dff55f265210137452ff8d874a0d9db9816ce58348ee2dada4a71f40f0ee0e",
+        "revision": null,
+        "inputFingerprint": "85fdcbf8dcf6ec9bceaefde6232467a5525ca0e118c58aef95c2a6ad961865b1",
+        "inputScope": "local-project-files",
+        "attribution": "unversioned"
+      }
+    ]
+  },
+  "renders": {
+    "latest": {
+      "id": "15397134-70e4-462d-a9a0-55739cbec231",
+      "completedAt": 1795103691925,
+      "output": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\motion-design\\configurateur\\renders\\configurateur_2026-11-19_16-54-25.mp4",
+      "status": "completed",
+      "revision": "4f5c949f-82ed-40b7-8cc2-5c25151fd1cf"
+    },
+    "retainedRevisions": [
+      "4f5c949f-82ed-40b7-8cc2-5c25151fd1cf"
+    ]
+  },
+  "pendingArtifactCleanup": []
+}

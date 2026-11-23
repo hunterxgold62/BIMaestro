@@ -46,8 +46,8 @@ namespace Modification
             if (!unused.Any())
             {
                 TaskDialog.Show(
-                    UiLanguage.T("Aucune famille inutilisée", "No Unused Families"),
-                    UiLanguage.T("Aucune famille chargée inutilisée trouvée.", "No unused loaded family was found.")
+                    UiLanguage.Get("DeleteUnusedFamiliesCommand.NoUnusedFamilies"),
+                    UiLanguage.Get("DeleteUnusedFamiliesCommand.NoUnusedLoadedFamilyWasFound")
                 );
                 return Result.Succeeded;
             }
@@ -58,9 +58,9 @@ namespace Modification
                 unused.Select(f => f.Name)
             );
 
-            var confirm = new TaskDialog(UiLanguage.T("Familles inutilisées détectées", "Unused Families Detected"))
+            var confirm = new TaskDialog(UiLanguage.Get("DeleteUnusedFamiliesCommand.UnusedFamiliesDetected"))
             {
-                MainInstruction = UiLanguage.T($"Vous allez purger {unused.Count} famille(s) inutilisée(s) :", $"You are about to purge {unused.Count} unused family(ies):"),
+                MainInstruction = UiLanguage.Format("DeleteUnusedFamiliesCommand.YouAreAboutToPurge0UnusedFamily", (object)unused.Count),
                 MainContent = listNames,
                 CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.Cancel,
                 DefaultButton = TaskDialogResult.Cancel,

@@ -30,7 +30,7 @@ namespace Analyse
             }
             catch (Exception ex)
             {
-                MessageBox.Show(UiLanguage.T("Impossible d’ouvrir la page d’aide : ", "Unable to Open the Help Page: ") + ex.Message, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(UiLanguage.Get("PipeNetworkOverviewWindow.xaml.UnableToOpenTheHelpPage") + ex.Message, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 

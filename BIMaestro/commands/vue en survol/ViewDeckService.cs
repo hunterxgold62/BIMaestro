@@ -22,7 +22,7 @@ namespace BIMaestro.ViewHover
         protected override Result OnExecute(ExternalCommandData data, ref string message, ElementSet elements)
         {
             if (ViewDeckService.Toggle(data.Application, out string error)) return Result.Succeeded;
-            TaskDialog.Show("BIMaestro - Onglets", error);
+            TaskDialog.Show(global::BIMaestro.Localization.UiLanguage.Get("UiDialog.ViewTabs"), error);
             return Result.Cancelled;
         }
     }
@@ -54,8 +54,7 @@ namespace BIMaestro.ViewHover
             if (_enabled) { Disable(); return true; }
             if (app?.ActiveUIDocument == null)
             {
-                error = UiLanguage.T("Ouvrez un document Revit avant d'activer les miniatures.",
-                    "Open a Revit document before enabling thumbnails.");
+                error = UiLanguage.Get("ViewDeckService.OpenARevitDocumentBeforeEnablingThumbnails");
                 return false;
             }
             try
@@ -68,8 +67,7 @@ namespace BIMaestro.ViewHover
                 if (!Tabs.Values.Any(tab => tab.IsExpanded))
                 {
                     Disable();
-                    error = UiLanguage.T("Les onglets de vues n'ont pas été trouvés. Repassez en vues à onglets (TW), puis réessayez.",
-                        "View tabs were not found. Switch to tabbed views (TW), then retry.");
+                    error = UiLanguage.Get("ViewDeckService.ViewTabsWereNotFoundSwitchToTabbed");
                     return false;
                 }
                 UpdateButton();
@@ -78,7 +76,7 @@ namespace BIMaestro.ViewHover
             catch (Exception ex)
             {
                 Disable();
-                error = UiLanguage.T("Impossible d'activer les miniatures : ", "Unable to enable thumbnails: ") + ex.Message;
+                error = UiLanguage.Get("ViewDeckService.UnableToEnableThumbnails") + ex.Message;
                 return false;
             }
         }
@@ -94,9 +92,7 @@ namespace BIMaestro.ViewHover
                 Disable();
                 RestoreTabs();
                 _suspended = true; // Don't repeatedly display an error every idle tick.
-                TaskDialog.Show("BIMaestro - Onglets", UiLanguage.T(
-                    "Les miniatures ont été désactivées après une erreur. Les onglets d'origine ont été restaurés.",
-                    "Thumbnails were disabled after an error. The original tabs have been restored.") + "\n\n" + ex.Message);
+                TaskDialog.Show(global::BIMaestro.Localization.UiLanguage.Get("UiDialog.ViewTabs"), UiLanguage.Get("ViewDeckService.ThumbnailsWereDisabledAfterAnErrorTheOriginal") + "\n\n" + ex.Message);
             }
         }
 
@@ -146,10 +142,10 @@ namespace BIMaestro.ViewHover
                 // Keep the learned identity even if a transient UI refresh cannot
                 // resolve it; OFF must not turn known native tabs into unknown ones.
                 remembered.Preview.Refresh(remembered.PreviewPath);
-                string placeholder = match == null ? UiLanguage.T("Activer pour l'aperçu", "Activate for preview") :
+                string placeholder = match == null ? UiLanguage.Get("ViewDeckService.ActivateForPreview") :
                     ViewHoverPreviewService.IsDeckPreviewUnavailable(match.Document, match.View)
-                        ? UiLanguage.T("Aperçu indisponible", "Preview unavailable")
-                        : UiLanguage.T("Aperçu en attente", "Preview pending");
+                        ? UiLanguage.Get("ViewDeckService.PreviewUnavailable")
+                        : UiLanguage.Get("ViewDeckService.PreviewPending");
                 string signature = title + "|" + remembered.PreviewPath + "|" + remembered.Preview.Revision + "|" + placeholder;
                 state.Update(_enabled, title, remembered.Preview.Image, placeholder, signature,
                     ViewDeckChangeService.GetCounts(match?.Document, match?.View));
@@ -224,8 +220,7 @@ namespace BIMaestro.ViewHover
         internal static void UpdateButton()
         {
             AppUI.UpdatePushButtonPresentation("ViewDeckToggle", _enabled ? "Onglets : ON" : "Onglets : OFF",
-                UiLanguage.T("ON : miniatures dans les onglets. OFF : onglets compacts. Les aperçus au survol se règlent dans Miniature ou Option > Miniatures.",
-                    "ON: inline thumbnails. OFF: compact tabs. Configure hover previews in Thumbnail or Options > Thumbnails."));
+                UiLanguage.Get("ViewDeckService.ONInlineThumbnailsOFFCompactTabsConfigureHover"));
         }
 
         private static void Disable()

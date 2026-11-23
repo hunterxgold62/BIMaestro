@@ -1,0 +1,81 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; overflow: hidden; }
+    #mcard { position: absolute; left: 330px; top: 300px; width: 620px; height: 960px; border-radius: 28px; overflow: hidden; background: #fff; box-shadow: 0 30px 80px rgba(17,24,39,.18), 0 0 0 2px #E5E7EB; }
+    .mv { position: absolute; left: 0; top: 0; width: 620px; height: 1469px; object-fit: fill; transform-origin: 0 0; }
+    #mbar { position: absolute; left: 0; top: 0; bottom: 0; width: 10px; background: #0F5132; z-index: 51; }
+    .mlab { position: absolute; left: 0; width: 330px; top: 560px; padding: 0 22px 0 50px; opacity: 0; display: flex; flex-direction: column; gap: 10px; }
+    .mlab span { align-self: flex-start; color: #fff; background: #0F5132; font-weight: 900; font-size: 28px; padding: 6px 14px; border-radius: 999px; }
+    .mlab b { color: #111827; font-weight: 900; font-size: 50px; letter-spacing: -0.03em; line-height: 1.02; }
+    .mlab i { font-style: normal; color: #6B7280; font-weight: 700; font-size: 26px; line-height: 1.25; }
+    #curtain { position: absolute; inset: 0; background: #0F5132; z-index: 80; }
+    .mname { position: absolute; left: 80px; right: 140px; top: 760px; text-align: center; color: #fff; font-weight: 900; font-size: 104px; letter-spacing: -0.04em; line-height: 1; z-index: 81; }
+  </style>
+  <div id="root" data-composition-id="reel" data-width="1080" data-height="1920">
+    <div id="mcard">
+      <video id="mv0" class="clip mv" src="assets/metiers.mp4" data-start="0.42" data-duration="2.6" data-media-start="7.6" muted playsinline style="z-index:1"></video>
+      <video id="mv1" class="clip mv" src="assets/metiers.mp4" data-start="3.02" data-duration="2.6" data-media-start="12.6" muted playsinline style="z-index:2"></video>
+      <video id="mv2" class="clip mv" src="assets/metiers.mp4" data-start="5.63" data-duration="2.6" data-media-start="17.6" muted playsinline style="z-index:3"></video>
+      <video id="mv3" class="clip mv" src="assets/metiers.mp4" data-start="8.22" data-duration="2.6" data-media-start="22.6" muted playsinline style="z-index:4"></video>
+      <video id="mv4" class="clip mv" src="assets/metiers.mp4" data-start="10.83" data-duration="2.47" data-media-start="27.6" muted playsinline style="z-index:5"></video>
+      <div id="mbar"></div>
+    </div>
+    <div id="ml0" class="mlab"><span>01 / 05</span><b>Architecte</b><i>Plan d'architecte · icônes archi</i></div>
+    <div id="ml1" class="mlab"><span>02 / 05</span><b>Structure</b><i>Grille · gras orange</i></div>
+    <div id="ml2" class="mlab"><span>03 / 05</span><b>Plomberie & CVC</b><i>Encre dans l'eau · dégradés bleus</i></div>
+    <div id="ml3" class="mlab"><span>04 / 05</span><b>Électricité</b><i>Constellation · texte jaune</i></div>
+    <div id="ml4" class="mlab"><span>05 / 05</span><b>BIM manager</b><i>Verre dépoli · badges</i></div>
+    <div id="curtain"></div>
+    <div id="mn0" class="mname">Architecte</div>
+    <div id="mn1" class="mname">Structure</div>
+    <div id="mn2" class="mname">Plomberie & CVC</div>
+    <div id="mn3" class="mname">Électricité</div>
+    <div id="mn4" class="mname">BIM manager</div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.set("#curtain", { yPercent: 100 }, 0);
+    tl.set(".mname", { opacity: 0 }, 0);
+    tl.fromTo("#curtain", { yPercent: 100 }, { yPercent: 0, duration: 0.3, ease: "power3.inOut", immediateRender: false }, 0);
+    tl.fromTo("#mn0", { opacity: 0, y: 60 }, { opacity: 1, y: 0, duration: 0.25, ease: "expo.out" }, 0.15);
+    tl.to("#mn0", { opacity: 0, y: -60, duration: 0.2, ease: "power2.in" }, 0.6);
+    tl.to("#curtain", { yPercent: -100, duration: 0.3, ease: "power3.inOut" }, 0.55);
+    tl.set("#curtain", { yPercent: 100 }, 0.86);
+    tl.fromTo("#ml0", { opacity: 0, x: -40 }, { opacity: 1, x: 0, duration: 0.3, ease: "expo.out" }, 0.85);
+    tl.to("#ml0", { opacity: 0, duration: 0.1 }, 2.6);
+    tl.fromTo("#mv0", { scale: 1.06 }, { scale: 1, duration: 1.6, ease: "power2.out" }, 0.42);
+    tl.fromTo("#curtain", { yPercent: 100 }, { yPercent: 0, duration: 0.3, ease: "power3.inOut", immediateRender: false }, 2.6);
+    tl.fromTo("#mn1", { opacity: 0, y: 60 }, { opacity: 1, y: 0, duration: 0.25, ease: "expo.out" }, 2.75);
+    tl.to("#mn1", { opacity: 0, y: -60, duration: 0.2, ease: "power2.in" }, 3.2);
+    tl.to("#curtain", { yPercent: -100, duration: 0.3, ease: "power3.inOut" }, 3.15);
+    tl.set("#curtain", { yPercent: 100 }, 3.46);
+    tl.fromTo("#ml1", { opacity: 0, x: -40 }, { opacity: 1, x: 0, duration: 0.3, ease: "expo.out" }, 3.45);
+    tl.to("#ml1", { opacity: 0, duration: 0.1 }, 5.2);
+    tl.fromTo("#mv1", { scale: 1.06 }, { scale: 1, duration: 1.6, ease: "power2.out" }, 3.02);
+    tl.fromTo("#curtain", { yPercent: 100 }, { yPercent: 0, duration: 0.3, ease: "power3.inOut", immediateRender: false }, 5.2);
+    tl.fromTo("#mn2", { opacity: 0, y: 60 }, { opacity: 1, y: 0, duration: 0.25, ease: "expo.out" }, 5.35);
+    tl.to("#mn2", { opacity: 0, y: -60, duration: 0.2, ease: "power2.in" }, 5.8);
+    tl.to("#curtain", { yPercent: -100, duration: 0.3, ease: "power3.inOut" }, 5.75);
+    tl.set("#curtain", { yPercent: 100 }, 6.06);
+    tl.fromTo("#ml2", { opacity: 0, x: -40 }, { opacity: 1, x: 0, duration: 0.3, ease: "expo.out" }, 6.05);
+    tl.to("#ml2", { opacity: 0, duration: 0.1 }, 7.8);
+    tl.fromTo("#mv2", { scale: 1.06 }, { scale: 1, duration: 1.6, ease: "power2.out" }, 5.63);
+    tl.fromTo("#curtain", { yPercent: 100 }, { yPercent: 0, duration: 0.3, ease: "power3.inOut", immediateRender: false }, 7.8);
+    tl.fromTo("#mn3", { opacity: 0, y: 60 }, { opacity: 1, y: 0, duration: 0.25, ease: "expo.out" }, 7.95);
+    tl.to("#mn3", { opacity: 0, y: -60, duration: 0.2, ease: "power2.in" }, 8.4);
+    tl.to("#curtain", { yPercent: -100, duration: 0.3, ease: "power3.inOut" }, 8.35);
+    tl.set("#curtain", { yPercent: 100 }, 8.66);
+    tl.fromTo("#ml3", { opacity: 0, x: -40 }, { opacity: 1, x: 0, duration: 0.3, ease: "expo.out" }, 8.65);
+    tl.to("#ml3", { opacity: 0, duration: 0.1 }, 10.4);
+    tl.fromTo("#mv3", { scale: 1.06 }, { scale: 1, duration: 1.6, ease: "power2.out" }, 8.22);
+    tl.fromTo("#curtain", { yPercent: 100 }, { yPercent: 0, duration: 0.3, ease: "power3.inOut", immediateRender: false }, 10.4);
+    tl.fromTo("#mn4", { opacity: 0, y: 60 }, { opacity: 1, y: 0, duration: 0.25, ease: "expo.out" }, 10.55);
+    tl.to("#mn4", { opacity: 0, y: -60, duration: 0.2, ease: "power2.in" }, 11);
+    tl.to("#curtain", { yPercent: -100, duration: 0.3, ease: "power3.inOut" }, 10.95);
+    tl.set("#curtain", { yPercent: 100 }, 11.26);
+    tl.fromTo("#ml4", { opacity: 0, x: -40 }, { opacity: 1, x: 0, duration: 0.3, ease: "expo.out" }, 11.25);
+    tl.fromTo("#mv4", { scale: 1.06 }, { scale: 1, duration: 1.6, ease: "power2.out" }, 10.83);
+    tl.to(["#mcard", "#ml4"], { y: -60, opacity: 0, duration: 0.3, ease: "power2.in" }, 13);
+    window.__timelines["reel"] = tl;
+  </script>
+</template>

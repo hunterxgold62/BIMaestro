@@ -60,6 +60,13 @@ namespace BIMaestro.VideoGames
                 Math.Max(0.001, _maxZ - _minZ))
             : Rect3D.Empty;
 
+        internal void ResetBounds()
+        {
+            _minX = _minY = _minZ = double.MaxValue;
+            _maxX = _maxY = _maxZ = double.MinValue;
+            HasBounds = false;
+        }
+
         public void Include(IEnumerable<Point3D> points)
         {
             foreach (Point3D point in points)
@@ -413,9 +420,9 @@ namespace BIMaestro.VideoGames
         public Point3D SpawnFootPosition { get; set; }
         public double InitialYawRadians { get; private set; }
 
-        public void NormalizeCoordinates(Point3D viewEye, Vector3D viewForward)
+        public void NormalizeCoordinates(Point3D viewEye, Vector3D viewForward, bool useMeshBounds = false)
         {
-            if (Triangles.Count == 0)
+            if (Triangles.Count == 0 && !useMeshBounds)
             {
                 Bounds = Rect3D.Empty;
                 ViewEye = viewEye;
@@ -438,6 +445,20 @@ namespace BIMaestro.VideoGames
                 maxX = Math.Max(maxX, triangle.MaxX);
                 maxY = Math.Max(maxY, triangle.MaxY);
                 maxZ = Math.Max(maxZ, triangle.MaxZ);
+            }
+
+            if (useMeshBounds)
+            {
+                foreach (GameMeshData mesh in Meshes)
+                foreach (Point3D point in mesh.Positions)
+                {
+                    minX = Math.Min(minX, point.X);
+                    minY = Math.Min(minY, point.Y);
+                    minZ = Math.Min(minZ, point.Z);
+                    maxX = Math.Max(maxX, point.X);
+                    maxY = Math.Max(maxY, point.Y);
+                    maxZ = Math.Max(maxZ, point.Z);
+                }
             }
 
             // Recentrer autour de l'origine améliore fortement la précision WPF sur

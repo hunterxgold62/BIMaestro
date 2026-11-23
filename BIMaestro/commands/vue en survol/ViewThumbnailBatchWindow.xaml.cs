@@ -24,7 +24,7 @@ namespace BIMaestro.ViewHover
             InitializeComponent();
             foreach (int size in new[] { 50, 75, 100, 125, 150, 200 })
             {
-                string label = size == 100 ? UiLanguage.T("100 % (actuelle)", "100% (current)") : size + " %";
+                string label = size == 100 ? UiLanguage.Get("ViewThumbnailBatchWindow.xaml.100Current") : size + " %";
                 BrowserSizeComboBox.Items.Add(new ComboBoxItem { Content = label, Tag = size });
                 ViewTabsSizeComboBox.Items.Add(new ComboBoxItem { Content = label, Tag = size });
             }
@@ -32,7 +32,7 @@ namespace BIMaestro.ViewHover
             ViewHoverPreviewPreferences.Changed += OnHoverPreferencesChanged;
             _startHandler = startHandler;
             _startEvent = startEvent;
-            DocumentText.Text = UiLanguage.T("Projet : ", "Project: ") +
+            DocumentText.Text = UiLanguage.Get("ViewThumbnailBatchWindow.xaml.Project") +
                                 (documentTitle ?? string.Empty);
 
             _startHandler.StartFailed += OnStartFailed;
@@ -83,8 +83,7 @@ namespace BIMaestro.ViewHover
         {
             if (ViewHoverPreviewPreferences.SetSizes(browser, tabs)) return;
             OnHoverPreferencesChanged();
-            MessageBox.Show(UiLanguage.T("Impossible d’enregistrer la taille des miniatures.",
-                "Unable to save the thumbnail sizes."), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(UiLanguage.Get("ViewThumbnailBatchWindow.xaml.UnableToSaveTheThumbnailSizes"), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
 
         private void HoverPreviewCheckBox_Click(object sender, RoutedEventArgs e)
@@ -92,8 +91,7 @@ namespace BIMaestro.ViewHover
             if (!ViewHoverPreviewPreferences.SetEnabled(HoverPreviewCheckBox.IsChecked == true))
             {
                 OnHoverPreferencesChanged();
-                MessageBox.Show(UiLanguage.T("Impossible d’enregistrer le réglage des miniatures au survol.",
-                    "Unable to save the hover thumbnail setting."), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(UiLanguage.Get("ViewThumbnailBatchWindow.xaml.UnableToSaveTheHoverThumbnailSetting"), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
@@ -110,15 +108,13 @@ namespace BIMaestro.ViewHover
             if (request == ExternalEventRequest.Denied)
             {
                 OnStartFailed(
-                    UiLanguage.T(
-                        "Revit ne peut pas démarrer le traitement maintenant.",
-                        "Revit cannot start the process right now."));
+                    UiLanguage.Get("ViewThumbnailBatchWindow.xaml.RevitCannotStartTheProcessRightNow"));
                 return;
             }
 
             StartButton.IsEnabled = false;
             ModeComboBox.IsEnabled = false;
-            StatusText.Text = UiLanguage.T("Préparation de la file…", "Preparing the queue…");
+            StatusText.Text = UiLanguage.Get("ViewThumbnailBatchWindow.xaml.PreparingTheQueue");
         }
 
         private void PauseResumeButton_Click(
@@ -143,7 +139,7 @@ namespace BIMaestro.ViewHover
             Dispatcher.BeginInvoke(new Action(() =>
             {
                 StatusText.Text = string.IsNullOrWhiteSpace(error)
-                    ? UiLanguage.T("Impossible de démarrer le traitement.", "Unable to start the process.")
+                    ? UiLanguage.Get("ViewThumbnailBatchWindow.xaml.UnableToStartTheProcess")
                     : error;
                 StartButton.IsEnabled = true;
                 ModeComboBox.IsEnabled = true;
@@ -168,23 +164,23 @@ namespace BIMaestro.ViewHover
                 return;
             }
 
-            DocumentText.Text = UiLanguage.T("Projet : ", "Project: ") + progress.DocumentTitle;
+            DocumentText.Text = UiLanguage.Get("ViewThumbnailBatchWindow.xaml.Project") + progress.DocumentTitle;
             StatusText.Text = UiLanguage.T(progress.Status ?? string.Empty);
             CounterText.Text = progress.Completed + " / " + progress.Total;
             ProgressBar.Maximum = Math.Max(1, progress.Total);
             ProgressBar.Value = Math.Min(
                 progress.Completed,
                 Math.Max(1, progress.Total));
-            CurrentViewText.Text = UiLanguage.T("Vue : ", "View: ") +
+            CurrentViewText.Text = UiLanguage.Get("ViewThumbnailBatchWindow.xaml.View") +
                 (string.IsNullOrWhiteSpace(progress.CurrentViewName)
                     ? "—"
                     : progress.CurrentViewName);
-            ElapsedText.Text = UiLanguage.T("Écoulé : ", "Elapsed: ") + FormatDuration(progress.Elapsed);
-            RemainingText.Text = UiLanguage.T("Restant estimé : ", "Estimated remaining: ") +
+            ElapsedText.Text = UiLanguage.Get("ViewThumbnailBatchWindow.xaml.Elapsed") + FormatDuration(progress.Elapsed);
+            RemainingText.Text = UiLanguage.Get("ViewThumbnailBatchWindow.xaml.EstimatedRemaining") +
                 (progress.EstimatedRemaining.HasValue
                     ? FormatDuration(progress.EstimatedRemaining.Value)
                     : "—");
-            FailedText.Text = UiLanguage.T("Échecs : ", "Failures: ") + progress.Failed;
+            FailedText.Text = UiLanguage.Get("ViewThumbnailBatchWindow.xaml.Failures") + progress.Failed;
 
             bool finished = progress.IsCompleted || progress.IsCanceled;
             StartButton.IsEnabled = finished;
@@ -192,8 +188,8 @@ namespace BIMaestro.ViewHover
             PauseResumeButton.IsEnabled = !finished;
             StopButton.IsEnabled = !finished;
             PauseResumeButton.Content = progress.IsPaused
-                ? UiLanguage.T("Reprendre", "Resume")
-                : UiLanguage.T("Pause", "Pause");
+                ? UiLanguage.Get("ViewThumbnailBatchWindow.xaml.Resume")
+                : UiLanguage.Get("ViewThumbnailBatchWindow.xaml.Pause");
         }
 
         private static string FormatDuration(TimeSpan duration)

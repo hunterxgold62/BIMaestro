@@ -57,7 +57,7 @@ namespace IA
             _jwt = BIMaestroApp.LicenseJwt;
             if (string.IsNullOrEmpty(_jwt))
             {
-                MessageBox.Show(UiLanguage.T("Licence non initialisée. Relancez le plugin.", "License is not initialized. Restart the plugin."));
+                MessageBox.Show(UiLanguage.Get("GPTbot.xaml.LicenseIsNotInitializedRestartThePlugin"));
                 this.Close();
                 return;
             }
@@ -78,7 +78,7 @@ namespace IA
             }
             catch (Exception ex)
             {
-                MessageBox.Show(UiLanguage.T($"Impossible d’ouvrir la page d’aide : {ex.Message}", $"Unable to open the help page: {ex.Message}"), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(UiLanguage.Format("GPTbot.xaml.UnableToOpenTheHelpPage0", (object)ex.Message), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
@@ -143,7 +143,7 @@ namespace IA
                 ICollection<ElementId> selectedElementIds = uidoc.Selection.GetElementIds();
                 if (selectedElementIds == null || !selectedElementIds.Any())
                 {
-                    MessageBox.Show(UiLanguage.T("Aucun élément sélectionné. Veuillez sélectionner des éléments dans Revit avant de cliquer sur 'Élément'.", "No element selected. Select elements in Revit before clicking 'Element'."));
+                    MessageBox.Show(UiLanguage.Get("GPTbot.xaml.NoElementSelectedSelectElementsInRevitBefore"));
                     return;
                 }
 
@@ -198,7 +198,7 @@ namespace IA
             }
             catch (Exception ex)
             {
-                MessageBox.Show(UiLanguage.T("Erreur lors de la récupération des éléments sélectionnés : ", "Error while retrieving the selected elements: ") + ex.Message);
+                MessageBox.Show(UiLanguage.Get("GPTbot.xaml.ErrorWhileRetrievingTheSelectedElements") + ex.Message);
             }
         }
 

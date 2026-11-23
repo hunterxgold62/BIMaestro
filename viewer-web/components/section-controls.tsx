@@ -17,7 +17,7 @@ export function SectionControls({ gamepad = false, gamepadMode = 'orbit', value,
       <Button size="sm" variant="ghost" disabled={!value.length} onClick={() => { onChange([]); onSelect(null); onPick(false); }}>Tout réafficher</Button></div>
     <Button aria-pressed={picking} disabled={value.length >= maximumSections && !picking}
       onClick={() => onPick(!picking)}>{picking ? 'Annuler la sélection' : gamepad ? '+ Viser une face' : '+ Cliquer une face'}</Button>
-    <p role="status">{picking ? (gamepad ? `Visez une face et appuyez sur ${confirm}. ${cancel} pour annuler. La coupe suit son orientation.` : 'Cliquez une face du bâtiment. La coupe suit son orientation.') : 'Ajoutez plusieurs faces pour isoler la zone à examiner.'}</p>
+    <p role="status">{picking ? (gamepad ? `Visez une face et appuyez sur ${confirm}. ${cancel} pour annuler. La coupe suit son orientation.` : 'Cliquez une face du bâtiment. La coupe suit son orientation.') : 'Glissez la poignée verte dans la maquette pour déplacer le plan.'}</p>
     <p className="section-shortcut"><strong>{gamepad ? 'LB + LT / RT' : 'Ctrl + molette'}</strong><span>Déplacer la coupe sélectionnée avec précision.</span></p>
     {value.length > 0 && <div className="section-list" role="group" aria-label="Choisir une coupe">
       {value.map(item => <Button key={item.id} size="sm" variant={item.id === selected ? 'default' : 'outline'} aria-pressed={item.id === selected}

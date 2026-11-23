@@ -373,7 +373,7 @@ public class AppUI : IExternalApplication
             }
             else
             {
-                TaskDialog.Show("Image introuvable",
+                TaskDialog.Show(global::BIMaestro.Localization.UiLanguage.Get("UiDialog.ImageNotFound"),
                     $"L'image intégrée pour {data.Text} n'a pas été trouvée ({resourceImageName}).");
             }
         }

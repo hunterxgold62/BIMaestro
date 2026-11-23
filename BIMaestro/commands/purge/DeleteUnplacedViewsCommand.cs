@@ -50,15 +50,15 @@ namespace Modification
 
             if (toDelete.Count == 0)
             {
-                TaskDialog.Show(UiLanguage.T("Supprimer vues non implantées", "Delete Unplaced Views"),
-                    UiLanguage.T("Aucune vue plan/coupe/3D/detail/rendering non implantée à supprimer.", "No unplaced plan, section, 3D, detail, or rendering view was found to delete."));
+                TaskDialog.Show(UiLanguage.Get("DeleteUnplacedViewsCommand.DeleteUnplacedViews"),
+                    UiLanguage.Get("DeleteUnplacedViewsCommand.NoUnplacedPlanSection3DDetailOrRendering"));
                 return Result.Succeeded;
             }
 
             // 4) Confirmation avant suppression
-            var dlg = new TaskDialog(UiLanguage.T("Supprimer vues non implantées", "Delete Unplaced Views"))
+            var dlg = new TaskDialog(UiLanguage.Get("DeleteUnplacedViewsCommand.DeleteUnplacedViews"))
             {
-                MainInstruction = UiLanguage.T($"Vous allez supprimer {toDelete.Count} vue(s) non implantée(s).", $"You are about to delete {toDelete.Count} unplaced view(s)."),
+                MainInstruction = UiLanguage.Format("DeleteUnplacedViewsCommand.YouAreAboutToDelete0UnplacedView", (object)toDelete.Count),
                 CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No
             };
             if (dlg.Show() != TaskDialogResult.Yes)
@@ -76,8 +76,8 @@ namespace Modification
                 tx.Commit();
             }
 
-            TaskDialog.Show(UiLanguage.T("Supprimer vues non implantées", "Delete Unplaced Views"),
-                UiLanguage.T($"{toDelete.Count} vue(s) supprimée(s).", $"{toDelete.Count} view(s) deleted."));
+            TaskDialog.Show(UiLanguage.Get("DeleteUnplacedViewsCommand.DeleteUnplacedViews"),
+                UiLanguage.Format("DeleteUnplacedViewsCommand.0ViewSDeleted", (object)toDelete.Count));
             return Result.Succeeded;
         }
     }

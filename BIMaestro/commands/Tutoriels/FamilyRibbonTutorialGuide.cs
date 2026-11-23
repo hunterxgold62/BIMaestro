@@ -66,7 +66,7 @@ namespace BIMaestro.Tutorials
 
             _cardWindow = new Window
             {
-                Title = UiLanguage.T("BIMaestro · Bulbizarre · Rosace", "BIMaestro · Bulbasaur · Radial Menu"),
+                Title = UiLanguage.Get("FamilyRibbonTutorialGuide.BIMaestroBulbasaurRadialMenu"),
                 Width = 390,
                 SizeToContent = SizeToContent.Height,
                 WindowStyle = WindowStyle.ToolWindow,
@@ -126,9 +126,9 @@ namespace BIMaestro.Tutorials
                 HorizontalAlignment = HorizontalAlignment.Right
             };
             stack.Children.Add(buttons);
-            _previous = AddButton(buttons, UiLanguage.T("Précédent", "Previous"), Previous);
-            _next = AddButton(buttons, UiLanguage.T("Suivant", "Next"), Next);
-            AddButton(buttons, UiLanguage.T("Quitter", "Quit"), () => { TutorialAnalytics.End("family-browser", "quit"); Close(); });
+            _previous = AddButton(buttons, UiLanguage.Get("FamilyRibbonTutorialGuide.Previous"), Previous);
+            _next = AddButton(buttons, UiLanguage.Get("FamilyRibbonTutorialGuide.Next"), Next);
+            AddButton(buttons, UiLanguage.Get("FamilyRibbonTutorialGuide.Quit"), () => { TutorialAnalytics.End("family-browser", "quit"); Close(); });
             _cardWindow.Closed += (_, __) => Close();
 
             _outlineWindow = new Window
@@ -190,7 +190,7 @@ namespace BIMaestro.Tutorials
             if (_closing || _index < FirstStep || _index >= _steps.Length) return;
             if (_steps[_index].CompletionEvent == "radial-tutorial-chaise-placed" && action == "radial-opened")
             {
-                _text.Text = UiLanguage.T("✓ La rosace est ouverte. Clic droit au centre > « Charger une collection » > « Favoris », puis choisis une chaise des favoris d'essai. Clique ensuite dans la vue pour la poser ; Bulbizarre attend sa création réelle.", "✓ The radial menu is open. Right-click the center > “Load a collection” > “Favorites”, then choose a chair among the test favorites. Then click in the view to place it; Bulbasaur waits for it to actually be created.");
+                _text.Text = UiLanguage.Get("FamilyRibbonTutorialGuide.TheRadialMenuIsOpenRightClickThe");
                 return;
             }
             if (string.Equals(_steps[_index].CompletionEvent, action, StringComparison.Ordinal))
@@ -224,7 +224,7 @@ namespace BIMaestro.Tutorials
             {
                 TutorialAnalytics.Complete("family-browser");
                 Close();
-                DemoTourCompletion.Show(_revitHandle, "family-browser", UiLanguage.T("Tu as terminé le tutoriel Navigateur de familles, y compris le placement depuis la rosace.", "You have finished the Family Browser tutorial, including placement from the radial menu."));
+                DemoTourCompletion.Show(_revitHandle, "family-browser", UiLanguage.Get("FamilyRibbonTutorialGuide.YouHaveFinishedTheFamilyBrowserTutorialIncluding"));
                 return;
             }
             _index++;
@@ -237,7 +237,7 @@ namespace BIMaestro.Tutorials
             {
                 if (_completed) return;
                 _completed = true;
-                _text.Text = UiLanguage.T("✓ Bulbizarre a vérifié la création de ta chaise dans la maquette depuis la rosace. Appuie sur Échap pour quitter le placement. Ton catalogue personnel et tes favoris sont conservés.", "✓ Bulbasaur confirmed that your chair was created in the model from the radial menu. Press Esc to exit placement. Your personal catalog and favorites are kept.");
+                _text.Text = UiLanguage.Get("FamilyRibbonTutorialGuide.BulbasaurConfirmedThatYourChairWasCreatedIn");
                 _next.IsEnabled = true;
             }
             else
@@ -258,7 +258,7 @@ namespace BIMaestro.Tutorials
             _title.Text = $"{_index + 1}/{_steps.Length} · {step.Title}";
             _text.Text = step.Text;
             _previous.IsEnabled = _index > FirstStep;
-            _next.Content = _index == _steps.Length - 1 ? UiLanguage.T("Terminer", "Finish") : UiLanguage.T("Suivant", "Next");
+            _next.Content = _index == _steps.Length - 1 ? UiLanguage.Get("FamilyRibbonTutorialGuide.Finish") : UiLanguage.Get("FamilyRibbonTutorialGuide.Next");
             // Revit's modal shortcut dialog disables this separate guide card.
             // All dialog instructions therefore live in one step, which resumes
             // after the dialog closes. Suivant remains available as a fallback
@@ -271,7 +271,7 @@ namespace BIMaestro.Tutorials
             if (_index == _steps.Length - 1 &&
                 Famille.FamilyBrowserCommand.uiapp?.ActiveUIDocument == null)
             {
-                _text.Text += UiLanguage.T(" Ouvre une maquette avant cet essai ; sinon, quitte le guide et relance-le plus tard.", " Open a model before this test; otherwise, quit the guide and restart it later.");
+                _text.Text += UiLanguage.Get("FamilyRibbonTutorialGuide.OpenAModelBeforeThisTestOtherwiseQuit");
             }
             UpdateTarget();
         }

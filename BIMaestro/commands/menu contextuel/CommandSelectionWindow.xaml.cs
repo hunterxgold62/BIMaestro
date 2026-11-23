@@ -23,7 +23,7 @@ namespace TonNamespace
             }
             else
             {
-                MessageBox.Show(UiLanguage.T("Veuillez sélectionner une commande.", "Select a command."));
+                MessageBox.Show(UiLanguage.Get("CommandSelectionWindow.xaml.SelectACommand"));
             }
         }
 

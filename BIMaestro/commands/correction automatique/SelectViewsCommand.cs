@@ -51,7 +51,7 @@ namespace ScanTextRevit
             List<ElementId> selectedIds = wpf.GetSelectedElementIds();
             if (selectedIds.Count == 0)
             {
-                TaskDialog.Show("Info", UiLanguage.T("Aucune vue/feuille sélectionnée.", "No view or sheet was selected."));
+                TaskDialog.Show("Info", UiLanguage.Get("SelectViewsCommand.NoViewOrSheetWasSelected"));
                 return Result.Cancelled;
             }
 
@@ -87,7 +87,7 @@ namespace ScanTextRevit
             // S'il ne reste plus rien après la déduplication
             if (selectedIds.Count == 0)
             {
-                TaskDialog.Show("Info", UiLanguage.T("Après déduplication, aucune vue/feuille n'est sélectionnée.", "After removing duplicates, no view or sheet remains selected."));
+                TaskDialog.Show("Info", UiLanguage.Get("SelectViewsCommand.AfterRemovingDuplicatesNoViewOrSheetRemains"));
                 return Result.Cancelled;
             }
 
@@ -96,7 +96,7 @@ namespace ScanTextRevit
             var scanResults = service.ScanSelectedViewsAndSheets(doc, selectedIds);
             if (scanResults.Count == 0 || !scanResults.Any(kvp => kvp.Value != null && kvp.Value.Count > 0))
             {
-                TaskDialog.Show("Info", UiLanguage.T("Aucun texte trouvé.", "No text was found."));
+                TaskDialog.Show("Info", UiLanguage.Get("SelectViewsCommand.NoTextWasFound"));
                 return Result.Cancelled;
             }
 

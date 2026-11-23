@@ -40,7 +40,7 @@ namespace Famille.Orbit3D
         {
             if (uiapp == null || string.IsNullOrWhiteSpace(familyPath) || !File.Exists(familyPath))
             {
-                MessageBox.Show(UiLanguage.T("Fichier famille introuvable.", "Family file not found."), UiLanguage.T("Aperçu 3D", "3D Preview"),
+                MessageBox.Show(UiLanguage.Get("FamilyPreviewBridge.FamilyFileNotFound"), UiLanguage.Get("FamilyPreviewBridge.3DPreview"),
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
@@ -53,7 +53,7 @@ namespace Famille.Orbit3D
                 try
                 {
                     _host.Window.ClearScene(); // nettoie l'ancien contenu si besoin
-                    _host.Window.ShowBusy(true, UiLanguage.T("Chargement de la famille…", "Loading family..."));
+                    _host.Window.ShowBusy(true, UiLanguage.Get("FamilyPreviewBridge.LoadingFamily"));
                     if (!_host.Window.IsVisible) _host.Window.Show();
                     RaisePreviewVisibilityChanged(_host.Window.IsVisible);
                     _host.Window.Activate();
@@ -76,7 +76,7 @@ namespace Famille.Orbit3D
                     if (info != null && info.Format != app.VersionNumber)
                     {
                         _host.Dispatcher.Invoke(() =>
-                            _host.Window.ShowBusy(true, UiLanguage.T("Mise à niveau du fichier… Cela peut prendre du temps.", "Upgrading the file... This may take some time.")));
+                            _host.Window.ShowBusy(true, UiLanguage.Get("FamilyPreviewBridge.UpgradingTheFileThisMayTakeSomeTime")));
                     }
                 }
                 catch { /* non bloquant */ }
@@ -95,7 +95,7 @@ namespace Famille.Orbit3D
                 _host.Dispatcher.Invoke(() =>
                 {
                     if (meshes == null || meshes.Count == 0)
-                        _host.Window.ShowBusy(true, UiLanguage.T("Aucune géométrie affichable trouvée.", "No displayable geometry was found."));
+                        _host.Window.ShowBusy(true, UiLanguage.Get("FamilyPreviewBridge.NoDisplayableGeometryWasFound"));
                     else
                         _host.Window.LoadMeshes(meshes);
                 });
@@ -103,7 +103,7 @@ namespace Famille.Orbit3D
             catch (Exception ex)
             {
                 _host.Dispatcher.Invoke(() =>
-                    _host.Window.ShowBusy(true, UiLanguage.T("Erreur : ", "Error: ") + ex.Message));
+                    _host.Window.ShowBusy(true, UiLanguage.Get("FamilyPreviewBridge.Error") + ex.Message));
             }
             finally
             {

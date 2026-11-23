@@ -51,7 +51,7 @@ namespace BIMaestro.Bonus
                 rows.Add(new LeaderboardRow
                 {
                     Rank = rank,
-                    PlayerName = string.IsNullOrWhiteSpace(entry.PlayerName) ? UiLanguage.T("Joueur", "Player") : entry.PlayerName,
+                    PlayerName = string.IsNullOrWhiteSpace(entry.PlayerName) ? UiLanguage.Get("SnakeLeaderboardModels.Player") : entry.PlayerName,
                     Score = entry.Score
                 });
                 rank++;
@@ -62,7 +62,7 @@ namespace BIMaestro.Bonus
                 rows.Add(new LeaderboardRow
                 {
                     Rank = 1,
-                    PlayerName = UiLanguage.T("Aucun score", "No Score"),
+                    PlayerName = UiLanguage.Get("SnakeLeaderboardModels.NoScore"),
                     Score = 0
                 });
             }

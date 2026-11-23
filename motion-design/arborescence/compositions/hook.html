@@ -1,0 +1,20 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 0 180px 320px 120px; }
+    .hk-line { font-weight: 900; font-size: 92px; line-height: 1.02; letter-spacing: -0.04em; color: #fff; text-align: center; }
+    #hk-l3 { color: #0F5132; background: #7FD6A6; padding: 8px 34px; border-radius: 24px; margin-top: 28px; }
+  </style>
+  <div id="root" data-composition-id="hook" data-width="1080" data-height="1920">
+    <div id="hk-l1" class="hk-line" data-var-text="hook1">Renuméroter</div>
+    <div id="hk-l2" class="hk-line" data-var-text="hook2">tes feuilles ?</div>
+    <div id="hk-l3" class="hk-line" data-var-text="hook3">3 clics.</div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#hk-l1", { scale: 1.2 }, { scale: 1, duration: 0.35, ease: "expo.out" }, 0);
+    tl.fromTo("#hk-l2", { scale: 1.2 }, { scale: 1, duration: 0.35, ease: "expo.out" }, 0.05);
+    tl.fromTo("#hk-l3", { scale: 0, rotation: -12 }, { scale: 1, rotation: -3, duration: 0.4, ease: "back.out(2.6)" }, 0.55);
+    tl.to("#root", { scale: 1.6, opacity: 0, filter: "blur(10px)", duration: 0.26, ease: "power3.in" }, 1.92);
+    window.__timelines["hook"] = tl;
+  </script>
+</template>

@@ -250,7 +250,7 @@ namespace TonNamespace
 
             if (available.Count == 0)
             {
-                MessageBox.Show(UiLanguage.T("Toutes les commandes disponibles ont été ajoutées.", "All available commands have already been added."));
+                MessageBox.Show(UiLanguage.Get("MenuContextuel.xaml.AllAvailableCommandsHaveAlreadyBeenAdded"));
                 return;
             }
 

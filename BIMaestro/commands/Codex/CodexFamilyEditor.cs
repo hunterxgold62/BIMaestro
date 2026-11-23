@@ -42,19 +42,32 @@ namespace BIMaestro.Codex
         }
         internal static object Inspect(Document doc, JObject args)
         {
-            RequireFamily(doc); CodexFamilyDesign.Keys(args, "offset", "limit");
+            RequireFamily(doc);
+            var includeSummary = args?["include_summary"];
+            if (includeSummary == null)
+                CodexFamilyDesign.Keys(args, "offset", "limit");
+            else
+                CodexFamilyDesign.Keys(args, "offset", "limit", "include_summary");
+            if (includeSummary != null && includeSummary.Type != JTokenType.Boolean)
+                throw new InvalidOperationException("include_summary doit être un booléen.");
             double offset = CodexFamilyDesign.Scalar(args["offset"], "offset", 0, 1000000);
             double limit = CodexFamilyDesign.Scalar(args["limit"], "limit", 1, 100);
             if (offset != Math.Truncate(offset) || limit != Math.Truncate(limit)) throw new InvalidOperationException("Pagination entière attendue.");
             var elements = new FilteredElementCollector(doc).WhereElementIsNotElementType().ToElements()
                 .Where(e => e is GenericForm || e is CurveElement || e is FamilyInstance || e is ReferencePlane || e is SketchPlane || e is Dimension || e is ConnectorElement || e is Opening)
                 .OrderBy(e => e.Id.ToString(), StringComparer.Ordinal).ToArray();
+            var page = elements.Skip((int)offset).Take((int)limit).Select(e => Describe(doc, e)).ToArray();
+            int? nextOffset = offset + limit < elements.Length ? (int?)(offset + limit) : null;
+            if (includeSummary != null && !includeSummary.Value<bool>())
+                return new { document_key = doc.OwnerFamily.UniqueId, document = doc.Title, total = elements.Length,
+                    offset = (int)offset, next_offset = nextOffset, elements = page };
+
             return new { document_key = doc.OwnerFamily.UniqueId, document = doc.Title, saved_path = doc.PathName,
                 parameters = CodexFamilyTools.Read(doc), total = elements.Length, offset = (int)offset,
                 materials = new FilteredElementCollector(doc).OfClass(typeof(Material)).Cast<Material>().Select(m => new { unique_id = m.UniqueId, name = m.Name }).ToArray(),
-                next_offset = offset + limit < elements.Length ? (int?)(offset + limit) : null,
+                next_offset = nextOffset,
                 drawing_groups = elements.Where(e => Group(e) != null).GroupBy(Group).Select(g => new { name = g.Key, count = g.Count() }).ToArray(),
-                elements = elements.Skip((int)offset).Take((int)limit).Select(e => Describe(doc, e)).ToArray(),
+                elements = page,
                 note = "État réel du type courant, coordonnées internes en mm. Inventaire paginé, pas une extraction complète des contraintes ni une recette de reconstruction. Les profils longs sont tronqués explicitement." };
         }
         private static double[] Mm(XYZ p) => new[] { p.X * 304.8, p.Y * 304.8, p.Z * 304.8 };

@@ -50,7 +50,7 @@ namespace BIMaestro.Dashboard
             DetailPlot.SizeChanged += (s, e) => FitChart(DetailPlot);
             From.SelectedDate = DateTime.Today.AddDays(-14);
             To.SelectedDate = DateTime.Today;
-            Version.ItemsSource = new[] { UiLanguage.T("Toutes", "All") };
+            Version.ItemsSource = new[] { UiLanguage.Get("TimeSeriesDashboardWindow.xaml.All") };
             Version.SelectedIndex = 0;
             _ready = true;
             Reload();
@@ -64,7 +64,7 @@ namespace BIMaestro.Dashboard
         {
             try
             {
-                if (!File.Exists(_excelPath)) { MessageBox.Show(this, UiLanguage.T("Aucun historique Excel enregistré pour le moment.", "No Excel history has been recorded yet."), "BIMaestro"); return; }
+                if (!File.Exists(_excelPath)) { MessageBox.Show(this, UiLanguage.Get("TimeSeriesDashboardWindow.xaml.NoExcelHistoryHasBeenRecordedYet"), "BIMaestro"); return; }
                 Process.Start(new ProcessStartInfo(_excelPath) { UseShellExecute = true });
             }
             catch (Exception ex) { MessageBox.Show(this, ex.Message, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Error); }
@@ -81,7 +81,7 @@ namespace BIMaestro.Dashboard
                     using var stream = new FileStream(_excelPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
                     using var book = new XSSFWorkbook(stream);
                     var sheet = book.GetSheet("Historique_Temps_Revit");
-                    if (sheet == null) throw new InvalidDataException(UiLanguage.T("La feuille Historique_Temps_Revit est absente.", "The Historique_Temps_Revit worksheet is missing."));
+                    if (sheet == null) throw new InvalidDataException(UiLanguage.Get("TimeSeriesDashboardWindow.xaml.TheHistoriqueTempsRevitWorksheetIsMissing"));
                     var format = new DataFormatter();
                     for (int i = sheet.FirstRowNum + 1; i <= sheet.LastRowNum; i++)
                     {
@@ -99,7 +99,7 @@ namespace BIMaestro.Dashboard
                 _invalidRows = invalid;
                 _loadError = null;
             }
-            catch (Exception ex) { _loadError = UiLanguage.T("Lecture de l’historique impossible : ", "Unable to read history: ") + ex.Message; }
+            catch (Exception ex) { _loadError = UiLanguage.Get("TimeSeriesDashboardWindow.xaml.UnableToReadHistory") + ex.Message; }
             // Current-process open sessions are not yet present as closed rows in the workbook.
             _all = _saved.Concat(ExcelLogger.GetDashboardEntries().Select(x => new Entry {
                 Id = Normalize(x.DocumentId), Name = x.Name, Version = x.Version, Kind = x.Kind,
@@ -108,8 +108,8 @@ namespace BIMaestro.Dashboard
             RebuildChoices();
             _batch = true;
             var version = Version.SelectedItem as string;
-            Version.ItemsSource = new[] { UiLanguage.T("Toutes", "All") }.Concat(_all.Select(x => x.Version).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().OrderBy(x => x)).ToList();
-            Version.SelectedItem = version ?? UiLanguage.T("Toutes", "All");
+            Version.ItemsSource = new[] { UiLanguage.Get("TimeSeriesDashboardWindow.xaml.All") }.Concat(_all.Select(x => x.Version).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().OrderBy(x => x)).ToList();
+            Version.SelectedItem = version ?? UiLanguage.Get("TimeSeriesDashboardWindow.xaml.All");
             if (Version.SelectedIndex < 0) Version.SelectedIndex = 0;
             _batch = false;
             Refresh();
@@ -175,10 +175,10 @@ namespace BIMaestro.Dashboard
             OverviewAverage.Text = Duration(recent.Sum(x => x.Hours) / Math.Max(1, recent.Select(x => x.When.Date).Distinct().Count()));
             OverviewCount.Text = totals.Count.ToString();
             int workedDays = recent.Select(x => x.When.Date).Distinct().Count();
-            OverviewWorkedDays.Text = workedDays + (workedDays == 1 ? UiLanguage.T(" jour avec activité", " active day") : UiLanguage.T(" jours avec activité", " active days"));
+            OverviewWorkedDays.Text = workedDays + (workedDays == 1 ? UiLanguage.Get("TimeSeriesDashboardWindow.xaml.ActiveDay") : UiLanguage.Get("TimeSeriesDashboardWindow.xaml.ActiveDays"));
             double previous = _all.Where(x => x.When.Date >= start.AddDays(-_days) && x.When.Date < start).Sum(x => x.Hours);
             double difference = recent.Sum(x => x.Hours) - previous;
-            OverviewTrend.Text = previous > 0 ? (Math.Abs(difference) < 1.0 / 120 ? UiLanguage.T("Stable", "Unchanged") : (difference >= 0 ? "+" : "−") + Duration(Math.Abs(difference))) + UiLanguage.T(" sur la période précédente", " compared with the previous period") : UiLanguage.T("Aucune activité sur la période précédente", "No activity in the previous period");
+            OverviewTrend.Text = previous > 0 ? (Math.Abs(difference) < 1.0 / 120 ? UiLanguage.Get("TimeSeriesDashboardWindow.xaml.Unchanged") : (difference >= 0 ? "+" : "−") + Duration(Math.Abs(difference))) + UiLanguage.Get("TimeSeriesDashboardWindow.xaml.ComparedWithThePreviousPeriod") : UiLanguage.Get("TimeSeriesDashboardWindow.xaml.NoActivityInThePreviousPeriod");
             Seven.FontWeight = _days == 7 ? FontWeights.Bold : FontWeights.Normal;
             Fifteen.FontWeight = _days == 15 ? FontWeights.Bold : FontWeights.Normal;
             Seven.SetResourceReference(Control.BorderBrushProperty, _days == 7 ? "Focus" : "Border");
@@ -195,8 +195,8 @@ namespace BIMaestro.Dashboard
             Picker.ItemsSource = _choices.Where(x => available.Contains(x.Id)).ToList();
             _batch = false;
             RefreshDetail();
-            Status.Text = _loadError ?? (UiLanguage.T("Historique local · temps actif et sessions ouvertes · actualisé à ", "Local history · active time and ongoing sessions · updated at ") + DateTime.Now.ToString("HH:mm") +
-                (_invalidRows > 0 ? " · " + _invalidRows + UiLanguage.T(" ligne(s) illisible(s) ignorée(s)", " unreadable row(s) skipped") : ""));
+            Status.Text = _loadError ?? (UiLanguage.Get("TimeSeriesDashboardWindow.xaml.LocalHistoryActiveTimeAndOngoingSessionsUpdated") + DateTime.Now.ToString("HH:mm") +
+                (_invalidRows > 0 ? " · " + _invalidRows + UiLanguage.Get("TimeSeriesDashboardWindow.xaml.UnreadableRowSSkipped") : ""));
         }
         private bool MatchesFilters(Entry x)
         {
@@ -215,7 +215,7 @@ namespace BIMaestro.Dashboard
             _detail = valid ? _all.Where(x => x.When.Date >= start && x.When.Date <= end && ids.Contains(x.Id) && MatchesFilters(x)).ToList() : new List<Entry>();
             _detailTotals = Totals(_detail);
             DetailTable.ItemsSource = _detailTotals;
-            DetailSummary.Text = valid ? Duration(_detail.Sum(x => x.Hours)) : UiLanguage.T("Période invalide", "Invalid period");
+            DetailSummary.Text = valid ? Duration(_detail.Sum(x => x.Hours)) : UiLanguage.Get("TimeSeriesDashboardWindow.xaml.InvalidPeriod");
             int activeDays = _detail.Select(x => x.When.Date).Distinct().Count();
             double hours = _detail.Sum(x => x.Hours);
             var daily = _detail.GroupBy(x => x.When.Date).Select(g => new ActivityDay {
@@ -226,23 +226,23 @@ namespace BIMaestro.Dashboard
                 When = x.When, Name = x.Name, Hours = x.Hours, Live = x.Live
             }).ToList();
             var peak = daily.OrderByDescending(x => x.Hours).ThenByDescending(x => x.Day).FirstOrDefault();
-            DetailAverage.Text = valid && activeDays > 0 ? UiLanguage.T("Moyenne / jour actif : ", "Average / active day: ") + Duration(hours / activeDays) : UiLanguage.T("Moyenne / jour actif : —", "Average / active day: —");
-            DetailPeak.Text = peak == null ? UiLanguage.T("Journée la plus active : —", "Most active day: —") : UiLanguage.T("Journée la plus active : ", "Most active day: ") + peak.Day.ToString("dd/MM/yyyy") + " · " + Duration(peak.Hours);
+            DetailAverage.Text = valid && activeDays > 0 ? UiLanguage.Get("TimeSeriesDashboardWindow.xaml.AverageActiveDay") + Duration(hours / activeDays) : UiLanguage.Get("TimeSeriesDashboardWindow.xaml.AverageActiveDay2");
+            DetailPeak.Text = peak == null ? UiLanguage.Get("TimeSeriesDashboardWindow.xaml.MostActiveDay") : UiLanguage.Get("TimeSeriesDashboardWindow.xaml.MostActiveDay2") + peak.Day.ToString("dd/MM/yyyy") + " · " + Duration(peak.Hours);
             // Compare the same selected documents and filters over an equally long preceding period.
             DateTime previousStart = valid ? start.AddDays(-((end - start).Days + 1)) : start;
             double previousHours = valid ? _all.Where(x => x.When.Date >= previousStart && x.When.Date < start && ids.Contains(x.Id) && MatchesFilters(x)).Sum(x => x.Hours) : 0;
             double delta = hours - previousHours;
-            DetailComparison.Text = !valid ? UiLanguage.T("Période précédente : —", "Previous period: —") :
-                UiLanguage.T("Période précédente : ", "Previous period: ") + previousStart.ToString("dd/MM/yyyy") + " – " + start.AddDays(-1).ToString("dd/MM/yyyy") + " · " + Duration(previousHours) +
-                (previousHours > 0 ? " · " + (delta >= 0 ? "+" : "−") + Duration(Math.Abs(delta)) + " (" + (delta >= 0 ? "+" : "") + (100 * delta / previousHours).ToString("0.#", CultureInfo.CurrentCulture) + " %)" : UiLanguage.T(" · aucune activité enregistrée", " · no recorded activity"));
-            DetailLive.Text = UiLanguage.T("Activité des sessions ouvertes : ", "Activity from ongoing sessions: ") + Duration(_detail.Where(x => x.Live).Sum(x => x.Hours));
-            DetailContext.Text = valid ? _detailTotals.Count + (_detailTotals.Count == 1 ? " document" : " documents") + " · " + activeDays + (activeDays == 1 ? UiLanguage.T(" jour actif", " active day") : UiLanguage.T(" jours actifs", " active days")) + " · " + start.ToString("dd/MM/yyyy") + UiLanguage.T(" au ", " to ") + end.ToString("dd/MM/yyyy") : UiLanguage.T("La date de début doit précéder la date de fin.", "The start date must be before the end date.");
-            DetailChartTitle.Text = (end - start).Days < 31 ? UiLanguage.T("Voir le temps actif par jour", "View active time by day") : UiLanguage.T("Voir l’évolution du temps actif · périodes regroupées", "View active time trends · grouped periods");
-            SelectionCount.Text = Picker.Items.Cast<ModelChoice>().Count(x => x.Selected) + " / " + Picker.Items.Count + UiLanguage.T(" documents sélectionnés", " documents selected");
+            DetailComparison.Text = !valid ? UiLanguage.Get("TimeSeriesDashboardWindow.xaml.PreviousPeriod") :
+                UiLanguage.Get("TimeSeriesDashboardWindow.xaml.PreviousPeriod2") + previousStart.ToString("dd/MM/yyyy") + " – " + start.AddDays(-1).ToString("dd/MM/yyyy") + " · " + Duration(previousHours) +
+                (previousHours > 0 ? " · " + (delta >= 0 ? "+" : "−") + Duration(Math.Abs(delta)) + " (" + (delta >= 0 ? "+" : "") + (100 * delta / previousHours).ToString("0.#", CultureInfo.CurrentCulture) + " %)" : UiLanguage.Get("TimeSeriesDashboardWindow.xaml.NoRecordedActivity"));
+            DetailLive.Text = UiLanguage.Get("TimeSeriesDashboardWindow.xaml.ActivityFromOngoingSessions") + Duration(_detail.Where(x => x.Live).Sum(x => x.Hours));
+            DetailContext.Text = valid ? _detailTotals.Count + (_detailTotals.Count == 1 ? " document" : " documents") + " · " + activeDays + (activeDays == 1 ? UiLanguage.Get("TimeSeriesDashboardWindow.xaml.ActiveDay2") : UiLanguage.Get("TimeSeriesDashboardWindow.xaml.ActiveDays2")) + " · " + start.ToString("dd/MM/yyyy") + UiLanguage.Get("TimeSeriesDashboardWindow.xaml.To") + end.ToString("dd/MM/yyyy") : UiLanguage.Get("TimeSeriesDashboardWindow.xaml.TheStartDateMustBeBeforeTheEnd");
+            DetailChartTitle.Text = (end - start).Days < 31 ? UiLanguage.Get("TimeSeriesDashboardWindow.xaml.ViewActiveTimeByDay") : UiLanguage.Get("TimeSeriesDashboardWindow.xaml.ViewActiveTimeTrendsGroupedPeriods");
+            SelectionCount.Text = Picker.Items.Cast<ModelChoice>().Count(x => x.Selected) + " / " + Picker.Items.Count + UiLanguage.Get("TimeSeriesDashboardWindow.xaml.DocumentsSelected");
             DetailPlot.Model = valid ? Chart(_detail, start, end) : new PlotModel();
             FitChart(DetailPlot);
             DetailEmpty.Visibility = valid && _detail.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-            DetailDocumentsEmpty.Text = !valid ? UiLanguage.T("Corrigez la période pour afficher les documents.", "Correct the period to display documents.") : ids.Count == 0 ? UiLanguage.T("Cochez un document pour afficher son temps actif.", "Select a document to display its active time.") : UiLanguage.T("Aucune activité pour cette période et ces filtres.", "No activity for this period and these filters.");
+            DetailDocumentsEmpty.Text = !valid ? UiLanguage.Get("TimeSeriesDashboardWindow.xaml.CorrectThePeriodToDisplayDocuments") : ids.Count == 0 ? UiLanguage.Get("TimeSeriesDashboardWindow.xaml.SelectADocumentToDisplayItsActiveTime") : UiLanguage.Get("TimeSeriesDashboardWindow.xaml.NoActivityForThisPeriodAndTheseFilters");
             DetailDocumentsEmpty.Visibility = _detail.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
             DetailPlot.Visibility = _detail.Count == 0 ? Visibility.Hidden : Visibility.Visible;
             PdfButton.IsEnabled = valid && _detail.Count > 0 && _loadError == null;
@@ -260,7 +260,7 @@ namespace BIMaestro.Dashboard
         private OxyColor ThemeColor(string key)
         {
             var brush = TryFindResource(key) as SolidColorBrush;
-            if (brush == null) throw new InvalidOperationException(UiLanguage.T("Couleur du thème introuvable : ", "Theme color not found: ") + key);
+            if (brush == null) throw new InvalidOperationException(UiLanguage.Get("TimeSeriesDashboardWindow.xaml.ThemeColorNotFound") + key);
             return OxyColor.FromArgb(brush.Color.A, brush.Color.R, brush.Color.G, brush.Color.B);
         }
         private static string PdfColor(OxyColor color) => string.Join(" ", new[] { color.R, color.G, color.B }.Select(x => (x / 255.0).ToString("0.###", CultureInfo.InvariantCulture)));
@@ -288,14 +288,14 @@ namespace BIMaestro.Dashboard
             double step = peak <= 1 ? .25 : peak <= 2 ? .5 : peak <= 4 ? 1 : peak <= 8 ? 2 : Math.Pow(2, Math.Ceiling(Math.Log(peak / 4, 2)));
             model.Axes.Add(new LinearAxis { Position = AxisPosition.Left, Minimum = 0, Maximum = Math.Max(step * 4, Math.Ceiling(peak * 1.25 / step) * step), MajorStep = step,
                 LabelFormatter = value => value == 0 ? "0" : value < 1 ? Math.Round(value * 60) + " min" : Duration(value).Replace(" h 00", " h"), MajorGridlineStyle = LineStyle.Solid, MajorGridlineColor = ThemeColor("Divider"), TickStyle = TickStyle.None, IsZoomEnabled = false, IsPanEnabled = false });
-            var series = new RectangleBarSeries { Title = UiLanguage.T("Temps actif", "Active time"), FillColor = ThemeColor("Brand"), StrokeThickness = 0, LabelFormatString = null, TrackerFormatString = "{0}\n{7}" };
+            var series = new RectangleBarSeries { Title = UiLanguage.Get("TimeSeriesDashboardWindow.xaml.ActiveTime"), FillColor = ThemeColor("Brand"), StrokeThickness = 0, LabelFormatString = null, TrackerFormatString = "{0}\n{7}" };
             for (int i = 0; i < count; i++)
             {
                 hours.TryGetValue(i, out double h);
                 var bucketStart = start.AddDays(i * bucketDays);
                 var bucketEnd = end.AddDays(-Math.Max(0, (end - bucketStart).Days - bucketDays + 1));
                 string period = bucketStart.ToString("dd MMM yyyy", CultureInfo.GetCultureInfo(UiLanguage.IsEnglish ? "en-GB" : "fr-FR"));
-                if (bucketDays > 1) period += UiLanguage.T(" au ", " to ") + bucketEnd.ToString("dd MMM yyyy", CultureInfo.GetCultureInfo(UiLanguage.IsEnglish ? "en-GB" : "fr-FR"));
+                if (bucketDays > 1) period += UiLanguage.Get("TimeSeriesDashboardWindow.xaml.To") + bucketEnd.ToString("dd MMM yyyy", CultureInfo.GetCultureInfo(UiLanguage.IsEnglish ? "en-GB" : "fr-FR"));
                 if (h > 0) series.Items.Add(new RectangleBarItem(i - .3, 0, i + .3, h) { Title = period + " · " + Duration(h) });
             }
             model.Series.Add(series);
@@ -318,18 +318,18 @@ namespace BIMaestro.Dashboard
             var to = To.SelectedDate?.Date ?? DateTime.Today;
             var rows = _detail.ToList();
             var totals = _detailTotals.ToList();
-            var filters = new List<string> { UiLanguage.T("Type : ", "Type: ") + ((ComboBoxItem)Kind.SelectedItem).Content, UiLanguage.T("Revit : ", "Revit: ") + Version.SelectedItem };
-            if (!string.IsNullOrWhiteSpace(Search.Text)) filters.Add(UiLanguage.T("Recherche : ", "Search: ") + Search.Text);
-            if (!string.IsNullOrWhiteSpace(ParameterSearch.Text)) filters.Add(UiLanguage.T("Paramètres : ", "Parameters: ") + ParameterSearch.Text);
-            var dialog = new SaveFileDialog { Filter = UiLanguage.T("Rapport PDF (*.pdf)|*.pdf", "PDF report (*.pdf)|*.pdf"), FileName = "BIMaestro-Temps-" + DateTime.Today.ToString("yyyy-MM-dd") + ".pdf" };
+            var filters = new List<string> { UiLanguage.Get("TimeSeriesDashboardWindow.xaml.Type") + ((ComboBoxItem)Kind.SelectedItem).Content, UiLanguage.Get("TimeSeriesDashboardWindow.xaml.Revit") + Version.SelectedItem };
+            if (!string.IsNullOrWhiteSpace(Search.Text)) filters.Add(UiLanguage.Get("TimeSeriesDashboardWindow.xaml.Search") + Search.Text);
+            if (!string.IsNullOrWhiteSpace(ParameterSearch.Text)) filters.Add(UiLanguage.Get("TimeSeriesDashboardWindow.xaml.Parameters") + ParameterSearch.Text);
+            var dialog = new SaveFileDialog { Filter = UiLanguage.Get("TimeSeriesDashboardWindow.xaml.PDFReportPdfPdf"), FileName = "BIMaestro-Temps-" + DateTime.Today.ToString("yyyy-MM-dd") + ".pdf" };
             if (dialog.ShowDialog(this) != true) return;
             try
             {
                 TimePdfReport.Write(dialog.FileName, from, to, rows, totals,
                     string.Join(" · ", filters), PdfColor(ThemeColor("Brand")));
-                MessageBox.Show(this, UiLanguage.T("Rapport PDF enregistré.", "PDF report saved."), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(this, UiLanguage.Get("TimeSeriesDashboardWindow.xaml.PDFReportSaved"), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Information);
             }
-            catch (Exception ex) { MessageBox.Show(this, UiLanguage.T("Export PDF impossible : ", "Unable to export PDF: ") + ex.Message, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Error); }
+            catch (Exception ex) { MessageBox.Show(this, UiLanguage.Get("TimeSeriesDashboardWindow.xaml.UnableToExportPDF") + ex.Message, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Error); }
         }
         internal static string Duration(double hours) { long minutes = (long)Math.Round(hours * 60, MidpointRounding.AwayFromZero); return (minutes / 60) + " h " + (minutes % 60).ToString("00"); }
         private static string Cell(IRow row, int i, DataFormatter format) => format.FormatCellValue(row.GetCell(i))?.Trim() ?? "";
@@ -371,7 +371,7 @@ namespace BIMaestro.Dashboard
             public double Hours { get; set; }
             public bool Live { get; set; }
             public string Duration => TimeSeriesDashboardWindow.Duration(Hours);
-            public string State => Live ? UiLanguage.T("Session ouverte", "Ongoing session") : UiLanguage.T("Enregistrée", "Recorded");
+            public string State => Live ? UiLanguage.Get("TimeSeriesDashboardWindow.xaml.OngoingSession") : UiLanguage.Get("TimeSeriesDashboardWindow.xaml.Recorded");
         }
         [Obfuscation(Exclude = true, ApplyToMembers = true)]
         internal class Total { public string Id { get; set; } public string Name { get; set; } public string Path { get; set; } public double Hours { get; set; } public string Duration => TimeSeriesDashboardWindow.Duration(Hours); public int Days { get; set; } public DateTime Last { get; set; } public string Versions { get; set; } public double Share { get; set; } public string ShareLabel => Share.ToString("0.#", CultureInfo.CurrentCulture) + " %"; }
@@ -422,49 +422,49 @@ namespace BIMaestro.Dashboard
             Action newPage = () => {
                 page = new StringBuilder(); pages.Add(page);
                 Rect(page, 0, 785, 595, 57, brandColor);
-                page.Append("BT /F2 18 Tf 1 1 1 rg 36 806 Td (" + Literal(UiLanguage.T("BIMaestro | Rapport de temps", "BIMaestro | Time report")) + ") Tj ET\n");
-                Text(page, start.ToString("dd/MM/yyyy") + UiLanguage.T(" au ", " to ") + end.ToString("dd/MM/yyyy") + UiLanguage.T(" · temps actif", " · active time"), 36, 763, 11);
+                page.Append("BT /F2 18 Tf 1 1 1 rg 36 806 Td (" + Literal(UiLanguage.Get("TimeSeriesDashboardWindow.xaml.BIMaestroTimeReport")) + ") Tj ET\n");
+                Text(page, start.ToString("dd/MM/yyyy") + UiLanguage.Get("TimeSeriesDashboardWindow.xaml.To") + end.ToString("dd/MM/yyyy") + UiLanguage.Get("TimeSeriesDashboardWindow.xaml.ActiveTime2"), 36, 763, 11);
                 y = 724;
             };
             Action detailHeading = () => {
-                Text(page, UiLanguage.T("Détail de la sélection", "Selection details"), 36, y, 12, true); y -= 28;
+                Text(page, UiLanguage.Get("TimeSeriesDashboardWindow.xaml.SelectionDetails"), 36, y, 12, true); y -= 28;
                 Rect(page, 36, y - 9, 523, 25, "0.96 0.97 0.98");
-                Text(page, UiLanguage.T("Maquette / famille", "Model / family"), 42, y, 9, true);
-                RightText(page, UiLanguage.T("Temps actif", "Active time"), 400, y, 9, true);
-                RightText(page, UiLanguage.T("Jours", "Days"), 447, y, 9, true);
-                RightText(page, UiLanguage.T("Dernière activité", "Last activity"), 553, y, 9, true);
+                Text(page, UiLanguage.Get("TimeSeriesDashboardWindow.xaml.ModelFamily"), 42, y, 9, true);
+                RightText(page, UiLanguage.Get("TimeSeriesDashboardWindow.xaml.ActiveTime"), 400, y, 9, true);
+                RightText(page, UiLanguage.Get("TimeSeriesDashboardWindow.xaml.Days"), 447, y, 9, true);
+                RightText(page, UiLanguage.Get("TimeSeriesDashboardWindow.xaml.LastActivity"), 553, y, 9, true);
                 y -= 30;
             };
             Action detailPage = () => { newPage(); detailHeading(); };
             newPage();
-            Text(page, UiLanguage.T("Total : ", "Total: ") + TimeSeriesDashboardWindow.Duration(rows.Sum(x => x.Hours)) + " · " + totals.Count + (totals.Count == 1 ? " document" : " documents"), 36, y, 16, true); y -= 26;
-            Text(page, UiLanguage.T("Dont sessions ouvertes : ", "Including ongoing sessions: ") + TimeSeriesDashboardWindow.Duration(rows.Where(x => x.Live).Sum(x => x.Hours)), 36, y); y -= 18;
+            Text(page, UiLanguage.Get("TimeSeriesDashboardWindow.xaml.Total") + TimeSeriesDashboardWindow.Duration(rows.Sum(x => x.Hours)) + " · " + totals.Count + (totals.Count == 1 ? " document" : " documents"), 36, y, 16, true); y -= 26;
+            Text(page, UiLanguage.Get("TimeSeriesDashboardWindow.xaml.IncludingOngoingSessions") + TimeSeriesDashboardWindow.Duration(rows.Where(x => x.Live).Sum(x => x.Hours)), 36, y); y -= 18;
             foreach (string line in Wrap(filters, 523, 9)) { if (y < 70) newPage(); Text(page, line, 36, y, 9); y -= 14; }
             if (y < 110) newPage();
-            Text(page, UiLanguage.T("Week-ends inclus · historique local et sessions ouvertes de cette instance.", "Weekends included · local history and ongoing sessions in this instance."), 36, y, 9); y -= 30;
-            Text(page, UiLanguage.T("Répartition du temps par document", "Time breakdown by document"), 36, y, 12, true); y -= 22;
+            Text(page, UiLanguage.Get("TimeSeriesDashboardWindow.xaml.WeekendsIncludedLocalHistoryAndOngoingSessionsIn"), 36, y, 9); y -= 30;
+            Text(page, UiLanguage.Get("TimeSeriesDashboardWindow.xaml.TimeBreakdownByDocument"), 36, y, 12, true); y -= 22;
             double max = Math.Max(0.001, totals.Select(x => x.Hours).DefaultIfEmpty(0).Max());
             foreach (var total in totals.Take(8))
             {
-                if (y < 70) { newPage(); Text(page, UiLanguage.T("Répartition du temps par document (suite)", "Time breakdown by document (continued)"), 36, y, 12, true); y -= 26; }
+                if (y < 70) { newPage(); Text(page, UiLanguage.Get("TimeSeriesDashboardWindow.xaml.TimeBreakdownByDocumentContinued"), 36, y, 12, true); y -= 26; }
                 Text(page, Short(total.Name, 224, 9), 36, y, 9);
                 Rect(page, 272, y - 1, 190 * total.Hours / max, 8, brandColor);
                 RightText(page, total.Duration, 559, y, 9); y -= 22;
             }
-            if (totals.Count > 8) { Text(page, UiLanguage.T("Les 8 documents les plus utilisés ; la liste complète figure ci-dessous.", "The 8 most used documents; the complete list is shown below."), 36, y, 9); y -= 18; }
-            if (totals.Count == 0) { Text(page, UiLanguage.T("Aucune activité sur cette sélection.", "No activity for this selection."), 36, y, 10); y -= 22; }
+            if (totals.Count > 8) { Text(page, UiLanguage.Get("TimeSeriesDashboardWindow.xaml.The8MostUsedDocumentsTheCompleteList"), 36, y, 9); y -= 18; }
+            if (totals.Count == 0) { Text(page, UiLanguage.Get("TimeSeriesDashboardWindow.xaml.NoActivityForThisSelection"), 36, y, 10); y -= 22; }
             y -= 20;
             var first = totals.FirstOrDefault();
-            int firstHeight = first == null ? 0 : Wrap(string.IsNullOrWhiteSpace(first.Name) ? UiLanguage.T("Sans nom", "Unnamed") : first.Name, 290, 10, true).Count() * 14
-                + (Wrap(first.Path, 523, 8).Count() + Wrap(UiLanguage.T("Revit : ", "Revit: ") + first.Versions, 523, 8).Count()) * 11 + 14;
+            int firstHeight = first == null ? 0 : Wrap(string.IsNullOrWhiteSpace(first.Name) ? UiLanguage.Get("TimeSeriesDashboardWindow.xaml.Unnamed") : first.Name, 290, 10, true).Count() * 14
+                + (Wrap(first.Path, 523, 8).Count() + Wrap(UiLanguage.Get("TimeSeriesDashboardWindow.xaml.Revit") + first.Versions, 523, 8).Count()) * 11 + 14;
             // Keep the section heading, column labels and first row together.
             if (y - 58 - Math.Min(firstHeight, 606) < 60) newPage();
             detailHeading();
             foreach (var total in totals)
             {
-                var nameLines = Wrap(string.IsNullOrWhiteSpace(total.Name) ? UiLanguage.T("Sans nom", "Unnamed") : total.Name, 290, 10, true).ToList();
+                var nameLines = Wrap(string.IsNullOrWhiteSpace(total.Name) ? UiLanguage.Get("TimeSeriesDashboardWindow.xaml.Unnamed") : total.Name, 290, 10, true).ToList();
                 var pathLines = Wrap(total.Path, 523, 8).ToList();
-                var versionLines = Wrap(UiLanguage.T("Revit : ", "Revit: ") + total.Versions, 523, 8).ToList();
+                var versionLines = Wrap(UiLanguage.Get("TimeSeriesDashboardWindow.xaml.Revit") + total.Versions, 523, 8).ToList();
                 int height = nameLines.Count * 14 + (pathLines.Count + versionLines.Count) * 11 + 14;
                 // Long paths are split across pages rather than silently truncated.
                 if (y - Math.Min(height, 606) < 60) detailPage();
@@ -476,7 +476,7 @@ namespace BIMaestro.Dashboard
                 Rect(page, 36, y - 3, 523, 0.5, "0.9 0.92 0.94");
                 y -= 14;
             }
-            for (int i = 0; i < pages.Count; i++) Text(pages[i], UiLanguage.T("Généré le ", "Generated on ") + DateTime.Now.ToString("dd/MM/yyyy HH:mm") + " · Page " + (i + 1) + " / " + pages.Count, 36, 30, 9);
+            for (int i = 0; i < pages.Count; i++) Text(pages[i], UiLanguage.Get("TimeSeriesDashboardWindow.xaml.GeneratedOn") + DateTime.Now.ToString("dd/MM/yyyy HH:mm") + " · Page " + (i + 1) + " / " + pages.Count, 36, 30, 9);
             var objects = new List<byte[]>();
             Action<string> add = value => objects.Add(Encoding.GetBytes(value));
             add("<< /Type /Catalog /Pages 2 0 R >>");

@@ -79,9 +79,9 @@ namespace Modification
             // Avertissement systématique si workshared
             if (isWorkshared)
             {
-                var warn = new TaskDialog(UiLanguage.T("Modèle partagé détecté", "Workshared Model Detected"))
+                var warn = new TaskDialog(UiLanguage.Get("CombinedCleanupCommand.WorksharedModelDetected"))
                 {
-                    MainInstruction = UiLanguage.T("Le modèle est en travail partagé.", "This is a workshared model."),
+                    MainInstruction = UiLanguage.Get("CombinedCleanupCommand.ThisIsAWorksharedModel"),
                     MainContent = UiLanguage.T(
                         "La copie automatique de sécurité est déconseillée sur un central/local.\n" +
                         "Si vous devez travailler sur une copie, utilisez de préférence « Ouvrir » > « Détacher du central » " +
@@ -108,11 +108,9 @@ namespace Modification
             // Proposer une copie auto seulement si non-workshared
             if (!isWorkshared)
             {
-                var ask = new TaskDialog(UiLanguage.T("Créer une copie pour purge ?", "Create a Cleanup Copy?"))
+                var ask = new TaskDialog(UiLanguage.Get("CombinedCleanupCommand.CreateACleanupCopy"))
                 {
-                    MainInstruction = UiLanguage.T(
-                        $"Créer automatiquement une copie « {title} - Purger.rvt » et travailler dessus ?",
-                        $"Automatically create and work in a copy named '{title} - Cleanup.rvt'?"),
+                    MainInstruction = UiLanguage.Format("CombinedCleanupCommand.AutomaticallyCreateAndWorkInACopyNamed", (object)title),
                     MainContent = UiLanguage.T(
                         "La copie sera enregistrée dans le même dossier que le fichier actuel. " +
                         "Le document ouvert pointera ensuite vers cette copie (l’original reste intact).",
@@ -127,7 +125,7 @@ namespace Modification
                     if (string.IsNullOrWhiteSpace(doc.PathName))
                     {
                         TaskDialog.Show(
-                            UiLanguage.T("Enregistrement requis", "Save Required"),
+                            UiLanguage.Get("CombinedCleanupCommand.SaveRequired"),
                             UiLanguage.T(
                                 "Le projet n’a pas encore été enregistré. Impossible de déterminer un dossier pour la copie.\n" +
                                 "Veuillez enregistrer le fichier, puis relancer la commande.",
@@ -144,19 +142,15 @@ namespace Modification
                         doc.SaveAs(newPath, opts);
 
                         TaskDialog.Show(
-                            UiLanguage.T("Copie créée", "Copy Created"),
-                            UiLanguage.T(
-                                $"La copie de purge a été créée :\n{newPath}\n\nVous travaillez désormais sur cette copie.",
-                                $"The cleanup copy was created:\n{newPath}\n\nYou are now working in this copy."));
+                            UiLanguage.Get("CombinedCleanupCommand.CopyCreated"),
+                            UiLanguage.Format("CombinedCleanupCommand.TheCleanupCopyWasCreated0YouAre", (object)newPath));
                     }
                     catch (Exception ex)
                     {
-                        var err = new TaskDialog(UiLanguage.T("Erreur lors de la copie", "Copy Error"))
+                        var err = new TaskDialog(UiLanguage.Get("CombinedCleanupCommand.CopyError"))
                         {
-                            MainInstruction = UiLanguage.T("La création de la copie a échoué.", "The copy could not be created."),
-                            MainContent = UiLanguage.T(
-                                $"Détail : {ex.Message}\n\nSouhaitez-vous continuer sans créer de copie ?",
-                                $"Details: {ex.Message}\n\nDo you want to continue without creating a copy?"),
+                            MainInstruction = UiLanguage.Get("CombinedCleanupCommand.TheCopyCouldNotBeCreated"),
+                            MainContent = UiLanguage.Format("CombinedCleanupCommand.Details0DoYouWantToContinueWithout", (object)ex.Message),
                             CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No,
                             DefaultButton = TaskDialogResult.No,
                             MainIcon = TaskDialogIcon.TaskDialogIconWarning

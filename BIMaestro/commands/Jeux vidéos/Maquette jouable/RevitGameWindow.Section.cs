@@ -32,9 +32,9 @@ namespace BIMaestro.VideoGames
         private void SectionAdd_Click(object sender, RoutedEventArgs e)
         {
             if (_sectionVolume.Planes.Count >= GameSectionVolume.MaximumPlanes)
-            { ShowToast(UiLanguage.T("8 coupes maximum : supprimez une coupe avant d'en ajouter une.", "8 sections maximum: delete a section before adding another.")); return; }
+            { ShowToast(UiLanguage.Get("RevitGameWindow.Section.8SectionsMaximumDeleteASectionBeforeAdding")); return; }
             _pickingSectionFace = true;
-            SectionHint.Text = UiLanguage.T("Cliquez une face du bâtiment · Échap pour annuler", "Click a building face · Esc to cancel");
+            SectionHint.Text = UiLanguage.Get("RevitGameWindow.Section.ClickABuildingFaceEscToCancel");
             GameViewport.Cursor = Cursors.Cross;
             GameViewport.Focus();
         }
@@ -42,7 +42,7 @@ namespace BIMaestro.VideoGames
         {
             _pickingSectionFace = false;
             GameViewport.Cursor = Cursors.Arrow;
-            SectionHint.Text = UiLanguage.T("Ctrl + molette : déplacer la coupe sélectionnée", "Ctrl + wheel: move the selected section");
+            SectionHint.Text = UiLanguage.Get("RevitGameWindow.Section.CtrlWheelMoveTheSelectedSection");
         }
         private void AddSectionAt(Point screenPoint)
         {
@@ -51,13 +51,13 @@ namespace BIMaestro.VideoGames
             if (!_sectionVolume.ClipRay(ref origin, direction, ref length)) return;
             var hit = _selectionIndex.FindNearest(origin, direction, length);
             if (hit?.Normal == null || hit.Normal.Value.LengthSquared < 1e-12)
-            { ShowToast(UiLanguage.T("Cliquez sur une face visible du bâtiment.", "Click a visible face of the building.")); return; }
+            { ShowToast(UiLanguage.Get("RevitGameWindow.Section.ClickAVisibleFaceOfTheBuilding")); return; }
             var normal = hit.Normal.Value;
             normal.Normalize();
             if (Vector3D.DotProduct(normal, direction) < 0) normal.Negate();
             var section = new GameSectionPlane
             {
-                Name = UiLanguage.T("Coupe ", "Section ") + ++_sectionSerial, Enabled = true, FaceNormal = normal, Anchor = hit.Position
+                Name = UiLanguage.Get("RevitGameWindow.Section.Section") + ++_sectionSerial, Enabled = true, FaceNormal = normal, Anchor = hit.Position
             };
             _sectionVolume.Planes.Add(section);
             CancelSectionPick(); BindSections(section); ApplySection();
@@ -86,7 +86,7 @@ namespace BIMaestro.VideoGames
             SectionPosition.Value = (section?.Offset ?? 0) * .3048;
             SectionEnabled.IsChecked = section?.Enabled == true;
             SectionInverted.IsChecked = section?.Inverted == true;
-            SectionPositionText.Text = UiLanguage.T($"Décalage : {SectionPosition.Value:0.00} m", $"Offset: {SectionPosition.Value:0.00} m");
+            SectionPositionText.Text = UiLanguage.Format("RevitGameWindow.Section.Offset0000M", (object)SectionPosition.Value);
             _bindingSections = false;
         }
         private void SectionChanged(object sender, RoutedEventArgs e)
@@ -100,7 +100,7 @@ namespace BIMaestro.VideoGames
         {
             if (_bindingSections || SectionList == null || SelectedSection == null) return;
             SelectedSection.Offset = SectionPosition.Value / .3048;
-            SectionPositionText.Text = UiLanguage.T($"Décalage : {SectionPosition.Value:0.00} m", $"Offset: {SectionPosition.Value:0.00} m");
+            SectionPositionText.Text = UiLanguage.Format("RevitGameWindow.Section.Offset0000M", (object)SectionPosition.Value);
             ApplySection();
         }
         private void SectionDelete_Click(object sender, RoutedEventArgs e)

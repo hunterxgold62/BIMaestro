@@ -165,7 +165,7 @@ namespace Visualisation
             }
             catch
             {
-                MessageBox.Show(UiLanguage.T("Impossible d’ouvrir la page d’aide.", "Unable to Open the Help Page."), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(UiLanguage.Get("FamilySelectionWindow.xaml.UnableToOpenTheHelpPage"), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 

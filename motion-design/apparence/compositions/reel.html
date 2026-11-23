@@ -1,0 +1,68 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; }
+    .rl-tree { position: absolute; left: 180px; top: 270px; width: 600px; height: 1055px; border-radius: 28px; box-shadow: 0 40px 120px rgba(0,0,0,.6), 0 0 0 5px #155C42; object-fit: cover; }
+    .rl-narrow { left: 230px; width: 500px; height: 1125px; top: 250px; }
+    .rl-wide { position: absolute; left: 70px; top: 470px; width: 900px; height: 632px; border-radius: 28px; box-shadow: 0 40px 120px rgba(0,0,0,.6), 0 0 0 5px #155C42; object-fit: cover; }
+    .rl-pill { position: absolute; top: 180px; left: 0; right: 120px; margin: 0 auto; width: max-content; padding: 16px 34px; border-radius: 999px; background: #E7F6EE; color: #0F5132; font-weight: 900; font-size: 52px; letter-spacing: -0.02em; opacity: 0; z-index: 5; }
+    #rl-p0 { background: #D1D5DB; color: #111827; }
+    .rl-sub { position: absolute; top: 1140px; left: 120px; right: 180px; text-align: center; color: #fff; font-weight: 800; font-size: 54px; line-height: 1.15; opacity: 0; }
+    .rl-sub b { color: #7FD6A6; }
+    .rl-half { position: absolute; top: 330px; width: 430px; height: 756px; border-radius: 24px; object-fit: cover; box-shadow: 0 30px 80px rgba(0,0,0,.6); }
+    #rl-ba { left: 70px; }
+    #rl-bb { left: 540px; box-shadow: 0 30px 80px rgba(0,0,0,.6), 0 0 0 6px #7FD6A6; }
+    .rl-tag { position: absolute; top: 1110px; width: 430px; text-align: center; font-weight: 900; font-size: 48px; opacity: 0; }
+    #rl-ta { left: 70px; color: #D1D5DB; }
+    #rl-tb { left: 540px; color: #7FD6A6; }
+  </style>
+  <div id="root" data-composition-id="reel" data-width="1080" data-height="1920">
+    <video id="rl-v0" class="clip rl-tree" src="assets/before.mp4" data-start="0" data-duration="2" muted playsinline></video>
+    <video id="rl-v1" class="clip rl-wide" src="assets/dialog.mp4" data-start="2" data-duration="2.6" muted playsinline></video>
+    <video id="rl-v2" class="clip rl-tree rl-narrow" src="assets/luc.mp4" data-start="4.6" data-duration="1.3" muted playsinline></video>
+    <video id="rl-v3" class="clip rl-tree rl-narrow" src="assets/verre.mp4" data-start="5.9" data-duration="1.3" muted playsinline></video>
+    <video id="rl-v4" class="clip rl-wide" src="assets/folder.mp4" data-start="7.2" data-duration="3" data-media-start="0.6" muted playsinline></video>
+    <video id="rl-v5" class="clip rl-tree" src="assets/dossiers.mp4" data-start="10.2" data-duration="2.2" muted playsinline></video>
+    <video id="rl-v6" class="clip rl-tree" src="assets/icones.mp4" data-start="12.4" data-duration="2" data-media-start="0.5" muted playsinline></video>
+    <video id="rl-ba" class="clip rl-half" src="assets/before.mp4" data-start="14.4" data-duration="2" data-media-start="1" muted playsinline></video>
+    <video id="rl-bb" class="clip rl-half" src="assets/dossiers.mp4" data-start="14.4" data-duration="2" data-media-start="2" muted playsinline></video>
+
+    <div id="rl-p0" class="rl-pill">Avant : Revit de base</div>
+    <div id="rl-p1" class="rl-pill">Apparence BIMaestro</div>
+    <div id="rl-p2" class="rl-pill">Lucioles pastel</div>
+    <div id="rl-p3" class="rl-pill">Verre dépoli</div>
+    <div id="rl-p4" class="rl-pill">Colore tes dossiers</div>
+    <div id="rl-p5" class="rl-pill">Dégradés par dossier</div>
+    <div id="rl-p6" class="rl-pill">Icônes &amp; vue active</div>
+    <div id="rl-p7" class="rl-pill">Avant → Après</div>
+    <div id="rl-s1" class="rl-sub">Fond, texte, repères :<br /><b>tout se règle en direct.</b></div>
+    <div id="rl-s4" class="rl-sub">Un dossier, une couleur.<br /><b>Aperçu avant d'appliquer.</b></div>
+    <div id="rl-ta" class="rl-tag">Avant</div>
+    <div id="rl-tb" class="rl-tag">Après</div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    const cuts = [[0, 2], [2, 4.6], [4.6, 5.9], [5.9, 7.2], [7.2, 10.2], [10.2, 12.4], [12.4, 14.4], [14.4, 16.4]];
+    cuts.forEach(([s, e], i) => {
+      tl.fromTo("#rl-p" + i, { opacity: 0, y: -30, scale: 0.7 }, { opacity: 1, y: 0, scale: 1, duration: 0.25, ease: "back.out(2.5)" }, s + 0.05);
+      tl.to("#rl-p" + i, { opacity: 0, duration: 0.1, ease: "none" }, e - 0.12);
+    });
+    // punch-in on every cut
+    tl.fromTo("#rl-v0", { scale: 1.12, y: 120 }, { scale: 1, y: 0, duration: 0.4, ease: "expo.out" }, 0);
+    tl.fromTo("#rl-v1", { scale: 1.15, rotation: -3 }, { scale: 1, rotation: 0, duration: 0.35, ease: "expo.out" }, 2);
+    tl.fromTo("#rl-v2", { scale: 1.1 }, { scale: 1, duration: 0.3, ease: "expo.out" }, 4.6);
+    tl.fromTo("#rl-v3", { scale: 1.1 }, { scale: 1, duration: 0.3, ease: "expo.out" }, 5.9);
+    tl.fromTo("#rl-v4", { scale: 1.15, rotation: 3 }, { scale: 1, rotation: 0, duration: 0.35, ease: "expo.out" }, 7.2);
+    tl.fromTo("#rl-v5", { scale: 1.1, y: 80 }, { scale: 1, y: 0, duration: 0.35, ease: "expo.out" }, 10.2);
+    tl.fromTo("#rl-v6", { scale: 1, y: 0 }, { scale: 1.06, y: -20, duration: 2, ease: "none" }, 12.4);
+    tl.fromTo("#rl-ba", { x: -500 }, { x: 0, duration: 0.35, ease: "expo.out" }, 14.4);
+    tl.fromTo("#rl-bb", { x: 600 }, { x: 0, duration: 0.35, ease: "expo.out" }, 14.5);
+    // subtitles
+    tl.fromTo("#rl-s1", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.25, ease: "power3.out" }, 2.2);
+    tl.to("#rl-s1", { opacity: 0, duration: 0.1 }, 4.5);
+    tl.fromTo("#rl-s4", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.25, ease: "power3.out" }, 7.6);
+    tl.to("#rl-s4", { opacity: 0, duration: 0.1 }, 10.05);
+    tl.fromTo(["#rl-ta", "#rl-tb"], { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.25, ease: "back.out(2)", stagger: 0.12 }, 14.8);
+    tl.to(["#rl-ba", "#rl-bb", "#rl-ta", "#rl-tb", "#rl-p7"], { opacity: 0, duration: 0.15 }, 16.2);
+    window.__timelines["reel"] = tl;
+  </script>
+</template>

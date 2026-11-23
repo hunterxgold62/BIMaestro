@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="fr" data-composition-variables='[{"id":"hook1","type":"string","label":"Accroche ligne 1","default":"Renuméroter"},{"id":"hook2","type":"string","label":"Accroche ligne 2","default":"tes feuilles ?"},{"id":"hook3","type":"string","label":"Accroche ligne 3","default":"3 clics."},{"id":"result","type":"string","label":"Résultat","default":"Seule ta sélection change."}]'>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: #111827; }
+      #root { position: relative; width: 100%; height: 100%; font-family: Inter; }
+      #bg { position: absolute; inset: 0; background: radial-gradient(120% 80% at 50% 30%, #17402d 0%, #0b1a14 60%, #070d0a 100%); }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="13" data-width="1080" data-height="1920">
+      <div id="bg"></div>
+      <div id="hook" data-composition-id="hook" data-composition-src="compositions/hook.html" data-start="0" data-duration="2.2" data-track-index="1" data-track-kind="graphics" data-width="1080" data-height="1920"></div>
+      <div id="tree" data-composition-id="tree" data-composition-src="compositions/tree.html" data-start="2.2" data-duration="6.4" data-track-index="1" data-track-kind="graphics" data-width="1080" data-height="1920"></div>
+      <div id="result" data-composition-id="result" data-composition-src="compositions/result.html" data-start="8.6" data-duration="1.8" data-track-index="1" data-track-kind="graphics" data-width="1080" data-height="1920"></div>
+      <div id="outro" data-composition-id="outro" data-composition-src="compositions/outro.html" data-start="10.4" data-duration="2.6" data-track-index="1" data-track-kind="graphics" data-width="1080" data-height="1920"></div>
+    </div>
+    <script>
+      window.__timelines["main"] = gsap.timeline({ paused: true });
+    </script>
+  </body>
+</html>

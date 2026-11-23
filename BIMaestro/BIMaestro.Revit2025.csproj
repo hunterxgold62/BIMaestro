@@ -20,6 +20,8 @@
     <LangVersion>9.0</LangVersion>
     <Nullable>annotations</Nullable>
     <DefineConstants>$(DefineConstants);REVIT2025_OR_GREATER</DefineConstants>
+    <!-- Build de test pour les vidéos : dotnet build ... -p:BimaestroDemo=true (jamais en release). -->
+    <DefineConstants Condition="'$(BimaestroDemo)' == 'true'">$(DefineConstants);BIMAESTRO_DEMO</DefineConstants>
     <DynamoForRevitDir>$(RevitInstallDir)\AddIns\DynamoForRevit</DynamoForRevitDir>
     <OutputPath>bin\Revit$(RevitVersion)\$(Configuration)\</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>

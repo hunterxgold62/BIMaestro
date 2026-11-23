@@ -588,7 +588,11 @@ namespace BIMaestro.ViewHover
             Directory.CreateDirectory(directory);
 
             if (view is ViewSchedule schedule)
-                return SchedulePreviewExporter.Export(schedule, targetPath);
+            {
+                bool exported = SchedulePreviewExporter.Export(schedule, targetPath);
+                if (exported) BIMaestro.ModelLoading.ModelOpeningService.RecordPreview(view, targetPath);
+                return exported;
+            }
 
             string baseName = "capture-" +
                               GetElementIdText(view.Id) + "-" +
@@ -630,6 +634,7 @@ namespace BIMaestro.ViewHover
 
             // Keep the previous PNG intact until a valid new image is ready.
             ViewDeckCachedImage.PublishGeneratedImage(generated, targetPath);
+            BIMaestro.ModelLoading.ModelOpeningService.RecordPreview(view, targetPath);
 
             return File.Exists(targetPath);
         }

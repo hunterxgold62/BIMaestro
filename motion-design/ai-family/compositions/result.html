@@ -1,0 +1,18 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding-bottom: 300px; gap: 40px; }
+    #rs-check { width: 220px; height: 220px; border-radius: 50%; background: #7FD6A6; display: flex; align-items: center; justify-content: center; color: #0F5132; font-size: 150px; font-weight: 900; }
+    #rs-text { color: #fff; font-weight: 900; font-size: 88px; letter-spacing: -0.04em; text-align: center; line-height: 1.05; padding: 0 200px 0 80px; }
+  </style>
+  <div id="root" data-composition-id="result" data-width="1080" data-height="1920">
+    <div id="rs-check">✓</div>
+    <div id="rs-text" data-var-text="result">Générée en secondes</div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#rs-check", { scale: 0, rotation: -90 }, { scale: 1, rotation: 0, duration: 0.4, ease: "back.out(2.4)" }, 0);
+    tl.fromTo("#rs-text", { x: 1200 }, { x: 0, duration: 0.35, ease: "expo.out" }, 0.12);
+    tl.to("#root", { y: -1920, duration: 0.3, ease: "power3.in" }, 1.48);
+    window.__timelines["result"] = tl;
+  </script>
+</template>

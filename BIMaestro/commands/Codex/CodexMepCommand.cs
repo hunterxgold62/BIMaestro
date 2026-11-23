@@ -18,7 +18,7 @@ namespace BIMaestro.Codex
             var document = data.Application.ActiveUIDocument?.Document;
             if (document == null || document.IsFamilyDocument)
             {
-                TaskDialog.Show(UiLanguage.T("BIMaestro — Assistant MEP", "BIMaestro — MEP Assistant"), UiLanguage.T("Ouvrez un projet Revit contenant les équipements à raccorder.", "Open a Revit project containing the equipment to connect."));
+                TaskDialog.Show(UiLanguage.Get("CodexMepCommand.BIMaestroMEPAssistant"), UiLanguage.Get("CodexMepCommand.OpenARevitProjectContainingTheEquipmentTo"));
                 return Result.Cancelled;
             }
 

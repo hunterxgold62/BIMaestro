@@ -42,8 +42,8 @@ namespace Famille
                 targetPaths = targetPaths.Where(File.Exists).ToList();
                 if (targetPaths.Count == 0)
                 {
-                    TaskDialog.Show(UiLanguage.T("BIMaestro - Rechargement", "BIMaestro - Reload"),
-                        UiLanguage.T("Chemin de famille invalide ou fichier introuvable.", "Invalid family path or file not found."));
+                    TaskDialog.Show(UiLanguage.Get("ReloadFamilyHandler.BIMaestroReload"),
+                        UiLanguage.Get("ReloadFamilyHandler.InvalidFamilyPathOrFileNotFound"));
                     return;
                 }
 
@@ -81,9 +81,7 @@ namespace Famille
                                 .Cast<Family>()
                                 .FirstOrDefault(f => f.Name.Equals(famName, StringComparison.OrdinalIgnoreCase));
                             if (reloaded == null)
-                                throw new InvalidOperationException(UiLanguage.T(
-                                    $"Impossible de retrouver « {famName} » après rechargement.",
-                                    $"Unable to find “{famName}” after reloading."));
+                                throw new InvalidOperationException(UiLanguage.Format("ReloadFamilyHandler.UnableToFind0AfterReloading", (object)famName));
                         }
 
                         SafeRegenerate(doc);
@@ -91,10 +89,10 @@ namespace Famille
                         if (singleMode)
                         {
                             string suffix = fileUnchanged
-                                ? UiLanguage.T(" (déjà à jour).", " (already up to date).")
-                                : UiLanguage.T(" (nouvelle version détectée).", " (new version detected).");
-                            TaskDialog.Show(UiLanguage.T("BIMaestro - Rechargement", "BIMaestro - Reload"),
-                                UiLanguage.T($"La famille « {famName} » a été rechargée avec succès{suffix}", $"The family “{famName}” was reloaded successfully{suffix}"));
+                                ? UiLanguage.Get("ReloadFamilyHandler.AlreadyUpToDate")
+                                : UiLanguage.Get("ReloadFamilyHandler.NewVersionDetected");
+                            TaskDialog.Show(UiLanguage.Get("ReloadFamilyHandler.BIMaestroReload"),
+                                UiLanguage.Format("ReloadFamilyHandler.TheFamily0WasReloadedSuccessfully1", (object)famName, (object)suffix));
 
                             ElementId symId = reloaded.GetFamilySymbolIds().FirstOrDefault();
                             if (symId != ElementId.InvalidElementId)
@@ -135,16 +133,16 @@ namespace Famille
                         ["families_unchanged"] = Math.Max(0, ok - reloadedCount), ["items_failed"] = fail });
                 if (!singleMode)
                 {
-                    string message = UiLanguage.T($"Familles rechargées : {ok}\nÉchecs : {fail}", $"Families reloaded: {ok}\nFailures: {fail}");
+                    string message = UiLanguage.Format("ReloadFamilyHandler.FamiliesReloaded0Failures1", (object)ok, (object)fail);
                     if (!string.IsNullOrWhiteSpace(firstError))
-                        message += UiLanguage.T($"\n\nPremier détail d'erreur : {firstError}", $"\n\nFirst error detail: {firstError}");
-                    TaskDialog.Show(UiLanguage.T("BIMaestro - Rechargement", "BIMaestro - Reload"), message);
+                        message += UiLanguage.Format("ReloadFamilyHandler.FirstErrorDetail0", (object)firstError);
+                    TaskDialog.Show(UiLanguage.Get("ReloadFamilyHandler.BIMaestroReload"), message);
                 }
             }
             catch (Exception ex)
             {
                 // Si quelque chose d'autre plante, on l'affiche.
-                TaskDialog.Show(UiLanguage.T("BIMaestro - Rechargement (erreur)", "BIMaestro - Reload Error"), ex.Message);
+                TaskDialog.Show(UiLanguage.Get("ReloadFamilyHandler.BIMaestroReloadError"), ex.Message);
             }
         }
 

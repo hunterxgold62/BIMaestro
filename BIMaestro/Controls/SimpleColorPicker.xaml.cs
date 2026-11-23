@@ -184,7 +184,7 @@ namespace BIMaestro.UI
             if (!color.HasValue)
             {
                 ColorSwatch.Fill = Brushes.Transparent;
-                ColorText.Text = UiLanguage.T("Aucune", "None");
+                ColorText.Text = UiLanguage.Get("SimpleColorPicker.xaml.None");
                 return;
             }
 

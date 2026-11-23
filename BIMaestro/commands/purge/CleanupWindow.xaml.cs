@@ -42,7 +42,7 @@ namespace Modification
             catch (Exception ex)
             {
                 MessageBox.Show(
-                    UiLanguage.T($"Impossible d’ouvrir la page d’aide : {ex.Message}", $"Unable to open the help page: {ex.Message}"),
+                    UiLanguage.Format("CleanupWindow.xaml.UnableToOpenTheHelpPage0", (object)ex.Message),
                     "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }

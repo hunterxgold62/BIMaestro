@@ -413,8 +413,8 @@ namespace BIMaestro.Bonus
             StopRenderLoop();
             _frameStopwatch.Reset();
 
-            OverlayTitle.Text = UiLanguage.T("Perdu !", "Game Over!");
-            OverlayMessage.Text = UiLanguage.T("Score : ", "Score: ") + _score + UiLanguage.T(" — Appuie sur Espace ou clique pour rejouer", " — Press Space or Click to Play Again");
+            OverlayTitle.Text = UiLanguage.Get("FlappyBirdWindow.xaml.GameOver");
+            OverlayMessage.Text = UiLanguage.Get("FlappyBirdWindow.xaml.Score") + _score + UiLanguage.Get("FlappyBirdWindow.xaml.PressSpaceOrClickToPlayAgain");
             UpdateBestScoreUi();
             UpdateOverlayBestScore();
             Overlay.Visibility = Visibility.Visible;
@@ -440,7 +440,7 @@ namespace BIMaestro.Bonus
         {
             if (OverlayBestScore != null)
             {
-                OverlayBestScore.Text = UiLanguage.T("Record : ", "High Score: ") + _bestScore;
+                OverlayBestScore.Text = UiLanguage.Get("FlappyBirdWindow.xaml.HighScore") + _bestScore;
             }
         }
 

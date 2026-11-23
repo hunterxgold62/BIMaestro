@@ -88,7 +88,7 @@ namespace Couleur
             _appliedRule = existing?.Clone();
             _rules = _settings.CategoryColorRules
                 .Select(rule => rule.Clone()).ToList();
-            Title = UiLanguage.T("Colorer un dossier dans les vues du projet", "Color a folder in the Project Browser");
+            Title = UiLanguage.Get("ProjectBrowserRuleWindow.ColorAFolderInTheProjectBrowser");
             Width = 1160;
             Height = 760;
             MinWidth = 850;
@@ -106,14 +106,14 @@ namespace Couleur
             var title = new StackPanel { Margin = new Thickness(0, 0, 0, 14) };
             title.Children.Add(new TextBlock
             {
-                Text = UiLanguage.T("Choisissez un dossier et voyez le résultat dans les vues du projet", "Choose a folder and see the result in the Project Browser"),
+                Text = UiLanguage.Get("ProjectBrowserRuleWindow.ChooseAFolderAndSeeTheResultIn"),
                 FontSize = 17,
                 FontWeight = FontWeights.SemiBold,
                 Foreground = new SolidColorBrush(Color.FromRgb(30, 41, 59))
             });
             title.Children.Add(new TextBlock
             {
-                Text = UiLanguage.T("Choisissez un dossier, réglez son effet et vérifiez-le à gauche. Les effets se cumulent ; Annuler restaure la dernière application.", "Choose a folder, adjust its effect and check it on the left. Effects stack; Undo restores the last application."),
+                Text = UiLanguage.Get("ProjectBrowserRuleWindow.ChooseAFolderAdjustItsEffectAndCheck"),
                 Margin = new Thickness(0, 4, 0, 0),
                 Foreground = Brushes.DimGray,
                 TextWrapping = TextWrapping.Wrap
@@ -145,7 +145,7 @@ namespace Couleur
             {
                 Background = new SolidColorBrush(Color.FromRgb(231, 234, 238)),
                 Padding = new Thickness(10, 6, 10, 6),
-                Child = new TextBlock { Text = UiLanguage.T("⌂   Vues du projet — ", "⌂   Project Browser — ") + document.Title, FontWeight = FontWeights.SemiBold }
+                Child = new TextBlock { Text = UiLanguage.Get("ProjectBrowserRuleWindow.ProjectBrowser") + document.Title, FontWeight = FontWeights.SemiBold }
             };
             browserLayout.Children.Add(browserBar);
             var searchPanel = new Grid();
@@ -153,12 +153,12 @@ namespace Couleur
             browserLayout.Children.Add(searchPanel);
             _search.Margin = new Thickness(10, 8, 10, 8);
             _search.Height = 30;
-            _search.ToolTip = UiLanguage.T("Rechercher un dossier ou une vue", "Search for a folder or a view");
+            _search.ToolTip = UiLanguage.Get("ProjectBrowserRuleWindow.SearchForAFolderOrAView");
             _search.Padding = new Thickness(28, 3, 6, 3);
             searchPanel.Children.Add(_search);
             var searchHint = new TextBlock
             {
-                Text = UiLanguage.T("⌕  Rechercher", "⌕  Search"),
+                Text = UiLanguage.Get("ProjectBrowserRuleWindow.Search"),
                 Foreground = Brushes.Gray,
                 Margin = new Thickness(19, 0, 0, 0),
                 VerticalAlignment = VerticalAlignment.Center,
@@ -191,8 +191,8 @@ namespace Couleur
             editor.Child = editorScroll;
             var fields = new StackPanel();
             editorScroll.Content = fields;
-            fields.Children.Add(new TextBlock { Text = UiLanguage.T("Dossier choisi", "Selected folder"), FontWeight = FontWeights.SemiBold });
-            _path.Text = UiLanguage.T("Cliquez sur un dossier à gauche", "Click a folder on the left");
+            fields.Children.Add(new TextBlock { Text = UiLanguage.Get("ProjectBrowserRuleWindow.SelectedFolder"), FontWeight = FontWeights.SemiBold });
+            _path.Text = UiLanguage.Get("ProjectBrowserRuleWindow.ClickAFolderOnTheLeft");
             _path.TextWrapping = TextWrapping.Wrap;
             _path.Margin = new Thickness(0, 5, 0, 6);
             fields.Children.Add(_path);
@@ -201,7 +201,7 @@ namespace Couleur
             _rulesSummary.Margin = new Thickness(0, 0, 0, 18);
             fields.Children.Add(_rulesSummary);
 
-            fields.Children.Add(new TextBlock { Text = UiLanguage.T("Apparence", "Appearance"), FontWeight = FontWeights.SemiBold });
+            fields.Children.Add(new TextBlock { Text = UiLanguage.Get("ProjectBrowserRuleWindow.Appearance"), FontWeight = FontWeights.SemiBold });
             foreach (string effect in new[]
             {
                 "Fond", "Texte", "Souligné", "Gras", "Italique", "Barré",
@@ -211,7 +211,7 @@ namespace Couleur
             _effect.Margin = new Thickness(0, 6, 0, 16);
             _effect.SelectionChanged += (_, __) => OnEffectChanged();
             fields.Children.Add(_effect);
-            _removeButton.Content = UiLanguage.T("Supprimer cet effet appliqué", "Remove this applied effect");
+            _removeButton.Content = UiLanguage.Get("ProjectBrowserRuleWindow.RemoveThisAppliedEffect");
             _removeButton.Margin = new Thickness(0, -8, 0, 12);
             _removeButton.IsEnabled = false;
             _removeButton.Click += (_, __) => RemoveSelectedEffect();
@@ -221,7 +221,7 @@ namespace Couleur
             _effectHint.Margin = new Thickness(0, -9, 0, 12);
             fields.Children.Add(_effectHint);
 
-            fields.Children.Add(new TextBlock { Text = UiLanguage.T("Couleur", "Color"), FontWeight = FontWeights.SemiBold });
+            fields.Children.Add(new TextBlock { Text = UiLanguage.Get("ProjectBrowserRuleWindow.Color"), FontWeight = FontWeights.SemiBold });
             _color.SelectedColor = Color.FromRgb(93, 159, 229);
             _color.Margin = new Thickness(0, 6, 0, 18);
             _color.SelectedColorChanged += (_, __) =>
@@ -231,10 +231,10 @@ namespace Couleur
             };
             fields.Children.Add(_color);
 
-            fields.Children.Add(new TextBlock { Text = UiLanguage.T("Où afficher cet effet ?", "Where should this effect appear?"), FontWeight = FontWeights.SemiBold });
-            _wholeBranch.Content = UiLanguage.T("Le dossier et tout son contenu", "The folder and all its contents");
-            _contentsOnly.Content = UiLanguage.T("Uniquement ce qu’il contient", "Only its contents");
-            _folderOnly.Content = UiLanguage.T("Uniquement le dossier", "Only the folder");
+            fields.Children.Add(new TextBlock { Text = UiLanguage.Get("ProjectBrowserRuleWindow.WhereShouldThisEffectAppear"), FontWeight = FontWeights.SemiBold });
+            _wholeBranch.Content = UiLanguage.Get("ProjectBrowserRuleWindow.TheFolderAndAllItsContents");
+            _contentsOnly.Content = UiLanguage.Get("ProjectBrowserRuleWindow.OnlyItsContents");
+            _folderOnly.Content = UiLanguage.Get("ProjectBrowserRuleWindow.OnlyTheFolder");
             _wholeBranch.IsChecked = true;
             foreach (RadioButton choice in new[] { _wholeBranch, _contentsOnly, _folderOnly })
             {
@@ -245,7 +245,7 @@ namespace Couleur
             }
             fields.Children.Add(new TextBlock
             {
-                Text = UiLanguage.T("Le résultat s’affiche à gauche avant d’être appliqué à Revit.", "The result is shown on the left before being applied to Revit."),
+                Text = UiLanguage.Get("ProjectBrowserRuleWindow.TheResultIsShownOnTheLeftBefore"),
                 TextWrapping = TextWrapping.Wrap,
                 Foreground = Brushes.DimGray,
                 Margin = new Thickness(0, 20, 0, 0)
@@ -256,30 +256,30 @@ namespace Couleur
             footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             Grid.SetRow(footer, 2);
             root.Children.Add(footer);
-            _status.Text = UiLanguage.T("Aperçu en direct — aucune modification enregistrée", "Live preview — no changes saved");
+            _status.Text = UiLanguage.Get("ProjectBrowserRuleWindow.LivePreviewNoChangesSaved");
             _status.VerticalAlignment = VerticalAlignment.Center;
             _status.Foreground = Brushes.DimGray;
             footer.Children.Add(_status);
             var actions = new StackPanel { Orientation = Orientation.Horizontal };
-            _undoButton.Content = UiLanguage.T("Annuler la dernière application", "Undo last application");
+            _undoButton.Content = UiLanguage.Get("ProjectBrowserRuleWindow.UndoLastApplication");
             _undoButton.MinWidth = 180;
             _undoButton.Height = 34;
             _undoButton.IsEnabled = canUndo;
             _undoButton.Margin = new Thickness(0, 0, 8, 0);
             _undoButton.Click += (_, __) => Undo();
-            _applyButton.Content = _appliesToProject ? UiLanguage.T("Appliquer à Revit et au projet", "Apply to Revit and the project") : UiLanguage.T("Appliquer à Revit (personnel)", "Apply to Revit (personal)");
+            _applyButton.Content = _appliesToProject ? UiLanguage.Get("ProjectBrowserRuleWindow.ApplyToRevitAndTheProject") : UiLanguage.Get("ProjectBrowserRuleWindow.ApplyToRevitPersonal");
             _applyButton.MinWidth = 205;
             _applyButton.Height = 34;
             _applyButton.Margin = new Thickness(0, 0, 8, 0);
             _applyButton.Click += (_, __) => Apply();
-            var closeButton = new Button { Content = UiLanguage.T("Fermer", "Close"), MinWidth = 90, Height = 34 };
+            var closeButton = new Button { Content = UiLanguage.Get("ProjectBrowserRuleWindow.Close"), MinWidth = 90, Height = 34 };
             closeButton.Click += (_, __) => Close();
             Closing += (_, args) =>
             {
                 if (_isApplying)
                 {
                     args.Cancel = true;
-                    _status.Text = UiLanguage.T("Patientez : Revit applique ce style au projet…", "Please wait: Revit is applying this style to the project…");
+                    _status.Text = UiLanguage.Get("ProjectBrowserRuleWindow.PleaseWaitRevitIsApplyingThisStyleTo");
                 }
             };
             actions.Children.Add(_undoButton);
@@ -355,19 +355,19 @@ namespace Couleur
             switch (_textColorGuideStep)
             {
                 case 0:
-                    _textColorGuideText.Text = UiLanguage.T("1/4 · Choisis un dossier sous « Vues » dans l’arborescence à gauche, par exemple « Plans d’étage ».", "1/4 · Choose a folder under “Views” in the tree on the left, for example “Floor Plans”.");
+                    _textColorGuideText.Text = UiLanguage.Get("ProjectBrowserRuleWindow.14ChooseAFolderUnderViewsIn");
                     break;
                 case 1:
-                    _textColorGuideText.Text = UiLanguage.T("2/4 · Dans « Apparence », à droite, choisis « Texte » pour changer la couleur des noms du dossier.", "2/4 · In “Appearance” on the right, choose “Text” to change the color of the folder names.");
+                    _textColorGuideText.Text = UiLanguage.Get("ProjectBrowserRuleWindow.24InAppearanceOnTheRightChoose");
                     break;
                 case 2:
-                    _textColorGuideText.Text = UiLanguage.T("3/4 · Choisis une autre couleur dans « Couleur », par exemple un vert foncé sur fond clair. Compare le texte dans l’aperçu à gauche. Le guide attend une vraie modification.", "3/4 · Choose another color in “Color”, for example a dark green on a light background. Compare the text in the preview on the left. The guide waits for an actual change.");
+                    _textColorGuideText.Text = UiLanguage.Get("ProjectBrowserRuleWindow.34ChooseAnotherColorInColorFor");
                     break;
                 case 3:
-                    _textColorGuideText.Text = UiLanguage.T("4/4 · Choisis où afficher cet effet : le dossier seul ou toute sa branche. Clique ensuite sur « ", "4/4 · Choose where to show this effect: the folder alone or its whole branch. Then click “") + _applyButton.Content + UiLanguage.T(" ». Ce bouton applique réellement ton choix ; tu peux l’annuler avec « Annuler la dernière application ».", "”. This button really applies your choice; you can undo it with “Undo last application”.");
+                    _textColorGuideText.Text = UiLanguage.Get("ProjectBrowserRuleWindow.44ChooseWhereToShowThisEffect") + _applyButton.Content + UiLanguage.Get("ProjectBrowserRuleWindow.ThisButtonReallyAppliesYourChoiceYouCan");
                     break;
                 case 4:
-                    _textColorGuideText.Text = UiLanguage.T("La couleur du texte est appliquée. Clique sur « Fermer » pour revenir au guide et continuer vers les icônes.", "The text color is applied. Click “Close” to return to the guide and continue to the icons.");
+                    _textColorGuideText.Text = UiLanguage.Get("ProjectBrowserRuleWindow.TheTextColorIsAppliedClickCloseTo");
                     break;
             }
         }
@@ -476,11 +476,11 @@ namespace Couleur
         private static string ViewLabel(View view)
         {
             string kind = view.ViewType.ToString();
-            if (kind == "FloorPlan") kind = UiLanguage.T("Plan d’étage", "Floor Plan");
-            else if (kind == "CeilingPlan") kind = UiLanguage.T("Plan de plafond", "Ceiling Plan");
-            else if (kind == "Section") kind = UiLanguage.T("Coupe", "Section");
-            else if (kind == "ThreeD") kind = UiLanguage.T("Vue 3D", "3D View");
-            else if (kind == "Elevation") kind = UiLanguage.T("Élévation", "Elevation");
+            if (kind == "FloorPlan") kind = UiLanguage.Get("ProjectBrowserRuleWindow.FloorPlan");
+            else if (kind == "CeilingPlan") kind = UiLanguage.Get("ProjectBrowserRuleWindow.CeilingPlan");
+            else if (kind == "Section") kind = UiLanguage.Get("ProjectBrowserRuleWindow.Section");
+            else if (kind == "ThreeD") kind = UiLanguage.Get("ProjectBrowserRuleWindow.3DView");
+            else if (kind == "Elevation") kind = UiLanguage.Get("ProjectBrowserRuleWindow.Elevation");
             return kind + ": " + view.Name;
         }
 
@@ -562,8 +562,8 @@ namespace Couleur
                 parent.IsSelected = true;
                 return;
             }
-            _path.Text = !node.IsEditable ? UiLanguage.T("Cette section est affichée pour comparaison ; choisissez un dossier sous Vues.", "This section is shown for comparison; choose a folder under Views.")
-                : UiLanguage.T("Vues / ", "Views / ") + node.FolderPath;
+            _path.Text = !node.IsEditable ? UiLanguage.Get("ProjectBrowserRuleWindow.ThisSectionIsShownForComparisonChooseA")
+                : UiLanguage.Get("ProjectBrowserRuleWindow.Views") + node.FolderPath;
             var saved = node.IsEditable
                 ? _rules.FirstOrDefault(rule => string.Equals(rule.FolderPath, node.FolderPath,
                     StringComparison.OrdinalIgnoreCase)) : null;
@@ -655,8 +655,8 @@ namespace Couleur
                     ? _rules.Where(rule => Matches(rule, selectedNode)).Take(5).ToList()
                     : new List<ProjectBrowserCategoryColorRule>();
                 _rulesSummary.Text = visibleRules.Count == 0
-                    ? UiLanguage.T("Aucun effet enregistré sur cette branche.", "No effect saved on this branch.")
-                    : UiLanguage.T("Effets déjà présents : ", "Existing effects: ") + string.Join(" · ", visibleRules.Select(rule =>
+                    ? UiLanguage.Get("ProjectBrowserRuleWindow.NoEffectSavedOnThisBranch")
+                    : UiLanguage.Get("ProjectBrowserRuleWindow.ExistingEffects") + string.Join(" · ", visibleRules.Select(rule =>
                         EffectDisplayName(string.IsNullOrWhiteSpace(rule.Effect) ? "Fond" : rule.Effect) + " " +
                         ProjectBrowserColorPreferences.ToHex(rule.Color) + " (" + rule.FolderPath + ")"));
             }
@@ -671,8 +671,8 @@ namespace Couleur
                 PaintNode(node, applicable);
             }
             _status.Text = draft == null
-                ? UiLanguage.T("Styles appliqués — modifiez un réglage pour prévisualiser", "Styles applied — change a setting to preview")
-                : UiLanguage.T("Aperçu non enregistré — appliquez lorsque le résultat vous convient", "Unsaved preview — apply when you are happy with the result");
+                ? UiLanguage.Get("ProjectBrowserRuleWindow.StylesAppliedChangeASettingToPreview")
+                : UiLanguage.Get("ProjectBrowserRuleWindow.UnsavedPreviewApplyWhenYouAreHappyWith");
         }
 
         private string SelectedEffect => (_effect.SelectedItem as ComboBoxItem)?.Tag as string ?? "Fond";
@@ -720,18 +720,18 @@ namespace Couleur
         {
             switch (effect)
             {
-                case "Fond": return UiLanguage.T("Fond", "Background");
-                case "Texte": return UiLanguage.T("Texte", "Text");
-                case "Souligné": return UiLanguage.T("Souligné", "Underline");
-                case "Gras": return UiLanguage.T("Gras", "Bold");
-                case "Italique": return UiLanguage.T("Italique", "Italic");
-                case "Barré": return UiLanguage.T("Barré", "Strikethrough");
-                case "Bordure": return UiLanguage.T("Bordure", "Border");
-                case "Pastille": return UiLanguage.T("Pastille", "Dot");
-                case "Icône": return UiLanguage.T("Icône", "Icon");
-                case "Badge": return UiLanguage.T("Badge", "Badge");
-                case "Dégradé": return UiLanguage.T("Dégradé", "Gradient");
-                case "Animation": return UiLanguage.T("Animation", "Animation");
+                case "Fond": return UiLanguage.Get("ProjectBrowserRuleWindow.Background");
+                case "Texte": return UiLanguage.Get("ProjectBrowserRuleWindow.Text");
+                case "Souligné": return UiLanguage.Get("ProjectBrowserRuleWindow.Underline");
+                case "Gras": return UiLanguage.Get("ProjectBrowserRuleWindow.Bold");
+                case "Italique": return UiLanguage.Get("ProjectBrowserRuleWindow.Italic");
+                case "Barré": return UiLanguage.Get("ProjectBrowserRuleWindow.Strikethrough");
+                case "Bordure": return UiLanguage.Get("ProjectBrowserRuleWindow.Border");
+                case "Pastille": return UiLanguage.Get("ProjectBrowserRuleWindow.Dot");
+                case "Icône": return UiLanguage.Get("ProjectBrowserRuleWindow.Icon");
+                case "Badge": return UiLanguage.Get("ProjectBrowserRuleWindow.Badge");
+                case "Dégradé": return UiLanguage.Get("ProjectBrowserRuleWindow.Gradient");
+                case "Animation": return UiLanguage.Get("ProjectBrowserRuleWindow.Animation");
                 default: return effect;
             }
         }
@@ -740,18 +740,18 @@ namespace Couleur
         {
             switch (effect)
             {
-                case "Fond": return UiLanguage.T("Colore le fond de la ligne.", "Colors the row background.");
-                case "Texte": return UiLanguage.T("Colore les lettres du nom.", "Colors the letters of the name.");
-                case "Souligné": return UiLanguage.T("Souligne et colore le nom.", "Underlines and colors the name.");
-                case "Gras": return UiLanguage.T("Épaissit et colore le nom.", "Bolds and colors the name.");
-                case "Italique": return UiLanguage.T("Incline et colore le nom.", "Italicizes and colors the name.");
-                case "Barré": return UiLanguage.T("Barre et colore le nom.", "Strikes through and colors the name.");
-                case "Bordure": return UiLanguage.T("Ajoute un trait coloré à gauche.", "Adds a colored line on the left.");
-                case "Pastille": return UiLanguage.T("Ajoute un point coloré devant le nom.", "Adds a colored dot before the name.");
-                case "Icône": return UiLanguage.T("Ajoute une étoile colorée devant le nom.", "Adds a colored star before the name.");
-                case "Badge": return UiLanguage.T("Ajoute une étoile colorée après le nom.", "Adds a colored star after the name.");
-                case "Dégradé": return UiLanguage.T("Colore le fond avec un dégradé.", "Colors the background with a gradient.");
-                case "Animation": return UiLanguage.T("Fait pulser doucement le repère coloré.", "Makes the colored marker pulse gently.");
+                case "Fond": return UiLanguage.Get("ProjectBrowserRuleWindow.ColorsTheRowBackground");
+                case "Texte": return UiLanguage.Get("ProjectBrowserRuleWindow.ColorsTheLettersOfTheName");
+                case "Souligné": return UiLanguage.Get("ProjectBrowserRuleWindow.UnderlinesAndColorsTheName");
+                case "Gras": return UiLanguage.Get("ProjectBrowserRuleWindow.BoldsAndColorsTheName");
+                case "Italique": return UiLanguage.Get("ProjectBrowserRuleWindow.ItalicizesAndColorsTheName");
+                case "Barré": return UiLanguage.Get("ProjectBrowserRuleWindow.StrikesThroughAndColorsTheName");
+                case "Bordure": return UiLanguage.Get("ProjectBrowserRuleWindow.AddsAColoredLineOnTheLeft");
+                case "Pastille": return UiLanguage.Get("ProjectBrowserRuleWindow.AddsAColoredDotBeforeTheName");
+                case "Icône": return UiLanguage.Get("ProjectBrowserRuleWindow.AddsAColoredStarBeforeTheName");
+                case "Badge": return UiLanguage.Get("ProjectBrowserRuleWindow.AddsAColoredStarAfterTheName");
+                case "Dégradé": return UiLanguage.Get("ProjectBrowserRuleWindow.ColorsTheBackgroundWithAGradient");
+                case "Animation": return UiLanguage.Get("ProjectBrowserRuleWindow.MakesTheColoredMarkerPulseGently");
                 default: return string.Empty;
             }
         }
@@ -834,7 +834,7 @@ namespace Couleur
             var rule = _draftDirty ? DraftRule() : null;
             if (rule == null)
             {
-                _status.Text = UiLanguage.T("Sélectionnez d’abord un dossier dans l’arborescence", "First select a folder in the tree");
+                _status.Text = UiLanguage.Get("ProjectBrowserRuleWindow.FirstSelectAFolderInTheTree");
                 return;
             }
             try
@@ -843,15 +843,15 @@ namespace Couleur
                     rule.Color != _textColorGuideInitial;
                 _isApplying = true;
                 _applyButton.IsEnabled = false;
-                _status.Text = _appliesToProject ? UiLanguage.T("Application au projet en cours…", "Applying to the project…") : UiLanguage.T("Application en cours…", "Applying…");
+                _status.Text = _appliesToProject ? UiLanguage.Get("ProjectBrowserRuleWindow.ApplyingToTheProject") : UiLanguage.Get("ProjectBrowserRuleWindow.Applying");
                 _apply(rule, null, error =>
                 {
                     _isApplying = false;
                     _applyButton.IsEnabled = true;
                     if (error != null)
                     {
-                        _status.Text = UiLanguage.T("Le style n’a pas été appliqué.", "The style was not applied.");
-                        MessageBox.Show(this, error.Message, UiLanguage.T("Application du style", "Apply style"), MessageBoxButton.OK, MessageBoxImage.Error);
+                        _status.Text = UiLanguage.Get("ProjectBrowserRuleWindow.TheStyleWasNotApplied");
+                        MessageBox.Show(this, error.Message, UiLanguage.Get("ProjectBrowserRuleWindow.ApplyStyle"), MessageBoxButton.OK, MessageBoxImage.Error);
                         return;
                     }
                     _appliedRule = rule.Clone();
@@ -861,8 +861,8 @@ namespace Couleur
                     _undoButton.IsEnabled = true;
                     LoadRuleIntoEditor(rule);
                     _status.Text = _appliesToProject
-                        ? UiLanguage.T("Appliqué à Revit et à la maquette. Enregistrez ou synchronisez le projet pour le partager.", "Applied to Revit and the model. Save or synchronize the project to share it.")
-                        : UiLanguage.T("Appliqué à Revit sur ce poste. La maquette n’a pas été modifiée.", "Applied to Revit on this computer. The model was not modified.");
+                        ? UiLanguage.Get("ProjectBrowserRuleWindow.AppliedToRevitAndTheModelSaveOr")
+                        : UiLanguage.Get("ProjectBrowserRuleWindow.AppliedToRevitOnThisComputerTheModel");
                     if (completesTextColorTutorial)
                     {
                         TextColorTutorialCompleted = true;
@@ -875,7 +875,7 @@ namespace Couleur
             {
                 _isApplying = false;
                 _applyButton.IsEnabled = true;
-                MessageBox.Show(this, error.Message, UiLanguage.T("Application du style", "Apply style"), MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(this, error.Message, UiLanguage.Get("ProjectBrowserRuleWindow.ApplyStyle"), MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -887,22 +887,22 @@ namespace Couleur
             _isApplying = true;
             _removeButton.IsEnabled = false;
             _applyButton.IsEnabled = false;
-            _status.Text = UiLanguage.T("Suppression en cours…", "Removing…");
+            _status.Text = UiLanguage.Get("ProjectBrowserRuleWindow.Removing");
             _remove(saved.Clone(), error =>
             {
                 _isApplying = false;
                 if (error != null)
                 {
                     _removeButton.IsEnabled = true;
-                    _status.Text = UiLanguage.T("La suppression a échoué.", "Removal failed.");
-                    MessageBox.Show(this, error.Message, UiLanguage.T("Supprimer le style", "Remove style"), MessageBoxButton.OK, MessageBoxImage.Error);
+                    _status.Text = UiLanguage.Get("ProjectBrowserRuleWindow.RemovalFailed");
+                    MessageBox.Show(this, error.Message, UiLanguage.Get("ProjectBrowserRuleWindow.RemoveStyle"), MessageBoxButton.OK, MessageBoxImage.Error);
                     return;
                 }
                 _rules.RemoveAll(rule => SameRule(rule, saved));
                 _settings.IsCategoryColoringEnabled = _rules.Count > 0;
                 _undoButton.IsEnabled = true;
                 LoadRuleIntoEditor(null);
-                _status.Text = UiLanguage.T("Effet supprimé. Vous pouvez annuler cette opération.", "Effect removed. You can undo this operation.");
+                _status.Text = UiLanguage.Get("ProjectBrowserRuleWindow.EffectRemovedYouCanUndoThisOperation");
             });
         }
 
@@ -912,15 +912,15 @@ namespace Couleur
             _isApplying = true;
             _undoButton.IsEnabled = false;
             _applyButton.IsEnabled = false;
-            _status.Text = UiLanguage.T("Annulation en cours…", "Undoing…");
+            _status.Text = UiLanguage.Get("ProjectBrowserRuleWindow.Undoing");
             _undo((settings, hasMore, error) =>
             {
                 _isApplying = false;
                 if (error != null)
                 {
                     _undoButton.IsEnabled = true;
-                    _status.Text = UiLanguage.T("L’annulation a échoué.", "Undo failed.");
-                    MessageBox.Show(this, error.Message, UiLanguage.T("Annuler le style", "Undo style"), MessageBoxButton.OK, MessageBoxImage.Error);
+                    _status.Text = UiLanguage.Get("ProjectBrowserRuleWindow.UndoFailed");
+                    MessageBox.Show(this, error.Message, UiLanguage.Get("ProjectBrowserRuleWindow.UndoStyle"), MessageBoxButton.OK, MessageBoxImage.Error);
                     UpdateTreePreview();
                     return;
                 }
@@ -933,7 +933,7 @@ namespace Couleur
                 var selected = DraftRule();
                 var saved = selected == null ? null : _rules.FirstOrDefault(rule => SameRule(rule, selected));
                 LoadRuleIntoEditor(saved);
-                _status.Text = UiLanguage.T("Dernière application annulée.", "Last application undone.");
+                _status.Text = UiLanguage.Get("ProjectBrowserRuleWindow.LastApplicationUndone");
             });
         }
     }

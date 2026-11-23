@@ -25,8 +25,8 @@ namespace BIMaestro.ViewHover
             if (uiApplication?.ActiveUIDocument?.Document == null)
             {
                 TaskDialog.Show(
-                    UiLanguage.T("BIMaestro - Miniatures", "BIMaestro - Thumbnails"),
-                    UiLanguage.T("Aucun projet Revit actif.", "No active Revit project."));
+                    UiLanguage.Get("ViewThumbnailBatchCommand.BIMaestroThumbnails"),
+                    UiLanguage.Get("ViewThumbnailBatchCommand.NoActiveRevitProject"));
                 return Result.Cancelled;
             }
 
@@ -94,9 +94,7 @@ namespace BIMaestro.ViewHover
 
         public string GetName()
         {
-            return UiLanguage.T(
-                "BIMaestro - Génération des miniatures de vues",
-                "BIMaestro - Generate View Thumbnails");
+            return UiLanguage.Get("ViewThumbnailBatchCommand.BIMaestroGenerateViewThumbnails");
         }
     }
 }

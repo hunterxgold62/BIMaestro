@@ -1,0 +1,544 @@
+{
+  "ok": true,
+  "strict": false,
+  "browserSkipped": false,
+  "lint": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 1,
+    "infoCount": 0,
+    "findings": [
+      {
+        "code": "gsap_repeated_fromto_without_baseline",
+        "severity": "warning",
+        "message": "2 tl.fromTo() calls target \"#dm-frame\" with no stable baseline. The last-authored fromTo \"from\" values become the element's resting state for any seek before the first tween actually runs, because GSAP applies fromTo from-values at authoring time (immediateRender), not at tween position.",
+        "selector": "#dm-frame",
+        "dataAttributes": {},
+        "sourceFile": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\motion-design\\ai-family\\compositions\\demo.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Add `immediateRender: false` to every fromTo except the earliest-positioned one (at 0s), so pre-first-tween seeks keep its \"from\" values. A hiding `tl.set(..., 0)` baseline trips gsap_timeline_set_initial_hide, and a `gsap.set` authored before the fromTo calls is overwritten by them."
+      }
+    ],
+    "filesScanned": 5
+  },
+  "runtime": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": []
+  },
+  "layout": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 6,
+    "infoCount": 1,
+    "findings": [
+      {
+        "selector": "#hk-l1",
+        "dataAttributes": {
+          "data-var-text": "hook1"
+        },
+        "sourceFile": "compositions/hook.html",
+        "bbox": {
+          "x": 92.16,
+          "y": 627.04,
+          "width": 895.68,
+          "height": 155.45
+        },
+        "time": 0.667,
+        "rect": {
+          "left": 92.16,
+          "top": 627.04,
+          "right": 987.84,
+          "bottom": 782.49,
+          "width": 895.68,
+          "height": 155.45
+        },
+        "code": "outside_safe_zone",
+        "severity": "warning",
+        "text": "Ta famille Revit",
+        "message": "<div> \"Ta famille Revit\" is outside the safe area: TikTok (left and right edges), YouTube Shorts (right edge).",
+        "fixHint": "Move the text inside the safe area, or mark text meant to sit there with data-layout-allow-safe-zone.",
+        "firstSeen": 0.667,
+        "lastSeen": 2,
+        "occurrences": 2,
+        "heldMs": 0,
+        "times": [
+          0.667,
+          2
+        ]
+      },
+      {
+        "selector": "#hk-l2",
+        "dataAttributes": {
+          "data-var-text": "hook2"
+        },
+        "sourceFile": "compositions/hook.html",
+        "bbox": {
+          "x": 187.39,
+          "y": 773.46,
+          "width": 705.22,
+          "height": 155.45
+        },
+        "time": 0.667,
+        "rect": {
+          "left": 187.39,
+          "top": 773.46,
+          "right": 892.61,
+          "bottom": 928.91,
+          "width": 705.22,
+          "height": 155.45
+        },
+        "code": "outside_safe_zone",
+        "severity": "warning",
+        "text": "en 1 phrase.",
+        "message": "<div> \"en 1 phrase.\" is outside the safe area: TikTok (right edge), YouTube Shorts (right edge).",
+        "fixHint": "Move the text inside the safe area, or mark text meant to sit there with data-layout-allow-safe-zone.",
+        "firstSeen": 0.667,
+        "lastSeen": 2,
+        "occurrences": 2,
+        "heldMs": 0,
+        "times": [
+          0.667,
+          2
+        ]
+      },
+      {
+        "selector": "#dm-sub",
+        "dataAttributes": {},
+        "sourceFile": "compositions/demo.html",
+        "bbox": {
+          "x": 234.5,
+          "y": 1118,
+          "width": 611,
+          "height": 141
+        },
+        "time": 3.333,
+        "rect": {
+          "left": 234.5,
+          "top": 1118,
+          "right": 845.5,
+          "bottom": 1259,
+          "width": 611,
+          "height": 141
+        },
+        "code": "outside_safe_zone",
+        "severity": "warning",
+        "text": "Tu décris. BIMaestro modélise.",
+        "message": "<div> \"Tu décris. BIMaestro modélise.\" is outside the safe area: TikTok (right edge), Instagram Reels (bottom edge), YouTube Shorts (bottom edge).",
+        "fixHint": "Move the text inside the safe area, or mark text meant to sit there with data-layout-allow-safe-zone.",
+        "firstSeen": 3.333,
+        "lastSeen": 7.333,
+        "occurrences": 4,
+        "heldMs": 0,
+        "times": [
+          3.333,
+          4.667,
+          6,
+          7.333
+        ]
+      },
+      {
+        "selector": "#rs-text",
+        "dataAttributes": {
+          "data-var-text": "result"
+        },
+        "sourceFile": "compositions/result.html",
+        "bbox": {
+          "x": 333.16,
+          "y": 827,
+          "width": 528.7,
+          "height": 226
+        },
+        "time": 8.667,
+        "rect": {
+          "left": 333.16,
+          "top": 827,
+          "right": 861.86,
+          "bottom": 1053,
+          "width": 528.7,
+          "height": 226
+        },
+        "code": "outside_safe_zone",
+        "severity": "warning",
+        "text": "Générée en secondes",
+        "message": "<div> \"Générée en secondes\" is outside the safe area: TikTok (right edge).",
+        "fixHint": "Move the text inside the safe area, or mark text meant to sit there with data-layout-allow-safe-zone.",
+        "firstSeen": 8.667,
+        "lastSeen": 10,
+        "occurrences": 2,
+        "heldMs": 0,
+        "times": [
+          8.667,
+          10
+        ]
+      },
+      {
+        "selector": "#ot-name",
+        "dataAttributes": {},
+        "sourceFile": "compositions/outro.html",
+        "bbox": {
+          "x": 277.48,
+          "y": 863.5,
+          "width": 525.02,
+          "height": 134
+        },
+        "time": 11.333,
+        "rect": {
+          "left": 277.48,
+          "top": 863.5,
+          "right": 802.5,
+          "bottom": 997.5,
+          "width": 525.02,
+          "height": 134
+        },
+        "code": "outside_safe_zone",
+        "severity": "warning",
+        "text": "BIMaestro",
+        "message": "<div> \"BIMaestro\" is outside the safe area: TikTok (right edge).",
+        "fixHint": "Move the text inside the safe area, or mark text meant to sit there with data-layout-allow-safe-zone.",
+        "firstSeen": 11.333,
+        "lastSeen": 11.333,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          11.333
+        ]
+      },
+      {
+        "selector": "#ot-sub",
+        "dataAttributes": {},
+        "sourceFile": "compositions/outro.html",
+        "bbox": {
+          "x": 153.89,
+          "y": 1025.5,
+          "width": 772.22,
+          "height": 59
+        },
+        "time": 11.333,
+        "rect": {
+          "left": 153.89,
+          "top": 1025.5,
+          "right": 926.11,
+          "bottom": 1084.5,
+          "width": 772.22,
+          "height": 59
+        },
+        "code": "outside_safe_zone",
+        "severity": "warning",
+        "text": "Le plugin Revit qui bosse pour toi",
+        "message": "<div> \"Le plugin Revit qui bosse pour toi\" is outside the safe area: TikTok (right edge), YouTube Shorts (right edge).",
+        "fixHint": "Move the text inside the safe area, or mark text meant to sit there with data-layout-allow-safe-zone.",
+        "firstSeen": 11.333,
+        "lastSeen": 11.333,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          11.333
+        ]
+      },
+      {
+        "code": "container_overflow",
+        "severity": "info",
+        "time": 4.667,
+        "selector": "#dm-video",
+        "message": "Element extends outside a clipping layout container.",
+        "rect": {
+          "left": -276,
+          "top": 338.5,
+          "right": 1116,
+          "bottom": 1121.5,
+          "width": 1392,
+          "height": 783
+        },
+        "containerSelector": "#dm-frame",
+        "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+        "containerRect": {
+          "left": 60,
+          "top": 500,
+          "right": 1020,
+          "bottom": 1040,
+          "width": 960,
+          "height": 540
+        },
+        "overflow": {
+          "left": 336,
+          "right": 96,
+          "top": 161.5,
+          "bottom": 81.5
+        },
+        "dataAttributes": {
+          "data-hf-render-id": "dm-video",
+          "data-start": "0",
+          "data-duration": "6",
+          "data-hf-authored-opacity": ""
+        },
+        "sourceFile": "compositions/demo.html",
+        "bbox": {
+          "x": -276,
+          "y": 338.5,
+          "width": 1392,
+          "height": 783
+        },
+        "firstSeen": 4.667,
+        "lastSeen": 4.667,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          4.667
+        ]
+      }
+    ],
+    "duration": 12,
+    "samples": [
+      0.667,
+      2,
+      3.333,
+      4.667,
+      6,
+      7.333,
+      8.667,
+      10,
+      11.333
+    ],
+    "transitionSamples": [],
+    "transitionSamplesDropped": 0,
+    "tolerance": 2,
+    "totalIssueCount": 7,
+    "truncated": false,
+    "faceCheck": {
+      "ran": true,
+      "candidates": 0,
+      "faces": 0
+    }
+  },
+  "motion": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "enabled": false,
+    "samples": 0
+  },
+  "contrast": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "enabled": true,
+    "samples": [
+      0.667,
+      3.333,
+      6,
+      8.667,
+      11.333
+    ],
+    "checked": 12,
+    "passed": 12
+  },
+  "craft": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 2,
+    "infoCount": 0,
+    "findings": [
+      {
+        "code": "line_unread",
+        "severity": "warning",
+        "message": "The film's last line \"BIMaestro\" (1 word) is on screen 1.54 s (±0.01 s), under the 2.00 s a closing line needs: hold it about 0.5 s + 0.3 s a word and at least 2 s before the film ends; see references/motion.md.",
+        "text": "BIMaestro",
+        "selector": "#ot-name",
+        "dataAttributes": {},
+        "sourceFile": "compositions/outro.html",
+        "bbox": {
+          "x": 277.48,
+          "y": 875.35,
+          "width": 525.02,
+          "height": 134
+        },
+        "time": 10.469,
+        "words": 1,
+        "seconds": 1.535,
+        "floorSeconds": 2,
+        "measured": [
+          {
+            "time": 10.125,
+            "opacity": null,
+            "heightPx": null
+          },
+          {
+            "time": 10.25,
+            "opacity": null,
+            "heightPx": null
+          },
+          {
+            "time": 10.375,
+            "opacity": null,
+            "heightPx": null
+          },
+          {
+            "time": 10.5,
+            "opacity": 0.8,
+            "heightPx": 134
+          },
+          {
+            "time": 10.625,
+            "opacity": 0.99,
+            "heightPx": 134
+          },
+          {
+            "time": 10.75,
+            "opacity": 1,
+            "heightPx": 134
+          },
+          {
+            "time": 10.875,
+            "opacity": 1,
+            "heightPx": 134
+          },
+          {
+            "time": 11.5,
+            "opacity": 1,
+            "heightPx": 134
+          },
+          {
+            "time": 11.625,
+            "opacity": 1,
+            "heightPx": 134
+          },
+          {
+            "time": 11.75,
+            "opacity": 1,
+            "heightPx": 134
+          },
+          {
+            "time": 11.875,
+            "opacity": 1,
+            "heightPx": 134
+          }
+        ]
+      },
+      {
+        "code": "line_unread",
+        "severity": "warning",
+        "message": "The film's last line \"Le plugin Revit qui bosse pour toi\" (7 words) is on screen 1.40 s (±0.01 s), under the 2.00 s a closing line needs: hold it about 0.5 s + 0.3 s a word and at least 2 s before the film ends; see references/motion.md.",
+        "text": "Le plugin Revit qui bosse pour toi",
+        "selector": "#ot-sub",
+        "dataAttributes": {},
+        "sourceFile": "compositions/outro.html",
+        "bbox": {
+          "x": 153.89,
+          "y": 1044.79,
+          "width": 772.22,
+          "height": 59
+        },
+        "time": 10.602,
+        "words": 7,
+        "seconds": 1.402,
+        "floorSeconds": 2,
+        "measured": [
+          {
+            "time": 10.25,
+            "opacity": null,
+            "heightPx": null
+          },
+          {
+            "time": 10.375,
+            "opacity": null,
+            "heightPx": null
+          },
+          {
+            "time": 10.5,
+            "opacity": null,
+            "heightPx": null
+          },
+          {
+            "time": 10.625,
+            "opacity": 0.52,
+            "heightPx": 59
+          },
+          {
+            "time": 10.75,
+            "opacity": 0.98,
+            "heightPx": 59
+          },
+          {
+            "time": 10.875,
+            "opacity": 1,
+            "heightPx": 59
+          },
+          {
+            "time": 11,
+            "opacity": 1,
+            "heightPx": 59
+          },
+          {
+            "time": 11.5,
+            "opacity": 1,
+            "heightPx": 59
+          },
+          {
+            "time": 11.625,
+            "opacity": 1,
+            "heightPx": 59
+          },
+          {
+            "time": 11.75,
+            "opacity": 1,
+            "heightPx": 59
+          },
+          {
+            "time": 11.875,
+            "opacity": 1,
+            "heightPx": 59
+          }
+        ]
+      }
+    ],
+    "enabled": true,
+    "step": 0.125,
+    "samples": 96
+  },
+  "audio": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 1,
+    "findings": [
+      {
+        "code": "audio_none",
+        "severity": "info",
+        "message": "The film has no sound: no clip in it plays audio.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0
+      }
+    ]
+  },
+  "hdr": {
+    "autoPromotion": null,
+    "inspection": "available"
+  },
+  "snapshots": {
+    "enabled": false,
+    "files": [],
+    "times": [],
+    "findingFiles": []
+  }
+}

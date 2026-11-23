@@ -26,7 +26,7 @@ namespace Famille
             }
             catch (System.Exception ex)
             {
-                MessageBox.Show(UiLanguage.T($"Impossible d’ouvrir la page d’aide : {ex.Message}", $"Unable to open the help page: {ex.Message}"), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(UiLanguage.Format("ParameterSelectionWindow.xaml.UnableToOpenTheHelpPage0", (object)ex.Message), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
@@ -56,7 +56,7 @@ namespace Famille
             dataGridParameters.Items.Refresh();
 
             // Mettre à jour le texte du bouton en fonction de l'état
-            ToggleButton.Content = allSelected ? UiLanguage.T("Tout cocher", "Select All") : UiLanguage.T("Tout décocher", "Clear All");
+            ToggleButton.Content = allSelected ? UiLanguage.Get("ParameterSelectionWindow.xaml.SelectAll") : UiLanguage.Get("ParameterSelectionWindow.xaml.ClearAll");
         }
     }
 }

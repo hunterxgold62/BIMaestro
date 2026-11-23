@@ -54,7 +54,7 @@ namespace IA
                 {
                     var json = AiClient.SendOpenAI(
                         jwt,
-                        "gpt-4o-mini",
+                        AiClient.TextModel,
                         $"Corrige sans ajouter de nouvelles informations : {original}"
                     );
 

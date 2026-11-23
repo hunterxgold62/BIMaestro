@@ -120,6 +120,17 @@ namespace Couleur
             _current = null;
         }
 
+#if BIMAESTRO_DEMO
+        // Build de test uniquement : force la relecture du fichier d'icônes.
+        internal static string DemoFilePath => FilePath;
+
+        internal static void DemoInvalidate()
+        {
+            _current = null;
+            _projectOverride = null;
+        }
+#endif
+
         internal static void SetProjectOverride(BrowserIconSettings settings)
         {
             _projectOverride = settings == null ? null : Clone(settings);

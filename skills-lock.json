@@ -1,0 +1,68 @@
+{
+  "version": 2,
+  "skills": {
+    "figma": {
+      "source": "heygen-com/hyperframes",
+      "commit": "4a73363322c661f04d94f139bd1621818fba164a",
+      "sourceType": "github",
+      "skillPath": "skills/figma/SKILL.md",
+      "computedHash": "c0fa96dcd20130cbb865024a5b2ebaed0330dddd4dd2b9891e3cc3fd63b861f2"
+    },
+    "hyperframes": {
+      "source": "heygen-com/hyperframes",
+      "commit": "4a73363322c661f04d94f139bd1621818fba164a",
+      "sourceType": "github",
+      "skillPath": "skills/hyperframes/SKILL.md",
+      "computedHash": "90ffd8a9f34109053c5d2005a5888b410829660fdc2896a550833feffc3a8580"
+    },
+    "hyperframes-cli": {
+      "source": "heygen-com/hyperframes",
+      "commit": "4a73363322c661f04d94f139bd1621818fba164a",
+      "sourceType": "github",
+      "skillPath": "skills/hyperframes-cli/SKILL.md",
+      "computedHash": "08fe6ce267a6054500b7da0590c0b5119ff053703785f17ab6c794c54670e544"
+    },
+    "hyperframes-registry": {
+      "source": "heygen-com/hyperframes",
+      "commit": "4a73363322c661f04d94f139bd1621818fba164a",
+      "sourceType": "github",
+      "skillPath": "skills/hyperframes-registry/SKILL.md",
+      "computedHash": "a3c816f09a2ff43bc1502983a68c3fb4e2bb40c6b70dc065d4c11bd91cfa8740"
+    },
+    "media-use": {
+      "source": "heygen-com/hyperframes",
+      "commit": "4a73363322c661f04d94f139bd1621818fba164a",
+      "sourceType": "github",
+      "skillPath": "skills/media-use/SKILL.md",
+      "computedHash": "ef91ddb68dba0751dcf590ba5a2929c20e52817ddd9b402e9b5019d8edee5e0c"
+    },
+    "remotion-to-hyperframes": {
+      "source": "heygen-com/hyperframes",
+      "commit": "4a73363322c661f04d94f139bd1621818fba164a",
+      "sourceType": "github",
+      "skillPath": "skills/remotion-to-hyperframes/SKILL.md",
+      "computedHash": "38eb75c5c051cfbd74d938fcaa7b57544d8b266ec47d18f02bab1574ef71786b"
+    },
+    "reverse-any-video": {
+      "source": "heygen-com/hyperframes",
+      "commit": "4a73363322c661f04d94f139bd1621818fba164a",
+      "sourceType": "github",
+      "skillPath": "skills/reverse-any-video/SKILL.md",
+      "computedHash": "ff697348c4f2b0590f156b939fcf7e550c7a17bc40bf210d07e71ccbd42db753"
+    },
+    "slideshow": {
+      "source": "heygen-com/hyperframes",
+      "commit": "4a73363322c661f04d94f139bd1621818fba164a",
+      "sourceType": "github",
+      "skillPath": "skills/slideshow/SKILL.md",
+      "computedHash": "1f3adb414853a124eb06b767d531048d68573a468b3790dd00bf340fc4a18677"
+    },
+    "style-sampling": {
+      "source": "heygen-com/hyperframes",
+      "commit": "4a73363322c661f04d94f139bd1621818fba164a",
+      "sourceType": "github",
+      "skillPath": "skills/style-sampling/SKILL.md",
+      "computedHash": "86da7c4f9b678b950c43c9b1ca323ac11e761be91d8ad14feb3cb9043926d20d"
+    }
+  }
+}

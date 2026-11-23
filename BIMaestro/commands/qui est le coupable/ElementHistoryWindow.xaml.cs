@@ -217,8 +217,8 @@ namespace Analyse
         private bool _extendedActionLoadInProgress;
         private bool _loadedHistoryReachedLimit;
         private int _loadedHistoryEventLimit = MaxLoadedHistoryEvents;
-        private static string AllActionsLabel => UiLanguage.T("Toutes", "All");
-        private static string AllUsersLabel => UiLanguage.T("Tous", "All");
+        private static string AllActionsLabel => UiLanguage.Get("ElementHistoryWindow.xaml.All");
+        private static string AllUsersLabel => UiLanguage.Get("ElementHistoryWindow.xaml.All2");
 
         public ElementHistoryWindow(UIDocument uidoc, Element selected)
             : this(uidoc, selected, null, null)
@@ -245,10 +245,8 @@ namespace Analyse
 
             if (selected != null)
             {
-                HeaderText.Text = UiLanguage.T("Qui a fait ça ??", "Who Did This?");
-                HeaderSubtitleText.Text = UiLanguage.T(
-                    $"BETA - Lecture visuelle des évènements liés à {selected.Name} (Id {selected.Id.GetIdValue()}).",
-                    $"BETA - Visual review of events related to {selected.Name} (ID {selected.Id.GetIdValue()}).");
+                HeaderText.Text = UiLanguage.Get("ElementHistoryWindow.xaml.WhoDidThis");
+                HeaderSubtitleText.Text = UiLanguage.Format("ElementHistoryWindow.xaml.BETAVisualReviewOfEventsRelatedTo0", (object)selected.Name, (object)selected.Id.GetIdValue());
                 if (initialEvents != null)
                     Bind(initialEvents, defaultAction);
                 else
@@ -256,8 +254,8 @@ namespace Analyse
             }
             else
             {
-                HeaderText.Text = UiLanguage.T("Qui a fait ça ??", "Who Did This?");
-                HeaderSubtitleText.Text = UiLanguage.T("BETA - Lecture visuelle des suppressions, déplacements, créations et clusters de la maquette.", "BETA - Visual review of deletions, moves, creations, and model clusters.");
+                HeaderText.Text = UiLanguage.Get("ElementHistoryWindow.xaml.WhoDidThis");
+                HeaderSubtitleText.Text = UiLanguage.Get("ElementHistoryWindow.xaml.BETAVisualReviewOfDeletionsMovesCreationsAnd");
                 if (initialEvents != null)
                     Bind(initialEvents, defaultAction);
                 else
@@ -281,7 +279,7 @@ namespace Analyse
             }
             catch (Exception ex)
             {
-                MessageBox.Show(UiLanguage.T($"Impossible d’ouvrir la page d’aide : {ex.Message}", $"Unable to open the help page: {ex.Message}"), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(UiLanguage.Format("ElementHistoryWindow.xaml.UnableToOpenTheHelpPage0", (object)ex.Message), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
@@ -296,7 +294,7 @@ namespace Analyse
         {
             var version = ++_loadVersion;
             Bind(new List<ElementHistoryEvent>(), defaultAction, false, false);
-            ResultText.Text = UiLanguage.T("Chargement des évènements...", "Loading events...");
+            ResultText.Text = UiLanguage.Get("ElementHistoryWindow.xaml.LoadingEvents");
 
             Task.Run(() =>
             {
@@ -315,7 +313,7 @@ namespace Analyse
                     {
                         if (version != _loadVersion) return;
                         if (ResultText != null)
-                            ResultText.Text = UiLanguage.T("Historique partiellement chargé.", "History partially loaded.");
+                            ResultText.Text = UiLanguage.Get("ElementHistoryWindow.xaml.HistoryPartiallyLoaded");
                     }));
                 }
             });
@@ -357,8 +355,8 @@ namespace Analyse
             Bind(new List<ElementHistoryEvent>(), null, false, true);
             var periodText = localStartDate.Date == localEndDate.Date
                 ? localStartDate.Date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)
-                : localStartDate.Date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) + UiLanguage.T(" au ", " to ") + localEndDate.Date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
-            ResultText.Text = UiLanguage.T("Chargement complet du ", "Loading full history from ") + periodText + "...";
+                : localStartDate.Date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) + UiLanguage.Get("ElementHistoryWindow.xaml.To") + localEndDate.Date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
+            ResultText.Text = UiLanguage.Get("ElementHistoryWindow.xaml.LoadingFullHistoryFrom") + periodText + "...";
 
             if (ScopeModelRadio != null)
                 ScopeModelRadio.IsChecked = true;
@@ -380,7 +378,7 @@ namespace Analyse
                     {
                         if (version != _loadVersion) return;
                         if (ResultText != null)
-                            ResultText.Text = UiLanguage.T("Historique de la période partiellement chargé.", "The period's history was partially loaded.");
+                            ResultText.Text = UiLanguage.Get("ElementHistoryWindow.xaml.ThePeriodSHistoryWasPartiallyLoaded");
                     }));
                 }
             });
@@ -545,17 +543,17 @@ namespace Analyse
             var row = new RowVm
             {
                 ElementId = first.ElementId,
-                ElementIdText = UiLanguage.T("Cluster x", "Cluster x") + events.Count.ToString(CultureInfo.InvariantCulture),
+                ElementIdText = UiLanguage.Get("ElementHistoryWindow.xaml.ClusterX") + events.Count.ToString(CultureInfo.InvariantCulture),
                 DateText = first.Ts.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
                 Source = first,
                 Events = events,
                 Action = first.Action,
                 ActionText = GetClusterActionText(first.Action),
                 User = first.User,
-                Category = SummarizeText(events.Select(e => CleanCellText(e.Category)), UiLanguage.T("catégories", "categories")),
-                Family = SummarizeText(events.Select(e => CleanCellText(e.Family)), UiLanguage.T("familles", "families")),
-                TypeName = SummarizeText(events.Select(e => CleanCellText(e.TypeName)), UiLanguage.T("types", "types")),
-                PositionText = events.Count.ToString(CultureInfo.InvariantCulture) + UiLanguage.T(" évènements groupés", " grouped events"),
+                Category = SummarizeText(events.Select(e => CleanCellText(e.Category)), UiLanguage.Get("ElementHistoryWindow.xaml.Categories")),
+                Family = SummarizeText(events.Select(e => CleanCellText(e.Family)), UiLanguage.Get("ElementHistoryWindow.xaml.Families")),
+                TypeName = SummarizeText(events.Select(e => CleanCellText(e.TypeName)), UiLanguage.Get("ElementHistoryWindow.xaml.Types")),
+                PositionText = events.Count.ToString(CultureInfo.InvariantCulture) + UiLanguage.Get("ElementHistoryWindow.xaml.GroupedEvents"),
                 Tx = CleanCellText(first.Tx)
             };
             EnrichVisualRow(row);
@@ -569,7 +567,7 @@ namespace Analyse
             row.AccentSoftBrush = GetActionBrush(row.Action, 0.14);
             row.ActionBadgeShort = GetActionBadgeShort(row.Action);
             row.ClusterBadgeText = row.IsCluster
-                ? row.EventCount.ToString(CultureInfo.InvariantCulture) + UiLanguage.T(" éléments", " elements")
+                ? row.EventCount.ToString(CultureInfo.InvariantCulture) + UiLanguage.Get("ElementHistoryWindow.xaml.Elements")
                 : string.Empty;
             row.ImportanceBadgeText = GetImportanceBadgeText(row);
             row.VisualInitials = BuildVisualInitials(row, events);
@@ -590,13 +588,13 @@ namespace Analyse
         private static string BuildTileTitle(RowVm row, List<ElementHistoryEvent> events)
         {
             if (row.IsCluster && string.Equals(row.Action, "move", StringComparison.OrdinalIgnoreCase))
-                return UiLanguage.T("Déplacements", "Moves");
+                return UiLanguage.Get("ElementHistoryWindow.xaml.Moves");
 
             var title = row.IsCluster
                 ? GetMostUsefulLabel(events)
                 : FirstNonEmpty(row.TypeName, row.Family, row.Category);
 
-            return string.IsNullOrWhiteSpace(title) ? UiLanguage.T("Élément ", "Element ") + row.ElementIdText : title;
+            return string.IsNullOrWhiteSpace(title) ? UiLanguage.Get("ElementHistoryWindow.xaml.Element") + row.ElementIdText : title;
         }
 
         private static string BuildTileSubtitle(RowVm row, List<ElementHistoryEvent> events)
@@ -612,14 +610,14 @@ namespace Analyse
                 return parameterSummary;
 
             if (string.Equals(row.Action, "geometry_change", StringComparison.OrdinalIgnoreCase))
-                return UiLanguage.T("Forme ou dimensions modifiées", "Shape or Dimensions Modified");
+                return UiLanguage.Get("ElementHistoryWindow.xaml.ShapeOrDimensionsModified");
 
             if (row.IsCluster)
             {
                 var values = new[]
                     {
-                        SummarizeText(events.Select(e => CleanCellText(e.Category)), UiLanguage.T("catégories", "categories")),
-                        SummarizeText(events.Select(e => CleanCellText(e.Family)), UiLanguage.T("familles", "families")),
+                        SummarizeText(events.Select(e => CleanCellText(e.Category)), UiLanguage.Get("ElementHistoryWindow.xaml.Categories")),
+                        SummarizeText(events.Select(e => CleanCellText(e.Family)), UiLanguage.Get("ElementHistoryWindow.xaml.Families")),
                     }
                     .Where(x => !string.IsNullOrWhiteSpace(x))
                     .ToList();
@@ -641,19 +639,19 @@ namespace Analyse
             {
                 var count = GetParameterDeltaCount(GetRowEvents(row));
                 if (count > 1)
-                    return count.ToString(CultureInfo.InvariantCulture) + UiLanguage.T(" PARAMÈTRES", " PARAMETERS");
+                    return count.ToString(CultureInfo.InvariantCulture) + UiLanguage.Get("ElementHistoryWindow.xaml.PARAMETERS");
             }
 
             if (!row.IsCluster) return string.Empty;
-            if (row.EventCount >= 50) return UiLanguage.T("MASSIF", "MASSIVE");
-            if (row.EventCount >= 20) return UiLanguage.T("IMPORTANT", "IMPORTANT");
+            if (row.EventCount >= 50) return UiLanguage.Get("ElementHistoryWindow.xaml.MASSIVE");
+            if (row.EventCount >= 20) return UiLanguage.Get("ElementHistoryWindow.xaml.IMPORTANT");
             return string.Empty;
         }
 
         private static string BuildStoryText(RowVm row, List<ElementHistoryEvent> events)
         {
             var count = Math.Max(1, events?.Count ?? row.EventCount);
-            var actor = string.IsNullOrWhiteSpace(row.User) ? UiLanguage.T("Un utilisateur", "A user") : row.User;
+            var actor = string.IsNullOrWhiteSpace(row.User) ? UiLanguage.Get("ElementHistoryWindow.xaml.AUser") : row.User;
             var target = GetStoryTarget(row, events, count);
 
             switch ((row.Action ?? string.Empty).Trim().ToLowerInvariant())
@@ -683,13 +681,13 @@ namespace Analyse
             if (row.IsCluster)
             {
                 var label = GetMostUsefulLabel(events);
-                if (string.IsNullOrWhiteSpace(label)) label = UiLanguage.T("éléments", "elements");
+                if (string.IsNullOrWhiteSpace(label)) label = UiLanguage.Get("ElementHistoryWindow.xaml.Elements2");
                 return count.ToString(CultureInfo.InvariantCulture) + " " + label;
             }
 
             var single = events?.FirstOrDefault() ?? row.Source;
             var text = FirstNonEmpty(CleanCellText(single?.TypeName), CleanCellText(single?.Family), CleanCellText(single?.Category));
-            return string.IsNullOrWhiteSpace(text) ? UiLanguage.T("l'élément ", "element ") + row.ElementIdText : text;
+            return string.IsNullOrWhiteSpace(text) ? UiLanguage.Get("ElementHistoryWindow.xaml.Element2") + row.ElementIdText : text;
         }
 
         private static string BuildVisualSubtitle(RowVm row, List<ElementHistoryEvent> events)
@@ -699,7 +697,7 @@ namespace Analyse
                 var categories = CountDistinct(events.Select(e => CleanCellText(e.Category)));
                 var families = CountDistinct(events.Select(e => CleanCellText(e.Family)));
                 var types = CountDistinct(events.Select(e => CleanCellText(e.TypeName)));
-                return categories + UiLanguage.T(" catégories · ", " categories · ") + families + UiLanguage.T(" familles · ", " families · ") + types + " types";
+                return categories + UiLanguage.Get("ElementHistoryWindow.xaml.Categories2") + families + UiLanguage.Get("ElementHistoryWindow.xaml.Families2") + types + " types";
             }
 
             return string.Join(" · ", new[]
@@ -714,7 +712,7 @@ namespace Analyse
         private static string BuildEvidenceText(RowVm row)
         {
             var tx = CleanCellText(row.Tx);
-            if (string.IsNullOrWhiteSpace(tx)) tx = UiLanguage.T("Transaction non renseignée", "Transaction Not Specified");
+            if (string.IsNullOrWhiteSpace(tx)) tx = UiLanguage.Get("ElementHistoryWindow.xaml.TransactionNotSpecified");
             return row.DateText + " · " + tx;
         }
 
@@ -724,9 +722,9 @@ namespace Analyse
             var today = DateTime.Today;
             var date = local.Date;
 
-            if (date == today) return UiLanguage.T("Aujourd'hui", "Today");
-            if (date == today.AddDays(-1)) return UiLanguage.T("Hier", "Yesterday");
-            if (date >= today.AddDays(-7)) return UiLanguage.T("Cette semaine", "This Week");
+            if (date == today) return UiLanguage.Get("ElementHistoryWindow.xaml.Today");
+            if (date == today.AddDays(-1)) return UiLanguage.Get("ElementHistoryWindow.xaml.Yesterday");
+            if (date >= today.AddDays(-7)) return UiLanguage.Get("ElementHistoryWindow.xaml.ThisWeek");
             if (date.Year == today.Year) return local.ToString("MMMM", CultureInfo.CurrentCulture);
             return local.ToString("yyyy", CultureInfo.InvariantCulture);
         }
@@ -739,7 +737,7 @@ namespace Analyse
                 .Select(e => new MiniEventVm
                 {
                     Label = "Id " + e.ElementId.ToString(CultureInfo.InvariantCulture),
-                    Detail = FirstNonEmpty(CleanCellText(e.TypeName), CleanCellText(e.Family), CleanCellText(e.Category), UiLanguage.T("Élément", "Element"))
+                    Detail = FirstNonEmpty(CleanCellText(e.TypeName), CleanCellText(e.Family), CleanCellText(e.Category), UiLanguage.Get("ElementHistoryWindow.xaml.Element3"))
                 })
                 .ToList();
         }
@@ -766,7 +764,7 @@ namespace Analyse
             var preview = distinct.Take(3).ToList();
             var extra = distinct.Count - preview.Count;
             return distinct.Count.ToString(CultureInfo.InvariantCulture) +
-                   UiLanguage.T(" paramètres modifiés : ", " modified parameters: ") +
+                   UiLanguage.Get("ElementHistoryWindow.xaml.ModifiedParameters") +
                    string.Join(", ", preview) +
                    (extra > 0 ? " +" + extra.ToString(CultureInfo.InvariantCulture) : string.Empty);
         }
@@ -811,27 +809,27 @@ namespace Analyse
             if (action == "type_change")
             {
                 var summary = GetTypeChangeSummary(new[] { ev });
-                return string.IsNullOrWhiteSpace(summary) ? string.Empty : UiLanguage.T("Avant / après : ", "Before / After: ") + summary;
+                return string.IsNullOrWhiteSpace(summary) ? string.Empty : UiLanguage.Get("ElementHistoryWindow.xaml.BeforeAfter") + summary;
             }
 
             if (action == "param_change")
             {
                 var summary = GetParameterBeforeAfterSummary(ev);
-                return string.IsNullOrWhiteSpace(summary) ? string.Empty : UiLanguage.T("Avant / après : ", "Before / After: ") + summary;
+                return string.IsNullOrWhiteSpace(summary) ? string.Empty : UiLanguage.Get("ElementHistoryWindow.xaml.BeforeAfter") + summary;
             }
 
             if (action == "move" && ev.Delta != null && ev.Delta.TryGetValue("new", out var newPos) && ev.Delta.TryGetValue("old", out var oldPos))
             {
                 var moveSummary = GetMoveDeltaSummary(ev);
                 return string.IsNullOrWhiteSpace(moveSummary)
-                    ? UiLanguage.T("Avant / après : ", "Before / After: ") + CompactPoint(oldPos) + " -> " + CompactPoint(newPos)
-                    : UiLanguage.T("Avant / après : ", "Before / After: ") + moveSummary;
+                    ? UiLanguage.Get("ElementHistoryWindow.xaml.BeforeAfter") + CompactPoint(oldPos) + " -> " + CompactPoint(newPos)
+                    : UiLanguage.Get("ElementHistoryWindow.xaml.BeforeAfter") + moveSummary;
             }
 
             if (action == "geometry_change")
             {
                 var summary = GetGeometrySizeSummary(ev);
-                return string.IsNullOrWhiteSpace(summary) ? UiLanguage.T("Forme / dimensions modifiées", "Shape / Dimensions Modified") : UiLanguage.T("Avant / après : ", "Before / After: ") + summary;
+                return string.IsNullOrWhiteSpace(summary) ? UiLanguage.Get("ElementHistoryWindow.xaml.ShapeDimensionsModified") : UiLanguage.Get("ElementHistoryWindow.xaml.BeforeAfter") + summary;
             }
 
             return string.Empty;
@@ -852,7 +850,7 @@ namespace Analyse
             AddSizeChange(parts, "Y", oldY, newY);
             AddSizeChange(parts, "Z", oldZ, newZ);
 
-            return parts.Count == 0 ? UiLanguage.T("Forme modifiée sans variation de taille lisible", "Shape modified with no readable size variation") : UiLanguage.T("Dimensions ", "Dimensions ") + string.Join(", ", parts);
+            return parts.Count == 0 ? UiLanguage.Get("ElementHistoryWindow.xaml.ShapeModifiedWithNoReadableSizeVariation") : UiLanguage.Get("ElementHistoryWindow.xaml.Dimensions") + string.Join(", ", parts);
         }
 
         private static string GetMoveDeltaSummary(ElementHistoryEvent ev)
@@ -862,7 +860,7 @@ namespace Analyse
             AddMoveAxis(parts, "X", ReadDeltaDouble(ev.Delta, "dx"));
             AddMoveAxis(parts, "Y", ReadDeltaDouble(ev.Delta, "dy"));
             AddMoveAxis(parts, "Z", ReadDeltaDouble(ev.Delta, "dz"));
-            return parts.Count == 0 ? string.Empty : UiLanguage.T("Déplacement ", "Move ") + string.Join(", ", parts);
+            return parts.Count == 0 ? string.Empty : UiLanguage.Get("ElementHistoryWindow.xaml.Move") + string.Join(", ", parts);
         }
 
         private static void AddMoveAxis(List<string> parts, string label, double? feet)
@@ -935,7 +933,7 @@ namespace Analyse
 
         private static string FormatParameterDisplayValue(string value)
         {
-            return string.IsNullOrWhiteSpace(value) ? UiLanguage.T("vide", "empty") : value.Trim();
+            return string.IsNullOrWhiteSpace(value) ? UiLanguage.Get("ElementHistoryWindow.xaml.Empty") : value.Trim();
         }
 
         private static List<ParameterRestoreChange> ReadParameterChanges(object raw)
@@ -1141,7 +1139,7 @@ namespace Analyse
             var categories = events.Select(e => CleanCellText(e.Category)).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             if (categories.Count == 1) return categories[0];
 
-            return UiLanguage.T("éléments", "elements");
+            return UiLanguage.Get("ElementHistoryWindow.xaml.Elements2");
         }
 
         private static int CountDistinct(IEnumerable<string> values)
@@ -1161,19 +1159,19 @@ namespace Analyse
         {
             switch ((action ?? string.Empty).Trim().ToLowerInvariant())
             {
-                case "delete": return UiLanguage.T("SUPPR.", "DEL.");
-                case "move": return UiLanguage.T("DEPL.", "MOVE");
-                case "create": return UiLanguage.T("AJOUT", "ADD");
-                case "type_change": return UiLanguage.T("TYPE", "TYPE");
-                case "param_change": return UiLanguage.T("PARAM.", "PARAM.");
-                case "geometry_change": return UiLanguage.T("FORME", "SHAPE");
-                default: return UiLanguage.T("MODIF.", "EDIT");
+                case "delete": return UiLanguage.Get("ElementHistoryWindow.xaml.DEL");
+                case "move": return UiLanguage.Get("ElementHistoryWindow.xaml.MOVE");
+                case "create": return UiLanguage.Get("ElementHistoryWindow.xaml.ADD");
+                case "type_change": return UiLanguage.Get("ElementHistoryWindow.xaml.TYPE");
+                case "param_change": return UiLanguage.Get("ElementHistoryWindow.xaml.PARAM");
+                case "geometry_change": return UiLanguage.Get("ElementHistoryWindow.xaml.SHAPE");
+                default: return UiLanguage.Get("ElementHistoryWindow.xaml.EDIT");
             }
         }
 
         private static string GetVisualCueText(string action)
         {
-            return CanVisualize(new ElementHistoryEvent { Action = action }) ? UiLanguage.T("Visualisable", "Viewable") : UiLanguage.T("Données", "Data");
+            return CanVisualize(new ElementHistoryEvent { Action = action }) ? UiLanguage.Get("ElementHistoryWindow.xaml.Viewable") : UiLanguage.Get("ElementHistoryWindow.xaml.Data");
         }
 
         private static Brush GetActionBrush(string action, double opacity)
@@ -1315,13 +1313,13 @@ namespace Analyse
             if (string.IsNullOrWhiteSpace(action)) return string.Empty;
             switch (action.Trim().ToLowerInvariant())
             {
-                case "delete": return UiLanguage.T("Suppression", "Deletion");
-                case "move": return UiLanguage.T("Déplacement", "Move");
-                case "create": return UiLanguage.T("Création", "Creation");
-                case "type_change": return UiLanguage.T("Changement de type", "Type Change");
-                case "param_change": return UiLanguage.T("Modification paramètres", "Parameter Changes");
-                case "geometry_change": return UiLanguage.T("Forme / dimensions", "Shape / Dimensions");
-                case "modify": return UiLanguage.T("Modification", "Modification");
+                case "delete": return UiLanguage.Get("ElementHistoryWindow.xaml.Deletion");
+                case "move": return UiLanguage.Get("ElementHistoryWindow.xaml.Move2");
+                case "create": return UiLanguage.Get("ElementHistoryWindow.xaml.Creation");
+                case "type_change": return UiLanguage.Get("ElementHistoryWindow.xaml.TypeChange");
+                case "param_change": return UiLanguage.Get("ElementHistoryWindow.xaml.ParameterChanges");
+                case "geometry_change": return UiLanguage.Get("ElementHistoryWindow.xaml.ShapeDimensions");
+                case "modify": return UiLanguage.Get("ElementHistoryWindow.xaml.Modification");
                 default: return action.Trim();
             }
         }
@@ -1331,9 +1329,9 @@ namespace Analyse
             if (string.IsNullOrWhiteSpace(action)) return string.Empty;
             switch (action.Trim().ToLowerInvariant())
             {
-                case "move": return UiLanguage.T("Déplacements", "Moves");
-                case "delete": return UiLanguage.T("Suppressions", "Deletions");
-                case "create": return UiLanguage.T("Créations", "Creations");
+                case "move": return UiLanguage.Get("ElementHistoryWindow.xaml.Moves");
+                case "delete": return UiLanguage.Get("ElementHistoryWindow.xaml.Deletions");
+                case "create": return UiLanguage.Get("ElementHistoryWindow.xaml.Creations");
                 default: return GetActionText(action);
             }
         }
@@ -1397,7 +1395,7 @@ namespace Analyse
             if (VisualizeDeletedButton != null)
             {
                 VisualizeDeletedButton.IsEnabled = hasRow;
-                VisualizeDeletedButton.Content = hasRow ? GetPrimaryActionText(row) : UiLanguage.T("Visualiser", "Visualize");
+                VisualizeDeletedButton.Content = hasRow ? GetPrimaryActionText(row) : UiLanguage.Get("ElementHistoryWindow.xaml.Visualize");
             }
 
             if (FocusButton != null)
@@ -1408,12 +1406,12 @@ namespace Analyse
             UpdateRestoreButtonLabel(row);
             if (RestoreDeletedButton != null)
             {
-                RestoreDeletedButton.Content = UiLanguage.T("Restaurer les éléments", "Restore elements");
+                RestoreDeletedButton.Content = UiLanguage.Get("ElementHistoryWindow.xaml.RestoreElements");
                 RestoreDeletedButton.IsEnabled = !_restoringDeleted && GetSelectedDeletionEvents().Count > 0;
             }
             if (ClusterRestoreButton != null)
             {
-                ClusterRestoreButton.Content = UiLanguage.T("Restaurer sélection", "Restore selection");
+                ClusterRestoreButton.Content = UiLanguage.Get("ElementHistoryWindow.xaml.RestoreSelection");
                 ClusterRestoreButton.IsEnabled = !_restoringDeleted;
             }
         }
@@ -1421,19 +1419,19 @@ namespace Analyse
         private static string GetPrimaryActionText(RowVm row)
         {
             if (row == null || row.Source == null)
-                return UiLanguage.T("Visualiser", "Visualize");
+                return UiLanguage.Get("ElementHistoryWindow.xaml.Visualize");
 
             if (row.IsCluster)
                 return GetRowEvents(row).Any(CanVisualize)
-                    ? UiLanguage.T("Visualiser cluster", "Visualize Cluster")
-                    : UiLanguage.T("Focus cluster", "Focus Cluster");
+                    ? UiLanguage.Get("ElementHistoryWindow.xaml.VisualizeCluster")
+                    : UiLanguage.Get("ElementHistoryWindow.xaml.FocusCluster");
 
             if (string.Equals(row.Source.Action, "delete", StringComparison.OrdinalIgnoreCase))
-                return UiLanguage.T("Visualiser suppression", "Visualize Deletion");
+                return UiLanguage.Get("ElementHistoryWindow.xaml.VisualizeDeletion");
             if (HasMoveDelta(row.Source))
-                return UiLanguage.T("Visualiser déplacement", "Visualize Move");
+                return UiLanguage.Get("ElementHistoryWindow.xaml.VisualizeMove");
 
-            return UiLanguage.T("Focus élément", "Focus Element");
+            return UiLanguage.Get("ElementHistoryWindow.xaml.FocusElement");
         }
 
         private void UpdateRestoreButtonLabel(RowVm row)
@@ -1442,10 +1440,10 @@ namespace Analyse
             var canRestore = CanRestoreParameters(row?.Source);
             RestoreParametersButton.IsEnabled = canRestore;
             RestoreParametersButton.Visibility = canRestore ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
-            RestoreParametersButton.Content = UiLanguage.T("Restaurer", "Restore");
+            RestoreParametersButton.Content = UiLanguage.Get("ElementHistoryWindow.xaml.Restore");
             RestoreParametersButton.ToolTip = canRestore
-                ? UiLanguage.T("Réappliquer les anciennes valeurs de paramètres enregistrées pour cette ligne", "Reapply the previous parameter values recorded for this row")
-                : UiLanguage.T("Disponible uniquement sur une modification de paramètres avec avant/après", "Only available for a parameter change with before/after values");
+                ? UiLanguage.Get("ElementHistoryWindow.xaml.ReapplyThePreviousParameterValuesRecordedForThis")
+                : UiLanguage.Get("ElementHistoryWindow.xaml.OnlyAvailableForAParameterChangeWithBefore");
         }
 
         private void ActionFilterCombo_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
@@ -1478,7 +1476,7 @@ namespace Analyse
             var version = ++_loadVersion;
             _extendedActionLoadInProgress = true;
             UpdateExtendedActionSearchOffer();
-            ResultText.Text = UiLanguage.T("Recherche étendue dans 10 000 évènements...", "Extended search across 10,000 events...");
+            ResultText.Text = UiLanguage.Get("ElementHistoryWindow.xaml.ExtendedSearchAcross10000Events");
 
             Task.Run(() =>
             {
@@ -1499,7 +1497,7 @@ namespace Analyse
                         _extendedActionLoadInProgress = false;
                         if (version != _loadVersion) return;
                         UpdateExtendedActionSearchOffer();
-                        ResultText.Text = UiLanguage.T("Recherche étendue partiellement chargée.", "Extended search partially loaded.");
+                        ResultText.Text = UiLanguage.Get("ElementHistoryWindow.xaml.ExtendedSearchPartiallyLoaded");
                     }));
                 }
             });
@@ -1525,8 +1523,8 @@ namespace Analyse
 
             if (ContextScopeText != null)
             {
-                var label = FirstNonEmpty(_selectedContext.TypeName, _selectedContext.Family, _selectedContext.Category, UiLanguage.T("sélection", "selection"));
-                ContextScopeText.Text = UiLanguage.T("Portée : ", "Scope: ") + label;
+                var label = FirstNonEmpty(_selectedContext.TypeName, _selectedContext.Family, _selectedContext.Category, UiLanguage.Get("ElementHistoryWindow.xaml.Selection"));
+                ContextScopeText.Text = UiLanguage.Get("ElementHistoryWindow.xaml.Scope") + label;
             }
 
             if (ScopeTypeRadio != null)
@@ -1573,7 +1571,7 @@ namespace Analyse
             if (endDate.Date < startDate.Date)
             {
                 MessageBox.Show(
-                    UiLanguage.T("La date de fin doit être postérieure ou égale à la date de début.", "The end date must be on or after the start date."),
+                    UiLanguage.Get("ElementHistoryWindow.xaml.TheEndDateMustBeOnOrAfter"),
                     "BIMaestro",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
@@ -1793,8 +1791,8 @@ namespace Analyse
             {
                 var total = _rows.SelectMany(GetRowEvents).Count();
                 ResultText.Text = events.Count == total
-                    ? total.ToString(CultureInfo.InvariantCulture) + UiLanguage.T(" évènements affichés", " events displayed")
-                    : events.Count.ToString(CultureInfo.InvariantCulture) + " / " + total.ToString(CultureInfo.InvariantCulture) + UiLanguage.T(" évènements affichés", " events displayed");
+                    ? total.ToString(CultureInfo.InvariantCulture) + UiLanguage.Get("ElementHistoryWindow.xaml.EventsDisplayed")
+                    : events.Count.ToString(CultureInfo.InvariantCulture) + " / " + total.ToString(CultureInfo.InvariantCulture) + UiLanguage.Get("ElementHistoryWindow.xaml.EventsDisplayed");
             }
         }
 
@@ -1814,8 +1812,8 @@ namespace Analyse
             UpdateDetailsLayout();
             if (DetailsButton != null)
                 DetailsButton.Content = _detailsVisible
-                    ? UiLanguage.T("Masquer détails", "Hide Details")
-                    : UiLanguage.T("Détails", "Details");
+                    ? UiLanguage.Get("ElementHistoryWindow.xaml.HideDetails")
+                    : UiLanguage.Get("ElementHistoryWindow.xaml.Details");
             UpdateDetails();
         }
 
@@ -1862,8 +1860,8 @@ namespace Analyse
             if (!CanRestoreParameters(row?.Source)) return;
 
             var confirm = MessageBox.Show(
-                UiLanguage.T("Restaurer les anciennes valeurs de paramètres pour cet évènement ?", "Restore the previous parameter values for this event?"),
-                UiLanguage.T("BIMaestro - Qui a fait ça ?", "BIMaestro - Who Did This?"),
+                UiLanguage.Get("ElementHistoryWindow.xaml.RestoreThePreviousParameterValuesForThisEvent"),
+                UiLanguage.Get("ElementHistoryWindow.xaml.BIMaestroWhoDidThis"),
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
             if (confirm != MessageBoxResult.Yes) return;
@@ -1912,18 +1910,14 @@ namespace Analyse
             events = events.Where(ev => !ElementHistoryRestoration.IsCalorifuge(ev.Category, ev.Family + " " + ev.TypeName)).ToList();
             if (events.Count == 0)
             {
-                MessageBox.Show(this, UiLanguage.T("Aucun élément à restaurer : le calorifuge est exclu.", "No elements to restore: insulation is excluded."));
+                MessageBox.Show(this, UiLanguage.Get("ElementHistoryWindow.xaml.NoElementsToRestoreInsulationIsExcluded"));
                 return;
             }
             if (_restoringDeleted || events.Count == 0) return;
             int count = events.Select(ev => ToRestoreRequest(ev)).Select(r => string.IsNullOrEmpty(r.SourceUniqueId) ? r.Label : r.SourceUniqueId).Distinct().Count();
-            var repairNotice = UiLanguage.T(
-                "\n\nLes raccords déjà recréés par BIMaestro pourront être redimensionnés ou remplacés pour retrouver leurs connecteurs historiques. Les raccords déplacés, réorientés ou reliés à de nouveaux voisins seront conservés sans modification.",
-                "\n\nFittings previously recreated by BIMaestro may be resized or replaced to recover their recorded connectors. Moved, reoriented fittings or fittings connected to new neighbors will be left unchanged.");
-            var confirm = MessageBox.Show(this, UiLanguage.T(
-                $"Restaurer {count} élément(s) dans la maquette à leur emplacement enregistré ?\n\nIls resteront dans le projet et seront modifiables normalement. Les connexions enregistrées seront rétablies si leurs deux extrémités sont disponibles et inchangées. Sélectionnez aussi les raccords et tronçons supprimés du réseau. Les éléments déjà présents ne seront pas dupliqués.\n\nLes anciennes suppressions sans données de reconstruction ne peuvent pas être restaurées.",
-                $"Restore {count} element(s) in the model at their recorded location?\n\nThey will remain in the project and be editable normally. Recorded connections will be restored when both ends are available and unchanged. Also select deleted network fittings and segments. Existing elements will not be duplicated.\n\nOlder deletions without reconstruction data cannot be restored.")
-                + repairNotice, UiLanguage.T("Restaurer les éléments", "Restore elements"), MessageBoxButton.YesNo, MessageBoxImage.Question);
+            var repairNotice = UiLanguage.Get("ElementHistoryWindow.xaml.FittingsPreviouslyRecreatedByBIMaestroMayBeResized");
+            var confirm = MessageBox.Show(this, UiLanguage.Format("ElementHistoryWindow.xaml.Restore0ElementSInTheModelAt", (object)count)
+                + repairNotice, UiLanguage.Get("ElementHistoryWindow.xaml.RestoreElements"), MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (confirm != MessageBoxResult.Yes) return;
             _restoringDeleted = true;
             UpdateVisualizeButtonLabel();
@@ -1940,27 +1934,21 @@ namespace Analyse
                 restoredForTutorial = result.Created > 0 || result.Existing > 0;
                 if (BIMaestro.Tutorials.DemoTourService.IsActive(this))
                     furnitureRestored = BIMaestro.Tutorials.DemoHistoryScene.HasRestoredFurniture(_doc);
-                message = UiLanguage.T(
-                    $"{result.Created} élément(s) restauré(s).\n{result.Existing} déjà présent(s).\n{result.Failed} non restauré(s).",
-                    $"{result.Created} element(s) restored.\n{result.Existing} already present.\n{result.Failed} not restored.");
+                message = UiLanguage.Format("ElementHistoryWindow.xaml.0ElementSRestored1AlreadyPresent2", (object)result.Created, (object)result.Existing, (object)result.Failed);
                 var failures = result.Items.Where(i => !i.Created && !i.Existing).ToList();
                 if (result.Repaired > 0 || result.RepairFailures.Count > 0)
-                    message += UiLanguage.T($"\nParmi les éléments déjà présents : {result.Repaired} raccord(s) corrigé(s), {result.RepairFailures.Count} correction(s) impossible(s).",
-                        $"\nAmong existing elements: {result.Repaired} fitting(s) repaired, {result.RepairFailures.Count} repair(s) failed.");
+                    message += UiLanguage.Format("ElementHistoryWindow.xaml.AmongExistingElements0FittingSRepaired1", (object)result.Repaired, (object)result.RepairFailures.Count);
                 foreach (var failure in result.RepairFailures.Take(2)) message += "\n" + ShortRestoreDetail(failure);
-                message += UiLanguage.T(
-                    $"\n\nConnexions : {result.ConnectionsRestored} rétablie(s), {result.ConnectionsExisting} déjà présente(s), {result.ConnectionFailures.Count} non rétablie(s).",
-                    $"\n\nConnections: {result.ConnectionsRestored} restored, {result.ConnectionsExisting} already present, {result.ConnectionFailures.Count} not restored.");
+                message += UiLanguage.Format("ElementHistoryWindow.xaml.Connections0Restored1AlreadyPresent2Not", (object)result.ConnectionsRestored, (object)result.ConnectionsExisting, (object)result.ConnectionFailures.Count);
                 foreach (var failure in result.ConnectionFailures.Take(3)) message += "\n" + ShortRestoreDetail(failure);
                 foreach (var failure in failures.Take(4))
                     message += "\n\n" + failure.Label + (string.IsNullOrWhiteSpace(failure.Category) ? "" : " (" + failure.Category + ")") + " : " + RestoreFailureText(failure.Reason)
                         + (string.IsNullOrWhiteSpace(failure.Detail) ? "" : "\n" + ShortRestoreDetail(failure.Detail));
-                if (failures.Count > 4) message += UiLanguage.T("\nAutres éléments non restaurés (rapport complet) : ", "\nOther elements not restored (full report): ") + (failures.Count - 4);
+                if (failures.Count > 4) message += UiLanguage.Get("ElementHistoryWindow.xaml.OtherElementsNotRestoredFullReport") + (failures.Count - 4);
                 var warnings = result.Items.Where(i => i.Created && !string.IsNullOrWhiteSpace(i.Detail)).Select(i => i.Detail).Distinct().Take(4).ToList();
                 if (warnings.Count > 0) message += "\n\n" + string.Join("\n", warnings);
                 if (result.CaptureWarnings.Count > 0)
-                    message += UiLanguage.T("\n\nCertaines connexions n’avaient pas pu être enregistrées : voir le rapport complet.",
-                        "\n\nSome connections could not be recorded: see the full report.");
+                    message += UiLanguage.Get("ElementHistoryWindow.xaml.SomeConnectionsCouldNotBeRecordedSeeThe");
                 // Preserve every failure, not only the twelve shown in the summary.
                 // Report I/O must never turn a successful restore into a reported rollback.
                 try
@@ -1973,11 +1961,11 @@ namespace Analyse
                         ReportVersion = 1, GeneratedUtc = DateTime.UtcNow, RevitVersion = _doc.Application.VersionNumber,
                         Result = result
                     }, Newtonsoft.Json.Formatting.Indented));
-                    message += UiLanguage.T("\n\nRapport complet (tous les éléments et connexions) :\n", "\n\nFull report (all elements and connections):\n") + path;
+                    message += UiLanguage.Get("ElementHistoryWindow.xaml.FullReportAllElementsAndConnections") + path;
                 }
                 catch (Exception reportError)
                 {
-                    message += UiLanguage.T("\n\nRapport non enregistré : ", "\n\nReport could not be saved: ") + reportError.Message;
+                    message += UiLanguage.Get("ElementHistoryWindow.xaml.ReportCouldNotBeSaved") + reportError.Message;
                 }
                 // Selection/navigation failures must not misreport a successful commit.
                 try
@@ -1990,7 +1978,7 @@ namespace Analyse
             }
             catch (Exception ex)
             {
-                message = UiLanguage.T("La restauration a été annulée.\n", "Restoration was rolled back.\n") + ex.Message;
+                message = UiLanguage.Get("ElementHistoryWindow.xaml.RestorationWasRolledBack") + ex.Message;
             }
             _restoringDeleted = false;
             Dispatcher.BeginInvoke(new Action(() =>
@@ -1998,11 +1986,11 @@ namespace Analyse
                 UpdateVisualizeButtonLabel();
                 if (restoredForTutorial && BIMaestro.Tutorials.DemoTourService.IsActive(this))
                     BIMaestro.Tutorials.DemoTourService.ObserveHistoryResult(this, _uidoc.Application.MainWindowHandle,
-                        UiLanguage.T("Les meubles réapparaissent", "The furniture reappears"),
-                        UiLanguage.T("Observe les tables restaurées dans la vue 3D. Confirme lorsque tu as vu le résultat ; nous passerons ensuite aux paramètres du mobilier témoin.", "Look at the restored tables in the 3D view. Confirm once you have seen the result; we will then move on to the reference furniture's parameters."),
+                        UiLanguage.Get("ElementHistoryWindow.xaml.TheFurnitureReappears"),
+                        UiLanguage.Get("ElementHistoryWindow.xaml.LookAtTheRestoredTablesInThe3D"),
                         () => BIMaestro.Tutorials.DemoTourService.ReportRestoration(this, furnitureRestored));
                 else
-                    MessageBox.Show(this, message, UiLanguage.T("Restaurer les éléments", "Restore elements"), MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show(this, message, UiLanguage.Get("ElementHistoryWindow.xaml.RestoreElements"), MessageBoxButton.OK, MessageBoxImage.Information);
             }));
         }
 
@@ -2010,11 +1998,11 @@ namespace Analyse
         {
             switch (reason)
             {
-                case "identity": case "recipe": return UiLanguage.T("Données de reconstruction absentes ou forme non prise en charge.", "Reconstruction data missing or unsupported shape.");
-                case "type": return UiLanguage.T("La famille ou le type n’est plus présent dans le projet.", "The family or type is no longer in the project.");
-                case "level": return UiLanguage.T("Le niveau d’origine n’est plus présent.", "The original level is no longer present.");
-                case "host": return UiLanguage.T("Le support manque : restaurer aussi le mur, sol, tuyau, gaine ou raccord concerné.", "The host is missing: also restore the corresponding wall, floor, pipe, duct or fitting.");
-                default: return UiLanguage.T("Revit n’a pas pu recréer cet élément.", "Revit could not recreate this element.");
+                case "identity": case "recipe": return UiLanguage.Get("ElementHistoryWindow.xaml.ReconstructionDataMissingOrUnsupportedShape");
+                case "type": return UiLanguage.Get("ElementHistoryWindow.xaml.TheFamilyOrTypeIsNoLongerIn");
+                case "level": return UiLanguage.Get("ElementHistoryWindow.xaml.TheOriginalLevelIsNoLongerPresent");
+                case "host": return UiLanguage.Get("ElementHistoryWindow.xaml.TheHostIsMissingAlsoRestoreTheCorresponding");
+                default: return UiLanguage.Get("ElementHistoryWindow.xaml.RevitCouldNotRecreateThisElement");
             }
         }
 
@@ -2073,7 +2061,7 @@ namespace Analyse
         {
             _detailsVisible = true;
             if (DetailsButton != null)
-                DetailsButton.Content = UiLanguage.T("Masquer détails", "Hide Details");
+                DetailsButton.Content = UiLanguage.Get("ElementHistoryWindow.xaml.HideDetails");
 
             UpdateDetailsLayout();
             UpdateDetails();
@@ -2235,7 +2223,7 @@ namespace Analyse
             var row = GetPrimarySelectedRow();
             if (row == null || row.Source == null)
             {
-                DetailsText.Text = UiLanguage.T("Sélectionne une ligne pour afficher ses détails.", "Select a row to display its details.");
+                DetailsText.Text = UiLanguage.Get("ElementHistoryWindow.xaml.SelectARowToDisplayItsDetails");
                 SetClusterDetails(null);
                 return;
             }
@@ -2244,17 +2232,17 @@ namespace Analyse
             if (row.IsCluster)
             {
                 DetailsText.Text =
-                    UiLanguage.T("Résumé : ", "Summary: ") + BuildClusterSummary(row.Events) + "\n\n" +
-                    $"Cluster: {row.EventCount}" + UiLanguage.T(" évènements\n", " events\n") +
-                    UiLanguage.T("Action : ", "Action: ") + row.ActionText + "\n" +
-                    UiLanguage.T("Utilisateur : ", "User: ") + row.User + "\n" +
+                    UiLanguage.Get("ElementHistoryWindow.xaml.Summary") + BuildClusterSummary(row.Events) + "\n\n" +
+                    $"Cluster: {row.EventCount}" + UiLanguage.Get("ElementHistoryWindow.xaml.Events") +
+                    UiLanguage.Get("ElementHistoryWindow.xaml.Action") + row.ActionText + "\n" +
+                    UiLanguage.Get("ElementHistoryWindow.xaml.User") + row.User + "\n" +
                     $"Date UTC: {ev.Ts:O}\n" +
-                    UiLanguage.T("Projet : ", "Project: ") + ev.Project + "\n" +
-                    UiLanguage.T("Maquette : ", "Model: ") + ev.ModelKey + "\n" +
-                    UiLanguage.T("Catégorie : ", "Category: ") + row.Category + "\n" +
-                    UiLanguage.T("Famille : ", "Family: ") + row.Family + "\n" +
-                    UiLanguage.T("Type : ", "Type: ") + row.TypeName + "\n" +
-                    UiLanguage.T("Transaction : ", "Transaction: ") + row.Tx;
+                    UiLanguage.Get("ElementHistoryWindow.xaml.Project") + ev.Project + "\n" +
+                    UiLanguage.Get("ElementHistoryWindow.xaml.Model") + ev.ModelKey + "\n" +
+                    UiLanguage.Get("ElementHistoryWindow.xaml.Category") + row.Category + "\n" +
+                    UiLanguage.Get("ElementHistoryWindow.xaml.Family") + row.Family + "\n" +
+                    UiLanguage.Get("ElementHistoryWindow.xaml.Type") + row.TypeName + "\n" +
+                    UiLanguage.Get("ElementHistoryWindow.xaml.Transaction") + row.Tx;
                 SetClusterDetails(row.Events);
                 return;
             }
@@ -2265,20 +2253,20 @@ namespace Analyse
             DetailsText.Text =
                 $"Id: {ev.ElementId}\n" +
                 $"UniqueId: {ev.UniqueId}\n" +
-                UiLanguage.T("Action : ", "Action: ") + GetActionText(ev.Action) + "\n" +
-                UiLanguage.T("Utilisateur : ", "User: ") + ev.User + "\n" +
+                UiLanguage.Get("ElementHistoryWindow.xaml.Action") + GetActionText(ev.Action) + "\n" +
+                UiLanguage.Get("ElementHistoryWindow.xaml.User") + ev.User + "\n" +
                 $"Date UTC: {ev.Ts:O}\n" +
-                UiLanguage.T("Projet : ", "Project: ") + ev.Project + "\n" +
-                UiLanguage.T("Maquette : ", "Model: ") + ev.ModelKey + "\n" +
-                UiLanguage.T("Catégorie : ", "Category: ") + ev.Category + "\n" +
-                UiLanguage.T("Famille : ", "Family: ") + ev.Family + "\n" +
-                UiLanguage.T("Type : ", "Type: ") + ev.TypeName + "\n" +
-                UiLanguage.T("Transaction : ", "Transaction: ") + ev.Tx + "\n" +
+                UiLanguage.Get("ElementHistoryWindow.xaml.Project") + ev.Project + "\n" +
+                UiLanguage.Get("ElementHistoryWindow.xaml.Model") + ev.ModelKey + "\n" +
+                UiLanguage.Get("ElementHistoryWindow.xaml.Category") + ev.Category + "\n" +
+                UiLanguage.Get("ElementHistoryWindow.xaml.Family") + ev.Family + "\n" +
+                UiLanguage.Get("ElementHistoryWindow.xaml.Type") + ev.TypeName + "\n" +
+                UiLanguage.Get("ElementHistoryWindow.xaml.Transaction") + ev.Tx + "\n" +
                 (string.IsNullOrWhiteSpace(readableDeltaBlock)
                     ? (string.IsNullOrWhiteSpace(readableDelta) ? string.Empty : readableDelta + "\n")
                     : readableDeltaBlock + "\n") +
                 "\n" +
-                UiLanguage.T("Delta :\n", "Delta:\n") +
+                UiLanguage.Get("ElementHistoryWindow.xaml.Delta") +
                 (ev.Delta == null ? "-" : JsonConvert.SerializeObject(ev.Delta, Formatting.Indented));
         }
 
@@ -2291,7 +2279,7 @@ namespace Analyse
             {
                 var lines = ReadParameterChangeLines(raw).Take(12).ToList();
                 if (lines.Count > 0)
-                    return UiLanguage.T("Avant / après :\n", "Before / After:\n") + string.Join("\n", lines.Select(x => "- " + x));
+                    return UiLanguage.Get("ElementHistoryWindow.xaml.BeforeAfter2") + string.Join("\n", lines.Select(x => "- " + x));
             }
 
             var summary = GetReadableDeltaSummary(ev);
@@ -2315,13 +2303,13 @@ namespace Analyse
                 .ThenBy(e => e.ElementId)
                 .Select(e =>
                 {
-                    var family = FirstNonEmpty(CleanCellText(e.Family), CleanCellText(e.Category), UiLanguage.T("Sans famille", "No Family"));
+                    var family = FirstNonEmpty(CleanCellText(e.Family), CleanCellText(e.Category), UiLanguage.Get("ElementHistoryWindow.xaml.NoFamily"));
                     return new ClusterItemVm
                     {
                         Source = e,
                         FamilyGroup = family,
                         Display = "Id " + e.ElementId.ToString(CultureInfo.InvariantCulture) +
-                                  " | " + FirstNonEmpty(CleanCellText(e.TypeName), CleanCellText(e.Category), UiLanguage.T("Élément", "Element"))
+                                  " | " + FirstNonEmpty(CleanCellText(e.TypeName), CleanCellText(e.Category), UiLanguage.Get("ElementHistoryWindow.xaml.Element3"))
                     };
                 })
                 .ToList();
@@ -2339,14 +2327,14 @@ namespace Analyse
         {
             events = events ?? new List<ElementHistoryEvent>();
             var action = GetActionText(events.FirstOrDefault()?.Action);
-            if (string.IsNullOrWhiteSpace(action)) action = UiLanguage.T("évènements", "events");
+            if (string.IsNullOrWhiteSpace(action)) action = UiLanguage.Get("ElementHistoryWindow.xaml.Events2");
 
             var families = CountDistinct(events.Select(e => CleanCellText(e.Family)));
             var types = CountDistinct(events.Select(e => CleanCellText(e.TypeName)));
 
             return events.Count.ToString(CultureInfo.InvariantCulture) + " " + action.ToLowerInvariant() +
-                   " · " + families.ToString(CultureInfo.InvariantCulture) + UiLanguage.T(" familles", " families") +
-                   " · " + types.ToString(CultureInfo.InvariantCulture) + UiLanguage.T(" types", " types");
+                   " · " + families.ToString(CultureInfo.InvariantCulture) + UiLanguage.Get("ElementHistoryWindow.xaml.Families3") +
+                   " · " + types.ToString(CultureInfo.InvariantCulture) + UiLanguage.Get("ElementHistoryWindow.xaml.Types2");
         }
 
         private RestoreResult ExecuteRestoreParameters(ElementHistoryEvent ev)
@@ -2357,7 +2345,7 @@ namespace Analyse
             var changes = ReadParameterChanges(ev.Delta["parameters"]);
             if (changes.Count == 0) return result;
 
-            using (var t = new Transaction(_doc, UiLanguage.T("BIMaestro - Restaurer paramètres historique", "BIMaestro - Restore history parameters")))
+            using (var t = new Transaction(_doc, UiLanguage.Get("ElementHistoryWindow.xaml.BIMaestroRestoreHistoryParameters")))
             {
                 t.Start();
 
@@ -2658,16 +2646,16 @@ namespace Analyse
             if (result.Applied > 0 && result.Failed == 0 && BIMaestro.Tutorials.DemoTourService.IsActive(this))
             {
                 BIMaestro.Tutorials.DemoTourService.ObserveHistoryResult(this, _uidoc.Application.MainWindowHandle,
-                    UiLanguage.T("Le témoin retrouve ses 4 chaises", "The reference furniture gets its 4 chairs back"),
-                    UiLanguage.T("Observe le mobilier dans la vue 3D : le nombre de chaises est revenu de 2 à 4. Confirme lorsque tu as vu la différence.", "Look at the furniture in the 3D view: the chair count went back from 2 to 4. Confirm once you have seen the difference."),
+                    UiLanguage.Get("ElementHistoryWindow.xaml.TheReferenceFurnitureGetsIts4ChairsBack"),
+                    UiLanguage.Get("ElementHistoryWindow.xaml.LookAtTheFurnitureInThe3DView"),
                     () => BIMaestro.Tutorials.DemoTourService.ReportParameterRestoration(this, exerciseRestored));
                 return;
             }
             MessageBox.Show(
                 result.Applied > 0
-                    ? UiLanguage.T($"{result.Applied} valeur(s) restaurée(s).", $"{result.Applied} value(s) restored.") + (result.Failed > 0 ? UiLanguage.T($"\n{result.Failed} valeur(s) n'ont pas pu être restaurée(s).", $"\n{result.Failed} value(s) could not be restored.") : "")
-                    : UiLanguage.T("Aucune valeur n'a pu être restaurée.", "No value could be restored."),
-                UiLanguage.T("BIMaestro - Qui a fait ça ?", "BIMaestro - Who Did This?"),
+                    ? UiLanguage.Format("ElementHistoryWindow.xaml.0ValueSRestored", (object)result.Applied) + (result.Failed > 0 ? UiLanguage.Format("ElementHistoryWindow.xaml.0ValueSCouldNotBeRestored", (object)result.Failed) : "")
+                    : UiLanguage.Get("ElementHistoryWindow.xaml.NoValueCouldBeRestored"),
+                UiLanguage.Get("ElementHistoryWindow.xaml.BIMaestroWhoDidThis"),
                 MessageBoxButton.OK,
                 result.Applied > 0 ? MessageBoxImage.Information : MessageBoxImage.Warning);
         }
@@ -2728,7 +2716,7 @@ namespace Analyse
         private void ExecuteVisualize(List<ElementHistoryEvent> events)
         {
             var originals = new List<ElementId>();
-            using (var t = new Transaction(_doc, UiLanguage.T("BIMaestro - Visualisation historique", "BIMaestro - History visualization")))
+            using (var t = new Transaction(_doc, UiLanguage.Get("ElementHistoryWindow.xaml.BIMaestroHistoryVisualization")))
             {
                 t.Start();
 
@@ -2782,7 +2770,7 @@ namespace Analyse
                 return;
             }
 
-            using (var t = new Transaction(_doc, UiLanguage.T("BIMaestro - Nettoyer previews historique", "BIMaestro - Clean up history previews")))
+            using (var t = new Transaction(_doc, UiLanguage.Get("ElementHistoryWindow.xaml.BIMaestroCleanUpHistoryPreviews")))
             {
                 t.Start();
                 _doc.Delete(ids);
@@ -2889,18 +2877,18 @@ namespace Analyse
             if (ev?.Delta == null) return "-";
             var readableDelta = GetReadableDeltaSummary(ev);
             if (!string.IsNullOrWhiteSpace(readableDelta))
-                return readableDelta.Replace(UiLanguage.T("Avant / après : ", "Before / After: "), string.Empty);
+                return readableDelta.Replace(UiLanguage.Get("ElementHistoryWindow.xaml.BeforeAfter"), string.Empty);
             if (ev.Delta.TryGetValue("lastKnown", out var lastKnown))
-                return UiLanguage.T("Supprimé @ ", "Deleted @ ") + CompactPoint(lastKnown);
+                return UiLanguage.Get("ElementHistoryWindow.xaml.Deleted") + CompactPoint(lastKnown);
             if (ev.Delta.TryGetValue("new", out var newPos) && ev.Delta.TryGetValue("old", out var oldPos))
                 return $"{CompactPoint(oldPos)} -> {CompactPoint(newPos)}";
             if (ev.Delta.TryGetValue("parameters", out var parameters))
             {
                 var names = ReadParameterNames(parameters).Take(2).ToList();
-                if (names.Count > 0) return UiLanguage.T("Paramètre : ", "Parameter: ") + string.Join(", ", names);
+                if (names.Count > 0) return UiLanguage.Get("ElementHistoryWindow.xaml.Parameter") + string.Join(", ", names);
             }
             if (ev.Delta.ContainsKey("oldBox") && ev.Delta.ContainsKey("newBox"))
-                return UiLanguage.T("Géométrie modifiée", "Geometry modified");
+                return UiLanguage.Get("ElementHistoryWindow.xaml.GeometryModified");
             return "-";
         }
 

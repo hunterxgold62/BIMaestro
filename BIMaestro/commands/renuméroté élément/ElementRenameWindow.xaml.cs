@@ -154,14 +154,14 @@ namespace Modification
             ? Visibility.Collapsed
             : Visibility.Visible;
         public string WindowSubtitle => IsViewportMode
-            ? UiLanguage.T("Numérotez les pastilles ou renommez les vues selon leur position sur la feuille.", "Number View Tags or Rename Views Based on Their Position on the Sheet.")
-            : UiLanguage.T("Configurez le paramètre cible, la structure de nommage et lancez le renommage en un clic.", "Configure the Target Parameter and Naming Structure, Then Rename in One Click.");
+            ? UiLanguage.Get("ElementRenameWindow.xaml.NumberViewTagsOrRenameViewsBasedOn")
+            : UiLanguage.Get("ElementRenameWindow.xaml.ConfigureTheTargetParameterAndNamingStructureThen");
         public string BandHeightLabel => IsViewportMode
-            ? UiLanguage.T("Tolérance de ligne (mm) :", "Row Tolerance (mm):")
-            : UiLanguage.T("Hauteur de bande (m) :", "Band Height (m):");
+            ? UiLanguage.Get("ElementRenameWindow.xaml.RowToleranceMm")
+            : UiLanguage.Get("ElementRenameWindow.xaml.BandHeightM");
         public string BandHeightToolTip => IsViewportMode
-            ? UiLanguage.T("Deux fenêtres de vue dont les centres sont proches verticalement sont considérées sur la même ligne, puis triées de gauche à droite.", "Two Viewports with Vertically Close Centers Are Treated as Being on the Same Row, Then Sorted Left to Right.")
-            : UiLanguage.T("Les éléments sont regroupés par bandes horizontales de cette hauteur et triés de gauche à droite.", "Elements Are Grouped into Horizontal Bands of This Height and Sorted Left to Right.");
+            ? UiLanguage.Get("ElementRenameWindow.xaml.TwoViewportsWithVerticallyCloseCentersAreTreated")
+            : UiLanguage.Get("ElementRenameWindow.xaml.ElementsAreGroupedIntoHorizontalBandsOfThis");
 
         public bool IsReset { get; private set; } // Propriété pour savoir si l'utilisateur veut réinitialiser
         public bool IsNumberingEnabled { get; internal set; }
@@ -238,7 +238,7 @@ namespace Modification
             }
             catch (Exception ex)
             {
-                MessageBox.Show(UiLanguage.T("Impossible d’ouvrir la page d’aide : ", "Unable to Open the Help Page: ") + ex.Message, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(UiLanguage.Get("ElementRenameWindow.xaml.UnableToOpenTheHelpPage") + ex.Message, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
     }

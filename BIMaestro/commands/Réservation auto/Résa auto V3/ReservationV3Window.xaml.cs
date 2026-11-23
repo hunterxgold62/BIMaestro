@@ -88,7 +88,7 @@ namespace Modification
             {
                 Symbol = s;
                 IsGenericModel = s?.Category?.Id?.GetIdLongValue() == (int)BuiltInCategory.OST_GenericModel;
-                string category = s?.Category?.Name ?? UiLanguage.T("Catégorie inconnue", "Unknown category");
+                string category = s?.Category?.Name ?? UiLanguage.Get("ReservationV3Window.xaml.UnknownCategory");
                 Display = $"{s?.Family?.Name} — {s?.Name}  ·  {category}";
             }
         }
@@ -201,28 +201,25 @@ namespace Modification
             }
 
             int ready = profiles.Count(x => IsReady(x.Profile, x.Unhosted));
-            txtConfigProgress.Text = UiLanguage.T(
-                $"{ready} configuration{(ready > 1 ? "s" : "")} prête{(ready > 1 ? "s" : "")} sur 8",
-                $"{ready} configuration{(ready == 1 ? "" : "s")} ready out of 8");
+            txtConfigProgress.Text = UiLanguage.Format("ReservationV3Window.xaml.AvailableConfigurations", ready, UiLanguage.IsEnglish ? (ready == 1 ? "" : "s") : (ready > 1 ? "s" : ""));
 
             ProfileConfig selected = GetSelectedTargetProfileConfig();
             if (selected == null || !selected.IsConfigured)
             {
-                txtSelectedConfigStatus.Text = UiLanguage.T("Aucune famille utilisateur configurée pour ce cas.", "No Custom Family Configured for This Case.");
+                txtSelectedConfigStatus.Text = UiLanguage.Get("ReservationV3Window.xaml.NoCustomFamilyConfiguredForThisCase");
             }
             else if (!loadedSymbols.Any(s => string.Equals(s.Family.Name, selected.FamilyName, StringComparison.OrdinalIgnoreCase)))
             {
-                txtSelectedConfigStatus.Text = UiLanguage.T("Configurée mais non chargée dans ce projet : ", "Configured but Not Loaded in This Project: ") + selected.FamilyName;
+                txtSelectedConfigStatus.Text = UiLanguage.Get("ReservationV3Window.xaml.ConfiguredButNotLoadedInThisProject") + selected.FamilyName;
             }
             else if (!IsReady(selected, SelectedConfigUnhosted))
             {
-                txtSelectedConfigStatus.Text = UiLanguage.T($"Chargée mais incompatible avec ce mode d'hébergement : {selected.FamilyName}",
-                    $"Loaded but incompatible with this hosting mode: {selected.FamilyName}");
+                txtSelectedConfigStatus.Text = UiLanguage.Format("ReservationV3Window.xaml.LoadedButIncompatibleWithThisHostingMode0", (object)selected.FamilyName);
             }
             else
             {
-                string type = string.IsNullOrWhiteSpace(selected.TypeName) ? UiLanguage.T("type automatique", "automatic type") : selected.TypeName;
-                txtSelectedConfigStatus.Text = UiLanguage.T($"Prête : {selected.FamilyName} — {type}", $"Ready: {selected.FamilyName} — {type}");
+                string type = string.IsNullOrWhiteSpace(selected.TypeName) ? UiLanguage.Get("ReservationV3Window.xaml.AutomaticType") : selected.TypeName;
+                txtSelectedConfigStatus.Text = UiLanguage.Format("ReservationV3Window.xaml.Ready01", (object)selected.FamilyName, (object)type);
             }
         }
 
@@ -347,7 +344,7 @@ namespace Modification
                     _selectedShapeBase = ShapeTarget.Rectangulaire;
                     _shapeOptionByLabel.Clear();
                     comboShape.Items.Clear();
-                    comboShape.Items.Add(new ComboBoxItem { Content = UiLanguage.T("(Aucune famille disponible)", "(No family available)") });
+                    comboShape.Items.Add(new ComboBoxItem { Content = UiLanguage.Get("ReservationV3Window.xaml.NoFamilyAvailable") });
                     comboShape.SelectedIndex = 0;
                     comboShape.IsEnabled = false;
                     comboShape.Text = string.Empty;
@@ -372,7 +369,7 @@ namespace Modification
 
                 if (comboShape.Items.Count == 0)
                 {
-                    comboShape.Items.Add(new ComboBoxItem { Content = UiLanguage.T("(Aucune famille disponible)", "(No family available)") });
+                    comboShape.Items.Add(new ComboBoxItem { Content = UiLanguage.Get("ReservationV3Window.xaml.NoFamilyAvailable") });
                     comboShape.SelectedIndex = 0;
                     comboShape.IsEnabled = false;
                     comboShape.Text = string.Empty;
@@ -1050,8 +1047,8 @@ namespace Modification
         {
             var dlg = new OpenFileDialog
             {
-                Filter = UiLanguage.T("Famille Revit (*.rfa)|*.rfa", "Revit family (*.rfa)|*.rfa"),
-                Title = UiLanguage.T("Sélectionner une famille de réservation (.rfa)", "Select an opening family (.rfa)")
+                Filter = UiLanguage.Get("ReservationV3Window.xaml.RevitFamilyRfaRfa"),
+                Title = UiLanguage.Get("ReservationV3Window.xaml.SelectAnOpeningFamilyRfa")
             };
 
             if (!string.IsNullOrWhiteSpace(tbRfaPath.Text))
@@ -1076,8 +1073,8 @@ namespace Modification
         {
             var dlg = new OpenFileDialog
             {
-                Filter = UiLanguage.T("Script Dynamo (*.dyn)|*.dyn", "Dynamo script (*.dyn)|*.dyn"),
-                Title = UiLanguage.T("Sélectionner le script Dynamo", "Select the Dynamo script")
+                Filter = UiLanguage.Get("ReservationV3Window.xaml.DynamoScriptDynDyn"),
+                Title = UiLanguage.Get("ReservationV3Window.xaml.SelectTheDynamoScript")
             };
 
             string currentPath = tbDynamoPath?.Text?.Trim();
@@ -1103,7 +1100,7 @@ namespace Modification
             string path = tbRfaPath.Text?.Trim();
             if (string.IsNullOrWhiteSpace(path) || !System.IO.File.Exists(path))
             {
-                MessageBox.Show(UiLanguage.T("Sélectionne un fichier .RFA valide.", "Select a valid .RFA file."), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(UiLanguage.Get("ReservationV3Window.xaml.SelectAValidRFAFile"), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -1116,7 +1113,7 @@ namespace Modification
                     if (!_doc.LoadFamily(path, new NoPromptFamilyLoadOptions(), out var fam))
                     {
                         t.RollBack();
-                        MessageBox.Show(UiLanguage.T("Impossible de charger la famille (LoadFamily a échoué).", "Unable to load the family (LoadFamily failed)."), "BIMaestro",
+                        MessageBox.Show(UiLanguage.Get("ReservationV3Window.xaml.UnableToLoadTheFamilyLoadFamilyFailed"), "BIMaestro",
                             MessageBoxButton.OK, MessageBoxImage.Error);
                         return;
                     }
@@ -1136,23 +1133,21 @@ namespace Modification
                     if (preferred == null)
                     {
                         string expected = SelectedConfigUnhosted
-                            ? UiLanguage.T("sans hôte, basée sur un niveau", "unhosted and level-based")
-                            : UiLanguage.T("hébergée par un niveau", "level-hosted");
-                        MessageBox.Show(UiLanguage.T(
-                                $"La famille est chargée, mais aucun de ses types n'est compatible avec le mode {expected}.",
-                                $"The family is loaded, but none of its types is compatible with {expected} mode."),
+                            ? UiLanguage.Get("ReservationV3Window.xaml.UnhostedAndLevelBased")
+                            : UiLanguage.Get("ReservationV3Window.xaml.LevelHosted");
+                        MessageBox.Show(UiLanguage.Format("ReservationV3Window.xaml.TheFamilyIsLoadedButNoneOfIts", (object)expected),
                             "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
                     }
                     else
                     {
-                        MessageBox.Show(UiLanguage.T("Famille chargée. Vérifie les paramètres puis applique la configuration.", "Family loaded. Check the parameters, then apply the configuration."),
+                        MessageBox.Show(UiLanguage.Get("ReservationV3Window.xaml.FamilyLoadedCheckTheParametersThenApplyThe"),
                             "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Information);
                     }
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show(UiLanguage.T("Erreur chargement famille : ", "Family loading error: ") + ex.Message, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(UiLanguage.Get("ReservationV3Window.xaml.FamilyLoadingError") + ex.Message, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -1571,7 +1566,7 @@ namespace Modification
 
             if (sym == null)
             {
-                MessageBox.Show(UiLanguage.T("Choisis une famille compatible chargée dans le projet.", "Choose a compatible family loaded in the project."), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(UiLanguage.Get("ReservationV3Window.xaml.ChooseACompatibleFamilyLoadedInTheProject"), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -1616,18 +1611,18 @@ namespace Modification
             {
                 if (!ReservationAutoV3PersoConfigStore.Save(_persoConfig, out var persoErr))
                 {
-                    MessageBox.Show(UiLanguage.T("Famille configurée mais erreur de sauvegarde : ", "Family configured, but saving failed: ") + persoErr, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show(UiLanguage.Get("ReservationV3Window.xaml.FamilyConfiguredButSavingFailed") + persoErr, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
 
                 RefreshProfilesSummary();
                 RefreshShapeOptions();
                 RefreshVerticalPlacementUiFromCurrentProfile();
-                MessageBox.Show(UiLanguage.T("Famille utilisateur configurée et sauvegardée.", "User family configured and saved."), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(UiLanguage.Get("ReservationV3Window.xaml.UserFamilyConfiguredAndSaved"), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             else
             {
-                MessageBox.Show(UiLanguage.T("Erreur sauvegarde : ", "Save error: ") + err, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(UiLanguage.Get("ReservationV3Window.xaml.SaveError") + err, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -1642,25 +1637,25 @@ namespace Modification
 
             if (!ReservationAutoV3ConfigStore.Save(Config, out var err))
             {
-                MessageBox.Show(UiLanguage.T("Erreur sauvegarde : ", "Save error: ") + err, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(UiLanguage.Get("ReservationV3Window.xaml.SaveError") + err, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 
             if (!ReservationAutoV3PersoConfigStore.Save(_persoConfig, out var persoErr))
             {
-                MessageBox.Show(UiLanguage.T("Erreur sauvegarde familles : ", "Family settings save error: ") + persoErr, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(UiLanguage.Get("ReservationV3Window.xaml.FamilySettingsSaveError") + persoErr, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 
             RefreshProfilesSummary();
-            MessageBox.Show(UiLanguage.T("Configuration sauvegardée.", "Configuration saved."), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(UiLanguage.Get("ReservationV3Window.xaml.ConfigurationSaved"), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         private void OnOk(object sender, RoutedEventArgs e)
         {
             if (!comboShape.IsEnabled || !_shapeOptionByLabel.Any())
             {
-                MessageBox.Show(UiLanguage.T("Aucune famille de réservation disponible pour le support sélectionné.", "No opening family is available for the selected host."), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(UiLanguage.Get("ReservationV3Window.xaml.NoOpeningFamilyIsAvailableForTheSelected"), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -1707,7 +1702,7 @@ namespace Modification
                         "Two Linked Models mode requires an unhosted family.\n\n" +
                         "The wall or floor belongs to a linked model and cannot host a family created in your project.\n\n" +
                         "Choose a 'My unhosted family' or 'BIMaestro unhosted' option in the Shape list."),
-                    UiLanguage.T("Famille sans hôte requise", "Unhosted Family Required"),
+                    UiLanguage.Get("ReservationV3Window.xaml.UnhostedFamilyRequired"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
                 return;
@@ -1764,8 +1759,8 @@ namespace Modification
             catch (Exception ex)
             {
                 MessageBox.Show(
-                    UiLanguage.T($"Impossible d'ouvrir l'aide en ligne : {ex.Message}", $"Unable to open online help: {ex.Message}"),
-                    UiLanguage.T("Aide", "Help"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                    UiLanguage.Format("ReservationV3Window.xaml.UnableToOpenOnlineHelp0", (object)ex.Message),
+                    UiLanguage.Get("ReservationV3Window.xaml.Help"), MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
         private class NoPromptFamilyLoadOptions : IFamilyLoadOptions

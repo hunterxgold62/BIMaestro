@@ -156,7 +156,7 @@ public partial class AppUI : IExternalApplication
                     ("GPTBotWindowButton", "Chat él.", "IA.GPTBotWindowCommand", "Chatbot + élémet.png", "Ouvre un assistant IA conversationnel connecté à votre contexte Revit.\r\nAnalyse les éléments sélectionnés et répond selon le profil choisi (Basique, Revit, BIM Manager)."),
                     ("TextCorrectionButton", "Corr. IA", "IA.TextCorrectionCommand", "Correction de texte IA (2).png", "Corrige et reformule les textes Revit sélectionnés avec l'IA.\r\nPropose plusieurs styles et laisse valider, modifier ou ignorer chaque suggestion."),
                     ("ScanText", "Audit IA", "ScanTextRevit.SelectViewsCommand", "Audit texte IA.png", "Analyse les textes des vues/feuilles sélectionnées pour détecter les fautes d'orthographe, de grammaire et de ponctuation. \r\n\r\nPourquoi ce bouton est utile :\r\n- évite les oublis avant envoi client,\r\n- classe les anomalies par gravité (Mineur / Erreur),\r\n- propose des corrections détaillées ligne par ligne.\r\n\r\nConseil : sélectionne seulement les vues/feuilles à contrôler pour accélérer l'analyse."))),
-                new RibbonItemDefinition("RealisticViewImage", "Rendu plan IA", panel => AddPushButton(panel, "RealisticViewImage", "Rendu\nplan IA", assemblyPath, "IA.RealisticViewImageCommand", "rendu plan IA.png", "Génère un rendu réaliste à partir d'une vue Plan/Coupe/3D via gpt-image-2.\r\n\r\nCe que fait le bouton :\r\n- conserve le cadrage et la géométrie de la vue source,\r\n- optimise l'image avant envoi ,\r\n- crée une variante visuelle rapide pour présentation client.\r\n\r\nConseil : lancez-le sur une vue propre (annotations masquées) pour obtenir un résultat plus lisible."))            }),
+                new RibbonItemDefinition("RealisticViewImage", "Rendu plan IA", panel => AddPushButton(panel, "RealisticViewImage", "Rendu\nplan IA", assemblyPath, "IA.RealisticViewImageCommand", "rendu plan IA.png", "Génère un rendu réaliste à partir d'une vue Plan/Coupe/3D via gpt-image-2.6-sunburst.\r\n\r\nCe que fait le bouton :\r\n- conserve le cadrage et la géométrie de la vue source,\r\n- optimise l'image avant envoi ,\r\n- crée une variante visuelle rapide pour présentation client.\r\n\r\nConseil : lancez-le sur une vue propre (annotations masquées) pour obtenir un résultat plus lisible."))            }),
            new RibbonPanelDefinition("Analyse", new List<RibbonItemDefinition>
             {
                 new RibbonItemDefinition("PipeLengthByDiameterV2", "Calcul des canalisations", panel => AddPushButton(panel, "PipeLengthByDiameterV2", "Calcul des\ncanalisations", assemblyPath, "Analyse.PipeLengthByDiameterCommandV2", "Calcul de canalisation.png", "Description :\r\n- Calcule les longueurs des canalisations et gaines par diamètre (DN ou dimensions).\r\n- Compte les accessoires de type coudes et tés par diamètre.\r\n- Estime les volumes d'eau par diamètre intérieur.\r\n- Intègre un filtre par type de système pour une analyse précise.\r\n- Permet d'inclure ou non les gaines dans les calculs.\r\n- Exporte les résultats sous forme de tableau Excel détaillé.\r\n\r\nUtilité :\r\nOptimisez votre gestion des systèmes MEP en obtenant rapidement une analyse précise des longueurs, volumes et accessoires, avec possibilité d'exportation.")),
@@ -625,7 +625,7 @@ public partial class AppUI : IExternalApplication
         string[] parts = tt.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
         string shortTip = parts.Length > 0 ? parts[0] : "";
         if (string.IsNullOrWhiteSpace(shortTip))
-            shortTip = UiLanguage.T($"Exécuter {buttonText}", $"Run {buttonText}");
+            shortTip = UiLanguage.Format("AppUI.Run0", (object)buttonText);
         string badgeLabel = GetRibbonBadgeLabel(buttonName);
         if (badgeLabel != null)
             shortTip = badgeLabel + " · " + shortTip;
@@ -1150,14 +1150,12 @@ public partial class AppUI : IExternalApplication
             return;
         string image = tours ? "DemoTours.png" : "DemoProject.png";
         string text = tours
-            ? UiLanguage.T("Parcours\nguidés", "Guided\ntours")
-            : UiLanguage.T("Maquette\nd’essai", "Demo\nmodel");
+            ? UiLanguage.Get("AppUI.GuidedTours")
+            : UiLanguage.Get("AppUI.DemoModel");
         if (info.ImageResourceName == image && info.PushButton.ItemText == text) return;
         string description = tours
-            ? UiLanguage.T("Choisissez un parcours pour essayer les outils BIMaestro pas à pas dans cette maquette d’essai.",
-                "Choose a tour to try the BIMaestro tools step by step in this demo model.")
-            : UiLanguage.T("Crée et ouvre une nouvelle maquette d’essai BIMaestro dans Documents\\BIMaestro_Revit, puis propose les exercices guidés.",
-                "Creates and opens a new BIMaestro demo model in Documents\\BIMaestro_Revit, then offers guided exercises.");
+            ? UiLanguage.Get("AppUI.ChooseATourToTryTheBIMaestroTools")
+            : UiLanguage.Get("AppUI.CreatesAndOpensANewBIMaestroDemoModel");
         UpdatePushButtonPresentation(info.Id, text, description);
         string badgeLabel = GetRibbonBadgeLabel(info.Id);
         if (badgeLabel != null) info.PushButton.ToolTip = badgeLabel + " · " + UiLanguage.T(description);

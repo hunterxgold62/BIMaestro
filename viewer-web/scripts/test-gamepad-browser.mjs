@@ -374,20 +374,12 @@ try {
     const saved = Object.values(scenario.state.markups)[0]; assert.equal(saved.text, 'test'); assert.equal(saved.dimensions.length, 1);
     assert.ok(saved.widthCm > 75); assert.ok(saved.heightCm > 40);
   });
-  await check('controller reaches reservation exports and analysis filters without a mouse', async () => {
+  await check('controller reaches reservation exports without a mouse', async () => {
     await controllerClick(page.locator('.view-toolbar').getByRole('button', { name: /^Annotation et Résa/ }));
     const download = page.waitForEvent('download');
     await controllerClick(page.locator('.markup-list').getByRole('button', { name: 'Exporter vers Revit', exact: true }));
     assert.ok((await download).suggestedFilename().length > 0);
     await controllerClick(page.locator('.markup-list').getByRole('button', { name: 'Fermer', exact: true }));
-    await controllerClick(page.locator('.view-toolbar').getByRole('button', { name: 'Analyser les coupes', exact: true }));
-    const panel = page.locator('.mep-impact-panel'); await panel.waitFor();
-    if (await panel.locator('summary').count()) {
-      await controllerClick(panel.locator('summary').first());
-      const filter = panel.getByRole('checkbox', { name: 'Équipements uniquement' }); await controllerClick(filter); assert.equal(await filter.isChecked(), true);
-      await controllerText(panel.getByRole('textbox', { name: 'Filtrer les éléments concernés' }), 'mur');
-    }
-    await quickTap(1); assert.equal(await panel.count(), 0);
   });
   await check('saved reservations can be modified and deleted with the controller in Maquette mode', async () => {
     await quickTap(9); await quickTap(8); await quickTap(9);

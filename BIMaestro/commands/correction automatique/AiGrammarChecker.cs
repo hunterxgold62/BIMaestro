@@ -216,7 +216,7 @@ namespace ScanTextRevit
             {
                 try
                 {
-                    var json = AiClient.SendOpenAI(_jwt, "gpt-4o-mini", prompt);
+                    var json = AiClient.SendOpenAI(_jwt, AiClient.TextModel, prompt);
                     string messageContent = json["choices"]?[0]?["message"]?["content"]?.ToString();
                     return messageContent;
                 }
@@ -278,7 +278,7 @@ namespace ScanTextRevit
                     {
                         LineNumber = 0,
                         OriginalText = originalTextIfError,
-                        CorrectedText = "Erreur lors de la désérialisation de la réponse de l'IA.",
+                        CorrectedText = global::BIMaestro.Localization.UiLanguage.Get("AiGrammarChecker.InvalidAiResponse"),
                         Explanation = "Réponse vide ou nulle.",
                         Category = "Erreur"
                     }
@@ -307,7 +307,7 @@ namespace ScanTextRevit
                     {
                         LineNumber = 0,
                         OriginalText = originalTextIfError,
-                        CorrectedText = "Erreur lors de la désérialisation de la réponse de l'IA.",
+                        CorrectedText = global::BIMaestro.Localization.UiLanguage.Get("AiGrammarChecker.InvalidAiResponse"),
                         Explanation = ex.Message,
                         Category = "Erreur"
                     }
@@ -319,7 +319,7 @@ namespace ScanTextRevit
                 {
                     LineNumber = 0,
                     OriginalText = originalTextIfError,
-                    CorrectedText = "Erreur lors de la désérialisation de la réponse de l'IA.",
+                    CorrectedText = global::BIMaestro.Localization.UiLanguage.Get("AiGrammarChecker.InvalidAiResponse"),
                     Explanation = "Format inattendu ou parsing impossible.",
                     Category = "Erreur"
                 }

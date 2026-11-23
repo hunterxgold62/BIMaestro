@@ -23,7 +23,7 @@ namespace Couleur
                 try { ShowPreferences(app); }
                 catch (Exception ex)
                 {
-                    TaskDialog.Show("BIMaestro", "Impossible d’ouvrir la personnalisation des couleurs : " + ex.Message);
+                    TaskDialog.Show("BIMaestro", global::BIMaestro.Localization.UiLanguage.Get("UiDialog.ColorPreferencesUnavailable") + ex.Message);
                 }
             }
         }

@@ -23,7 +23,7 @@ namespace IA
                 ICollection<ElementId> selectedIds = uidoc.Selection.GetElementIds();
                 if (selectedIds == null || !selectedIds.Any())
                 {
-                    TaskDialog.Show(UiLanguage.T("Sélection", "Selection"), UiLanguage.T("Aucun élément sélectionné. Veuillez sélectionner des éléments.", "No elements selected. Select some elements first."));
+                    TaskDialog.Show(UiLanguage.Get("SelectElementsCommand.Selection"), UiLanguage.Get("SelectElementsCommand.NoElementsSelectedSelectSomeElementsFirst"));
                     return Result.Cancelled;
                 }
 
@@ -67,7 +67,7 @@ namespace IA
                     elementInfos.Select(ei => ei.ToString())
                 );
 
-                TaskDialog.Show(UiLanguage.T("Informations des éléments", "Element Information"), elementsInfoLog);
+                TaskDialog.Show(UiLanguage.Get("SelectElementsCommand.ElementInformation"), elementsInfoLog);
                 return Result.Succeeded;
             }
             catch (Exception ex)

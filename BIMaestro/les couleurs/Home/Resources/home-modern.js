@@ -48,7 +48,11 @@
    ['[data-bimaestro-home-region="sidebar"] svg[data-testid^="revit-"] path','fill:'+ink+'!important;'],
    ['button[data-testid$="file-button"]','border:1px solid '+border+'!important;color:'+ink+'!important;border-radius:9px!important;background:white!important;min-height:36px!important;'],
    ['button[data-testid="open-revit-file-button"]','background:'+accent+'!important;color:white!important;border-color:'+accent+'!important;'],
-   ['[data-testid="recent-container"]','padding:26px 30px!important;'],
+   // Reserve space for the added panels before sizing the native scrolling region.
+   ['[data-testid="recent-container"]','display:flex!important;flex-direction:column!important;box-sizing:border-box!important;min-height:0!important;padding:26px 30px!important;'],
+   ['[data-testid="recent-container"] > :not([data-testid="recent-wrapper"])','flex-shrink:0!important;'],
+   ['[data-testid="recent-container"] > [data-testid="recent-wrapper"]','flex:1 1 auto!important;height:auto!important;min-height:0!important;'],
+   ['[data-testid="recent-wrapper"] > #top-container','flex-shrink:0!important;'],
    ['[data-testid="recent-container"] h3','display:none!important;'],
    ['[data-testid="tile-view-wrapper"]','grid-template-columns:repeat(auto-fill,minmax(224px,1fr))!important;gap:20px!important;grid-template-rows:none!important;grid-auto-rows:auto!important;align-items:stretch!important;padding:2px 2px 24px!important;'],
    ['[data-testid="tile-card"]','border:1px solid '+border+'!important;border-radius:14px!important;min-height:310px!important;height:auto!important;max-height:none!important;align-self:stretch!important;background:white!important;box-shadow:0 2px 14px rgba(15,23,42,.06)!important;overflow:hidden!important;transition:border-color .15s,box-shadow .15s;'],

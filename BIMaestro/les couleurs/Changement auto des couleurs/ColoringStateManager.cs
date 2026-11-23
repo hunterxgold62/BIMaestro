@@ -90,9 +90,7 @@ namespace Couleur
             {
                 TaskDialog.Show(
                     "BIMaestro",
-                    UiLanguage.T(
-                        "Impossible d’ouvrir la personnalisation des couleurs : ",
-                        "Unable to Open Color Customization: ") +
+                    UiLanguage.Get("ColoringStateManager.UnableToOpenColorCustomization") +
                     ex.Message);
             }
         }
@@ -163,7 +161,7 @@ namespace Couleur
             }
             catch
             {
-                TaskDialog.Show(UiLanguage.T("Erreur de Chargement", "Load Error"), UiLanguage.T("Impossible de charger l'état, valeurs par défaut appliquées.", "Unable to load the state; default values were applied."));
+                TaskDialog.Show(UiLanguage.Get("ColoringStateManager.LoadError"), UiLanguage.Get("ColoringStateManager.UnableToLoadTheStateDefaultValuesWere"));
                 IsColoringActive = DefaultColoringActive;
                 IsFullMode = DefaultFullMode;
             }
@@ -180,7 +178,7 @@ namespace Couleur
             }
             catch
             {
-                TaskDialog.Show(UiLanguage.T("Erreur de Sauvegarde", "Save Error"), UiLanguage.T("Impossible de sauvegarder l'état.", "Unable to save the state."));
+                TaskDialog.Show(UiLanguage.Get("ColoringStateManager.SaveError"), UiLanguage.Get("ColoringStateManager.UnableToSaveTheState"));
             }
         }
 
@@ -1039,7 +1037,69 @@ namespace Couleur
                 return;
 
             EnsureRefreshTimer(root);
+#if BIMAESTRO_DEMO
+            _demoMainWindowHandle = mainWindowHandle;
+            EnsureDemoTimer(root);
+#endif
         }
+
+#if BIMAESTRO_DEMO
+        // Mode démo (build de test uniquement, jamais en release) :
+        // quand le fichier de préférences change sur disque, le thème de
+        // l'arborescence est rechargé et réappliqué aussitôt. Sert à filmer
+        // les variantes d'apparence pilotées par un script externe.
+        private static DispatcherTimer _demoTimer;
+        private static DateTime _demoStamp;
+        private static IntPtr _demoMainWindowHandle;
+
+        private static void EnsureDemoTimer(FrameworkElement root)
+        {
+            if (_demoTimer != null && _demoTimer.Dispatcher == root.Dispatcher)
+                return;
+
+            _demoTimer?.Stop();
+            string path = RibbonColorPreferences.PreferenceFilePath;
+            _demoStamp = File.Exists(path)
+                ? File.GetLastWriteTimeUtc(path)
+                : DateTime.MinValue;
+            _demoTimer = new DispatcherTimer(
+                DispatcherPriority.Background,
+                root.Dispatcher)
+            {
+                Interval = TimeSpan.FromMilliseconds(150)
+            };
+            _demoTimer.Tick += (_, __) =>
+            {
+                try
+                {
+                    string iconPath = ProjectBrowserIcons.DemoFilePath;
+                    DateTime stamp = File.Exists(path)
+                        ? File.GetLastWriteTimeUtc(path)
+                        : DateTime.MinValue;
+                    if (File.Exists(iconPath))
+                    {
+                        DateTime iconStamp = File.GetLastWriteTimeUtc(iconPath);
+                        if (iconStamp > stamp)
+                            stamp = iconStamp;
+                    }
+                    if (stamp == _demoStamp)
+                        return;
+
+                    _demoStamp = stamp;
+                    ProjectBrowserColorPreferences.DemoInvalidate();
+                    ProjectBrowserIcons.DemoInvalidate();
+                    Reset();
+                    Apply(_demoMainWindowHandle);
+                }
+                catch
+                {
+                    // Fichier en cours d'écriture : nouvel essai au tick suivant.
+                    _demoStamp = DateTime.MinValue;
+                }
+            };
+            _demoTimer.Start();
+        }
+#endif
 
         public static void Reset()
         {

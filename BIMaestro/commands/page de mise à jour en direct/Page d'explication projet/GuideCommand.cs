@@ -30,7 +30,7 @@ namespace Page
             }
             catch (Exception ex)
             {
-                TaskDialog.Show(UiLanguage.T("BIMaestro - Erreur", "BIMaestro - Error"), UiLanguage.T($"Impossible d'ouvrir le guide dans le navigateur : {ex.Message}", $"Unable to open the guide in the browser: {ex.Message}"));
+                TaskDialog.Show(UiLanguage.Get("GuideCommand.BIMaestroError"), UiLanguage.Format("GuideCommand.UnableToOpenTheGuideInTheBrowser", (object)ex.Message));
                 return Result.Failed;
             }
         }

@@ -62,7 +62,7 @@ namespace Modification
             if (_uidoc == null || _document == null)
             {
                 MessageBox.Show(
-                    UiLanguage.T("Impossible de récupérer le document actif.", "Unable to Retrieve the Active Document."),
+                    UiLanguage.Get("ColorPicker.xaml.UnableToRetrieveTheActiveDocument"),
                     "BIMaestro",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
@@ -91,11 +91,11 @@ namespace Modification
 
             if (_copyExistingOverridesMode)
             {
-                Title = UiLanguage.T("BIMaestro - Copier les surcharges existantes", "BIMaestro - Copy Existing Overrides");
-                ApplyButton.Content = UiLanguage.T("Copier", "Copy");
+                Title = UiLanguage.Get("ColorPicker.xaml.BIMaestroCopyExistingOverrides");
+                ApplyButton.Content = UiLanguage.Get("ColorPicker.xaml.Copy");
 
                 MessageBox.Show(
-                    UiLanguage.T("Mode copie activé.\n\nLes options générales sont désactivées, car BIMaestro va copier la surcharge graphique existante détectée dans la vue active.", "Copy Mode Enabled.\n\nGeneral Options Are Disabled Because BIMaestro Will Copy the Existing Graphic Override Detected in the Active View."),
+                    UiLanguage.Get("ColorPicker.xaml.CopyModeEnabledGeneralOptionsAreDisabledBecause"),
                     "BIMaestro",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
@@ -115,7 +115,7 @@ namespace Modification
             catch
             {
                 MessageBox.Show(
-                    UiLanguage.T("Impossible d’ouvrir la page d’aide.", "Unable to Open the Help Page."),
+                    UiLanguage.Get("ColorPicker.xaml.UnableToOpenTheHelpPage"),
                     "BIMaestro",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
@@ -147,7 +147,7 @@ namespace Modification
 
             View activeView = _uidoc.ActiveView;
 
-            TreeViewItem activeGroup = CreateGroup(UiLanguage.T("Vue active", "Active View"));
+            TreeViewItem activeGroup = CreateGroup(UiLanguage.Get("ColorPicker.xaml.ActiveView"));
 
             if (IsUsableGraphicView(activeView))
             {
@@ -155,12 +155,12 @@ namespace Modification
             }
             else
             {
-                activeGroup.Items.Add(CreateInfoItem(UiLanguage.T("La vue active ne supporte pas les surcharges graphiques.", "The Active View Does Not Support Graphic Overrides.")));
+                activeGroup.Items.Add(CreateInfoItem(UiLanguage.Get("ColorPicker.xaml.TheActiveViewDoesNotSupportGraphicOverrides")));
             }
 
             ViewsTreeView.Items.Add(activeGroup);
 
-            TreeViewItem sheetsGroup = CreateGroup(UiLanguage.T("Feuilles - appliquer aux vues placées", "Sheets - Apply to Placed Views"));
+            TreeViewItem sheetsGroup = CreateGroup(UiLanguage.Get("ColorPicker.xaml.SheetsApplyToPlacedViews"));
 
             foreach (ViewSheet sheet in _allSheets)
             {
@@ -359,7 +359,7 @@ namespace Modification
             if (SelectedViews.Count == 0)
             {
                 MessageBox.Show(
-                    UiLanguage.T("Sélectionne au moins une vue ou une feuille contenant des vues.", "Select at Least One View or a Sheet Containing Views."),
+                    UiLanguage.Get("ColorPicker.xaml.SelectAtLeastOneViewOrASheet"),
                     "BIMaestro",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
@@ -377,7 +377,7 @@ namespace Modification
             if (SelectedViews.Count == 0)
             {
                 MessageBox.Show(
-                    UiLanguage.T("Sélectionne au moins une vue ou une feuille contenant des vues à réinitialiser.", "Select at Least One View or a Sheet Containing Views to Reset."),
+                    UiLanguage.Get("ColorPicker.xaml.SelectAtLeastOneViewOrASheet2"),
                     "BIMaestro",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
@@ -385,8 +385,8 @@ namespace Modification
             }
 
             MessageBoxResult answer = MessageBox.Show(
-                UiLanguage.T("Voulez-vous aussi réafficher les éléments masqués dans les vues sélectionnées ?", "Do You Also Want to Unhide Hidden Elements in the Selected Views?"),
-                UiLanguage.T("Réinitialisation", "Reset"),
+                UiLanguage.Get("ColorPicker.xaml.DoYouAlsoWantToUnhideHiddenElements"),
+                UiLanguage.Get("ColorPicker.xaml.Reset"),
                 MessageBoxButton.YesNoCancel,
                 MessageBoxImage.Question);
 

@@ -56,7 +56,7 @@ namespace Analyse
             }
             catch (Exception ex)
             {
-                MessageBox.Show(UiLanguage.T($"Impossible d’ouvrir la page d’aide : {ex.Message}", $"Unable to open the help page: {ex.Message}"), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(UiLanguage.Format("AnalysePoids.xaml.UnableToOpenTheHelpPage0", (object)ex.Message), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
@@ -90,7 +90,7 @@ namespace Analyse
             var contextMenu = new ContextMenu();
             var deleteMenuItem = new MenuItem
             {
-                Header = UiLanguage.T("Supprimer du projet", "Delete from Project"),
+                Header = UiLanguage.Get("AnalysePoids.xaml.DeleteFromProject"),
                 MinWidth = 190,
                 MinHeight = 28,
                 Padding = new Thickness(12, 5, 12, 5)
@@ -115,9 +115,9 @@ namespace Analyse
                 .Where(e => !e.IsFamily)
                 .Sum(e => e.TailleEnMo);
 
-            FamilyTotalText.Text = UiLanguage.T($"Total Familles : {familyTotal:N2} Mo", $"Family Total: {familyTotal:N2} MB");
-            ImportTotalText.Text = UiLanguage.T($"Total Imports (PDF/DWG/etc.) : {importTotal:N2} Mo", $"Import Total (PDF/DWG/etc.): {importTotal:N2} MB");
-            GrandTotalText.Text = UiLanguage.T($"Total Général : {(familyTotal + importTotal):N2} Mo", $"Grand Total: {(familyTotal + importTotal):N2} MB");
+            FamilyTotalText.Text = UiLanguage.Format("AnalysePoids.xaml.FamilyTotal0N2MB", (object)familyTotal);
+            ImportTotalText.Text = UiLanguage.Format("AnalysePoids.xaml.ImportTotalPDFDWGEtc0N2MB", (object)importTotal);
+            GrandTotalText.Text = UiLanguage.Format("AnalysePoids.xaml.GrandTotal0N2MB", (object)(familyTotal + importTotal));
         }
 
         private void OnRowDoubleClick(object sender, MouseButtonEventArgs e)
@@ -143,21 +143,21 @@ namespace Analyse
                 if (elementIds.Length == 0 || elementIds.Any(id => id == null))
                 {
                     MessageBox.Show(this,
-                        UiLanguage.T("Impossible de déterminer l'identifiant de l'élément à supprimer.", "Unable to determine the ID of the element to delete."),
-                        UiLanguage.T("Suppression impossible", "Cannot Delete"),
+                        UiLanguage.Get("AnalysePoids.xaml.UnableToDetermineTheIDOfTheElement"),
+                        UiLanguage.Get("AnalysePoids.xaml.CannotDelete"),
                         MessageBoxButton.OK,
                         MessageBoxImage.Warning);
                     return;
                 }
 
                 var details = info.IsFamily
-                    ? UiLanguage.T("Toutes ses instances seront également supprimées.", "All its instances will also be deleted.")
+                    ? UiLanguage.Get("AnalysePoids.xaml.AllItsInstancesWillAlsoBeDeleted")
                     : elementIds.Length > 1
-                        ? UiLanguage.T($"Les {elementIds.Length} éléments correspondants seront supprimés.", $"The {elementIds.Length} corresponding elements will be deleted.")
-                        : UiLanguage.T("L'élément sera supprimé du projet.", "The element will be deleted from the project.");
+                        ? UiLanguage.Format("AnalysePoids.xaml.The0CorrespondingElementsWillBeDeleted", (object)elementIds.Length)
+                        : UiLanguage.Get("AnalysePoids.xaml.TheElementWillBeDeletedFromTheProject");
                 var confirmation = MessageBox.Show(this,
-                    UiLanguage.T($"Supprimer définitivement \"{info.Nom}\" du projet ?\n{details}", $"Permanently delete \"{info.Nom}\" from the project?\n{details}"),
-                    UiLanguage.T("Supprimer l'élément", "Delete Element"),
+                    UiLanguage.Format("AnalysePoids.xaml.PermanentlyDelete0FromTheProject1", (object)info.Nom, (object)details),
+                    UiLanguage.Get("AnalysePoids.xaml.DeleteElement"),
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Question,
                     MessageBoxResult.No);

@@ -177,10 +177,8 @@ namespace Page
             catch (Exception ex)
             {
                 TaskDialog.Show(
-                    UiLanguage.T("BIMaestro - Soutenir", "BIMaestro - Support"),
-                    UiLanguage.T(
-                        $"Impossible d'ouvrir la page Ko-fi : {ex.Message}",
-                        $"Unable to open the Ko-fi page: {ex.Message}"));
+                    UiLanguage.Get("SupportPromptManager.BIMaestroSupport"),
+                    UiLanguage.Format("SupportPromptManager.UnableToOpenTheKoFiPage0", (object)ex.Message));
             }
         }
 

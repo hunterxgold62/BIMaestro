@@ -1,0 +1,11 @@
+{
+  "name": "defile-fonds",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npx --yes hyperframes@0.9.70 preview",
+    "check": "npx --yes hyperframes@0.9.70 check",
+    "render": "npx --yes hyperframes@0.9.70 render",
+    "publish": "npx --yes hyperframes@0.9.70 publish"
+  }
+}

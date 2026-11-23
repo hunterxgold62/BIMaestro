@@ -129,8 +129,8 @@ namespace Modification
 
             if (selectedPaths.Count == 0)
             {
-                MessageBox.Show(UiLanguage.T("Veuillez sélectionner au moins un fichier .dyn.", "Select at Least One .dyn File."),
-                                UiLanguage.T("Attention", "Warning"),
+                MessageBox.Show(UiLanguage.Get("ConfigureDynamoWindow.xaml.SelectAtLeastOneDynFile"),
+                                UiLanguage.Get("ConfigureDynamoWindow.xaml.Warning"),
                                 MessageBoxButton.OK,
                                 MessageBoxImage.Warning);
                 return;
@@ -162,8 +162,8 @@ namespace Modification
 
             var dlg = new OpenFileDialog
             {
-                Title = UiLanguage.T("Choisir un fichier Dynamo (.dyn)", "Choose a Dynamo File (.dyn)"),
-                Filter = UiLanguage.T("Fichiers Dynamo (*.dyn)|*.dyn", "Dynamo Files (*.dyn)|*.dyn"),
+                Title = UiLanguage.Get("ConfigureDynamoWindow.xaml.ChooseADynamoFileDyn"),
+                Filter = UiLanguage.Get("ConfigureDynamoWindow.xaml.DynamoFilesDynDyn"),
                 InitialDirectory = GetInitialDirectory(entry.Path)
             };
 
@@ -184,7 +184,7 @@ namespace Modification
 
             if (_paths.Count <= 1)
             {
-                MessageBox.Show(UiLanguage.T("Au moins un chemin est requis.", "At Least One Path Is Required."), UiLanguage.T("Information", "Information"), MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(UiLanguage.Get("ConfigureDynamoWindow.xaml.AtLeastOnePathIsRequired"), UiLanguage.Get("ConfigureDynamoWindow.xaml.Information"), MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
@@ -199,7 +199,7 @@ namespace Modification
 
             for (int i = 0; i < _paths.Count; i++)
             {
-                _paths[i].Label = UiLanguage.T("Chemin ", "Path ") + (i + 1);
+                _paths[i].Label = UiLanguage.Get("ConfigureDynamoWindow.xaml.Path") + (i + 1);
             }
         }
         private void HelpButton_Click(object sender, RoutedEventArgs e)
@@ -210,7 +210,7 @@ namespace Modification
             }
             catch (Exception ex)
             {
-                MessageBox.Show(UiLanguage.T("Impossible d’ouvrir la page d’aide : ", "Unable to Open the Help Page: ") + ex.Message, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(UiLanguage.Get("ConfigureDynamoWindow.xaml.UnableToOpenTheHelpPage") + ex.Message, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
     }

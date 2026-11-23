@@ -51,8 +51,8 @@ namespace Licensing
                 CommonButtons = TaskDialogCommonButtons.Close
             };
 
-            td.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, UiLanguage.T("Signaler sur LinkedIn (copier le résumé)", "Report on LinkedIn (copy summary)"));
-            td.AddCommandLink(TaskDialogCommandLinkId.CommandLink2, UiLanguage.T("Signaler par e-mail", "Report by email"));
+            td.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, UiLanguage.Get("IssueReporter.ReportOnLinkedInCopySummary"));
+            td.AddCommandLink(TaskDialogCommandLinkId.CommandLink2, UiLanguage.Get("IssueReporter.ReportByEmail"));
 
             var result = td.Show();
             if (result != TaskDialogResult.CommandLink1 && result != TaskDialogResult.CommandLink2) return;
@@ -74,7 +74,7 @@ namespace Licensing
             {
                 var destination = result == TaskDialogResult.CommandLink1 ? "LinkedIn" : "l'application de messagerie";
                 var englishDestination = result == TaskDialogResult.CommandLink1 ? "LinkedIn" : "the email application";
-                TaskDialog.Show(UiLanguage.T("BIMaestro - Contact", "BIMaestro - Contact"), UiLanguage.T($"Impossible d'ouvrir {destination} : {openEx.Message}. Le résumé a été copié si le presse-papiers est disponible.", $"Unable to open {englishDestination}: {openEx.Message}. The summary was copied if the clipboard is available."));
+                TaskDialog.Show(UiLanguage.Get("IssueReporter.BIMaestroContact"), UiLanguage.Format("IssueReporter.OpenFailed", UiLanguage.IsEnglish ? englishDestination : destination, openEx.Message));
             }
         }
 

@@ -87,7 +87,7 @@ namespace ScanTextRevit
             }
             catch (System.Exception ex)
             {
-                MessageBox.Show(UiLanguage.T($"Impossible d’ouvrir la page d’aide : {ex.Message}", $"Unable to open the help page: {ex.Message}"), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(UiLanguage.Format("CorrectionResultWindow.xaml.UnableToOpenTheHelpPage0", (object)ex.Message), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
@@ -151,7 +151,7 @@ namespace ScanTextRevit
             ProgressBarPanel.Visibility = System.Windows.Visibility.Collapsed;
             TextBlock done = new TextBlock
             {
-                Text = UiLanguage.T("Toutes les corrections sont terminées.", "All corrections are complete."),
+                Text = UiLanguage.Get("CorrectionResultWindow.xaml.AllCorrectionsAreComplete"),
                 FontSize = 14,
                 FontWeight = FontWeights.Bold,
                 Foreground = Brushes.DarkGreen,
@@ -307,7 +307,7 @@ namespace ScanTextRevit
             // Texte original
             TextBlock originalText = new TextBlock
             {
-                Text = UiLanguage.T("Texte original : ", "Original Text: ") + item.OriginalText,
+                Text = UiLanguage.Get("CorrectionResultWindow.xaml.OriginalText") + item.OriginalText,
                 FontSize = 13,
                 TextWrapping = TextWrapping.Wrap,
                 Foreground = new SolidColorBrush(Colors.Black)
@@ -331,7 +331,7 @@ namespace ScanTextRevit
             {
                 correctedColor = Color.FromRgb(199, 119, 0);
             }
-            string correctedLabel = UiLanguage.T("Texte corrigé : ", "Corrected Text: ") + item.CorrectedText;
+            string correctedLabel = UiLanguage.Get("CorrectionResultWindow.xaml.CorrectedText") + item.CorrectedText;
             if (repetitionCount > 1)
             {
                 correctedLabel += $" (x{repetitionCount})";
@@ -351,7 +351,7 @@ namespace ScanTextRevit
             // Bouton "Copier"
             Button copyButton = new Button
             {
-                Content = UiLanguage.T("Copier", "Copy"),
+                Content = UiLanguage.Get("CorrectionResultWindow.xaml.Copy"),
                 Margin = new Thickness(0, 0, 8, 0),
                 Padding = new Thickness(5, 2, 5, 2),
                 Cursor = Cursors.Hand,
@@ -368,8 +368,8 @@ namespace ScanTextRevit
             Button showButton = new Button
             {
                 Content = repetitions != null && repetitions.Count > 1
-                    ? UiLanguage.T("Afficher ▼", "Show ▼")
-                    : UiLanguage.T("Afficher", "Show"),
+                    ? UiLanguage.Get("CorrectionResultWindow.xaml.Show")
+                    : UiLanguage.Get("CorrectionResultWindow.xaml.Show2"),
                 Margin = new Thickness(0),
                 Padding = new Thickness(5, 2, 5, 2),
                 Cursor = Cursors.Hand,
@@ -418,7 +418,7 @@ namespace ScanTextRevit
             // Explication
             TextBlock explanationText = new TextBlock
             {
-                Text = UiLanguage.T("Explication : ", "Explanation: ") + item.Explanation,
+                Text = UiLanguage.Get("CorrectionResultWindow.xaml.Explanation") + item.Explanation,
                 FontSize = 12,
                 FontStyle = FontStyles.Italic,
                 TextWrapping = TextWrapping.Wrap,
@@ -447,7 +447,7 @@ namespace ScanTextRevit
                 _showElementEvent == null)
             {
                 MessageBox.Show(
-                    UiLanguage.T("L'élément ne peut pas être affiché.", "The element cannot be displayed."),
+                    UiLanguage.Get("CorrectionResultWindow.xaml.TheElementCannotBeDisplayed"),
                     "BIMaestro",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
@@ -463,7 +463,7 @@ namespace ScanTextRevit
             if (result == ExternalEventRequest.Denied)
             {
                 MessageBox.Show(
-                    UiLanguage.T("Revit ne peut pas traiter cette demande pour le moment.", "Revit cannot process this request right now."),
+                    UiLanguage.Get("CorrectionResultWindow.xaml.RevitCannotProcessThisRequestRightNow"),
                     "BIMaestro",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
@@ -514,14 +514,14 @@ namespace ScanTextRevit
                     {
                         TaskDialog.Show(
                             "BIMaestro",
-                            UiLanguage.T("Le document analysé n'est plus le document actif. Revenez dans ce document puis réessayez.", "The analyzed document is no longer active. Return to that document and try again."));
+                            UiLanguage.Get("CorrectionResultWindow.xaml.TheAnalyzedDocumentIsNoLongerActiveReturn"));
                         return;
                     }
 
                     Element element = _document.GetElement(CreateElementId(elementId.Value));
                     if (element == null)
                     {
-                        TaskDialog.Show("BIMaestro", UiLanguage.T("L'élément n'existe plus dans le document.", "The element no longer exists in the document."));
+                        TaskDialog.Show("BIMaestro", UiLanguage.Get("CorrectionResultWindow.xaml.TheElementNoLongerExistsInTheDocument"));
                         return;
                     }
 
@@ -561,7 +561,7 @@ namespace ScanTextRevit
                 {
                     TaskDialog.Show(
                         "BIMaestro",
-                        UiLanguage.T("Impossible d'afficher cet élément sans risque pour Revit.\n\n", "Unable to display this element safely in Revit.\n\n") + ex.Message);
+                        UiLanguage.Get("CorrectionResultWindow.xaml.UnableToDisplayThisElementSafelyInRevit") + ex.Message);
                 }
             }
 

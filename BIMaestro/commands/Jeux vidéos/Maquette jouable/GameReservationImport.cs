@@ -22,7 +22,7 @@ namespace BIMaestro.VideoGames
             var dialog = new OpenFileDialog { Title = "Importer les volumes de réservation web", Filter = "Réservations BIMaestro (*.bimaestro-reservations.json)|*.bimaestro-reservations.json" };
             if (dialog.ShowDialog() != true) return;
             _path = dialog.FileName;
-            if (_event.Raise() != ExternalEventRequest.Accepted) TaskDialog.Show("Réservations web", "Revit est occupé. Réessayez l’import.");
+            if (_event.Raise() != ExternalEventRequest.Accepted) TaskDialog.Show(global::BIMaestro.Localization.UiLanguage.Get("GameReservationImport.WebOpenings"), global::BIMaestro.Localization.UiLanguage.Get("GameReservationImport.RevitIsBusyTryImportingAgain"));
         }
         public string GetName() => "Importer les réservations web BIMaestro";
         public void Dispose() { if (!_event.IsPending) _event.Dispose(); }
@@ -32,31 +32,31 @@ namespace BIMaestro.VideoGames
             {
                 if (_path == null) return;
                 var document = application.ActiveUIDocument?.Document;
-                if (document == null || document.IsFamilyDocument || document.IsReadOnly) throw new InvalidOperationException(UiLanguage.T("Ouvrez le projet Revit d’origine, modifiable.", "Open the original Revit project, in an editable state."));
-                if (new FileInfo(_path).Length > 10 * 1024 * 1024) throw new InvalidOperationException(UiLanguage.T("Fichier trop volumineux.", "File too large."));
+                if (document == null || document.IsFamilyDocument || document.IsReadOnly) throw new InvalidOperationException(global::BIMaestro.Localization.UiLanguage.Get("GameReservationImport.OpenTheOriginalRevitProjectInAnEditable"));
+                if (new FileInfo(_path).Length > 10 * 1024 * 1024) throw new InvalidOperationException(global::BIMaestro.Localization.UiLanguage.Get("GameReservationImport.FileTooLarge"));
                 var data = JObject.Parse(File.ReadAllText(_path)); _path = null;
                 if ((int?)data["schemaVersion"] != 1 || (string?)data["kind"] != "bimaestro-reservations" || (string?)data["units"] != "revit-internal-feet")
-                    throw new InvalidOperationException(UiLanguage.T("Format de réservations non reconnu.", "Unrecognized openings file format."));
+                    throw new InvalidOperationException(global::BIMaestro.Localization.UiLanguage.Get("GameReservationImport.UnrecognizedOpeningsFileFormat"));
                 if ((string?)data["sourceDocumentId"] != document.ProjectInformation.UniqueId)
-                    throw new InvalidOperationException(UiLanguage.T("Ce fichier provient d’un autre projet. Ouvrez le projet utilisé pour publier cette maquette afin de conserver les bonnes coordonnées.", "This file comes from another project. Open the project used to publish this model to keep the correct coordinates."));
-                if (!Guid.TryParse((string?)data["publicationId"], out var publicationId)) throw new InvalidOperationException(UiLanguage.T("Publication invalide.", "Invalid publication."));
+                    throw new InvalidOperationException(global::BIMaestro.Localization.UiLanguage.Get("GameReservationImport.ThisFileComesFromAnotherProjectOpenThe"));
+                if (!Guid.TryParse((string?)data["publicationId"], out var publicationId)) throw new InvalidOperationException(global::BIMaestro.Localization.UiLanguage.Get("GameReservationImport.InvalidPublication"));
                 var reservations = data["reservations"] as JArray;
-                if (reservations == null || reservations.Count == 0 || reservations.Count > 500) throw new InvalidOperationException(UiLanguage.T("Le fichier doit contenir de 1 à 500 réservations.", "The file must contain between 1 and 500 openings."));
+                if (reservations == null || reservations.Count == 0 || reservations.Count > 500) throw new InvalidOperationException(global::BIMaestro.Localization.UiLanguage.Get("GameReservationImport.TheFileMustContainBetween1And500"));
                 var seen = new HashSet<string>();
                 // Validate and construct every solid before starting the Revit transaction.
                 var prepared = new List<Tuple<string, Solid, string>>();
                 foreach (var mark in reservations)
                 {
-                    if (!Guid.TryParse((string?)mark["id"], out var id) || !seen.Add(id.ToString())) throw new InvalidOperationException(UiLanguage.T("Identifiant de réservation invalide ou dupliqué.", "Invalid or duplicate opening ID."));
+                    if (!Guid.TryParse((string?)mark["id"], out var id) || !seen.Add(id.ToString())) throw new InvalidOperationException(global::BIMaestro.Localization.UiLanguage.Get("GameReservationImport.InvalidOrDuplicateOpeningID"));
                     XYZ position = Vector(mark["position"]), normal = Vector(mark["normal"]), x = Vector(mark["xAxis"]);
-                    if (Math.Abs(normal.GetLength() - 1) > .001 || Math.Abs(x.GetLength() - 1) > .001 || Math.Abs(normal.DotProduct(x)) > .001) throw new InvalidOperationException(UiLanguage.T("Orientation de réservation invalide.", "Invalid opening orientation."));
+                    if (Math.Abs(normal.GetLength() - 1) > .001 || Math.Abs(x.GetLength() - 1) > .001 || Math.Abs(normal.DotProduct(x)) > .001) throw new InvalidOperationException(global::BIMaestro.Localization.UiLanguage.Get("GameReservationImport.InvalidOpeningOrientation"));
                     var y = normal.CrossProduct(x).Normalize();
                     double width = Dimension(mark["widthCm"]), height = Dimension(mark["heightCm"]), depth = Dimension(mark["depthCm"]);
                     var points = new[] { position - x * width / 2 - y * height / 2, position + x * width / 2 - y * height / 2,
                         position + x * width / 2 + y * height / 2, position - x * width / 2 + y * height / 2 };
                     var loop = new CurveLoop();
                     string form = (string?)mark["shape"] ?? "rectangle";
-                    if (form != "rectangle" && form != "round") throw new InvalidOperationException(UiLanguage.T("Forme de réservation non reconnue.", "Unrecognized opening shape."));
+                    if (form != "rectangle" && form != "round") throw new InvalidOperationException(global::BIMaestro.Localization.UiLanguage.Get("GameReservationImport.UnrecognizedOpeningShape"));
                     if (form == "round")
                     {
                         double radius = Dimension(mark["diameterCm"]) / 2;
@@ -81,7 +81,7 @@ namespace BIMaestro.VideoGames
                         DirectShape shape;
                         if (existing.TryGetValue(item.Item1, out var matches))
                         {
-                            if (matches.Count != 1) throw new InvalidOperationException(UiLanguage.T("Plusieurs objets Revit portent le même identifiant de réservation. Supprimez le doublon avant de réimporter.", "Several Revit objects share the same opening ID. Delete the duplicate before reimporting."));
+                            if (matches.Count != 1) throw new InvalidOperationException(global::BIMaestro.Localization.UiLanguage.Get("GameReservationImport.SeveralRevitObjectsShareTheSameOpeningID"));
                             shape = matches[0]; updated++;
                         }
                         else { shape = DirectShape.CreateElement(document, new ElementId(BuiltInCategory.OST_GenericModel)); created++; }
@@ -91,23 +91,23 @@ namespace BIMaestro.VideoGames
                         var comment = shape.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS);
                         if (comment != null && !comment.IsReadOnly) comment.Set(item.Item3);
                     }
-                    if (transaction.Commit() != TransactionStatus.Committed) throw new InvalidOperationException(UiLanguage.T("Revit n’a pas validé l’import.", "Revit did not commit the import."));
+                    if (transaction.Commit() != TransactionStatus.Committed) throw new InvalidOperationException(global::BIMaestro.Localization.UiLanguage.Get("GameReservationImport.RevitDidNotCommitTheImport"));
                 }
-                TaskDialog.Show("Réservations web", created + " volume(s) créé(s), " + updated + " mis à jour.\n\nLes volumes sont dans la catégorie Modèles génériques. Les murs ne sont pas percés automatiquement. Les réservations absentes du fichier ne sont pas supprimées.\n\nRouvrez Maquette MEP pour actualiser sa géométrie.");
+                TaskDialog.Show(global::BIMaestro.Localization.UiLanguage.Get("GameReservationImport.WebOpenings"), global::BIMaestro.Localization.UiLanguage.Format("GameReservationImport.0VolumeSCreated1UpdatedTheVolumes", (object)(created), (object)(updated)));
             }
-            catch (Exception exception) { TaskDialog.Show("Import des réservations", exception.Message); }
+            catch (Exception exception) { TaskDialog.Show(global::BIMaestro.Localization.UiLanguage.Get("GameReservationImport.ImportOpenings"), exception.Message); }
         }
         private static XYZ Vector(JToken? token)
         {
-            if (!(token is JArray array) || array.Count != 3) throw new InvalidOperationException(UiLanguage.T("Coordonnées invalides.", "Invalid coordinates."));
+            if (!(token is JArray array) || array.Count != 3) throw new InvalidOperationException(global::BIMaestro.Localization.UiLanguage.Get("GameReservationImport.InvalidCoordinates"));
             var values = array.Select(value => (double)value).ToArray();
-            if (values.Any(value => double.IsNaN(value) || double.IsInfinity(value) || Math.Abs(value) > 1e8)) throw new InvalidOperationException(UiLanguage.T("Coordonnées hors limites.", "Coordinates out of range."));
+            if (values.Any(value => double.IsNaN(value) || double.IsInfinity(value) || Math.Abs(value) > 1e8)) throw new InvalidOperationException(global::BIMaestro.Localization.UiLanguage.Get("GameReservationImport.CoordinatesOutOfRange"));
             return new XYZ(values[0], values[1], values[2]);
         }
         private static double Dimension(JToken? token)
         {
             double cm = token == null ? 0 : (double)token;
-            if (double.IsNaN(cm) || double.IsInfinity(cm) || cm < 1 || cm > 1000) throw new InvalidOperationException(UiLanguage.T("Dimensions hors limites (1 à 1000 cm).", "Dimensions out of range (1 to 1000 cm)."));
+            if (double.IsNaN(cm) || double.IsInfinity(cm) || cm < 1 || cm > 1000) throw new InvalidOperationException(global::BIMaestro.Localization.UiLanguage.Get("GameReservationImport.DimensionsOutOfRange1To1000Cm"));
             return cm / 30.48;
         }
     }

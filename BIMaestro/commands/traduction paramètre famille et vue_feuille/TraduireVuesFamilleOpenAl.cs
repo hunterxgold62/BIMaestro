@@ -27,7 +27,7 @@ namespace Famille
     {
         protected override string ButtonId => "TraduireVuesFamilleOpenAI";
 
-        private const string Model = "gpt-4o-mini";
+        private const string Model = AiClient.TextModel;
         private const int BatchSize = 80;
         private const int MaxParallelBatches = 2;
         private const int MaxRetriesPerBatch = 3;
@@ -39,7 +39,7 @@ namespace Famille
             var doc = uiDoc?.Document;
             if (doc == null)
             {
-                TaskDialog.Show(UiLanguage.T("Erreur", "Error"), UiLanguage.T("Ouvrez un document Revit avant d’exécuter ce plugin.", "Open a Revit document before running this plugin."));
+                TaskDialog.Show(UiLanguage.Get("TraduireVuesFamilleOpenAl.Error"), UiLanguage.Get("TraduireVuesFamilleOpenAl.OpenARevitDocumentBeforeRunningThisPlugin"));
                 return Result.Cancelled;
             }
 
@@ -90,10 +90,9 @@ namespace Famille
                 if (candidates.Count == 0)
                 {
                     TaskDialog.Show(
-                        UiLanguage.T("BIMaestro - Résultat", "BIMaestro - Result"),
-                        UiLanguage.T("Aucune vue ou feuille renommable détectée dans ce document.\n\n", "No renameable view or sheet was found in this document.\n\n") +
-                        UiLanguage.T($"Total vues/feuilles: {totalViews}  •  Renommables: {renameableViews}  •  Templates: {templateViews}  •  Verrouillées: {lockedViews}",
-                            $"Total views/sheets: {totalViews}  •  Renameable: {renameableViews}  •  Templates: {templateViews}  •  Locked: {lockedViews}")
+                        UiLanguage.Get("TraduireVuesFamilleOpenAl.BIMaestroResult"),
+                        UiLanguage.Get("TraduireVuesFamilleOpenAl.NoRenameableViewOrSheetWasFoundIn") +
+                        UiLanguage.Format("TraduireVuesFamilleOpenAl.TotalViewsSheets0Renameable1Templates2", (object)totalViews, (object)renameableViews, (object)templateViews, (object)lockedViews)
                     );
                     return Result.Succeeded;
                 }
@@ -178,9 +177,9 @@ namespace Famille
 
                 if (renameMap.Count == 0)
                 {
-                    TaskDialog.Show(UiLanguage.T("BIMaestro - Résultat", "BIMaestro - Result"),
-                        UiLanguage.T("Aucune traduction appliquée (tout est déjà en FR ou identique).\n\n", "No translation applied (everything is already in French or identical).\n\n") +
-                        UiLanguage.T($"Vues/feuilles analysées: {items.Count}", $"Views/sheets analyzed: {items.Count}"));
+                    TaskDialog.Show(UiLanguage.Get("TraduireVuesFamilleOpenAl.BIMaestroResult"),
+                        UiLanguage.Get("TraduireVuesFamilleOpenAl.NoTranslationAppliedEverythingIsAlreadyInFrench") +
+                        UiLanguage.Format("TraduireVuesFamilleOpenAl.ViewsSheetsAnalyzed0", (object)items.Count));
                     return Result.Succeeded;
                 }
 
@@ -225,61 +224,60 @@ namespace Famille
                 }
 
                 var sb = new StringBuilder();
-                sb.AppendLine(UiLanguage.T($"Vues/feuilles renommables détectées : {items.Count}", $"Renameable views/sheets found: {items.Count}"));
-                sb.AppendLine(UiLanguage.T($"Vues/feuilles traduites : {finalRenamed.Count}", $"Views/sheets translated: {finalRenamed.Count}"));
+                sb.AppendLine(UiLanguage.Format("TraduireVuesFamilleOpenAl.RenameableViewsSheetsFound0", (object)items.Count));
+                sb.AppendLine(UiLanguage.Format("TraduireVuesFamilleOpenAl.ViewsSheetsTranslated0", (object)finalRenamed.Count));
                 sb.AppendLine();
 
                 if (finalRenamed.Count > 0)
                 {
-                    sb.AppendLine(UiLanguage.T("Renommages appliqués :", "Applied renames:"));
+                    sb.AppendLine(UiLanguage.Get("TraduireVuesFamilleOpenAl.AppliedRenames"));
                     foreach (var v in finalRenamed.Take(30))
                         sb.AppendLine($" - {v.OldName} → {v.NewName}");
                     if (finalRenamed.Count > 30)
-                        sb.AppendLine(UiLanguage.T($"… (+ {finalRenamed.Count - 30} autres)", $"… (+ {finalRenamed.Count - 30} more)"));
+                        sb.AppendLine(UiLanguage.Format("TraduireVuesFamilleOpenAl.0More", (object)(finalRenamed.Count - 30)));
                     sb.AppendLine();
                 }
 
                 if (finalRenameErrors.Count > 0)
                 {
-                    sb.AppendLine(UiLanguage.T("Erreurs de renommage :", "Rename errors:"));
+                    sb.AppendLine(UiLanguage.Get("TraduireVuesFamilleOpenAl.RenameErrors"));
                     foreach (var e in finalRenameErrors.Take(10)) sb.AppendLine(" - " + e);
                     if (finalRenameErrors.Count > 10)
-                        sb.AppendLine(UiLanguage.T($"… (+ {finalRenameErrors.Count - 10} autres)", $"… (+ {finalRenameErrors.Count - 10} more)"));
+                        sb.AppendLine(UiLanguage.Format("TraduireVuesFamilleOpenAl.0More", (object)(finalRenameErrors.Count - 10)));
                     sb.AppendLine();
                 }
 
                 if (finalWarnings.Count > 0)
                 {
-                    sb.AppendLine(UiLanguage.T("Avertissements :", "Warnings:"));
+                    sb.AppendLine(UiLanguage.Get("TraduireVuesFamilleOpenAl.Warnings"));
                     foreach (var w in finalWarnings) sb.AppendLine(w);
                     sb.AppendLine();
                 }
 
-                sb.AppendLine(UiLanguage.T($"Total vues/feuilles: {totalViews}  •  Renommables: {renameableViews}  •  Templates: {templateViews}  •  Verrouillées: {lockedViews}",
-                    $"Total views/sheets: {totalViews}  •  Renameable: {renameableViews}  •  Templates: {templateViews}  •  Locked: {lockedViews}"));
+                sb.AppendLine(UiLanguage.Format("TraduireVuesFamilleOpenAl.TotalViewsSheets0Renameable1Templates2", (object)totalViews, (object)renameableViews, (object)templateViews, (object)lockedViews));
                 if (totalSheets > 0)
                 {
-                    sb.AppendLine(UiLanguage.T($"Dont feuilles: {totalSheets} (renommables: {renameableSheets})", $"Including sheets: {totalSheets} (renameable: {renameableSheets})"));
+                    sb.AppendLine(UiLanguage.Format("TraduireVuesFamilleOpenAl.IncludingSheets0Renameable1", (object)totalSheets, (object)renameableSheets));
                 }
 
-                TaskDialog.Show(UiLanguage.T("BIMaestro - Traduction terminée", "BIMaestro - Translation completed"), sb.ToString());
+                TaskDialog.Show(UiLanguage.Get("TraduireVuesFamilleOpenAl.BIMaestroTranslationCompleted"), sb.ToString());
 
                 return Result.Succeeded;
             }
             catch (InvalidOperationException ex) when (ex.Message == AiClient.QuotaExceededMessage)
             {
-                TaskDialog.Show(UiLanguage.T("Quota dépassé", "Quota exceeded"), UiLanguage.T(AiClient.QuotaExceededMessage, "The AI quota has been exceeded."));
+                TaskDialog.Show(UiLanguage.Get("TraduireVuesFamilleOpenAl.QuotaExceeded"), UiLanguage.T(AiClient.QuotaExceededMessage, "The AI quota has been exceeded."));
                 return Result.Cancelled;
             }
             catch (AggregateException agg)
             {
                 var flat = agg.Flatten().InnerExceptions.Select(e => e.Message).Distinct();
-                TaskDialog.Show(UiLanguage.T("Erreur IA", "AI Error"), UiLanguage.T("Des erreurs réseau sont survenues :\n", "Network errors occurred:\n") + string.Join("\n", flat));
+                TaskDialog.Show(UiLanguage.Get("TraduireVuesFamilleOpenAl.AIError"), UiLanguage.Get("TraduireVuesFamilleOpenAl.NetworkErrorsOccurred") + string.Join("\n", flat));
                 return Result.Failed;
             }
             catch (Exception ex)
             {
-                TaskDialog.Show(UiLanguage.T("Erreur", "Error"), ex.Message);
+                TaskDialog.Show(UiLanguage.Get("TraduireVuesFamilleOpenAl.Error"), ex.Message);
                 return Result.Failed;
             }
         }

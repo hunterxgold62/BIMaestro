@@ -24,10 +24,9 @@ namespace Page
         {
             InitializeComponent();
 
-            TitleText.Text = UiLanguage.T("Nouvelle version BIMaestro : v", "New BIMaestro Version: v") + latestVersion;
-            ContentText.Text = UiLanguage.T("Version installée : v", "Installed Version: v") + currentVersion +
-                UiLanguage.T("\n\nTéléchargez la nouvelle version sur le site officiel, puis fermez toutes les fenêtres Revit et lancez l'installateur.",
-                    "\n\nDownload the new version from the official website, then close all Revit windows and run the installer.");
+            TitleText.Text = UiLanguage.Get("UpdatePromptWindow.xaml.NewBIMaestroVersionV") + latestVersion;
+            ContentText.Text = UiLanguage.Get("UpdatePromptWindow.xaml.InstalledVersionV") + currentVersion +
+                UiLanguage.Get("UpdatePromptWindow.xaml.DownloadTheNewVersionFromTheOfficialWebsite");
 
             TryAttachEmbeddedGif(GifImage, "BIMaestro.Resources.OLD.Mickey.gif");
         }
@@ -43,7 +42,7 @@ namespace Page
             catch (Exception ex)
             {
                 MessageBox.Show(
-                    UiLanguage.T("Impossible d'ouvrir la page de téléchargement : ", "Unable to open the download page: ") + ex.Message +
+                    UiLanguage.Get("UpdatePromptWindow.xaml.UnableToOpenTheDownloadPage") + ex.Message +
                     "\n\n" + UpdateCheckService.DownloadPageUrl,
                     "BIMaestro",
                     MessageBoxButton.OK,

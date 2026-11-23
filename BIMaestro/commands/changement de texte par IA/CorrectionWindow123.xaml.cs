@@ -54,7 +54,7 @@ namespace IA
             }
             catch (System.Exception ex)
             {
-                MessageBox.Show(UiLanguage.T("Impossible d’ouvrir la page d’aide : ", "Unable to Open the Help Page: ") + ex.Message, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(UiLanguage.Get("CorrectionWindow123.xaml.UnableToOpenTheHelpPage") + ex.Message, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
@@ -87,7 +87,7 @@ namespace IA
 
                 // Appel via AiClient
                 var jsonDoc = await Task.Run(() =>
-    AiClient.SendOpenAI(_jwt, "gpt-4o-mini", prompt, 3)
+    AiClient.SendOpenAI(_jwt, AiClient.TextModel, prompt, 3)
                 );
 
                 // Extraction des résultats
@@ -106,7 +106,7 @@ namespace IA
                 // MessageBox.Show utilise la constante définie dans AiClient
                 MessageBox.Show(
                     UiLanguage.IsEnglish ? "Your AI quota has been exceeded." : AiClient.QuotaExceededMessage,
-                    UiLanguage.T("Quota dépassé", "Quota Exceeded"),
+                    UiLanguage.Get("CorrectionWindow123.xaml.QuotaExceeded"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning
                 );
@@ -114,7 +114,7 @@ namespace IA
             catch (InvalidOperationException ex)
             {
                 // autres erreurs IA
-                MessageBox.Show(ex.Message, UiLanguage.T("Erreur IA", "AI Error"), MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(ex.Message, UiLanguage.Get("CorrectionWindow123.xaml.AIError"), MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
         

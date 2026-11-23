@@ -269,11 +269,16 @@ async function handleOpenAiChatCompletions(parameters: JsonObject): Promise<{ da
 
   if (!model || !prompt) throw new HttpError(400, "Missing model/prompt");
 
-  const resp = await callOpenAiJsonWithRetry("/v1/chat/completions", {
+  const payload: JsonObject = {
     model,
     messages: [{ role: "user", content: prompt }],
     n,
-  });
+  };
+  // Keep simple text tasks on Luna without reasoning, including older clients.
+  const reasoningEffort = model === "gpt-6-luna" ? "none" : getString(parameters.reasoning_effort);
+  if (reasoningEffort) payload.reasoning_effort = reasoningEffort;
+
+  const resp = await callOpenAiJsonWithRetry("/v1/chat/completions", payload);
   const parsed = await parseProviderResponse(resp);
 
   if (!parsed.ok) throw new HttpError(parsed.status, `OpenAI error ${parsed.status}: ${parsed.raw}`);
@@ -294,7 +299,7 @@ async function handleOpenAiResponses(parameters: JsonObject): Promise<{ data: an
 }
 
 async function handleOpenAiImageGeneration(parameters: JsonObject): Promise<{ data: any; tokens: number }> {
-  const model = getString(parameters.model) ?? "gpt-image-2";
+  const model = getString(parameters.model) ?? "gpt-image-2.6-sunburst";
   const prompt = getString(parameters.prompt);
   if (!prompt) throw new HttpError(400, "Missing prompt for image generation");
 
@@ -314,7 +319,7 @@ async function handleOpenAiImageGeneration(parameters: JsonObject): Promise<{ da
 }
 
 async function handleOpenAiImageEdit(parameters: JsonObject): Promise<{ data: any; tokens: number }> {
-  const model = getString(parameters.model) ?? "gpt-image-2";
+  const model = getString(parameters.model) ?? "gpt-image-2.6-sunburst";
   const prompt = getString(parameters.prompt);
   if (!prompt) throw new HttpError(400, "Missing prompt for image edit");
 

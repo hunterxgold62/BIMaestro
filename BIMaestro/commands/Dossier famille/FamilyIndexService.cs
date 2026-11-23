@@ -62,7 +62,7 @@ namespace Famille
             try
             {
                 IsReady = false;
-                UpdateStatus(UiLanguage.T("Recherche des familles…", "Searching for families…"));
+                UpdateStatus(UiLanguage.Get("FamilyIndexService.SearchingForFamilies"));
 
                 var list = new List<Entry>(capacity: 8192);
                 int n = 0;
@@ -78,19 +78,19 @@ namespace Famille
                     if (n == 1 || n % 25 == 0)
                     {
                         lock (_lock) _items = list.ToList();
-                        UpdateStatus(UiLanguage.T($"Familles trouvées : {n}…", $"Families found: {n}…"));
+                        UpdateStatus(UiLanguage.Format("FamilyIndexService.FamiliesFound0", (object)n));
                     }
                 }
 
                 lock (_lock) _items = list;
                 IsReady = true;
-                UpdateStatus(UiLanguage.T($"Recherche prête ({_items.Count} familles).", $"Search ready ({_items.Count} families)."));
+                UpdateStatus(UiLanguage.Format("FamilyIndexService.SearchReady0Families", (object)_items.Count));
 
                 EnrichIndexMetadata(list, ct);
             }
             catch (Exception ex)
             {
-                UpdateStatus(UiLanguage.T("Index erreur : ", "Index error: ") + ex.Message);
+                UpdateStatus(UiLanguage.Get("FamilyIndexService.IndexError") + ex.Message);
             }
         }
 
@@ -153,7 +153,7 @@ namespace Famille
             }
 
             lock (_lock) _items = list.ToList();
-            UpdateStatus(UiLanguage.T($"Index complet ({list.Count} familles).", $"Index complete ({list.Count} families)."));
+            UpdateStatus(UiLanguage.Format("FamilyIndexService.IndexComplete0Families", (object)list.Count));
         }
 
         public bool RefreshSearchMetadata(string familyPath, bool notify = true)

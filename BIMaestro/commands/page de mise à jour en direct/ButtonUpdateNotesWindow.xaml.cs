@@ -17,14 +17,14 @@ namespace Page
             NotesItems.ItemsSource = list;
 
             var title = list.Count == 1 && !string.IsNullOrWhiteSpace(list[0].Title)
-                ? UiLanguage.T("Nouveautés - ", "What's New - ") + UiLanguage.T(list[0].Title)
-                : UiLanguage.T("Nouveautés BIMaestro", "What's New in BIMaestro");
+                ? UiLanguage.Get("ButtonUpdateNotesWindow.xaml.WhatSNew") + UiLanguage.T(list[0].Title)
+                : UiLanguage.Get("ButtonUpdateNotesWindow.xaml.WhatSNewInBIMaestro");
 
             Title = title;
             HeaderTitleText.Text = title;
             HeaderSubtitleText.Text = string.IsNullOrWhiteSpace(previousVersion)
-                ? UiLanguage.T("Version ", "Version ") + version + UiLanguage.T(" - première utilisation après mise à jour", " - First Use after Update")
-                : UiLanguage.T("Passage ", "Upgrade ") + previousVersion + " → " + version + UiLanguage.T(" - première utilisation après mise à jour", " - First Use after Update");
+                ? UiLanguage.Get("ButtonUpdateNotesWindow.xaml.Version") + version + UiLanguage.Get("ButtonUpdateNotesWindow.xaml.FirstUseAfterUpdate")
+                : UiLanguage.Get("ButtonUpdateNotesWindow.xaml.Upgrade") + previousVersion + " → " + version + UiLanguage.Get("ButtonUpdateNotesWindow.xaml.FirstUseAfterUpdate");
         }
 
         private void ContinueButton_Click(object sender, RoutedEventArgs e)

@@ -213,8 +213,8 @@ namespace Analyse
 
         public bool HasThumbnail => !string.IsNullOrWhiteSpace(ThumbnailPath);
         public string ThumbnailStateText => ThumbnailLoading
-            ? UiLanguage.T("Aperçu en cours", "Preview in Progress")
-            : UiLanguage.T("Aperçu non généré", "Preview Not Generated");
+            ? UiLanguage.Get("SmartCheck.Types.PreviewInProgress")
+            : UiLanguage.Get("SmartCheck.Types.PreviewNotGenerated");
 
         public IssueSeverity Severity
         {
@@ -252,19 +252,19 @@ namespace Analyse
         public string SeverityDisplayText => UiLanguage.T(SeverityText);
 
         public string VisualTitle => string.IsNullOrWhiteSpace(Category)
-            ? UiLanguage.T("Anomalie 3D", "3D Issue")
+            ? UiLanguage.Get("SmartCheck.Types.3DIssue")
             : UiLanguage.T(Category);
         public string VisualSubtitle => WhyText;
         public string IssueFamily => !string.IsNullOrWhiteSpace(ElementTypeName)
             ? ElementTypeName
-            : ElementIdValue > 0 ? UiLanguage.T("Élément ", "Element ") + ElementIdValue : UiLanguage.T("Élément", "Element");
+            : ElementIdValue > 0 ? UiLanguage.Get("SmartCheck.Types.Element") + ElementIdValue : UiLanguage.Get("SmartCheck.Types.Element2");
         public string RelatedLabel
         {
             get
             {
                 if (!string.IsNullOrWhiteSpace(LinkName)) return LinkName;
                 return RelatedId != null && RelatedId != ElementId.InvalidElementId && RelatedId.GetIdLongValue() > 0
-                    ? UiLanguage.T("Lié à ", "Related to ") + RelatedId.GetIdLongValue()
+                    ? UiLanguage.Get("SmartCheck.Types.RelatedTo") + RelatedId.GetIdLongValue()
                     : string.Empty;
             }
         }
@@ -287,14 +287,14 @@ namespace Analyse
             {
                 switch (Kind)
                 {
-                    case IssueKind.LinkPipeClash: return UiLanguage.T("Collision entre un réseau et un fichier lié.", "Clash between a network and a linked file.");
+                    case IssueKind.LinkPipeClash: return UiLanguage.Get("SmartCheck.Types.ClashBetweenANetworkAndALinkedFile");
                     case IssueKind.LocalClash: return "Intersection entre deux objets de la maquette active.";
                     case IssueKind.MepThroughWallNoSleeve: return "Le réseau intersecte une paroi. La nécessité et le dimensionnement d'une réservation restent à vérifier.";
-                    case IssueKind.MepUnconnected: return UiLanguage.T("Connecteur ouvert ou réseau non raccordé.", "Open connector or unconnected network.");
-                    case IssueKind.WallFloating: return UiLanguage.T("Mur sans support détecté sous sa base.", "Wall with no support detected below its base.");
-                    case IssueKind.WallOnWall: return UiLanguage.T("Mur posé directement sur un autre mur.", "Wall placed directly on another wall.");
-                    case IssueKind.WallEmbeddedInFloor: return UiLanguage.T("Mur noyé dans un plancher.", "Wall embedded in a floor.");
-                    default: return string.IsNullOrWhiteSpace(Message) ? UiLanguage.T("Anomalie à vérifier.", "Issue to review.") : Message;
+                    case IssueKind.MepUnconnected: return UiLanguage.Get("SmartCheck.Types.OpenConnectorOrUnconnectedNetwork");
+                    case IssueKind.WallFloating: return UiLanguage.Get("SmartCheck.Types.WallWithNoSupportDetectedBelowItsBase");
+                    case IssueKind.WallOnWall: return UiLanguage.Get("SmartCheck.Types.WallPlacedDirectlyOnAnotherWall");
+                    case IssueKind.WallEmbeddedInFloor: return UiLanguage.Get("SmartCheck.Types.WallEmbeddedInAFloor");
+                    default: return string.IsNullOrWhiteSpace(Message) ? UiLanguage.Get("SmartCheck.Types.IssueToReview") : Message;
                 }
             }
         }
@@ -305,14 +305,14 @@ namespace Analyse
             {
                 switch (Kind)
                 {
-                    case IssueKind.LinkPipeClash: return UiLanguage.T("Coordonner le tracé ou le lien.", "Coordinate the route or linked model.");
+                    case IssueKind.LinkPipeClash: return UiLanguage.Get("SmartCheck.Types.CoordinateTheRouteOrLinkedModel");
                     case IssueKind.LocalClash: return "Vérifier l'intersection et coordonner les deux objets.";
                     case IssueKind.MepThroughWallNoSleeve: return "Vérifier le passage, la réservation et les exigences de la paroi.";
-                    case IssueKind.MepUnconnected: return UiLanguage.T("Raccorder, boucher ou confirmer le cas.", "Connect, cap, or confirm the condition.");
-                    case IssueKind.WallFloating: return UiLanguage.T("Vérifier niveau, contrainte et support.", "Check the level, constraint, and support.");
-                    case IssueKind.WallOnWall: return UiLanguage.T("Contrôler les contraintes verticales.", "Check the vertical constraints.");
-                    case IssueKind.WallEmbeddedInFloor: return UiLanguage.T("Contrôler base, hauteur et plancher.", "Check the base, height, and floor.");
-                    default: return UiLanguage.T("Ouvrir le détail avant décision.", "Open the details before deciding.");
+                    case IssueKind.MepUnconnected: return UiLanguage.Get("SmartCheck.Types.ConnectCapOrConfirmTheCondition");
+                    case IssueKind.WallFloating: return UiLanguage.Get("SmartCheck.Types.CheckTheLevelConstraintAndSupport");
+                    case IssueKind.WallOnWall: return UiLanguage.Get("SmartCheck.Types.CheckTheVerticalConstraints");
+                    case IssueKind.WallEmbeddedInFloor: return UiLanguage.Get("SmartCheck.Types.CheckTheBaseHeightAndFloor");
+                    default: return UiLanguage.Get("SmartCheck.Types.OpenTheDetailsBeforeDeciding");
                 }
             }
         }

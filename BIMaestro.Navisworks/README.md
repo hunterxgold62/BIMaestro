@@ -41,12 +41,20 @@ Destination par utilisateur :
 Les installeurs générés se trouvent dans `Installer/Output`. Leur génération n'installe
 pas le plugin sur le poste. Fermer Navisworks avant d'exécuter l'installeur.
 
+## Publication web
+
+Ouvrir un NWF ou un NWD enregistré, puis choisir **Publier sur le web** dans le ruban BIMaestro. Cocher les maquettes à exporter et cliquer sur **Calculer le poids**. La fenêtre affiche le poids des GLB et celui du transfert compressé pour la sélection. La colonne **GLB compressé estimé** indique la part de chaque maquette dans la géométrie compressée, hors aperçu et données communes. Ces valeurs restent visibles quand on décoche une maquette, jusqu’au prochain calcul. Un changement de sélection impose un nouveau calcul avant l’export ou la publication. Pour une maquette fabricant, surligner sa ligne et cocher **Extérieur uniquement**. Le plugin écarte les pièces cachées dans les vues extérieures avant le découpage et la compression GLB. Le mode **Carcasse simplifiée** filtre aussi les pièces masquées et réduit les triangles des pièces visibles. La géométrie de ce mode est approximative. Le regroupement vise une diagonale de cellule de 20 mm au premier passage, sous réserve de la limite de résolution des grandes pièces. Les sommets des plans extérieurs restent séparés des sommets voisins et les angles vifs conservent des normales distinctes. Si le paquet dépasse le budget web, le calcul essaie une réduction plus forte sur ces seules maquettes. Le fichier reste en mode **Complet** par défaut. **Exporter les GLB** enregistre une archive locale. **Publier** utilise l’identifiant de licence BIMaestro (le même que dans Revit) et affiche les liens de consultation et d’édition après activation de la révision. Pour mettre à jour les mêmes liens, republier avec le même identifiant depuis le fichier au même emplacement.
+
+L’export prend les objets visibles des maquettes cochées et leurs couleurs. Il récupère les noms, catégories, types, niveaux et identifiants présents dans Navisworks. Les maillages d’un même objet BIM sont associés à sa fiche. Le mode marche part d’une dalle identifiée près du point de vue quand elle est disponible. Les plans de coupe, textures, lignes, nuages de points et résultats de clash ne sont pas exportés. Le mode **Simplifier toute la maquette** conserve les pièces intérieures et indexe les sommets identiques. Si nécessaire, il allège les formes planes secondaires ; les murs, dalles et réseaux identifiés ainsi que les maillages à formes variées gardent leur géométrie. Navisworks permet de publier jusqu’à 100 Mo transférés au total, avec une limite de 48 Mo par fichier du paquet. Le poids cible peut être fixé plus bas pour la carcasse simplifiée.
+
+Évolution à prévoir pour les publications multi-lots : protéger les lots utiles à la synthèse, puis répartir la réduction entre les autres en fonction du poids gagné et du détail perdu.
+
 ## Test dans Navisworks
 
 1. Utiliser une copie de travail d'un NWF enregistré contenant deux NWC, des Clash Tests
    (Manage), Search Sets, sélections, points de vue et apparences. Noter leur état initial.
 2. Installer puis démarrer Navisworks 2025 ou 2027. Ouvrir le NWF et vérifier l'onglet
-   **BIMaestro**, panneau **BIMaestro**, unique bouton **Modifier les liens**.
+   **BIMaestro**, panneau **BIMaestro**, boutons **Modifier les liens** et **Publier sur le web**.
 3. Vérifier que les chemins affichés correspondent aux fichiers ajoutés (NWC, pas RVT source).
 4. Sélectionner une référence, choisir un nouveau fichier de la même maquette.
    Le remplacement et l'actualisation sont déclenchés immédiatement.

@@ -19,7 +19,7 @@ namespace Modification
             UIDocument uidoc = data.Application.ActiveUIDocument;
             if (uidoc == null)
             {
-                TaskDialog.Show("BIMaestro", UiLanguage.T("Aucun document Revit actif.", "No Active Revit Document."));
+                TaskDialog.Show("BIMaestro", UiLanguage.Get("OverrideColorCommand.NoActiveRevitDocument"));
                 return Result.Failed;
             }
 
@@ -29,8 +29,8 @@ namespace Modification
             if (selectedElementIds == null || selectedElementIds.Count == 0)
             {
                 TaskDialog.Show(
-                    UiLanguage.T("Surcharges vues", "View Overrides"),
-                    UiLanguage.T("Sélectionne d’abord un ou plusieurs éléments Revit avant de lancer l’outil.", "Select One or More Revit Elements before Running the Tool."));
+                    UiLanguage.Get("OverrideColorCommand.ViewOverrides"),
+                    UiLanguage.Get("OverrideColorCommand.SelectOneOrMoreRevitElementsBeforeRunning"));
                 return Result.Cancelled;
             }
 
@@ -45,12 +45,12 @@ namespace Modification
                 Element referenceElement = doc.GetElement(existingOverrideInfo.ElementId);
                 string referenceName = GetReadableElementName(referenceElement, existingOverrideInfo.ElementId);
 
-                TaskDialog dialog = new TaskDialog(UiLanguage.T("Surcharges graphiques existantes", "Existing Graphic Overrides"))
+                TaskDialog dialog = new TaskDialog(UiLanguage.Get("OverrideColorCommand.ExistingGraphicOverrides"))
                 {
-                    MainInstruction = UiLanguage.T("Un des éléments sélectionnés possède déjà une surcharge graphique dans la vue active.", "One of the Selected Elements Already Has a Graphic Override in the Active View."),
+                    MainInstruction = UiLanguage.Get("OverrideColorCommand.OneOfTheSelectedElementsAlreadyHasA"),
                     MainContent =
-                        UiLanguage.T("Élément détecté : ", "Detected Element: ") + referenceName + "\n\n" +
-                        UiLanguage.T("Voulez-vous copier ses réglages graphiques sur les autres éléments sélectionnés et dans les vues choisies ?\n\nOui : copier la surcharge existante.\nNon : ouvrir les options normales de l’outil.", "Do You Want to Copy Its Graphic Settings to the Other Selected Elements and Chosen Views?\n\nYes: Copy the Existing Override.\nNo: Open the Tool's Normal Options."),
+                        UiLanguage.Get("OverrideColorCommand.DetectedElement") + referenceName + "\n\n" +
+                        UiLanguage.Get("OverrideColorCommand.DoYouWantToCopyItsGraphicSettings"),
                     CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No | TaskDialogCommonButtons.Cancel,
                     DefaultButton = TaskDialogResult.Yes
                 };
@@ -83,8 +83,8 @@ namespace Modification
             if (targetViews.Count == 0)
             {
                 TaskDialog.Show(
-                    UiLanguage.T("Surcharges vues", "View Overrides"),
-                    UiLanguage.T("Aucune vue valide sélectionnée.\n\nNote : les feuilles ne supportent pas directement les surcharges graphiques. L’outil applique les réglages aux vues placées sur les feuilles sélectionnées.", "No Valid View Selected.\n\nNote: Sheets Do Not Directly Support Graphic Overrides. The Tool Applies Settings to Views Placed on the Selected Sheets."));
+                    UiLanguage.Get("OverrideColorCommand.ViewOverrides"),
+                    UiLanguage.Get("OverrideColorCommand.NoValidViewSelectedNoteSheetsDoNot"));
                 return Result.Cancelled;
             }
 
@@ -99,8 +99,8 @@ namespace Modification
                 if (!existingOverrideInfo.HasOverride || existingOverrideInfo.OverrideSettings == null)
                 {
                     TaskDialog.Show(
-                        UiLanguage.T("Surcharges vues", "View Overrides"),
-                        UiLanguage.T("Impossible de récupérer la surcharge graphique existante.", "Unable to Retrieve the Existing Graphic Override."));
+                        UiLanguage.Get("OverrideColorCommand.ViewOverrides"),
+                        UiLanguage.Get("OverrideColorCommand.UnableToRetrieveTheExistingGraphicOverride"));
                     return Result.Failed;
                 }
 

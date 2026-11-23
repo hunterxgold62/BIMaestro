@@ -1,0 +1,46 @@
+{
+  "source": "C:/Users/plemert/Videos/2026-10-30 09-33-17.mp4",
+  "output": "BIMaestro-Tutoriel-Proprietes",
+  "title": "Personnaliser la palette Propriétés",
+  "subtitle": "BIMaestro",
+  "end_text": "Vos propriétés sont personnalisées",
+  "ref_width": 1280,
+  "output_size": [1920, 1080],
+  "fps": 60,
+  "intro": 2.5,
+  "outro": 2.2,
+  "steps": [
+    {"start": 3.4,  "title": "Ouvrir l'onglet BIMaestro", "label": "Onglet BIMaestro", "box": [592, 15, 44, 17], "box_time": [3.4, 4.9], "click": [614, 23, 4.3]},
+    {"start": 7.2,  "title": "Cliquer sur Couleurs", "label": "Couleurs", "box": [1008, 34, 36, 36], "box_time": [7.2, 9.8], "click": [1025, 50, 9.6]},
+    {"start": 12.9, "title": "Onglet Propriétés", "label": "Propriétés", "box": [403, 148, 44, 18], "box_time": [12.9, 14.6], "click": [424, 157, 13.6]},
+    {"start": 21.2, "title": "Créer un groupe personnalisé", "box": [278, 339, 128, 17], "box_time": [21.2, 22.6], "click": [284, 347, 22.1]},
+    {"start": 23.4, "title": "Créer un groupe", "box": [396, 358, 88, 20], "box_time": [23.4, 25.6], "click": [440, 368, 25.0]},
+    {"start": 27.2, "title": "Nommer le bandeau", "box": [790, 398, 171, 22], "box_time": [27.2, 28.8]},
+    {"start": 44.5, "title": "Glisser un paramètre", "label": "Glisser le paramètre ici", "box": [513, 445, 228, 18], "box_time": [46.0, 50.6], "click": [560, 454, 50.3]},
+    {"start": 50.8, "title": "Choisir une ambiance", "label": "Ambiance en un clic", "box": [790, 511, 87, 23], "box_time": [50.8, 53.2], "click": [835, 522, 52.2]},
+    {"start": 54.0, "title": "Choisir ses couleurs", "label": "Choisir mes propres couleurs", "box": [790, 486, 130, 16], "box_time": [54.0, 55.2], "click": [797, 494, 54.2]},
+    {"start": 55.4, "title": "Couleur du fond", "box": [790, 464, 171, 20], "box_time": [55.4, 57.6]},
+    {"start": 63.8, "title": "Enregistrer", "label": "Enregistrer mes réglages", "box": [880, 614, 107, 23], "box_time": [63.8, 65.8], "click": [933, 625, 65.4]},
+    {"start": 67.5, "title": "Résultat dans Revit", "label": "Résultat dans Propriétés", "box": [1055, 181, 215, 24], "box_time": [67.6, 71.6]}
+  ],
+  "zooms": [
+    [3.0, 5.6, 614, 40, 2.4],
+    [6.8, 10.0, 980, 110, 2.0],
+    [12.6, 15.0, 430, 170, 2.2],
+    [20.8, 25.8, 400, 360, 2.0],
+    [26.5, 30.8, 860, 400, 2.0],
+    [44.5, 53.5, 680, 470, 1.6],
+    [54.0, 58.0, 860, 520, 1.6],
+    [63.5, 66.0, 900, 600, 1.8],
+    [67.5, 72.2, 1160, 215, 2.4]
+  ],
+  "segments": [
+    [2.6, 10.4, 1],
+    [12.4, 15.8, 1],
+    [15.8, 20.8, 3],
+    [20.8, 31.0, 1],
+    [31.0, 44.5, 2.5],
+    [44.5, 58.0, 1],
+    [63.5, 71.6, 1]
+  ]
+}

@@ -77,8 +77,7 @@ namespace BIMaestro.ViewHover
             }
             if (image.Cells.Count == 0) return false;
             if (partial)
-                image.Footer = UiLanguage.T("Aperçu partiel — ouvrez la nomenclature pour tout voir.",
-                    "Partial preview — open the schedule to see all rows and columns.");
+                image.Footer = UiLanguage.Get("SchedulePreviewExporter.PartialPreviewOpenTheScheduleToSeeAll");
 
             string generated = Path.Combine(Path.GetDirectoryName(targetPath),
                 "schedule-" + Guid.NewGuid().ToString("N") + ".png");

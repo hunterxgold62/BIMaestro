@@ -76,7 +76,7 @@ namespace Famille
             string target = GetMetadataPath(familyPath);
             if (string.IsNullOrWhiteSpace(target))
             {
-                error = UiLanguage.T("Le chemin de la famille est invalide.", "The family path is invalid.");
+                error = UiLanguage.Get("FamilySearchMetadata.TheFamilyPathIsInvalid");
                 return false;
             }
 
@@ -87,7 +87,7 @@ namespace Famille
                 DateTime? actualWriteUtc = exists ? File.GetLastWriteTimeUtc(target) : (DateTime?)null;
                 if (actualWriteUtc != expectedLastWriteUtc)
                 {
-                    error = UiLanguage.T("Les mots-clés ont été modifiés par un autre utilisateur. Fermez puis rouvrez l’éditeur avant de réessayer.", "The keywords were modified by another user. Close and reopen the editor before trying again.");
+                    error = UiLanguage.Get("FamilySearchMetadata.TheKeywordsWereModifiedByAnotherUserClose");
                     return false;
                 }
 
@@ -106,7 +106,7 @@ namespace Famille
                     : (DateTime?)null;
                 if (writeBeforeCommit != expectedLastWriteUtc)
                 {
-                    error = UiLanguage.T("Les mots-clés ont été modifiés pendant l’enregistrement. Fermez puis rouvrez l’éditeur avant de réessayer.", "The keywords were modified while saving. Close and reopen the editor before trying again.");
+                    error = UiLanguage.Get("FamilySearchMetadata.TheKeywordsWereModifiedWhileSavingCloseAnd");
                     return false;
                 }
 
@@ -129,12 +129,12 @@ namespace Famille
             }
             catch (UnauthorizedAccessException)
             {
-                error = UiLanguage.T("La bibliothèque est en lecture seule ou vous n’avez pas l’autorisation d’y enregistrer les mots-clés.", "The library is read-only or you do not have permission to save keywords there.");
+                error = UiLanguage.Get("FamilySearchMetadata.TheLibraryIsReadOnlyOrYouDo");
                 return false;
             }
             catch (Exception ex)
             {
-                error = UiLanguage.T("Impossible d’enregistrer les mots-clés : ", "Unable to save keywords: ") + ex.Message;
+                error = UiLanguage.Get("FamilySearchMetadata.UnableToSaveKeywords") + ex.Message;
                 return false;
             }
             finally
@@ -174,7 +174,7 @@ namespace Famille
 
     internal static class FamilySearchAiService
     {
-        private const string Model = "gpt-4o-mini";
+        private const string Model = AiClient.TextModel;
 
         public static Task<FamilySearchMetadata> SuggestAsync(string name, string folder, string category)
         {
@@ -182,7 +182,7 @@ namespace Famille
             {
                 string jwt = global::BIMaestroApp.LicenseJwt;
                 if (string.IsNullOrWhiteSpace(jwt))
-                    throw new InvalidOperationException(UiLanguage.T("Aucune licence IA active n’est disponible.", "No active AI license is available."));
+                    throw new InvalidOperationException(UiLanguage.Get("FamilySearchMetadata.NoActiveAILicenseIsAvailable"));
 
                 string prompt = UiLanguage.T(
                     "Tu aides à indexer une bibliothèque de familles Revit en français. À partir du nom, du dossier et de la catégorie, propose une description courte et 6 à 15 mots-clés utiles. Ajoute des synonymes et concepts que l’utilisateur pourrait naturellement saisir, sans inventer une fonction technique non déductible. Réponds uniquement avec un objet JSON valide de forme {\"description\":\"...\",\"keywords\":[\"...\"]}.\nNom=" + (name ?? string.Empty) + "\nDossier=" + (folder ?? string.Empty) + "\nCatégorie Revit=" + (category ?? string.Empty),
@@ -199,7 +199,7 @@ namespace Famille
                 };
                 result = FamilySearchMetadataService.Normalize(result);
                 if (result.Keywords.Count == 0)
-                    throw new InvalidOperationException(UiLanguage.T("L’IA n’a proposé aucun mot-clé exploitable.", "AI did not suggest any usable keywords."));
+                    throw new InvalidOperationException(UiLanguage.Get("FamilySearchMetadata.AIDidNotSuggestAnyUsableKeywords"));
                 return result;
             });
         }
@@ -207,16 +207,16 @@ namespace Famille
         private static JObject ParseObject(string content)
         {
             if (string.IsNullOrWhiteSpace(content))
-                throw new InvalidOperationException(UiLanguage.T("La réponse IA est vide.", "The AI response is empty."));
+                throw new InvalidOperationException(UiLanguage.Get("FamilySearchMetadata.TheAIResponseIsEmpty"));
 
             string text = content.Trim();
             int first = text.IndexOf('{');
             int last = text.LastIndexOf('}');
             if (first < 0 || last <= first)
-                throw new InvalidOperationException(UiLanguage.T("La réponse IA ne contient pas de JSON valide.", "The AI response does not contain valid JSON."));
+                throw new InvalidOperationException(UiLanguage.Get("FamilySearchMetadata.TheAIResponseDoesNotContainValidJSON"));
 
             try { return JObject.Parse(text.Substring(first, last - first + 1)); }
-            catch (Exception ex) { throw new InvalidOperationException(UiLanguage.T("La réponse IA est illisible : ", "The AI response could not be read: ") + ex.Message); }
+            catch (Exception ex) { throw new InvalidOperationException(UiLanguage.Get("FamilySearchMetadata.TheAIResponseCouldNotBeRead") + ex.Message); }
         }
     }
 
@@ -234,7 +234,7 @@ namespace Famille
         public FamilySearchMetadataWindow(FamilyItem family)
         {
             _family = family ?? throw new ArgumentNullException(nameof(family));
-            Title = UiLanguage.T("Mots-clés de recherche — ", "Search Keywords — ") + family.Name;
+            Title = UiLanguage.Get("FamilySearchMetadata.SearchKeywords") + family.Name;
             Width = 620;
             Height = 510;
             MinWidth = 520;
@@ -254,7 +254,7 @@ namespace Famille
 
             var intro = new TextBlock
             {
-                Text = UiLanguage.T("Ajoutez les termes qu’une personne pourrait utiliser pour retrouver cette famille, sans changer son nom.", "Add terms someone might use to find this family without changing its name."),
+                Text = UiLanguage.Get("FamilySearchMetadata.AddTermsSomeoneMightUseToFindThis"),
                 TextWrapping = TextWrapping.Wrap,
                 Foreground = new SolidColorBrush(Color.FromRgb(71, 85, 105)),
                 Margin = new Thickness(0, 0, 0, 16)
@@ -263,7 +263,7 @@ namespace Famille
             root.Children.Add(intro);
 
             var fields = new StackPanel();
-            fields.Children.Add(Label(UiLanguage.T("Description recherchable", "Searchable Description")));
+            fields.Children.Add(Label(UiLanguage.Get("FamilySearchMetadata.SearchableDescription")));
             _descriptionBox = new TextBox
             {
                 Text = metadata.Description ?? string.Empty,
@@ -275,7 +275,7 @@ namespace Famille
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto
             };
             fields.Children.Add(_descriptionBox);
-            fields.Children.Add(Label(UiLanguage.T("Mots-clés (séparés par une virgule ou un retour à la ligne)", "Keywords (separated by a comma or line break)"), new Thickness(0, 16, 0, 6)));
+            fields.Children.Add(Label(UiLanguage.Get("FamilySearchMetadata.KeywordsSeparatedByACommaOrLineBreak"), new Thickness(0, 16, 0, 6)));
             _keywordsBox = new TextBox
             {
                 Text = string.Join(", ", metadata.Keywords),
@@ -291,7 +291,7 @@ namespace Famille
 
             var hint = new TextBlock
             {
-                Text = UiLanguage.T("La description participe aussi à la recherche. Exemple de mots-clés : humain, personnage, ouvrier, travailleur, chantier", "The description is also included in search. Example keywords: human, person, worker, laborer, construction site"),
+                Text = UiLanguage.Get("FamilySearchMetadata.TheDescriptionIsAlsoIncludedInSearchExample"),
                 Foreground = new SolidColorBrush(Color.FromRgb(100, 116, 139)),
                 Margin = new Thickness(0, 10, 0, 0),
                 TextWrapping = TextWrapping.Wrap
@@ -300,18 +300,18 @@ namespace Famille
             root.Children.Add(hint);
 
             var buttons = new DockPanel { Margin = new Thickness(0, 18, 0, 0), LastChildFill = false };
-            _aiButton = Button(UiLanguage.T("Proposer avec l’IA", "Suggest with AI"), 145);
+            _aiButton = Button(UiLanguage.Get("FamilySearchMetadata.SuggestWithAI"), 145);
             _aiButton.Click += SuggestWithAi_Click;
             DockPanel.SetDock(_aiButton, Dock.Left);
             buttons.Children.Add(_aiButton);
 
-            var cancel = Button(UiLanguage.T("Annuler", "Cancel"), 90);
+            var cancel = Button(UiLanguage.Get("FamilySearchMetadata.Cancel"), 90);
             cancel.Margin = new Thickness(8, 0, 0, 0);
             cancel.Click += (s, e) => { DialogResult = false; Close(); };
             DockPanel.SetDock(cancel, Dock.Right);
             buttons.Children.Add(cancel);
 
-            var save = Button(UiLanguage.T("Enregistrer", "Save"), 110);
+            var save = Button(UiLanguage.Get("FamilySearchMetadata.Save"), 110);
             save.Margin = new Thickness(8, 0, 0, 0);
             save.FontWeight = FontWeights.SemiBold;
             save.Click += Save_Click;
@@ -327,7 +327,7 @@ namespace Famille
         {
             _aiButton.IsEnabled = false;
             string original = _aiButton.Content?.ToString();
-            _aiButton.Content = UiLanguage.T("Génération…", "Generating...");
+            _aiButton.Content = UiLanguage.Get("FamilySearchMetadata.Generating");
             try
             {
                 var suggestion = await FamilySearchAiService.SuggestAsync(
@@ -341,8 +341,8 @@ namespace Famille
             catch (Exception ex)
             {
                 MessageBox.Show(this,
-                    UiLanguage.T("La proposition IA n’est pas disponible. Vous pouvez continuer à saisir les mots-clés manuellement.\n\n", "The AI suggestion is unavailable. You can continue entering keywords manually.\n\n") + ex.Message,
-                    UiLanguage.T("Mots-clés de recherche", "Search Keywords"),
+                    UiLanguage.Get("FamilySearchMetadata.TheAISuggestionIsUnavailableYouCanContinue") + ex.Message,
+                    UiLanguage.Get("FamilySearchMetadata.SearchKeywords2"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
             }
@@ -366,7 +366,7 @@ namespace Famille
             if (!FamilySearchMetadataService.TrySave(
                 _family.Path, metadata, _expectedLastWriteUtc, out string error, out DateTime? newWriteUtc))
             {
-                MessageBox.Show(this, error, UiLanguage.T("Mots-clés de recherche", "Search Keywords"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(this, error, UiLanguage.Get("FamilySearchMetadata.SearchKeywords2"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 

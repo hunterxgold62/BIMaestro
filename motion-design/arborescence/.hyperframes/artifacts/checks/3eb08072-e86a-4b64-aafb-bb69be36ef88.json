@@ -1,0 +1,1131 @@
+{
+  "ok": false,
+  "strict": false,
+  "browserSkipped": false,
+  "lint": {
+    "ok": false,
+    "errorCount": 3,
+    "warningCount": 3,
+    "infoCount": 0,
+    "findings": [
+      {
+        "code": "gsap_repeated_fromto_without_baseline",
+        "severity": "warning",
+        "message": "2 tl.fromTo() calls target \"#tr-panel\" with no stable baseline. The last-authored fromTo \"from\" values become the element's resting state for any seek before the first tween actually runs, because GSAP applies fromTo from-values at authoring time (immediateRender), not at tween position.",
+        "selector": "#tr-panel",
+        "dataAttributes": {},
+        "sourceFile": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\motion-design\\arborescence\\compositions\\tree.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Add `immediateRender: false` to every fromTo except the earliest-positioned one (at 0s), so pre-first-tween seeks keep its \"from\" values. A hiding `tl.set(..., 0)` baseline trips gsap_timeline_set_initial_hide, and a `gsap.set` authored before the fromTo calls is overwritten by them."
+      },
+      {
+        "code": "gsap_repeated_fromto_without_baseline",
+        "severity": "warning",
+        "message": "5 tl.fromTo() calls target \"#tr-ring\" with no stable baseline. The last-authored fromTo \"from\" values become the element's resting state for any seek before the first tween actually runs, because GSAP applies fromTo from-values at authoring time (immediateRender), not at tween position.",
+        "selector": "#tr-ring",
+        "dataAttributes": {},
+        "sourceFile": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\motion-design\\arborescence\\compositions\\tree.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Add `immediateRender: false` to every fromTo except the earliest-positioned one (at 0.68s), so pre-first-tween seeks keep its \"from\" values. A hiding `tl.set(..., 0)` baseline trips gsap_timeline_set_initial_hide, and a `gsap.set` authored before the fromTo calls is overwritten by them."
+      },
+      {
+        "code": "gsap_repeated_fromto_without_baseline",
+        "severity": "warning",
+        "message": "5 tl.fromTo() calls target \"#tr-cursor svg\" with no stable baseline. The last-authored fromTo \"from\" values become the element's resting state for any seek before the first tween actually runs, because GSAP applies fromTo from-values at authoring time (immediateRender), not at tween position.",
+        "selector": "#tr-cursor svg",
+        "dataAttributes": {},
+        "sourceFile": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\motion-design\\arborescence\\compositions\\tree.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Add `immediateRender: false` to every fromTo except the earliest-positioned one (at 0.68s), so pre-first-tween seeks keep its \"from\" values. A hiding `tl.set(..., 0)` baseline trips gsap_timeline_set_initial_hide, and a `gsap.set` authored before the fromTo calls is overwritten by them."
+      },
+      {
+        "code": "gsap_css_transform_conflict",
+        "severity": "error",
+        "message": "\"#tr-ctrl\" has CSS `transform: scale(0)` and a GSAP tween animates scale. GSAP will overwrite the full CSS transform, discarding any translateX(-50%) centering or CSS scale value.",
+        "selector": "#tr-ctrl",
+        "dataAttributes": {},
+        "sourceFile": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\motion-design\\arborescence\\compositions\\tree.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Remove `transform: scale(0)` from CSS and replace with GSAP properties: scale: 0. Example: tl.fromTo('#tr-ctrl', { scale: 0 }, { scale: 0, ...yourAnimation }). tl.fromTo is exempt from this rule."
+      },
+      {
+        "code": "gsap_css_transform_conflict",
+        "severity": "error",
+        "message": "\"#tr-pop\" has CSS `transform: translateY(260px)` and a GSAP tween animates y. GSAP will overwrite the full CSS transform, discarding any translateX(-50%) centering or CSS scale value.",
+        "selector": "#tr-pop",
+        "dataAttributes": {},
+        "sourceFile": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\motion-design\\arborescence\\compositions\\tree.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Remove `transform: translateY(260px)` from CSS and replace with GSAP properties: y: 260. Example: tl.fromTo('#tr-pop', { y: 260 }, { y: 260, ...yourAnimation }). tl.fromTo is exempt from this rule."
+      },
+      {
+        "code": "gsap_css_transform_conflict",
+        "severity": "error",
+        "message": "\"#tr-cursor\" has CSS `transform: translate(980px, 1500px)` and a GSAP tween animates x/y. GSAP will overwrite the full CSS transform, discarding any translateX(-50%) centering or CSS scale value.",
+        "selector": "#tr-cursor",
+        "dataAttributes": {},
+        "sourceFile": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\motion-design\\arborescence\\compositions\\tree.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Remove `transform: translate(980px, 1500px)` from CSS and replace with GSAP properties: x: 980, y: 1500. Example: tl.fromTo('#tr-cursor', { x: 980, y: 1500 }, { x: 980, y: 1500, ...yourAnimation }). tl.fromTo is exempt from this rule."
+      }
+    ],
+    "filesScanned": 5
+  },
+  "runtime": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": []
+  },
+  "layout": {
+    "ok": false,
+    "errorCount": 2,
+    "warningCount": 20,
+    "infoCount": 3,
+    "findings": [
+      {
+        "code": "text_occluded",
+        "severity": "error",
+        "time": 6.5,
+        "selector": "#tr-nb > div:nth-of-type(1)",
+        "message": "Text is hidden beneath an opaque element.",
+        "rect": {
+          "left": 232.29,
+          "top": 820.59,
+          "right": 263.76,
+          "bottom": 875.47,
+          "width": 31.47,
+          "height": 54.88
+        },
+        "containerSelector": "#tr-hla",
+        "text": "4",
+        "fixHint": "Give the text its own zone, raise its stacking order above the covering element, or mark intentional layering with data-layout-allow-occlusion.",
+        "coveredFraction": 1,
+        "dataAttributes": {},
+        "sourceFile": "compositions/tree.html",
+        "bbox": {
+          "x": 232.29,
+          "y": 820.59,
+          "width": 31.47,
+          "height": 54.88
+        },
+        "firstSeen": 6.5,
+        "lastSeen": 7.944,
+        "occurrences": 2,
+        "heldMs": 0,
+        "times": [
+          6.5,
+          7.944
+        ]
+      },
+      {
+        "code": "text_occluded",
+        "severity": "error",
+        "time": 6.5,
+        "selector": "#tr-nc > div:nth-of-type(1)",
+        "message": "Text is hidden beneath an opaque element.",
+        "rect": {
+          "left": 234.8,
+          "top": 923.63,
+          "right": 263.76,
+          "bottom": 978.51,
+          "width": 28.96,
+          "height": 54.88
+        },
+        "containerSelector": "#tr-hlb",
+        "text": "5",
+        "fixHint": "Give the text its own zone, raise its stacking order above the covering element, or mark intentional layering with data-layout-allow-occlusion.",
+        "coveredFraction": 1,
+        "dataAttributes": {},
+        "sourceFile": "compositions/tree.html",
+        "bbox": {
+          "x": 234.8,
+          "y": 923.63,
+          "width": 28.96,
+          "height": 54.88
+        },
+        "firstSeen": 6.5,
+        "lastSeen": 7.944,
+        "occurrences": 2,
+        "heldMs": 0,
+        "times": [
+          6.5,
+          7.944
+        ]
+      },
+      {
+        "code": "container_overflow",
+        "severity": "warning",
+        "time": 3.611,
+        "selector": "#tr-na",
+        "message": "Element extends outside a clipping layout container.",
+        "rect": {
+          "left": 228,
+          "top": 806,
+          "right": 288,
+          "bottom": 990,
+          "width": 60,
+          "height": 184
+        },
+        "containerSelector": "#tr-a > div:nth-of-type(2) > span:nth-of-type(2)",
+        "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+        "containerRect": {
+          "left": 228,
+          "top": 806,
+          "right": 288,
+          "bottom": 898,
+          "width": 60,
+          "height": 92
+        },
+        "overflow": {
+          "bottom": 92
+        },
+        "dataAttributes": {},
+        "sourceFile": "compositions/tree.html",
+        "bbox": {
+          "x": 228,
+          "y": 806,
+          "width": 60,
+          "height": 184
+        },
+        "firstSeen": 3.611,
+        "lastSeen": 7.944,
+        "occurrences": 4,
+        "heldMs": 0,
+        "times": [
+          3.611,
+          5.056,
+          6.5,
+          7.944
+        ]
+      },
+      {
+        "code": "container_overflow",
+        "severity": "warning",
+        "time": 3.611,
+        "selector": "#tr-nb",
+        "message": "Element extends outside a clipping layout container.",
+        "rect": {
+          "left": 228,
+          "top": 898,
+          "right": 288,
+          "bottom": 1082,
+          "width": 60,
+          "height": 184
+        },
+        "containerSelector": "#tr-b > div:nth-of-type(2) > span:nth-of-type(2)",
+        "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+        "containerRect": {
+          "left": 228,
+          "top": 898,
+          "right": 288,
+          "bottom": 990,
+          "width": 60,
+          "height": 92
+        },
+        "overflow": {
+          "bottom": 92
+        },
+        "dataAttributes": {},
+        "sourceFile": "compositions/tree.html",
+        "bbox": {
+          "x": 228,
+          "y": 898,
+          "width": 60,
+          "height": 184
+        },
+        "firstSeen": 3.611,
+        "lastSeen": 7.944,
+        "occurrences": 4,
+        "heldMs": 0,
+        "times": [
+          3.611,
+          5.056,
+          6.5,
+          7.944
+        ]
+      },
+      {
+        "code": "container_overflow",
+        "severity": "warning",
+        "time": 3.611,
+        "selector": "#tr-nc",
+        "message": "Element extends outside a clipping layout container.",
+        "rect": {
+          "left": 228,
+          "top": 990,
+          "right": 288,
+          "bottom": 1174,
+          "width": 60,
+          "height": 184
+        },
+        "containerSelector": "#tr-c > div:nth-of-type(2) > span:nth-of-type(2)",
+        "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+        "containerRect": {
+          "left": 228,
+          "top": 990,
+          "right": 288,
+          "bottom": 1082,
+          "width": 60,
+          "height": 92
+        },
+        "overflow": {
+          "bottom": 92
+        },
+        "dataAttributes": {},
+        "sourceFile": "compositions/tree.html",
+        "bbox": {
+          "x": 228,
+          "y": 990,
+          "width": 60,
+          "height": 184
+        },
+        "firstSeen": 3.611,
+        "lastSeen": 7.944,
+        "occurrences": 4,
+        "heldMs": 0,
+        "times": [
+          3.611,
+          5.056,
+          6.5,
+          7.944
+        ]
+      },
+      {
+        "selector": "#hk-l1",
+        "dataAttributes": {
+          "data-var-text": "hook1"
+        },
+        "sourceFile": "compositions/hook.html",
+        "bbox": {
+          "x": 76.34,
+          "y": 449.15,
+          "width": 838.16,
+          "height": 164.96
+        },
+        "time": 2.167,
+        "rect": {
+          "left": 76.34,
+          "top": 449.15,
+          "right": 914.5,
+          "bottom": 614.11,
+          "width": 838.16,
+          "height": 164.96
+        },
+        "code": "outside_safe_zone",
+        "severity": "warning",
+        "text": "Renuméroter",
+        "message": "<div> \"Renuméroter\" is outside the safe area: TikTok (left edge), YouTube Shorts (right edge).",
+        "fixHint": "Move the text inside the safe area, or mark text meant to sit there with data-layout-allow-safe-zone.",
+        "firstSeen": 2.167,
+        "lastSeen": 2.167,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          2.167
+        ]
+      },
+      {
+        "selector": "#hk-l2",
+        "dataAttributes": {
+          "data-var-text": "hook2"
+        },
+        "sourceFile": "compositions/hook.html",
+        "bbox": {
+          "x": 101.09,
+          "y": 606.42,
+          "width": 788.63,
+          "height": 164.96
+        },
+        "time": 2.167,
+        "rect": {
+          "left": 101.09,
+          "top": 606.42,
+          "right": 889.72,
+          "bottom": 771.38,
+          "width": 788.63,
+          "height": 164.96
+        },
+        "code": "outside_safe_zone",
+        "severity": "warning",
+        "text": "tes feuilles ?",
+        "message": "<div> \"tes feuilles ?\" is outside the safe area: TikTok (left edge), YouTube Shorts (right edge).",
+        "fixHint": "Move the text inside the safe area, or mark text meant to sit there with data-layout-allow-safe-zone.",
+        "firstSeen": 2.167,
+        "lastSeen": 2.167,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          2.167
+        ]
+      },
+      {
+        "selector": "#tr-s1",
+        "dataAttributes": {},
+        "sourceFile": "compositions/tree.html",
+        "bbox": {
+          "x": 179.66,
+          "y": 250,
+          "width": 660.67,
+          "height": 72
+        },
+        "time": 3.611,
+        "rect": {
+          "left": 179.66,
+          "top": 250,
+          "right": 840.33,
+          "bottom": 322,
+          "width": 660.67,
+          "height": 72
+        },
+        "code": "outside_safe_zone",
+        "severity": "warning",
+        "text": "Sélectionne tes feuilles",
+        "message": "<div> \"Sélectionne tes feuilles\" is outside the safe area: Instagram Reels (top edge), YouTube Shorts (top edge).",
+        "fixHint": "Move the text inside the safe area, or mark text meant to sit there with data-layout-allow-safe-zone.",
+        "firstSeen": 3.611,
+        "lastSeen": 3.611,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          3.611
+        ]
+      },
+      {
+        "selector": "#tr-r0 > div:nth-of-type(1) > span:nth-of-type(1)",
+        "dataAttributes": {},
+        "sourceFile": "compositions/tree.html",
+        "bbox": {
+          "x": 110,
+          "y": 556.5,
+          "width": 25.08,
+          "height": 36
+        },
+        "time": 3.611,
+        "rect": {
+          "left": 110,
+          "top": 556.5,
+          "right": 135.08,
+          "bottom": 592.5,
+          "width": 25.08,
+          "height": 36
+        },
+        "code": "outside_safe_zone",
+        "severity": "warning",
+        "text": "▸",
+        "message": "<span> \"▸\" is outside the safe area: TikTok (left edge).",
+        "fixHint": "Move the text inside the safe area, or mark text meant to sit there with data-layout-allow-safe-zone.",
+        "firstSeen": 3.611,
+        "lastSeen": 7.944,
+        "occurrences": 4,
+        "heldMs": 0,
+        "times": [
+          3.611,
+          5.056,
+          6.5,
+          7.944
+        ]
+      },
+      {
+        "selector": "#tr-r1 > div:nth-of-type(1) > span:nth-of-type(1)",
+        "dataAttributes": {},
+        "sourceFile": "compositions/tree.html",
+        "bbox": {
+          "x": 110,
+          "y": 648.5,
+          "width": 25.08,
+          "height": 36
+        },
+        "time": 3.611,
+        "rect": {
+          "left": 110,
+          "top": 648.5,
+          "right": 135.08,
+          "bottom": 684.5,
+          "width": 25.08,
+          "height": 36
+        },
+        "code": "outside_safe_zone",
+        "severity": "warning",
+        "text": "▸",
+        "message": "<span> \"▸\" is outside the safe area: TikTok (left edge).",
+        "fixHint": "Move the text inside the safe area, or mark text meant to sit there with data-layout-allow-safe-zone.",
+        "firstSeen": 3.611,
+        "lastSeen": 7.944,
+        "occurrences": 4,
+        "heldMs": 0,
+        "times": [
+          3.611,
+          5.056,
+          6.5,
+          7.944
+        ]
+      },
+      {
+        "selector": "#tr-caret",
+        "dataAttributes": {},
+        "sourceFile": "compositions/tree.html",
+        "bbox": {
+          "x": 108.5,
+          "y": 745,
+          "width": 36,
+          "height": 25.08
+        },
+        "time": 3.611,
+        "rect": {
+          "left": 108.5,
+          "top": 745,
+          "right": 144.5,
+          "bottom": 770.08,
+          "width": 36,
+          "height": 25.08
+        },
+        "code": "outside_safe_zone",
+        "severity": "warning",
+        "text": "▸",
+        "message": "<span> \"▸\" is outside the safe area: TikTok (left edge).",
+        "fixHint": "Move the text inside the safe area, or mark text meant to sit there with data-layout-allow-safe-zone.",
+        "firstSeen": 3.611,
+        "lastSeen": 7.944,
+        "occurrences": 4,
+        "heldMs": 0,
+        "times": [
+          3.611,
+          5.056,
+          6.5,
+          7.944
+        ]
+      },
+      {
+        "selector": "#tr-ctrl",
+        "dataAttributes": {},
+        "sourceFile": "compositions/tree.html",
+        "bbox": {
+          "x": 146,
+          "y": 1214,
+          "width": 64.34,
+          "height": 41
+        },
+        "time": 3.611,
+        "rect": {
+          "left": 146,
+          "top": 1214,
+          "right": 210.34,
+          "bottom": 1255,
+          "width": 64.34,
+          "height": 41
+        },
+        "code": "outside_safe_zone",
+        "severity": "warning",
+        "text": "Ctrl",
+        "message": "<div> \"Ctrl\" is outside the safe area: Instagram Reels (bottom edge), YouTube Shorts (bottom edge).",
+        "fixHint": "Move the text inside the safe area, or mark text meant to sit there with data-layout-allow-safe-zone.",
+        "firstSeen": 3.611,
+        "lastSeen": 3.611,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          3.611
+        ]
+      },
+      {
+        "selector": "#tr-pop > span:nth-of-type(1)",
+        "dataAttributes": {},
+        "sourceFile": "compositions/tree.html",
+        "bbox": {
+          "x": 264,
+          "y": 1491.5,
+          "width": 431.89,
+          "height": 49
+        },
+        "time": 3.611,
+        "rect": {
+          "left": 264,
+          "top": 1491.5,
+          "right": 695.89,
+          "bottom": 1540.5,
+          "width": 431.89,
+          "height": 49
+        },
+        "code": "outside_safe_zone",
+        "severity": "warning",
+        "text": "Renuméroter · début 1",
+        "message": "<span> \"Renuméroter · début 1\" is outside the safe area: TikTok (bottom edge), Instagram Reels (bottom edge), YouTube Shorts (bottom edge).",
+        "fixHint": "Move the text inside the safe area, or mark text meant to sit there with data-layout-allow-safe-zone.",
+        "firstSeen": 3.611,
+        "lastSeen": 7.944,
+        "occurrences": 4,
+        "heldMs": 0,
+        "times": [
+          3.611,
+          5.056,
+          6.5,
+          7.944
+        ]
+      },
+      {
+        "selector": "#tr-go",
+        "dataAttributes": {},
+        "sourceFile": "compositions/tree.html",
+        "bbox": {
+          "x": 726.75,
+          "y": 1494,
+          "width": 55.25,
+          "height": 44
+        },
+        "time": 3.611,
+        "rect": {
+          "left": 726.75,
+          "top": 1494,
+          "right": 782,
+          "bottom": 1538,
+          "width": 55.25,
+          "height": 44
+        },
+        "code": "outside_safe_zone",
+        "severity": "warning",
+        "text": "OK",
+        "message": "<span> \"OK\" is outside the safe area: TikTok (bottom edge), Instagram Reels (bottom edge), YouTube Shorts (bottom edge).",
+        "fixHint": "Move the text inside the safe area, or mark text meant to sit there with data-layout-allow-safe-zone.",
+        "firstSeen": 3.611,
+        "lastSeen": 7.944,
+        "occurrences": 4,
+        "heldMs": 0,
+        "times": [
+          3.611,
+          5.056,
+          6.5,
+          7.944
+        ]
+      },
+      {
+        "selector": "#tr-s2",
+        "dataAttributes": {},
+        "sourceFile": "compositions/tree.html",
+        "bbox": {
+          "x": 231.58,
+          "y": 250,
+          "width": 556.84,
+          "height": 72
+        },
+        "time": 5.056,
+        "rect": {
+          "left": 231.58,
+          "top": 250,
+          "right": 788.42,
+          "bottom": 322,
+          "width": 556.84,
+          "height": 72
+        },
+        "code": "outside_safe_zone",
+        "severity": "warning",
+        "text": "Lance Renuméroter",
+        "message": "<div> \"Lance Renuméroter\" is outside the safe area: Instagram Reels (top edge), YouTube Shorts (top edge).",
+        "fixHint": "Move the text inside the safe area, or mark text meant to sit there with data-layout-allow-safe-zone.",
+        "firstSeen": 5.056,
+        "lastSeen": 5.056,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          5.056
+        ]
+      },
+      {
+        "selector": "#tr-s3",
+        "dataAttributes": {},
+        "sourceFile": "compositions/tree.html",
+        "bbox": {
+          "x": 371.31,
+          "y": 250,
+          "width": 277.36,
+          "height": 72
+        },
+        "time": 6.5,
+        "rect": {
+          "left": 371.31,
+          "top": 250,
+          "right": 648.67,
+          "bottom": 322,
+          "width": 277.36,
+          "height": 72
+        },
+        "code": "outside_safe_zone",
+        "severity": "warning",
+        "text": "C'est fait.",
+        "message": "<div> \"C'est fait.\" is outside the safe area: Instagram Reels (top edge), YouTube Shorts (top edge).",
+        "fixHint": "Move the text inside the safe area, or mark text meant to sit there with data-layout-allow-safe-zone.",
+        "firstSeen": 6.5,
+        "lastSeen": 7.944,
+        "occurrences": 2,
+        "heldMs": 0,
+        "times": [
+          6.5,
+          7.944
+        ]
+      },
+      {
+        "selector": "#tr-head",
+        "dataAttributes": {},
+        "sourceFile": "compositions/tree.html",
+        "bbox": {
+          "x": 104.72,
+          "y": 413.47,
+          "width": 439,
+          "height": 45.92
+        },
+        "time": 6.5,
+        "rect": {
+          "left": 104.72,
+          "top": 413.47,
+          "right": 543.72,
+          "bottom": 459.39,
+          "width": 439,
+          "height": 45.92
+        },
+        "code": "outside_safe_zone",
+        "severity": "warning",
+        "text": "Arborescence du projet",
+        "message": "<div> \"Arborescence du projet\" is outside the safe area: TikTok (left edge).",
+        "fixHint": "Move the text inside the safe area, or mark text meant to sit there with data-layout-allow-safe-zone.",
+        "firstSeen": 6.5,
+        "lastSeen": 6.5,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          6.5
+        ]
+      },
+      {
+        "selector": "#tr-r0 > div:nth-of-type(1)",
+        "dataAttributes": {},
+        "sourceFile": "compositions/tree.html",
+        "bbox": {
+          "x": 118.16,
+          "y": 512.03,
+          "width": 234.67,
+          "height": 54.88
+        },
+        "time": 6.5,
+        "rect": {
+          "left": 118.16,
+          "top": 512.03,
+          "right": 352.83,
+          "bottom": 566.91,
+          "width": 234.67,
+          "height": 54.88
+        },
+        "code": "outside_safe_zone",
+        "severity": "warning",
+        "text": "Vues (tout)",
+        "message": "<div> \"Vues (tout)\" is outside the safe area: TikTok (left edge).",
+        "fixHint": "Move the text inside the safe area, or mark text meant to sit there with data-layout-allow-safe-zone.",
+        "firstSeen": 6.5,
+        "lastSeen": 6.5,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          6.5
+        ]
+      },
+      {
+        "selector": "#tr-r1 > div:nth-of-type(1)",
+        "dataAttributes": {},
+        "sourceFile": "compositions/tree.html",
+        "bbox": {
+          "x": 118.16,
+          "y": 615.07,
+          "width": 321.09,
+          "height": 54.88
+        },
+        "time": 6.5,
+        "rect": {
+          "left": 118.16,
+          "top": 615.07,
+          "right": 439.25,
+          "bottom": 669.95,
+          "width": 321.09,
+          "height": 54.88
+        },
+        "code": "outside_safe_zone",
+        "severity": "warning",
+        "text": "Nomenclatures",
+        "message": "<div> \"Nomenclatures\" is outside the safe area: TikTok (left edge).",
+        "fixHint": "Move the text inside the safe area, or mark text meant to sit there with data-layout-allow-safe-zone.",
+        "firstSeen": 6.5,
+        "lastSeen": 6.5,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          6.5
+        ]
+      },
+      {
+        "selector": "#tr-r2 > div:nth-of-type(1)",
+        "dataAttributes": {},
+        "sourceFile": "compositions/tree.html",
+        "bbox": {
+          "x": 118.16,
+          "y": 718.11,
+          "width": 287.12,
+          "height": 54.88
+        },
+        "time": 6.5,
+        "rect": {
+          "left": 118.16,
+          "top": 718.11,
+          "right": 405.28,
+          "bottom": 772.99,
+          "width": 287.12,
+          "height": 54.88
+        },
+        "code": "outside_safe_zone",
+        "severity": "warning",
+        "text": "Feuilles (tout)",
+        "message": "<div> \"Feuilles (tout)\" is outside the safe area: TikTok (left edge).",
+        "fixHint": "Move the text inside the safe area, or mark text meant to sit there with data-layout-allow-safe-zone.",
+        "firstSeen": 6.5,
+        "lastSeen": 6.5,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          6.5
+        ]
+      },
+      {
+        "selector": "#tr-badge",
+        "dataAttributes": {},
+        "sourceFile": "compositions/tree.html",
+        "bbox": {
+          "x": 762,
+          "y": 1112,
+          "width": 90,
+          "height": 31
+        },
+        "time": 7.944,
+        "rect": {
+          "left": 762,
+          "top": 1112,
+          "right": 852,
+          "bottom": 1143,
+          "width": 90,
+          "height": 31
+        },
+        "code": "outside_safe_zone",
+        "severity": "warning",
+        "text": "intacte",
+        "message": "<div> \"intacte\" is outside the safe area: TikTok (right edge).",
+        "fixHint": "Move the text inside the safe area, or mark text meant to sit there with data-layout-allow-safe-zone.",
+        "firstSeen": 7.944,
+        "lastSeen": 7.944,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          7.944
+        ]
+      },
+      {
+        "selector": "#rs-text",
+        "dataAttributes": {
+          "data-var-text": "result"
+        },
+        "sourceFile": "compositions/result.html",
+        "bbox": {
+          "x": 189.42,
+          "y": 818.7,
+          "width": 621.16,
+          "height": 171.8
+        },
+        "time": 9.389,
+        "rect": {
+          "left": 189.42,
+          "top": 818.7,
+          "right": 810.58,
+          "bottom": 990.5,
+          "width": 621.16,
+          "height": 171.8
+        },
+        "code": "outside_safe_zone",
+        "severity": "warning",
+        "text": "Seule ta sélection change.",
+        "message": "<div> \"Seule ta sélection change.\" is outside the safe area: TikTok (right edge).",
+        "fixHint": "Move the text inside the safe area, or mark text meant to sit there with data-layout-allow-safe-zone.",
+        "firstSeen": 9.389,
+        "lastSeen": 9.389,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          9.389
+        ]
+      },
+      {
+        "code": "escaped_container",
+        "severity": "info",
+        "time": 3.611,
+        "selector": "#tr-ring",
+        "message": "Positioned element renders far outside its offset parent — its coordinates were likely computed in a different frame (canvas/viewport pixels).",
+        "rect": {
+          "left": 596.41,
+          "top": 806.41,
+          "right": 683.59,
+          "bottom": 893.59,
+          "width": 87.18,
+          "height": 87.18
+        },
+        "containerSelector": "#tr-cursor",
+        "text": "",
+        "fixHint": "Compute left/top in the offset parent's frame (subtract its rect), or mark intentional placement with data-layout-allow-overflow.",
+        "containerRect": {
+          "left": 640,
+          "top": 850,
+          "right": 710,
+          "bottom": 920,
+          "width": 70,
+          "height": 70
+        },
+        "dataAttributes": {},
+        "sourceFile": "compositions/tree.html",
+        "bbox": {
+          "x": 596.41,
+          "y": 806.41,
+          "width": 87.18,
+          "height": 87.18
+        },
+        "firstSeen": 3.611,
+        "lastSeen": 3.611,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          3.611
+        ]
+      },
+      {
+        "code": "text_occluded",
+        "severity": "info",
+        "time": 5.056,
+        "selector": "#tr-na > div:nth-of-type(2)",
+        "message": "Text is hidden beneath an opaque element.",
+        "rect": {
+          "left": 269.91,
+          "top": 919,
+          "right": 288,
+          "bottom": 968,
+          "width": 18.09,
+          "height": 49
+        },
+        "containerSelector": "#tr-hlb",
+        "text": "1",
+        "fixHint": "Give the text its own zone, raise its stacking order above the covering element, or mark intentional layering with data-layout-allow-occlusion.",
+        "coveredFraction": 1,
+        "dataAttributes": {},
+        "sourceFile": "compositions/tree.html",
+        "bbox": {
+          "x": 269.91,
+          "y": 919,
+          "width": 18.09,
+          "height": 49
+        },
+        "firstSeen": 5.056,
+        "lastSeen": 5.056,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          5.056
+        ]
+      },
+      {
+        "code": "text_occluded",
+        "severity": "info",
+        "time": 5.056,
+        "selector": "#tr-nb > div:nth-of-type(2)",
+        "message": "Text is hidden beneath an opaque element.",
+        "rect": {
+          "left": 262.14,
+          "top": 1011,
+          "right": 288,
+          "bottom": 1060,
+          "width": 25.86,
+          "height": 49
+        },
+        "containerSelector": "#tr-hlc",
+        "text": "2",
+        "fixHint": "Give the text its own zone, raise its stacking order above the covering element, or mark intentional layering with data-layout-allow-occlusion.",
+        "coveredFraction": 1,
+        "dataAttributes": {},
+        "sourceFile": "compositions/tree.html",
+        "bbox": {
+          "x": 262.14,
+          "y": 1011,
+          "width": 25.86,
+          "height": 49
+        },
+        "firstSeen": 5.056,
+        "lastSeen": 5.056,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          5.056
+        ]
+      }
+    ],
+    "duration": 13,
+    "samples": [
+      0.722,
+      2.167,
+      3.611,
+      5.056,
+      6.5,
+      7.944,
+      9.389,
+      10.833,
+      12.278
+    ],
+    "transitionSamples": [],
+    "transitionSamplesDropped": 0,
+    "tolerance": 2,
+    "totalIssueCount": 25,
+    "truncated": false,
+    "faceCheck": {
+      "ran": true,
+      "candidates": 0,
+      "faces": 0
+    }
+  },
+  "motion": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "enabled": false,
+    "samples": 0
+  },
+  "contrast": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "enabled": true,
+    "samples": [
+      0.722,
+      3.611,
+      6.5,
+      9.389,
+      12.278
+    ],
+    "checked": 51,
+    "passed": 51
+  },
+  "craft": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 1,
+    "infoCount": 0,
+    "findings": [
+      {
+        "code": "text_below_floor",
+        "severity": "warning",
+        "message": "Type floor is 28 px (2.6% of the 1080 px short side, what a phone can read) and \"intacte\" renders at 26 px for 1.00 s: set reading text to at least 28 px, or put data-layout-ignore on text that is texture rather than reading; see references/look.md.",
+        "text": "intacte",
+        "selector": "#tr-badge",
+        "dataAttributes": {},
+        "sourceFile": "compositions/tree.html",
+        "bbox": {
+          "x": 763.03,
+          "y": 1112.88,
+          "width": 90.35,
+          "height": 31.12
+        },
+        "time": 7.5,
+        "times": [
+          7.5
+        ],
+        "fontPx": 26,
+        "floorPx": 28,
+        "seconds": 1,
+        "elements": [
+          {
+            "selector": "#tr-badge",
+            "text": "intacte",
+            "fontPx": 26,
+            "time": 7.5,
+            "seconds": 1
+          }
+        ]
+      }
+    ],
+    "enabled": true,
+    "step": 0.125,
+    "samples": 104
+  },
+  "audio": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 1,
+    "findings": [
+      {
+        "code": "audio_none",
+        "severity": "info",
+        "message": "The film has no sound: no clip in it plays audio.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0
+      }
+    ]
+  },
+  "hdr": {
+    "autoPromotion": null,
+    "inspection": "available"
+  },
+  "snapshots": {
+    "enabled": false,
+    "files": [],
+    "times": [],
+    "findingFiles": []
+  }
+}

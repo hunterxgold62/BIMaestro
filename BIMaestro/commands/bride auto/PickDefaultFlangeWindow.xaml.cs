@@ -50,7 +50,7 @@ namespace Modification
             }
             catch (Exception ex)
             {
-                MessageBox.Show(UiLanguage.T("Impossible d’ouvrir la page d’aide : ", "Unable to Open the Help Page: ") + ex.Message, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(UiLanguage.Get("PickDefaultFlangeWindow.xaml.UnableToOpenTheHelpPage") + ex.Message, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
@@ -130,7 +130,7 @@ namespace Modification
 
             if (symbols.Count == 0)
             {
-                TaskDialog.Show(UiLanguage.T("Choisir une bride", "Choose a Flange"), UiLanguage.T("Aucun type de bride trouvé dans ce projet.", "No Flange Type Found in This Project."));
+                TaskDialog.Show(UiLanguage.Get("PickDefaultFlangeWindow.xaml.ChooseAFlange"), UiLanguage.Get("PickDefaultFlangeWindow.xaml.NoFlangeTypeFoundInThisProject"));
                 return Result.Cancelled;
             }
 
@@ -147,9 +147,9 @@ namespace Modification
             FlangeChoiceCache.FamilyName = chosen.FamilyName;
             FlangeChoiceCache.SymbolName = chosen.Name;
 
-            TaskDialog.Show(UiLanguage.T("Bride sélectionnée (session)", "Flange Selected (Session)"),
+            TaskDialog.Show(UiLanguage.Get("PickDefaultFlangeWindow.xaml.FlangeSelectedSession"),
                 $"{chosen.FamilyName} : {chosen.Name}\n\n" +
-                UiLanguage.T("Cette sélection sera utilisée par la commande principale tant que Revit reste ouvert.", "This Selection Will Be Used by the Main Command While Revit Remains Open."));
+                UiLanguage.Get("PickDefaultFlangeWindow.xaml.ThisSelectionWillBeUsedByTheMain"));
 
             return Result.Succeeded;
         }

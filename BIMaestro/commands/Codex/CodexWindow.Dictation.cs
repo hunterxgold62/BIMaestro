@@ -20,7 +20,7 @@ namespace BIMaestro.Codex
                 if (closed || !IsActive || !dictate.IsEnabled || !input.IsKeyboardFocused) return;
                 if (Keyboard.Modifiers != ModifierKeys.None)
                 {
-                    status.Text = UiLanguage.T("Relâchez les touches du clavier, puis cliquez sur Micro ou appuyez sur Win+H dans le champ du message.", "Release the keyboard keys, then click Mic or press Win+H in the message field.");
+                    status.Text = UiLanguage.Get("CodexWindow.Dictation.ReleaseTheKeyboardKeysThenClickMicOr");
                     return;
                 }
                 try
@@ -32,9 +32,9 @@ namespace BIMaestro.Codex
                         // Release keys even if Windows accepted only part of the sequence.
                         var release = new[] { DictationKey(0x48, 2), DictationKey(0x5B, 2) };
                         SendInput((uint)release.Length, release, Marshal.SizeOf(typeof(DictationInput)));
-                        throw new Win32Exception(UiLanguage.T("Impossible d'ouvrir la dictée. Appuyez sur Win+H dans le champ du message.", "Could not open dictation. Press Win+H in the message field."));
+                        throw new Win32Exception(UiLanguage.Get("CodexWindow.Dictation.CouldNotOpenDictationPressWinHIn"));
                     }
-                    status.Text = UiLanguage.T("Dictée Windows : utilisez son bouton micro pour démarrer ou arrêter. Relisez le texte, puis cliquez sur Envoyer. Si nécessaire, autorisez le micro et la reconnaissance vocale dans Windows.", "Windows dictation: use its microphone button to start or stop. Review the text, then click Send. If needed, allow microphone access and speech recognition in Windows.");
+                    status.Text = UiLanguage.Get("CodexWindow.Dictation.WindowsDictationUseItsMicrophoneButtonToStart");
                 }
                 catch (Exception ex) { Error(ex); }
             }));

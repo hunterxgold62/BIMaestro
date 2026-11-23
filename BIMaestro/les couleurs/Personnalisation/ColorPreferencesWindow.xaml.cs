@@ -73,7 +73,7 @@ namespace Couleur
             {
                 _propertiesEditor = BIMaestro.PropertiesAppearance.PropertiesAppearanceCommand.CreateEditor(application);
                 _propertiesEditor.SaveBackupRequested = () => ExportCurrentPack(false, false,
-                    UiLanguage.T("Sauvegarder mes propriétés avant réinitialisation", "Back up my properties before reset"), UiLanguage.T("Mes propriétés avant réinitialisation.bimaestro-style.json", "My properties before reset.bimaestro-style.json"), true, false);
+                    UiLanguage.Get("ColorPreferencesWindow.xaml.BackUpMyPropertiesBeforeReset"), UiLanguage.Get("ColorPreferencesWindow.xaml.MyPropertiesBeforeResetBimaestroStyleJson"), true, false);
                 PropertiesEditorHost.Content = _propertiesEditor;
                 _homeEditor = new BIMaestro.Home.HomeAppearanceEditor();
                 HomeEditorHost.Content = _homeEditor;
@@ -101,7 +101,7 @@ namespace Couleur
                 ProjectBrowserColoring.Apply(_mainWindowHandle);
             }
             RefreshBrowserProfiles();
-            PreferenceFilePath = UiLanguage.T("Sauvegarde : ", "Saved at: ") +
+            PreferenceFilePath = UiLanguage.Get("ColorPreferencesWindow.xaml.SavedAt") +
                 RibbonColorPreferences.PreferenceFilePath;
             PresetEntries = RibbonColorPresetCatalog.StandardPresetNames
                 .Select(name => new PresetMenuEntry(name, false))
@@ -123,7 +123,7 @@ namespace Couleur
                 if (_projectWriteHandler.HasPending || _savingAppearance)
                 {
                     args.Cancel = true;
-                    MessageBox.Show(this, UiLanguage.T("Patientez : Revit termine l’enregistrement des réglages.", "Please wait: Revit is finishing saving the settings."), UiLanguage.T("Enregistrement en cours", "Saving in progress"), MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show(this, UiLanguage.Get("ColorPreferencesWindow.xaml.PleaseWaitRevitIsFinishingSavingTheSettings"), UiLanguage.Get("ColorPreferencesWindow.xaml.SavingInProgress"), MessageBoxButton.OK, MessageBoxImage.Information);
                 }
             };
             Closed += (_, __) =>
@@ -169,7 +169,7 @@ namespace Couleur
                         SetSavingAppearance(false);
                         if (!app.CanPostCommand(command))
                         {
-                            MessageBox.Show(this, UiLanguage.T("Vos réglages sont enregistrés. Revit ne peut pas afficher l’accueil pour le moment.", "Your settings are saved. Revit cannot display Home right now."), UiLanguage.T("Accueil Revit", "Revit Home"), MessageBoxButton.OK, MessageBoxImage.Information);
+                            MessageBox.Show(this, UiLanguage.Get("ColorPreferencesWindow.xaml.YourSettingsAreSavedRevitCannotDisplayHome"), UiLanguage.Get("ColorPreferencesWindow.xaml.RevitHome"), MessageBoxButton.OK, MessageBoxImage.Information);
                             return;
                         }
                         app.PostCommand(command);
@@ -241,7 +241,7 @@ namespace Couleur
                 {
                     Document active = app.ActiveUIDocument?.Document;
                     if (active == null || !active.Equals(request.Document))
-                        throw new System.InvalidOperationException(UiLanguage.T("Le projet actif a changé. Revenez au projet initial puis réessayez.", "The active project has changed. Return to the original project and try again."));
+                        throw new System.InvalidOperationException(UiLanguage.Get("ColorPreferencesWindow.xaml.TheActiveProjectHasChangedReturnToThe"));
                     if (request.ApiAction != null)
                         request.ApiAction(app);
                     else if (request.Clear)
@@ -267,7 +267,7 @@ namespace Couleur
         {
             if (_projectWriteHandler.HasPending)
             {
-                completed(new System.InvalidOperationException(UiLanguage.T("Une modification du projet est déjà en cours. Patientez un instant.", "A project change is already in progress. Please wait a moment.")));
+                completed(new System.InvalidOperationException(UiLanguage.Get("ColorPreferencesWindow.xaml.AProjectChangeIsAlreadyInProgressPlease")));
                 return false;
             }
             var request = new BrowserProjectWriteRequest
@@ -298,7 +298,7 @@ namespace Couleur
         {
             if (_projectWriteHandler.HasPending)
             {
-                request.Completed(new System.InvalidOperationException(UiLanguage.T("Une opération Revit est déjà en cours. Patientez un instant.", "A Revit operation is already in progress. Please wait a moment.")));
+                request.Completed(new System.InvalidOperationException(UiLanguage.Get("ColorPreferencesWindow.xaml.ARevitOperationIsAlreadyInProgressPlease")));
                 return false;
             }
             _projectWriteHandler.Pending = request;
@@ -306,7 +306,7 @@ namespace Couleur
             if (response == ExternalEventRequest.Accepted || response == ExternalEventRequest.Pending)
                 return true;
             _projectWriteHandler.Pending = null;
-            request.Completed(new System.InvalidOperationException(UiLanguage.T("Revit n’a pas accepté la demande. Réessayez lorsqu’il est disponible.", "Revit did not accept the request. Try again when it is available.")));
+            request.Completed(new System.InvalidOperationException(UiLanguage.Get("ColorPreferencesWindow.xaml.RevitDidNotAcceptTheRequestTryAgain")));
             return false;
         }
 
@@ -316,11 +316,11 @@ namespace Couleur
         public bool CanApplyBrowserToProject => _canApplyBrowserToProject;
         public bool HasSharedBrowserAppearance => _hasSharedBrowserAppearance;
         public string BrowserSourceLabel => HasSharedBrowserAppearance
-            ? UiLanguage.T("Style partagé dans la maquette", "Style shared in the model")
-            : UiLanguage.T("Mes réglages personnels", "My personal settings");
+            ? UiLanguage.Get("ColorPreferencesWindow.xaml.StyleSharedInTheModel")
+            : UiLanguage.Get("ColorPreferencesWindow.xaml.MyPersonalSettings");
         public string BrowserSourceStatus => HasSharedBrowserAppearance
-            ? UiLanguage.T("Source actuelle : style partagé dans cette maquette. « Enregistrer mes réglages » met aussi à jour les vues, dossiers et icônes de ce projet.", "Current source: style shared in this model. “Save my settings” also updates the views, folders and icons of this project.")
-            : UiLanguage.T("Source actuelle : mes réglages personnels. Pour les partager, utilisez « Appliquer au projet ».", "Current source: my personal settings. To share them, use “Apply to project”.");
+            ? UiLanguage.Get("ColorPreferencesWindow.xaml.CurrentSourceStyleSharedInThisModelSave")
+            : UiLanguage.Get("ColorPreferencesWindow.xaml.CurrentSourceMyPersonalSettingsToShareThem");
 
         private void NotifyBrowserSourceChanged(bool shared)
         {
@@ -329,7 +329,7 @@ namespace Couleur
             OnPropertyChanged(nameof(BrowserSourceLabel));
             OnPropertyChanged(nameof(BrowserSourceStatus));
         }
-        private string _packStatus = UiLanguage.T("Sauvegardez ou restaurez les panneaux BIMaestro, l’arborescence et ses icônes, les propriétés et l’accueil Revit. Les profils et groupes personnalisés sont inclus.", "Back up or restore the BIMaestro panels, the Project Browser and its icons, properties and Revit Home. Profiles and custom groups are included.");
+        private string _packStatus = UiLanguage.Get("ColorPreferencesWindow.xaml.BackUpOrRestoreTheBIMaestroPanelsThe");
         public string PackStatus { get => _packStatus; private set { _packStatus = value; OnPropertyChanged(); } }
 
         private void ExportPack_Click(object sender, RoutedEventArgs e)
@@ -339,22 +339,22 @@ namespace Couleur
             try
             {
                 ExportCurrentPack(scopeDialog.IncludesRibbon, scopeDialog.IncludesBrowser,
-                    UiLanguage.T("Exporter un pack d’apparence", "Export an appearance pack"), UiLanguage.T("Mon pack.bimaestro-style.json", "My pack.bimaestro-style.json"), scopeDialog.IncludesProperties, scopeDialog.IncludesHome);
+                    UiLanguage.Get("ColorPreferencesWindow.xaml.ExportAnAppearancePack"), UiLanguage.Get("ColorPreferencesWindow.xaml.MyPackBimaestroStyleJson"), scopeDialog.IncludesProperties, scopeDialog.IncludesHome);
             }
-            catch (System.Exception ex) { MessageBox.Show(this, ex.Message, UiLanguage.T("Export du pack", "Pack export"), MessageBoxButton.OK, MessageBoxImage.Error); }
+            catch (System.Exception ex) { MessageBox.Show(this, ex.Message, UiLanguage.Get("ColorPreferencesWindow.xaml.PackExport"), MessageBoxButton.OK, MessageBoxImage.Error); }
         }
 
         private void ImportPack_Click(object sender, RoutedEventArgs e)
         {
-            var dialog = new Microsoft.Win32.OpenFileDialog { Title = UiLanguage.T("Importer un pack d’apparence", "Import an appearance pack"),
-                Filter = UiLanguage.T("Pack BIMaestro|*.bimaestro-style.json|Fichier JSON|*.json", "BIMaestro pack|*.bimaestro-style.json|JSON file|*.json"), CheckFileExists = true };
+            var dialog = new Microsoft.Win32.OpenFileDialog { Title = UiLanguage.Get("ColorPreferencesWindow.xaml.ImportAnAppearancePack"),
+                Filter = UiLanguage.Get("ColorPreferencesWindow.xaml.BIMaestroPackBimaestroStyleJsonJSONFileJson"), CheckFileExists = true };
             if (dialog.ShowDialog(this) != true) return;
             try
             {
                 var pack = AppearancePackFile.Import(dialog.FileName);
                 var scope = new AppearancePackScopeDialog(pack) { Owner = this };
                 if (scope.ShowDialog() != true) return;
-                if (!OfferBackup(UiLanguage.T("Avant l’import, voulez-vous enregistrer vos réglages actuels dans un pack de secours ?", "Before importing, do you want to save your current settings in a backup pack?"), UiLanguage.T("Import du pack", "Pack import")))
+                if (!OfferBackup(UiLanguage.Get("ColorPreferencesWindow.xaml.BeforeImportingDoYouWantToSaveYour"), UiLanguage.Get("ColorPreferencesWindow.xaml.PackImport")))
                     return;
                 if (scope.IncludesRibbon)
                 {
@@ -373,19 +373,19 @@ namespace Couleur
                 }
                 if (scope.IncludesProperties) _propertiesEditor.LoadPreferences(pack.Properties);
                 if (scope.IncludesHome) _homeEditor.LoadSettings(pack.Home);
-                PackStatus = UiLanguage.T("Pack chargé : ", "Pack loaded:") + System.IO.Path.GetFileName(dialog.FileName) + UiLanguage.T(". Vérifiez les onglets puis cliquez sur Enregistrer pour l’appliquer, ou Annuler pour abandonner.", ". Check the tabs, then click Save to apply it, or Cancel to discard it.");
+                PackStatus = UiLanguage.Get("ColorPreferencesWindow.xaml.PackLoaded") + System.IO.Path.GetFileName(dialog.FileName) + UiLanguage.Get("ColorPreferencesWindow.xaml.CheckTheTabsThenClickSaveToApply");
             }
-            catch (System.Exception ex) { MessageBox.Show(this, ex.Message, UiLanguage.T("Import du pack", "Pack import"), MessageBoxButton.OK, MessageBoxImage.Error); }
+            catch (System.Exception ex) { MessageBox.Show(this, ex.Message, UiLanguage.Get("ColorPreferencesWindow.xaml.PackImport"), MessageBoxButton.OK, MessageBoxImage.Error); }
         }
 
         private bool OfferBackup(string question, string title)
         {
             var choice = MessageBox.Show(this,
-                question + UiLanguage.T("\n\nOui : enregistrer un fichier de secours.\nNon : continuer sans sauvegarder.\nAnnuler : ne rien modifier.", "\n\nYes: save a backup file.\nNo: continue without backing up.\nCancel: change nothing."),
+                question + UiLanguage.Get("ColorPreferencesWindow.xaml.YesSaveABackupFileNoContinueWithout"),
                 title, MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
             if (choice == MessageBoxResult.Cancel) return false;
             return choice != MessageBoxResult.Yes || ExportCurrentPack(true, true,
-                UiLanguage.T("Enregistrer mes réglages actuels", "Save my current settings"), UiLanguage.T("Mes réglages avant modification.bimaestro-style.json", "My settings before changes.bimaestro-style.json"), _propertiesEditor != null, _homeEditor != null);
+                UiLanguage.Get("ColorPreferencesWindow.xaml.SaveMyCurrentSettings"), UiLanguage.Get("ColorPreferencesWindow.xaml.MySettingsBeforeChangesBimaestroStyleJson"), _propertiesEditor != null, _homeEditor != null);
         }
 
         private bool ExportCurrentPack(bool includesRibbon, bool includesBrowser, string title, string fileName,
@@ -404,7 +404,7 @@ namespace Couleur
                 Browser = includesBrowser ? BrowserPreferences : null,
                 Icons = includesBrowser ? BrowserIcons : null
             });
-            PackStatus = UiLanguage.T("Pack exporté : ", "Pack exported:") + System.IO.Path.GetFileName(dialog.FileName) + ".";
+            PackStatus = UiLanguage.Get("ColorPreferencesWindow.xaml.PackExported") + System.IO.Path.GetFileName(dialog.FileName) + ".";
             return true;
         }
 
@@ -420,34 +420,34 @@ namespace Couleur
         {
             if (!CanApplyBrowserToProject)
             {
-                PackStatus = UiLanguage.T("Aucun projet Revit modifiable n’est actif.", "No editable Revit project is active.");
+                PackStatus = UiLanguage.Get("ColorPreferencesWindow.xaml.NoEditableRevitProjectIsActive");
                 return;
             }
 
             try
             {
                 BrowserPreferences.IsEnabled = true;
-                PackStatus = UiLanguage.T("Application au projet en cours…", "Applying to the project…");
+                PackStatus = UiLanguage.Get("ColorPreferencesWindow.xaml.ApplyingToTheProject");
                 QueueProjectWrite(false, BrowserPreferences, BrowserIcons, error =>
                 {
                     if (error != null)
                     {
-                        PackStatus = UiLanguage.T("Le projet n’a pas été modifié : ", "The project was not modified:") + error.Message;
-                        MessageBox.Show(this, error.Message, UiLanguage.T("Configuration du projet", "Project configuration"), MessageBoxButton.OK, MessageBoxImage.Error);
+                        PackStatus = UiLanguage.Get("ColorPreferencesWindow.xaml.TheProjectWasNotModified") + error.Message;
+                        MessageBox.Show(this, error.Message, UiLanguage.Get("ColorPreferencesWindow.xaml.ProjectConfiguration"), MessageBoxButton.OK, MessageBoxImage.Error);
                         return;
                     }
                     ProjectBrowserColoring.Reset();
                     ProjectBrowserColoring.Apply(_mainWindowHandle);
                     NotifyBrowserSourceChanged(true);
-                    PackStatus = UiLanguage.T("Arborescence enregistrée dans le projet. Elle sera partagée lors du prochain enregistrement ou de la prochaine synchronisation.", "Project Browser saved in the project. It will be shared at the next save or synchronization.");
+                    PackStatus = UiLanguage.Get("ColorPreferencesWindow.xaml.ProjectBrowserSavedInTheProjectItWill");
                 });
             }
             catch (System.Exception ex)
             {
                 MessageBox.Show(
                     this,
-                    UiLanguage.T("Impossible d’enregistrer l’arborescence dans le projet.\n\n", "Unable to save the Project Browser in the project.\n\n") + ex.Message,
-                    UiLanguage.T("Configuration du projet", "Project configuration"),
+                    UiLanguage.Get("ColorPreferencesWindow.xaml.UnableToSaveTheProjectBrowserInThe") + ex.Message,
+                    UiLanguage.Get("ColorPreferencesWindow.xaml.ProjectConfiguration"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
             }
@@ -471,7 +471,7 @@ namespace Couleur
         {
             var dialog = new Microsoft.Win32.OpenFileDialog
             {
-                Title = UiLanguage.T("Importer une icône simple (PNG conseillé)", "Import a simple icon (PNG recommended)"),
+                Title = UiLanguage.Get("ColorPreferencesWindow.xaml.ImportASimpleIconPNGRecommended"),
                 Filter = "Images|*.png;*.jpg;*.jpeg;*.bmp",
                 CheckFileExists = true
             };
@@ -479,7 +479,7 @@ namespace Couleur
             try
             {
                 if (new System.IO.FileInfo(dialog.FileName).Length > 10 * 1024 * 1024)
-                    throw new System.InvalidOperationException(UiLanguage.T("Choisissez une image de moins de 10 Mo.", "Choose an image smaller than 10 MB."));
+                    throw new System.InvalidOperationException(UiLanguage.Get("ColorPreferencesWindow.xaml.ChooseAnImageSmallerThan10MB"));
                 using (var stream = System.IO.File.OpenRead(dialog.FileName))
                 {
                     var asset = new BrowserIconAsset
@@ -496,8 +496,8 @@ namespace Couleur
             }
             catch (System.Exception ex)
             {
-                MessageBox.Show(this, UiLanguage.T("Impossible de lire cette image.\n", "Unable to read this image.\n") + ex.Message,
-                    UiLanguage.T("Icônes", "Icons"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(this, UiLanguage.Get("ColorPreferencesWindow.xaml.UnableToReadThisImage") + ex.Message,
+                    UiLanguage.Get("ColorPreferencesWindow.xaml.Icons"), MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
@@ -531,8 +531,8 @@ namespace Couleur
 
         public string BrowserCategorySuggestionTitle =>
             BrowserCategorySuggestions.Count == 0
-                ? UiLanguage.T("Aucune nouvelle catégorie détectée", "No New Category Detected")
-                : BrowserCategorySuggestions.Count + UiLanguage.T(" catégories détectées", " categories detected");
+                ? UiLanguage.Get("ColorPreferencesWindow.xaml.NoNewCategoryDetected")
+                : BrowserCategorySuggestions.Count + UiLanguage.Get("ColorPreferencesWindow.xaml.CategoriesDetected");
 
         public string PreferenceFilePath { get; }
 
@@ -871,14 +871,14 @@ namespace Couleur
             if (_document == null)
             {
                 MessageBox.Show(this,
-                    UiLanguage.T("Ouvrez d’abord un projet Revit pour choisir un dossier.", "First open a Revit project to choose a folder."),
-                    UiLanguage.T("Arborescence du projet", "Project Browser"), MessageBoxButton.OK, MessageBoxImage.Information);
+                    UiLanguage.Get("ColorPreferencesWindow.xaml.FirstOpenARevitProjectToChooseA"),
+                    UiLanguage.Get("ColorPreferencesWindow.xaml.ProjectBrowser"), MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
             QueueBrowserRead(_ =>
             {
                 if (!int.TryParse(_document.Application.VersionNumber, out int version) || version < 2024)
-                    throw new System.InvalidOperationException(UiLanguage.T("La sélection des dossiers nécessite Revit 2024 ou plus récent.", "Folder selection requires Revit 2024 or later."));
+                    throw new System.InvalidOperationException(UiLanguage.Get("ColorPreferencesWindow.xaml.FolderSelectionRequiresRevit2024OrLater"));
                 var dialog = new ProjectBrowserRuleWindow(
                     _document, BrowserPreferences,
                     (selected, previous, completed) => ApplyBrowserRule(selected, previous, completed),
@@ -896,7 +896,7 @@ namespace Couleur
                         if (dialog.TextColorTutorialCompleted)
                         {
                             CompleteAppearanceGuideStep(7);
-                            AppearanceGuideText.Text = UiLanguage.T("La couleur du texte a été appliquée au dossier choisi. Clique sur Suivant pour ajouter les icônes. Tu peux annuler cet essai avec « Annuler la dernière application » dans le choix des dossiers.", "The text color has been applied to the selected folder. Click Next to add icons. You can undo this test with “Undo last application” in the folder selection.");
+                            AppearanceGuideText.Text = UiLanguage.Get("ColorPreferencesWindow.xaml.TheTextColorHasBeenAppliedToThe");
                         }
                     };
                 }
@@ -904,7 +904,7 @@ namespace Couleur
             }, error =>
             {
                 if (error != null)
-                    MessageBox.Show(this, error.Message, UiLanguage.T("Arborescence du projet", "Project Browser"), MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show(this, error.Message, UiLanguage.Get("ColorPreferencesWindow.xaml.ProjectBrowser"), MessageBoxButton.OK, MessageBoxImage.Error);
             });
         }
 
@@ -916,7 +916,7 @@ namespace Couleur
             if (HasSharedBrowserAppearance && !CanApplyBrowserToProject)
             {
                 completed(new System.InvalidOperationException(
-                    UiLanguage.T("Le style de cette maquette est partagé, mais le projet est en lecture seule. Aucune modification personnelle ne peut le remplacer ici.", "This model's style is shared, but the project is read-only. No personal change can replace it here.")));
+                    UiLanguage.Get("ColorPreferencesWindow.xaml.ThisModelSStyleIsSharedButThe")));
                 return;
             }
             var undoState = new BrowserRuleUndoState
@@ -981,7 +981,7 @@ namespace Couleur
         {
             if (_browserRuleUndo.Count == 0)
             {
-                completed(null, false, new System.InvalidOperationException(UiLanguage.T("Aucune application récente à annuler.", "No recent application to undo.")));
+                completed(null, false, new System.InvalidOperationException(UiLanguage.Get("ColorPreferencesWindow.xaml.NoRecentApplicationToUndo")));
                 return;
             }
             BrowserRuleUndoState previous = _browserRuleUndo.Peek();
@@ -1026,7 +1026,7 @@ namespace Couleur
             }, error =>
             {
                 if (error != null)
-                    MessageBox.Show(this, error.Message, UiLanguage.T("Modifier un dossier", "Edit a folder"), MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show(this, error.Message, UiLanguage.Get("ColorPreferencesWindow.xaml.EditAFolder"), MessageBoxButton.OK, MessageBoxImage.Error);
             });
         }
 
@@ -1054,7 +1054,7 @@ namespace Couleur
             QueueBrowserRead(_ => DetectBrowserCategories(), error =>
             {
                 if (error != null)
-                    MessageBox.Show(this, error.Message, UiLanguage.T("Actualiser les dossiers", "Refresh folders"), MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show(this, error.Message, UiLanguage.Get("ColorPreferencesWindow.xaml.RefreshFolders"), MessageBoxButton.OK, MessageBoxImage.Error);
             });
         }
 
@@ -1250,18 +1250,18 @@ namespace Couleur
         {
             string[] disciplines =
             {
-                "Architecture", "Structure", UiLanguage.T("Aménagement", "Interiors"), "Coordination"
+                "Architecture", "Structure", UiLanguage.Get("ColorPreferencesWindow.xaml.Interiors"), "Coordination"
             };
             string[] levels =
             {
-                UiLanguage.T("RDC", "Ground Floor"), UiLanguage.T("Niveau 01", "Level 01"), UiLanguage.T("Niveau 02", "Level 02"), UiLanguage.T("Toiture", "Roof")
+                UiLanguage.Get("ColorPreferencesWindow.xaml.GroundFloor"), UiLanguage.Get("ColorPreferencesWindow.xaml.Level01"), UiLanguage.Get("ColorPreferencesWindow.xaml.Level02"), UiLanguage.Get("ColorPreferencesWindow.xaml.Roof")
             };
             string[] sections =
             {
-                UiLanguage.T("Coupe AA · Hall central", "Section AA · Main Hall"),
-                UiLanguage.T("Coupe BB · Escalier principal", "Section BB · Main Stair"),
-                UiLanguage.T("Façade · Nord", "Elevation · North"),
-                UiLanguage.T("Détail · Entrée principale", "Detail · Main Entrance")
+                UiLanguage.Get("ColorPreferencesWindow.xaml.SectionAAMainHall"),
+                UiLanguage.Get("ColorPreferencesWindow.xaml.SectionBBMainStair"),
+                UiLanguage.Get("ColorPreferencesWindow.xaml.ElevationNorth"),
+                UiLanguage.Get("ColorPreferencesWindow.xaml.DetailMainEntrance")
             };
 
             string level = levels[_previewRandom.Next(levels.Length)];
@@ -1340,12 +1340,12 @@ namespace Couleur
         {
             try
             {
-                if (!OfferBackup(UiLanguage.T("Avant de revenir aux valeurs par défaut, voulez-vous enregistrer vos réglages actuels ?", "Before reverting to the default values, do you want to save your current settings?"), UiLanguage.T("Valeurs par défaut", "Default values")))
+                if (!OfferBackup(UiLanguage.Get("ColorPreferencesWindow.xaml.BeforeRevertingToTheDefaultValuesDoYou"), UiLanguage.Get("ColorPreferencesWindow.xaml.DefaultValues")))
                     return;
             }
             catch (System.Exception ex)
             {
-                MessageBox.Show(this, ex.Message, UiLanguage.T("Sauvegarde des réglages", "Settings backup"), MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(this, ex.Message, UiLanguage.Get("ColorPreferencesWindow.xaml.SettingsBackup"), MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
             BrowserIcons.Enabled = false;
@@ -1366,8 +1366,8 @@ namespace Couleur
             AreColoredPanelsEnabled = true;
             UseFullPanelColoring = false;
             PackStatus = HasSharedBrowserAppearance
-                ? UiLanguage.T("Valeurs par défaut préparées. Si vous enregistrez, elles remplaceront le style partagé de ce projet ; vos préférences personnelles resteront intactes.", "Default values prepared. If you save, they will replace this project's shared style; your personal preferences will remain intact.")
-                : UiLanguage.T("Valeurs personnelles remises à zéro dans cette fenêtre. Cliquez sur « Enregistrer mes réglages » pour les appliquer.", "Personal values reset in this window. Click “Save my settings” to apply them.");
+                ? UiLanguage.Get("ColorPreferencesWindow.xaml.DefaultValuesPreparedIfYouSaveTheyWill")
+                : UiLanguage.Get("ColorPreferencesWindow.xaml.PersonalValuesResetInThisWindowClickSave");
         }
 
         private void ResetBrowserDefaultsButton_Click(
@@ -1376,17 +1376,17 @@ namespace Couleur
         {
             try
             {
-                if (!OfferBackup(UiLanguage.T("Avant de restaurer l’arborescence Revit, voulez-vous enregistrer vos réglages actuels ?", "Before restoring the Revit Project Browser, do you want to save your current settings?"), UiLanguage.T("Restaurer Revit", "Restore Revit")))
+                if (!OfferBackup(UiLanguage.Get("ColorPreferencesWindow.xaml.BeforeRestoringTheRevitProjectBrowserDoYou"), UiLanguage.Get("ColorPreferencesWindow.xaml.RestoreRevit")))
                     return;
             }
             catch (System.Exception ex)
             {
-                MessageBox.Show(this, ex.Message, UiLanguage.T("Sauvegarde des réglages", "Settings backup"), MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(this, ex.Message, UiLanguage.Get("ColorPreferencesWindow.xaml.SettingsBackup"), MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
             if (HasSharedBrowserAppearance && MessageBox.Show(this,
-                UiLanguage.T("Cette maquette contient un style d’arborescence partagé. Le retirer modifiera la maquette pour toute l’équipe après enregistrement ou synchronisation. Continuer ?", "This model contains a shared Project Browser style. Removing it will modify the model for the whole team after saving or synchronizing. Continue?"),
-                UiLanguage.T("Retirer le style partagé", "Remove shared style"), MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                UiLanguage.Get("ColorPreferencesWindow.xaml.ThisModelContainsASharedProjectBrowserStyle"),
+                UiLanguage.Get("ColorPreferencesWindow.xaml.RemoveSharedStyle"), MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                 return;
             if (HasSharedBrowserAppearance)
             {
@@ -1394,7 +1394,7 @@ namespace Couleur
                 {
                     if (error != null)
                     {
-                        MessageBox.Show(this, error.Message, UiLanguage.T("Restaurer l’arborescence Revit", "Restore Revit Project Browser"), MessageBoxButton.OK, MessageBoxImage.Error);
+                        MessageBox.Show(this, error.Message, UiLanguage.Get("ColorPreferencesWindow.xaml.RestoreRevitProjectBrowser"), MessageBoxButton.OK, MessageBoxImage.Error);
                         return;
                     }
                     BrowserPreferences = ProjectBrowserColorPreferences.Load();
@@ -1405,7 +1405,7 @@ namespace Couleur
                     NotifyBrowserSourceChanged(false);
                     ProjectBrowserColoring.Reset();
                     ProjectBrowserColoring.Apply(_mainWindowHandle);
-                    PackStatus = UiLanguage.T("Style partagé retiré. Ce projet utilise à nouveau vos réglages personnels, sans les modifier.", "Shared style removed. This project uses your personal settings again, without changing them.");
+                    PackStatus = UiLanguage.Get("ColorPreferencesWindow.xaml.SharedStyleRemovedThisProjectUsesYourPersonal");
                 });
                 return;
             }
@@ -1426,7 +1426,7 @@ namespace Couleur
             ProjectBrowserColoring.Reset();
             ProjectBrowserColoring.Apply(_mainWindowHandle);
             NotifyBrowserSourceChanged(false);
-            PackStatus = UiLanguage.T("Arborescence Revit restaurée. Le style partagé a été retiré du projet s’il était présent.", "Revit Project Browser restored. The shared style was removed from the project if it was present.");
+            PackStatus = UiLanguage.Get("ColorPreferencesWindow.xaml.RevitProjectBrowserRestoredTheSharedStyleWas");
         }
 
         private void OpenRevitColorsButton_Click(
@@ -1454,7 +1454,7 @@ namespace Couleur
                 if (guided)
                 {
                     BIMaestro.Tutorials.DemoTourCompletion.Show(_mainWindowHandle, "colors",
-                        UiLanguage.T("Tes réglages d’apparence sont enregistrés. Tu as terminé le tutoriel Couleurs et vues, avec les onglets Propriétés, Accueil Revit et partage des réglages.", "Your appearance settings are saved. You have completed the Colors and Views tutorial, including the Properties, Revit Home and settings sharing tabs."));
+                        UiLanguage.Get("ColorPreferencesWindow.xaml.YourAppearanceSettingsAreSavedYouHaveCompleted"));
                 }
             });
         }
@@ -1469,8 +1469,8 @@ namespace Couleur
                 {
                     SetSavingAppearance(false);
                     MessageBox.Show(this,
-                        UiLanguage.T("Cette maquette partage son apparence, mais elle est en lecture seule. Les changements ne peuvent pas être conservés dans ce projet.", "This model shares its appearance, but it is read-only. Changes cannot be kept in this project."),
-                        UiLanguage.T("Enregistrer mes réglages", "Save my settings"), MessageBoxButton.OK, MessageBoxImage.Information);
+                        UiLanguage.Get("ColorPreferencesWindow.xaml.ThisModelSharesItsAppearanceButItIs"),
+                        UiLanguage.Get("ColorPreferencesWindow.xaml.SaveMySettings"), MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
                 }
                 QueueProjectWrite(false, BrowserPreferences, BrowserIcons, error =>
@@ -1525,7 +1525,7 @@ namespace Couleur
         private static void ShowSaveError(System.Exception ex)
         {
             MessageBox.Show(
-                UiLanguage.T("Impossible d’enregistrer les couleurs.\n\n", "Unable to Save Colors.\n\n") + ex.Message,
+                UiLanguage.Get("ColorPreferencesWindow.xaml.UnableToSaveColors") + ex.Message,
                 "BIMaestro",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
@@ -1910,7 +1910,7 @@ namespace Couleur
 
         public string CountLabel =>
             ViewCount == 1
-                ? UiLanguage.T("1 vue", "1 view")
-                : ViewCount + UiLanguage.T(" vues", " views");
+                ? UiLanguage.Get("ColorPreferencesWindow.xaml.1View")
+                : ViewCount + UiLanguage.Get("ColorPreferencesWindow.xaml.Views");
     }
 }

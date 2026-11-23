@@ -29,22 +29,18 @@ namespace Page
         private void ApplyContent(SupportPromptKind kind)
         {
             Height = 420;
-            Title = UiLanguage.T("Pour me soutenir", "Support my work");
+            Title = UiLanguage.Get("SupportPromptWindow.xaml.SupportMyWork");
             TitleText.Text = Title;
             SubtitleText.Visibility = Visibility.Collapsed;
             HighlightBorder.Visibility = Visibility.Collapsed;
-            IntroText.Text = UiLanguage.T(
-                "Merci d’utiliser BIMaestro ! Si vous souhaitez me soutenir, vous pouvez le faire sur Ko-fi.",
-                "Thank you for using BIMaestro! If you would like to support my work, you can do so on Ko-fi.");
-            ClosingText.Text = UiLanguage.T(
-                "Partager le plugin autour de vous et me mentionner sur LinkedIn m’aide déjà énormément. Merci pour votre soutien !",
-                "Sharing the plugin with others and mentioning me on LinkedIn already helps a great deal. Thank you for your support!");
+            IntroText.Text = UiLanguage.Get("SupportPromptWindow.xaml.ThankYouForUsingBIMaestroIfYouWould");
+            ClosingText.Text = UiLanguage.Get("SupportPromptWindow.xaml.SharingThePluginWithOthersAndMentioningMe");
             ClosingText.Margin = new Thickness(0, 16, 0, 0);
             ClosingText.FontSize = 14;
             ClosingText.LineHeight = 22;
-            LaterButton.Content = UiLanguage.T("Continuer", "Continue");
-            SupportButton.Content = UiLanguage.T("♥  Ko-fi", "♥  Ko-fi");
-            VoluntaryText.Text = UiLanguage.T("Merci !", "Thank you!");
+            LaterButton.Content = UiLanguage.Get("SupportPromptWindow.xaml.Continue");
+            SupportButton.Content = UiLanguage.Get("SupportPromptWindow.xaml.KoFi");
+            VoluntaryText.Text = UiLanguage.Get("SupportPromptWindow.xaml.ThankYou");
         }
         private void SupportButton_Click(object sender, RoutedEventArgs e)
         {

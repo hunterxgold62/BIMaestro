@@ -108,7 +108,7 @@ namespace BIMaestro.PropertiesAppearance
                     var target = context.Parameters.First(p => p.NativeParameterId == id);
                     if (nativeRow > rows.Count || AppearancePreferences.Normalize(rows[nativeRow - 1].Label) != target.NativeName)
                     {
-                        Status = UiLanguage.T("En attente de la synchronisation de la sélection avec la palette Revit.", "Waiting for the selection to sync with the Revit palette.");
+                        Status = UiLanguage.Get("PropertiesPaletteLayout.WaitingForTheSelectionToSyncWithThe");
                         return false;
                     }
                     parameterTokens.Add(id, nativeRow - 1);
@@ -116,7 +116,7 @@ namespace BIMaestro.PropertiesAppearance
             }
             if (parameterTokens.Count == 0)
             {
-                Status = UiLanguage.T("En attente de la synchronisation des identités de paramètres dans la palette Revit.", "Waiting for parameter identities to sync in the Revit palette.");
+                Status = UiLanguage.Get("PropertiesPaletteLayout.WaitingForParameterIdentitiesToSyncInThe");
                 return false;
             }
             _window = grid.Window; _core = grid.Core; _context = context.Signature;
@@ -167,18 +167,18 @@ namespace BIMaestro.PropertiesAppearance
             // Keep saved layouts available in the comparison without changing native editors.
             if (!NativeEditingQualified(revitVersion, context.CategoryKey))
             {
-                Status = UiLanguage.T("Ordre enregistré dans l’aperçu ; cette version ou catégorie n’est pas encore validée pour la saisie après déplacement.", "Order saved in the preview; this version or category is not yet validated for input after reordering.");
+                Status = UiLanguage.Get("PropertiesPaletteLayout.OrderSavedInThePreviewThisVersionOr");
                 return;
             }
             // MoveRows and native editing are qualified separately from color drawing.
-            if (!int.TryParse(revitVersion, out int year) || year < 2023 || year > 2027) { Status = UiLanguage.T("Réordonnancement indisponible pour cette version de Revit.", "Reordering is not available for this Revit version."); return; }
-            if (grid.IsEditing) { Status = UiLanguage.T("Terminez la saisie dans Revit pour appliquer le nouvel ordre.", "Finish your input in Revit to apply the new order."); return; }
+            if (!int.TryParse(revitVersion, out int year) || year < 2023 || year > 2027) { Status = UiLanguage.Get("PropertiesPaletteLayout.ReorderingIsNotAvailableForThisRevitVersion"); return; }
+            if (grid.IsEditing) { Status = UiLanguage.Get("PropertiesPaletteLayout.FinishYourInputInRevitToApplyThe"); return; }
             var actual = Read(grid);
             bool sameInstance = _window == grid.Window && _core == grid.Core && _context == context.Signature && _baseline != null;
             if (!sameInstance)
             {
                 if(_customRowCount>0 && _context!=context.Signature && actual.Any(r=>_baseline.Skip(_originalRowCount).Any(b=>!string.IsNullOrWhiteSpace(b.Label)&&Identity(b)==Identity(r))))
-                {Status=UiLanguage.T("En attente de la palette de la nouvelle sélection.", "Waiting for the palette of the new selection.");return;}
+                {Status=UiLanguage.Get("PropertiesPaletteLayout.WaitingForThePaletteOfTheNewSelection");return;}
                 bool retainedOrder = _baseline != null && _context == context.Signature &&
                     actual.Select(Identity).SequenceEqual(_current.Select(i => Identity(_baseline[i]))) &&
                     ParameterMappingMatches(grid, _current);
@@ -194,7 +194,7 @@ namespace BIMaestro.PropertiesAppearance
                     else { if (!Capture(grid, context, actual)) return; }
                 }
             }
-            if (_failed) { Status = UiLanguage.T("Ordre natif suspendu pour cette sélection après une réponse inattendue de Revit.", "Native order suspended for this selection after an unexpected response from Revit."); return; }
+            if (_failed) { Status = UiLanguage.Get("PropertiesPaletteLayout.NativeOrderSuspendedForThisSelectionAfterAn"); return; }
             if (!ParameterMappingMatches(grid, _current)) { _failed = true; RequiresNativeRebuild = HasApplied; throw new InvalidOperationException("La correspondance native des paramètres a changé avant le déplacement."); }
             PrepareCustomGroups(grid,context,layout,revitVersion,beforeMove);
             var desired = _prefix.ToList();
@@ -223,7 +223,7 @@ namespace BIMaestro.PropertiesAppearance
                         if (!string.IsNullOrWhiteSpace(native.Label) && !NativePropertiesGrid.IsGroupMarker(native.Marker) && grid.CanStyle((uint)affected + 1) && !verifiedTokens.Contains(native.Token))
                         {
                             RestoreBaseline(grid, notified ? null : beforeMove); _failed = true;
-                            Status = UiLanguage.T("Ordre suspendu : un champ modifiable de cette sélection n’a pas d’identité native vérifiable.", "Order suspended: an editable field in this selection has no verifiable native identity.");
+                            Status = UiLanguage.Get("PropertiesPaletteLayout.OrderSuspendedAnEditableFieldInThisSelection");
                             return;
                         }
                     }

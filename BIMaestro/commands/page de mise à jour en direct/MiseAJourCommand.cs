@@ -23,7 +23,7 @@ namespace Page
             }
             catch (Exception ex)
             {
-                TaskDialog.Show(UiLanguage.T("BIMaestro - Erreur", "BIMaestro - Error"), UiLanguage.T($"Une erreur s'est produite : {ex.Message}", $"An error occurred: {ex.Message}"));
+                TaskDialog.Show(UiLanguage.Get("MiseAJourCommand.BIMaestroError"), UiLanguage.Format("MiseAJourCommand.AnErrorOccurred0", (object)ex.Message));
                 return Result.Failed;
             }
         }

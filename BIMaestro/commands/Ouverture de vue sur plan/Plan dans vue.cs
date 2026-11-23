@@ -126,7 +126,7 @@ namespace Visualisation
         // Méthode pour afficher des messages d'erreur
         private void ShowError(string message)
         {
-            TaskDialog.Show("Erreur", message);
+            TaskDialog.Show(global::BIMaestro.Localization.UiLanguage.Get("UiDialog.Error"), message);
         }
     }
 }

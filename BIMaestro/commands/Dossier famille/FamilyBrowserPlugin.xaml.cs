@@ -352,8 +352,8 @@ namespace Famille
             if (!Directory.Exists(familiesFolder))
             {
                 MessageBox.Show(this,
-                    UiLanguage.T("Le dossier de familles spécifié n'existe pas.", "The specified family folder does not exist."),
-                    UiLanguage.T("Erreur", "Error"),
+                    UiLanguage.Get("FamilyBrowserPlugin.xaml.TheSpecifiedFamilyFolderDoesNotExist"),
+                    UiLanguage.Get("FamilyBrowserPlugin.xaml.Error"),
                     MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
@@ -613,7 +613,7 @@ namespace Famille
         {
             BreadcrumbItems.Clear();
 
-            var rootName = string.IsNullOrWhiteSpace(RootFolderName) ? UiLanguage.T("Bibliothèque", "Library") : RootFolderName;
+            var rootName = string.IsNullOrWhiteSpace(RootFolderName) ? UiLanguage.Get("FamilyBrowserPlugin.xaml.Library") : RootFolderName;
             BreadcrumbItems.Add(new FolderBreadcrumb
             {
                 Name = rootName,
@@ -1054,7 +1054,7 @@ namespace Famille
                     displayedFamilies = new List<FamilyItem>();
                     FamilyListView.ItemsSource = displayedFamilies;
                     UpdateCount(0);
-                    PagingStatusText.Text = UiLanguage.T("Aucun résultat.", "No Results.");
+                    PagingStatusText.Text = UiLanguage.Get("FamilyBrowserPlugin.xaml.NoResults");
                 }
                 finally
                 {
@@ -1084,8 +1084,8 @@ namespace Famille
                 UpdateCount(_currentResult.Count);
 
                 PagingStatusText.Text = _nextIndex >= _currentResult.Count
-                    ? UiLanguage.T("Fin de la liste.", "End of list.")
-                    : UiLanguage.T($"Affichés : {displayedFamilies.Count}/{_currentResult.Count}", $"Displayed: {displayedFamilies.Count}/{_currentResult.Count}");
+                    ? UiLanguage.Get("FamilyBrowserPlugin.xaml.EndOfList")
+                    : UiLanguage.Format("FamilyBrowserPlugin.xaml.Displayed01", (object)displayedFamilies.Count, (object)_currentResult.Count);
             }
             finally
             {
@@ -1149,9 +1149,9 @@ namespace Famille
             if (RememberUnmatchedSearch(query))
             {
                 PagingStatusText.Visibility = Visibility.Visible;
-                PagingStatusText.Text = UiLanguage.T("Aucun résultat. Recherche « ", "No Results. Search “") +
+                PagingStatusText.Text = UiLanguage.Get("FamilyBrowserPlugin.xaml.NoResultsSearch") +
                     string.Join(" ", query.Terms) +
-                    UiLanguage.T(" » mémorisée : ouvre maintenant la famille correspondante.", "” Saved: Now Open the Matching Family.");
+                    UiLanguage.Get("FamilyBrowserPlugin.xaml.SavedNowOpenTheMatchingFamily");
             }
         }
 
@@ -1206,8 +1206,8 @@ namespace Famille
                 if (PlaceholderText != null && string.IsNullOrWhiteSpace(SearchBox?.Text))
                 {
                     PlaceholderText.Text = global
-                        ? UiLanguage.T("Rechercher dans toute la bibliothèque…", "Search the entire library…")
-                        : UiLanguage.T("Rechercher dans le dossier…", "Search in this folder…");
+                        ? UiLanguage.Get("FamilyBrowserPlugin.xaml.SearchTheEntireLibrary")
+                        : UiLanguage.Get("FamilyBrowserPlugin.xaml.SearchInThisFolder");
                     PlaceholderText.Visibility = Visibility.Visible;
                 }
             }
@@ -1251,14 +1251,14 @@ namespace Famille
                 SearchDescription = entry.Description,
                 SearchKeywords = entry.Keywords?.ToList() ?? new List<string>(),
                 MatchedKeywordsText = matchedKeywords.Count > 0
-                    ? UiLanguage.T("Trouvé grâce à : ", "Found via: ") + string.Join(", ", matchedKeywords)
-                    : descriptionOnlyMatch ? UiLanguage.T("Trouvé grâce à la description", "Found via description") : null,
+                    ? UiLanguage.Get("FamilyBrowserPlugin.xaml.FoundVia") + string.Join(", ", matchedKeywords)
+                    : descriptionOnlyMatch ? UiLanguage.Get("FamilyBrowserPlugin.xaml.FoundViaDescription") : null,
                 ApproximateMatchText = isApproximate ? GetApproximateMatchText(entry, query) : null,
                 SearchScore = isApproximate ? 10 : CalculateSearchScore(entry, query),
                 IsInCurrentFolder = isInCurrentFolder,
                 SearchLocationLabel = isInCurrentFolder
-                    ? UiLanguage.T("Dans ce dossier", "In this folder")
-                    : UiLanguage.T("Trouvé dans", "Found in"),
+                    ? UiLanguage.Get("FamilyBrowserPlugin.xaml.InThisFolder")
+                    : UiLanguage.Get("FamilyBrowserPlugin.xaml.FoundIn"),
                 SearchFolderPath = folderPath,
                 SearchLocationVisibility = showLocation ? Visibility.Visible : Visibility.Collapsed
             };
@@ -1434,13 +1434,13 @@ namespace Famille
         private FamilyItem CreateSearchGroupHeader(string folderPath, int count)
         {
             var displayFolder = string.IsNullOrWhiteSpace(folderPath)
-                ? UiLanguage.T("Autre dossier", "Other folder")
+                ? UiLanguage.Get("FamilyBrowserPlugin.xaml.OtherFolder")
                 : folderPath;
             return new FamilyItem
             {
                 Name = displayFolder,
                 IsSearchGroupHeader = true,
-                SearchGroupTitle = UiLanguage.T("Dossier : ", "Folder: ") + displayFolder,
+                SearchGroupTitle = UiLanguage.Get("FamilyBrowserPlugin.xaml.Folder") + displayFolder,
                 SearchGroupCountText = FormatFamilyCount(count),
                 SearchLocationVisibility = Visibility.Collapsed
             };
@@ -1477,7 +1477,7 @@ namespace Famille
             {
                 groups.Add(new FamilySearchGroup
                 {
-                    Title = UiLanguage.T("Dans ce dossier", "In this folder"),
+                    Title = UiLanguage.Get("FamilyBrowserPlugin.xaml.InThisFolder"),
                     CountText = FormatFamilyCount(localSorted.Count),
                     Families = new ObservableCollection<FamilyItem>(localSorted)
                 });
@@ -1497,7 +1497,7 @@ namespace Famille
                 groups.Add(new FamilySearchGroup
                 {
                     Title = group.Key == "Autre dossier"
-                        ? UiLanguage.T("Autre dossier", "Other folder")
+                        ? UiLanguage.Get("FamilyBrowserPlugin.xaml.OtherFolder")
                         : group.Key,
                     CountText = FormatFamilyCount(sorted.Count),
                     Families = new ObservableCollection<FamilyItem>(sorted)
@@ -1532,8 +1532,8 @@ namespace Famille
 
             PagingStatusText.Visibility = Visibility.Visible;
             PagingStatusText.Text = flatItems.Count == 0
-                ? UiLanguage.T("Aucun résultat.", "No Results.")
-                : UiLanguage.T("Fin de la liste.", "End of List.");
+                ? UiLanguage.Get("FamilyBrowserPlugin.xaml.NoResults")
+                : UiLanguage.Get("FamilyBrowserPlugin.xaml.EndOfList2");
         }
 
         private int ShowInitialGroupedFolderSearchResults(List<FamilyItem> localItems)
@@ -1554,7 +1554,7 @@ namespace Famille
             {
                 _activeSearchGroups.Add(new FamilySearchGroup
                 {
-                    Title = UiLanguage.T("Dans ce dossier", "In this folder"),
+                    Title = UiLanguage.Get("FamilyBrowserPlugin.xaml.InThisFolder"),
                     CountText = FormatFamilyCount(initialItems.Count),
                     Families = new ObservableCollection<FamilyItem>(initialItems)
                 });
@@ -1570,9 +1570,9 @@ namespace Famille
 
             PagingStatusText.Visibility = Visibility.Visible;
             PagingStatusText.Text = initialItems.Count == 0
-                ? UiLanguage.T("Recherche dans les autres dossiers…", "Searching other folders…")
-                : UiLanguage.T("Dans ce dossier : ", "In this folder: ") + initialItems.Count +
-                  UiLanguage.T(". Recherche ailleurs…", ". Searching elsewhere…");
+                ? UiLanguage.Get("FamilyBrowserPlugin.xaml.SearchingOtherFolders")
+                : UiLanguage.Get("FamilyBrowserPlugin.xaml.InThisFolder2") + initialItems.Count +
+                  UiLanguage.Get("FamilyBrowserPlugin.xaml.SearchingElsewhere");
 
             return version;
         }
@@ -1651,9 +1651,9 @@ namespace Famille
 
                     PagingStatusText.Visibility = Visibility.Visible;
                     PagingStatusText.Text = otherCount == 0
-                        ? UiLanguage.T("Dans ce dossier : ", "In this folder: ") + localCount + "."
-                        : UiLanguage.T("Dans ce dossier : ", "In this folder: ") + localCount +
-                          UiLanguage.T(". Autres dossiers : ", ". Other folders: ") + otherCount + ".";
+                        ? UiLanguage.Get("FamilyBrowserPlugin.xaml.InThisFolder2") + localCount + "."
+                        : UiLanguage.Get("FamilyBrowserPlugin.xaml.InThisFolder2") + localCount +
+                          UiLanguage.Get("FamilyBrowserPlugin.xaml.OtherFolders") + otherCount + ".";
                 }), DispatcherPriority.Background);
             });
         }
@@ -1707,10 +1707,10 @@ namespace Famille
 
             PagingStatusText.Visibility = Visibility.Visible;
             PagingStatusText.Text = isComplete
-                ? UiLanguage.T("Dans ce dossier : ", "In this folder: ") + localCount +
-                  UiLanguage.T(". Autres dossiers : ", ". Other folders: ") + otherCount + "."
-                : UiLanguage.T("Dans ce dossier : ", "In this folder: ") + localCount +
-                  UiLanguage.T(". Autres dossiers trouvés : ", ". Other folders found: ") + otherCount + "…";
+                ? UiLanguage.Get("FamilyBrowserPlugin.xaml.InThisFolder2") + localCount +
+                  UiLanguage.Get("FamilyBrowserPlugin.xaml.OtherFolders") + otherCount + "."
+                : UiLanguage.Get("FamilyBrowserPlugin.xaml.InThisFolder2") + localCount +
+                  UiLanguage.Get("FamilyBrowserPlugin.xaml.OtherFoldersFound") + otherCount + "…";
         }
 
         private async void LoadGroupedVisualsDeferred(List<FamilyItem> items)
@@ -1754,7 +1754,7 @@ namespace Famille
 
             var query = FamilySearchQuery.Parse(normalizedText);
             PagingStatusText.Visibility = Visibility.Visible;
-            PagingStatusText.Text = UiLanguage.T("Recherche…", "Searching…");
+            PagingStatusText.Text = UiLanguage.Get("FamilyBrowserPlugin.xaml.Searching");
 
             List<FamilyItem> items;
             try
@@ -1777,7 +1777,7 @@ namespace Famille
                     return;
 
                 PagingStatusText.Visibility = Visibility.Visible;
-                PagingStatusText.Text = UiLanguage.T("Recherche impossible : ", "Search failed: ") + ex.Message;
+                PagingStatusText.Text = UiLanguage.Get("FamilyBrowserPlugin.xaml.SearchFailed") + ex.Message;
                 return;
             }
 
@@ -1796,8 +1796,8 @@ namespace Famille
                 {
                     PagingStatusText.Visibility = Visibility.Visible;
                     PagingStatusText.Text = items.Count == 0
-                        ? UiLanguage.T("Recherche en cours…", "Search in progress…")
-                        : UiLanguage.T($"Familles affichées : {items.Count}. Les détails se complètent.", $"Families displayed: {items.Count}. Details are loading.");
+                        ? UiLanguage.Get("FamilyBrowserPlugin.xaml.SearchInProgress")
+                        : UiLanguage.Format("FamilyBrowserPlugin.xaml.FamiliesDisplayed0DetailsAreLoading", (object)items.Count);
                 }
                 return;
             }
@@ -1821,12 +1821,12 @@ namespace Famille
             var localItems = items.Where(i => i?.IsInCurrentFolder == true).ToList();
             foreach (var item in localItems)
             {
-                item.SearchLocationLabel = UiLanguage.T("Dans ce dossier", "In this folder");
+                item.SearchLocationLabel = UiLanguage.Get("FamilyBrowserPlugin.xaml.InThisFolder");
                 item.SearchLocationVisibility = Visibility.Visible;
             }
 
             if (localItems.Count > 0)
-                definitions.Add((UiLanguage.T("Dans ce dossier", "In this folder"), localItems));
+                definitions.Add((UiLanguage.Get("FamilyBrowserPlugin.xaml.InThisFolder"), localItems));
 
             definitions.AddRange(items
                 .Where(i => i != null && !i.IsInCurrentFolder)
@@ -1838,7 +1838,7 @@ namespace Famille
                 definitions.Select(d => new FamilySearchGroup
                 {
                     Title = d.Title == "Autre dossier"
-                        ? UiLanguage.T("Autre dossier", "Other folder")
+                        ? UiLanguage.Get("FamilyBrowserPlugin.xaml.OtherFolder")
                         : d.Title,
                     CountText = FormatFamilyCount(d.Items.Count),
                     Families = new ObservableCollection<FamilyItem>()
@@ -1856,7 +1856,7 @@ namespace Famille
             if (items.Count == 0)
             {
                 PagingStatusText.Visibility = Visibility.Visible;
-                PagingStatusText.Text = UiLanguage.T("Aucun résultat.", "No Results.");
+                PagingStatusText.Text = UiLanguage.Get("FamilyBrowserPlugin.xaml.NoResults");
                 return;
             }
 
@@ -1889,9 +1889,9 @@ namespace Famille
                     displayedCount += batch.Count;
                     PagingStatusText.Visibility = Visibility.Visible;
                     PagingStatusText.Text = displayedCount >= items.Count
-                        ? UiLanguage.T("Dans ce dossier : ", "In this folder: ") + localItems.Count +
-                          UiLanguage.T(". Autres dossiers : ", ". Other folders: ") + otherCount + "."
-                        : UiLanguage.T("Affichage : ", "Showing: ") + displayedCount + "/" + items.Count + "…";
+                        ? UiLanguage.Get("FamilyBrowserPlugin.xaml.InThisFolder2") + localItems.Count +
+                          UiLanguage.Get("FamilyBrowserPlugin.xaml.OtherFolders") + otherCount + "."
+                        : UiLanguage.Get("FamilyBrowserPlugin.xaml.Showing") + displayedCount + "/" + items.Count + "…";
 
                     // Rend les nouvelles cartes puis redonne immédiatement la
                     // priorité à la frappe avant de préparer le lot suivant.
@@ -1933,8 +1933,8 @@ namespace Famille
                     BeginPaging(ApplyInteractiveSorting(indexedItems));
                     PagingStatusText.Visibility = Visibility.Visible;
                     PagingStatusText.Text = indexedItems.Count == 0
-                        ? UiLanguage.T("Recherche en cours…", "Search in progress…")
-                        : UiLanguage.T($"Familles affichées : {indexedItems.Count}. Les détails se complètent.", $"Families displayed: {indexedItems.Count}. Details are loading.");
+                        ? UiLanguage.Get("FamilyBrowserPlugin.xaml.SearchInProgress")
+                        : UiLanguage.Format("FamilyBrowserPlugin.xaml.FamiliesDisplayed0DetailsAreLoading", (object)indexedItems.Count);
                     return;
                 }
 
@@ -1957,26 +1957,26 @@ namespace Famille
                         var otherFolderMatches = allMatches.Where(i => !i.IsInCurrentFolder).ToList();
                         foreach (var item in currentFolderMatches)
                         {
-                            item.SearchLocationLabel = UiLanguage.T("Dans ce dossier", "In this folder");
+                            item.SearchLocationLabel = UiLanguage.Get("FamilyBrowserPlugin.xaml.InThisFolder");
                             item.SearchLocationVisibility = Visibility.Visible;
                         }
 
                         ShowGroupedFolderSearchResults(currentFolderMatches, otherFolderMatches);
                         PagingStatusText.Text = otherFolderMatches.Count == 0
-                            ? UiLanguage.T("Dans ce dossier : ", "In this folder: ") + currentFolderMatches.Count + "."
-                            : UiLanguage.T("Dans ce dossier : ", "In this folder: ") + currentFolderMatches.Count +
-                              UiLanguage.T(". Autres dossiers : ", ". Other folders: ") + otherFolderMatches.Count + ".";
+                            ? UiLanguage.Get("FamilyBrowserPlugin.xaml.InThisFolder2") + currentFolderMatches.Count + "."
+                            : UiLanguage.Get("FamilyBrowserPlugin.xaml.InThisFolder2") + currentFolderMatches.Count +
+                              UiLanguage.Get("FamilyBrowserPlugin.xaml.OtherFolders") + otherFolderMatches.Count + ".";
                         return;
                     }
 
                     baseSet = baseSet.Where(f => !f.IsBackNavigation && f.NormalizedName.Contains(txt));
                     var currentFolderMatchesFallback = baseSet.ToList();
                     foreach (var item in currentFolderMatchesFallback)
-                        MarkSearchLocation(item, UiLanguage.T("Dans ce dossier", "In this folder"));
+                        MarkSearchLocation(item, UiLanguage.Get("FamilyBrowserPlugin.xaml.InThisFolder"));
 
                     BeginPaging(ApplyInteractiveSorting(currentFolderMatchesFallback));
                     PagingStatusText.Visibility = Visibility.Visible;
-                    PagingStatusText.Text = UiLanguage.T("Recherche ailleurs en préparation…", "Preparing search in other folders…");
+                    PagingStatusText.Text = UiLanguage.Get("FamilyBrowserPlugin.xaml.PreparingSearchInOtherFolders");
                     return;
                 }
 
@@ -2147,14 +2147,14 @@ namespace Famille
         private static string FormatFamilyCount(int count)
         {
             return count == 1
-                ? UiLanguage.T("1 famille", "1 family")
-                : count + " " + UiLanguage.T("familles", "families");
+                ? UiLanguage.Get("FamilyBrowserPlugin.xaml.1Family")
+                : count + " " + UiLanguage.Get("FamilyBrowserPlugin.xaml.Families");
         }
 
         private static string GetApproximateMatchText(FamilyIndexService.Entry entry, FamilySearchQuery query)
         {
             if (entry == null || query == null)
-                return UiLanguage.T("Résultat approché", "Approximate result");
+                return UiLanguage.Get("FamilyBrowserPlugin.xaml.ApproximateResult");
 
             foreach (var term in query.Terms.Where(CanUseApproximateSearch))
             {
@@ -2165,10 +2165,10 @@ namespace Famille
                     .OrderBy(token => BoundedEditDistance(term, token, term.Length >= 8 ? 2 : 1))
                     .FirstOrDefault();
                 if (!string.IsNullOrWhiteSpace(closest))
-                    return UiLanguage.T("Recherche approchée : « ", "Approximate search: “") + term +
-                           UiLanguage.T(" » ≈ « ", "” ≈ “") + closest + "”";
+                    return UiLanguage.Get("FamilyBrowserPlugin.xaml.ApproximateSearch") + term +
+                           UiLanguage.Get("FamilyBrowserPlugin.xaml.Text") + closest + "”";
             }
-            return UiLanguage.T("Résultat approché", "Approximate result");
+            return UiLanguage.Get("FamilyBrowserPlugin.xaml.ApproximateResult");
         }
 
         private static bool ContainsNormalized(string source, string term)
@@ -2228,10 +2228,8 @@ namespace Famille
 
             string searched = string.Join(", ", terms);
             var answer = MessageBox.Show(this,
-                UiLanguage.T(
-                    $"Vous aviez recherché « {searched} » sans résultat.\n\nAssocier ce terme à la famille « {family.Name} » pour la retrouver plus facilement la prochaine fois ?",
-                    $"You searched for “{searched}” with no results.\n\nAssociate this term with the family “{family.Name}” so it is easier to find next time?"),
-                UiLanguage.T("Améliorer la recherche", "Improve Search"),
+                UiLanguage.Format("FamilyBrowserPlugin.xaml.YouSearchedFor0WithNoResultsAssociate", (object)searched, (object)family.Name),
+                UiLanguage.Get("FamilyBrowserPlugin.xaml.ImproveSearch"),
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
             if (answer != MessageBoxResult.Yes)
@@ -2255,7 +2253,7 @@ namespace Famille
                 out string error,
                 out _))
             {
-                MessageBox.Show(this, error, UiLanguage.T("Améliorer la recherche", "Improve Search"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(this, error, UiLanguage.Get("FamilyBrowserPlugin.xaml.ImproveSearch"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -2466,8 +2464,8 @@ namespace Famille
 
             PagingStatusText.Visibility = Visibility.Visible;
             PagingStatusText.Text = _currentResult.Count == 0
-                ? UiLanguage.T("Aucun résultat.", "No Results.")
-                : UiLanguage.T("Chargement...", "Loading...");
+                ? UiLanguage.Get("FamilyBrowserPlugin.xaml.NoResults")
+                : UiLanguage.Get("FamilyBrowserPlugin.xaml.Loading");
 
             AppendNextPage();
             UpdateCount(_currentResult.Count);
@@ -2481,7 +2479,7 @@ namespace Famille
             if (_nextIndex >= _currentResult.Count)
             {
                 AddScrollTopActionIfNeeded();
-                PagingStatusText.Text = UiLanguage.T("Fin de la liste.", "End of list.");
+                PagingStatusText.Text = UiLanguage.Get("FamilyBrowserPlugin.xaml.EndOfList");
                 return;
             }
 
@@ -2506,8 +2504,8 @@ namespace Famille
                 AddScrollTopActionIfNeeded();
 
             PagingStatusText.Text = _nextIndex >= _currentResult.Count
-                ? UiLanguage.T("Fin de la liste.", "End of list.")
-                : UiLanguage.T($"Affichés : {displayedFamilies.Count}/{_currentResult.Count}", $"Displayed: {displayedFamilies.Count}/{_currentResult.Count}");
+                ? UiLanguage.Get("FamilyBrowserPlugin.xaml.EndOfList")
+                : UiLanguage.Format("FamilyBrowserPlugin.xaml.Displayed01", (object)displayedFamilies.Count, (object)_currentResult.Count);
         }
 
         private void AddScrollTopActionIfNeeded()
@@ -2581,10 +2579,8 @@ namespace Famille
                 return;
 
             var answer = MessageBox.Show(this,
-                UiLanguage.T(
-                    $"L’IA va proposer des mots-clés pour {families.Count} familles. Les mots-clés existants seront conservés et complétés. Continuer ?",
-                    $"AI will suggest keywords for {families.Count} families. Existing keywords will be kept and supplemented. Continue?"),
-                UiLanguage.T("Mots-clés de recherche", "Search Keywords"),
+                UiLanguage.Format("FamilyBrowserPlugin.xaml.AIWillSuggestKeywordsFor0FamiliesExisting", (object)families.Count),
+                UiLanguage.Get("FamilyBrowserPlugin.xaml.SearchKeywords"),
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
             if (answer != MessageBoxResult.Yes)
@@ -2599,9 +2595,7 @@ namespace Famille
                 {
                     var family = families[i];
                     PagingStatusText.Visibility = Visibility.Visible;
-                    PagingStatusText.Text = UiLanguage.T(
-                        $"Mots-clés IA : {i + 1}/{families.Count} — {family.Name}",
-                        $"AI keywords: {i + 1}/{families.Count} — {family.Name}");
+                    PagingStatusText.Text = UiLanguage.Format("FamilyBrowserPlugin.xaml.AIKeywords012", (object)(i + 1), (object)(families.Count), (object)(family.Name));
 
                     try
                     {
@@ -2651,16 +2645,14 @@ namespace Famille
             _index?.NotifySearchMetadataUpdated();
             ApplyFilters();
 
-            string message = UiLanguage.T(
-                $"Mots-clés enregistrés pour {saved} famille(s).",
-                $"Keywords saved for {saved} family/families.");
+            string message = UiLanguage.Format("FamilyBrowserPlugin.xaml.KeywordsSavedFor0FamilyFamilies", (object)saved);
             if (errors.Count > 0)
             {
                 string details = string.Join("\n", errors.Take(8));
-                if (errors.Count > 8) details += UiLanguage.T($"\n… et {errors.Count - 8} autre(s).", $"\n… and {errors.Count - 8} more.");
-                message += UiLanguage.T($"\n\n{errors.Count} échec(s) :\n", $"\n\n{errors.Count} failure(s):\n") + details;
+                if (errors.Count > 8) details += UiLanguage.Format("FamilyBrowserPlugin.xaml.And0More", (object)(errors.Count - 8));
+                message += UiLanguage.Format("FamilyBrowserPlugin.xaml.0FailureS", (object)errors.Count) + details;
             }
-            MessageBox.Show(this, message, UiLanguage.T("Mots-clés de recherche", "Search Keywords"), MessageBoxButton.OK,
+            MessageBox.Show(this, message, UiLanguage.Get("FamilyBrowserPlugin.xaml.SearchKeywords"), MessageBoxButton.OK,
                 errors.Count == 0 ? MessageBoxImage.Information : MessageBoxImage.Warning);
         }
 
@@ -2719,8 +2711,8 @@ namespace Famille
                     if (!fam.HasDocumentation)
                     {
                         MessageBox.Show(this,
-                            UiLanguage.T("Aucun document n'a été associé à cette famille.", "No document has been associated with this family."),
-                            UiLanguage.T("Documentation", "Documentation"),
+                            UiLanguage.Get("FamilyBrowserPlugin.xaml.NoDocumentHasBeenAssociatedWithThisFamily"),
+                            UiLanguage.Get("FamilyBrowserPlugin.xaml.Documentation"),
                             MessageBoxButton.OK,
                             MessageBoxImage.Information);
                         return;
@@ -2730,8 +2722,8 @@ namespace Famille
                 {
                     fam.DocumentationAvailable = fam.HasDocumentation;
                     MessageBox.Show(this,
-                        UiLanguage.T("Aucun document n'a été associé à cette famille.", "No document has been associated with this family."),
-                        UiLanguage.T("Documentation", "Documentation"),
+                        UiLanguage.Get("FamilyBrowserPlugin.xaml.NoDocumentHasBeenAssociatedWithThisFamily"),
+                        UiLanguage.Get("FamilyBrowserPlugin.xaml.Documentation"),
                         MessageBoxButton.OK,
                         MessageBoxImage.Information);
                     return;
@@ -2834,8 +2826,8 @@ namespace Famille
 
             var dialog = new OpenFileDialog
             {
-                Title = UiLanguage.T("Sélectionner des documents", "Select Documents"),
-                Filter = UiLanguage.T("Tous les fichiers|*.*", "All Files|*.*"),
+                Title = UiLanguage.Get("FamilyBrowserPlugin.xaml.SelectDocuments"),
+                Filter = UiLanguage.Get("FamilyBrowserPlugin.xaml.AllFiles"),
                 Multiselect = true,
                 CheckFileExists = true,
                 CheckPathExists = true
@@ -2948,8 +2940,8 @@ namespace Famille
             catch (Exception ex)
             {
                 MessageBox.Show(this,
-                    UiLanguage.T("Impossible d'enregistrer la documentation :\n", "Unable to save documentation:\n") + ex.Message,
-                    UiLanguage.T("Documentation", "Documentation"),
+                    UiLanguage.Get("FamilyBrowserPlugin.xaml.UnableToSaveDocumentation") + ex.Message,
+                    UiLanguage.Get("FamilyBrowserPlugin.xaml.Documentation"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
                 return false;
@@ -2965,7 +2957,7 @@ namespace Famille
 
             var dialog = new Window
             {
-                Title = UiLanguage.T($"Documentation - {fam.Name}", $"Documentation - {fam.Name}"),
+                Title = UiLanguage.Format("FamilyBrowserPlugin.xaml.Documentation0", (object)fam.Name),
                 Owner = this,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 ResizeMode = ResizeMode.NoResize,
@@ -3012,7 +3004,7 @@ namespace Famille
 
             var closeButton = new Button
             {
-                Content = UiLanguage.T("Fermer", "Close"),
+                Content = UiLanguage.Get("FamilyBrowserPlugin.xaml.Close"),
                 MinWidth = 90,
                 Margin = new Thickness(8, 0, 0, 0),
                 IsCancel = true
@@ -3021,7 +3013,7 @@ namespace Famille
 
             var openSelectedButton = new Button
             {
-                Content = UiLanguage.T("Ouvrir la sélection", "Open Selected"),
+                Content = UiLanguage.Get("FamilyBrowserPlugin.xaml.OpenSelected"),
                 MinWidth = 140,
                 Margin = new Thickness(8, 0, 0, 0),
                 IsDefault = true
@@ -3031,8 +3023,8 @@ namespace Famille
                 if (listBox.SelectedItems.Count == 0)
                 {
                     MessageBox.Show(dialog,
-                        UiLanguage.T("Sélectionne au moins un document.", "Select at least one document."),
-                        UiLanguage.T("Documentation", "Documentation"),
+                        UiLanguage.Get("FamilyBrowserPlugin.xaml.SelectAtLeastOneDocument"),
+                        UiLanguage.Get("FamilyBrowserPlugin.xaml.Documentation"),
                         MessageBoxButton.OK,
                         MessageBoxImage.Information);
                     return;
@@ -3053,7 +3045,7 @@ namespace Famille
 
             var openAllButton = new Button
             {
-                Content = UiLanguage.T("Tout ouvrir", "Open All"),
+                Content = UiLanguage.Get("FamilyBrowserPlugin.xaml.OpenAll"),
                 MinWidth = 110,
                 Margin = new Thickness(8, 0, 0, 0)
             };
@@ -3065,7 +3057,7 @@ namespace Famille
 
             var addButton = new Button
             {
-                Content = UiLanguage.T("Ajouter...", "Add..."),
+                Content = UiLanguage.Get("FamilyBrowserPlugin.xaml.Add"),
                 MinWidth = 100
             };
             addButton.Click += (_, __) =>
@@ -3078,7 +3070,7 @@ namespace Famille
 
             var changePathButton = new Button
             {
-                Content = UiLanguage.T("Modifier le chemin...", "Change Path..."),
+                Content = UiLanguage.Get("FamilyBrowserPlugin.xaml.ChangePath"),
                 MinWidth = 140,
                 Margin = new Thickness(8, 0, 0, 0),
                 IsEnabled = false
@@ -3098,7 +3090,7 @@ namespace Famille
 
             var removeButton = new Button
             {
-                Content = UiLanguage.T("Supprimer le lien", "Remove Link"),
+                Content = UiLanguage.Get("FamilyBrowserPlugin.xaml.RemoveLink"),
                 MinWidth = 125,
                 Margin = new Thickness(8, 0, 0, 0),
                 IsEnabled = false
@@ -3110,12 +3102,12 @@ namespace Famille
                     return;
 
                 string subject = linksToRemove.Count == 1
-                    ? UiLanguage.T($"le lien vers « {linksToRemove[0].DisplayName} »", $"the link to “{linksToRemove[0].DisplayName}”")
-                    : UiLanguage.T($"ces {linksToRemove.Count} liens", $"these {linksToRemove.Count} links");
+                    ? UiLanguage.Format("FamilyBrowserPlugin.xaml.TheLinkTo0", (object)(linksToRemove[0].DisplayName))
+                    : UiLanguage.Format("FamilyBrowserPlugin.xaml.These0Links", (object)linksToRemove.Count);
 
                 var answer = MessageBox.Show(dialog,
-                    UiLanguage.T($"Voulez-vous supprimer {subject} ?\n\nLes fichiers eux-mêmes ne seront pas supprimés.", $"Do you want to remove {subject}?\n\nThe files themselves will not be deleted."),
-                    UiLanguage.T("Documentation", "Documentation"),
+                    UiLanguage.Format("FamilyBrowserPlugin.xaml.DoYouWantToRemove0TheFiles", (object)subject),
+                    UiLanguage.Get("FamilyBrowserPlugin.xaml.Documentation"),
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Question);
 
@@ -3173,8 +3165,8 @@ namespace Famille
 
             var dialog = new OpenFileDialog
             {
-                Title = UiLanguage.T($"Rechercher « {link.DisplayName} »", $"Locate “{link.DisplayName}”"),
-                Filter = UiLanguage.T("Tous les fichiers|*.*", "All Files|*.*"),
+                Title = UiLanguage.Format("FamilyBrowserPlugin.xaml.Locate0", (object)link.DisplayName),
+                Filter = UiLanguage.Get("FamilyBrowserPlugin.xaml.AllFiles"),
                 Multiselect = false,
                 CheckFileExists = true,
                 CheckPathExists = true,
@@ -3256,7 +3248,7 @@ namespace Famille
         {
             var dialog = new Window
             {
-                Title = UiLanguage.T("Document introuvable", "Document Not Found"),
+                Title = UiLanguage.Get("FamilyBrowserPlugin.xaml.DocumentNotFound"),
                 Owner = this,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 ResizeMode = ResizeMode.NoResize,
@@ -3268,7 +3260,7 @@ namespace Famille
             var root = new StackPanel { Margin = new Thickness(18), MaxWidth = 680 };
             root.Children.Add(new TextBlock
             {
-                Text = UiLanguage.T($"Le document « {link.DisplayName} » est introuvable.", $"The document “{link.DisplayName}” could not be found."),
+                Text = UiLanguage.Format("FamilyBrowserPlugin.xaml.TheDocument0CouldNotBeFound", (object)link.DisplayName),
                 FontWeight = FontWeights.SemiBold,
                 FontSize = 14,
                 TextWrapping = TextWrapping.Wrap
@@ -3282,7 +3274,7 @@ namespace Famille
             });
             root.Children.Add(new TextBlock
             {
-                Text = UiLanguage.T("Voulez-vous rechercher son nouvel emplacement, supprimer le lien ou gérer les documents associés ?", "Would you like to locate its new path, remove the link, or manage the associated documents?"),
+                Text = UiLanguage.Get("FamilyBrowserPlugin.xaml.WouldYouLikeToLocateItsNewPath"),
                 Margin = new Thickness(0, 14, 0, 0),
                 TextWrapping = TextWrapping.Wrap
             });
@@ -3312,13 +3304,13 @@ namespace Famille
                 buttons.Children.Add(button);
             }
 
-            AddActionButton(UiLanguage.T("Rechercher...", "Locate..."), MissingDocumentAction.Relocate, isDefault: true);
-            AddActionButton(UiLanguage.T("Supprimer le lien", "Remove Link"), MissingDocumentAction.Remove);
-            AddActionButton(UiLanguage.T("Gérer les documents", "Manage Documents"), MissingDocumentAction.Manage);
+            AddActionButton(UiLanguage.Get("FamilyBrowserPlugin.xaml.Locate"), MissingDocumentAction.Relocate, isDefault: true);
+            AddActionButton(UiLanguage.Get("FamilyBrowserPlugin.xaml.RemoveLink"), MissingDocumentAction.Remove);
+            AddActionButton(UiLanguage.Get("FamilyBrowserPlugin.xaml.ManageDocuments"), MissingDocumentAction.Manage);
 
             var cancelButton = new Button
             {
-                Content = UiLanguage.T("Annuler", "Cancel"),
+                Content = UiLanguage.Get("FamilyBrowserPlugin.xaml.Cancel"),
                 MinWidth = 90,
                 Margin = new Thickness(8, 0, 0, 0),
                 IsCancel = true
@@ -3339,8 +3331,8 @@ namespace Famille
             if (string.IsNullOrWhiteSpace(rawPath))
             {
                 MessageBox.Show(this,
-                    UiLanguage.T("Le chemin du document est vide.", "The document path is empty."),
-                    UiLanguage.T("Documentation", "Documentation"),
+                    UiLanguage.Get("FamilyBrowserPlugin.xaml.TheDocumentPathIsEmpty"),
+                    UiLanguage.Get("FamilyBrowserPlugin.xaml.Documentation"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
                 return;
@@ -3389,8 +3381,8 @@ namespace Famille
             catch (Exception ex)
             {
                 MessageBox.Show(this,
-                    UiLanguage.T($"Impossible d'ouvrir \"{link.DisplayName}\" :\n{ex.Message}", $"Unable to open \"{link.DisplayName}\":\n{ex.Message}"),
-                    UiLanguage.T("Documentation", "Documentation"),
+                    UiLanguage.Format("FamilyBrowserPlugin.xaml.UnableToOpen01", (object)link.DisplayName, (object)ex.Message),
+                    UiLanguage.Get("FamilyBrowserPlugin.xaml.Documentation"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
             }
@@ -3432,8 +3424,8 @@ namespace Famille
             catch (Exception ex)
             {
                 MessageBox.Show(this,
-                    UiLanguage.T($"Impossible d'ouvrir l'aide en ligne :\n{ex.Message}", $"Unable to open online help:\n{ex.Message}"),
-                    UiLanguage.T("Aide", "Help"),
+                    UiLanguage.Format("FamilyBrowserPlugin.xaml.UnableToOpenOnlineHelp0", (object)ex.Message),
+                    UiLanguage.Get("FamilyBrowserPlugin.xaml.Help"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
             }
@@ -3457,8 +3449,8 @@ namespace Famille
             if (catalogue == null)
             {
                 if (IsLoaded)
-                    MessageBox.Show(this, UiLanguage.T("Le catalogue de formation est introuvable. Vérifie que les familles de démonstration sont installées avec BIMaestro.", "The training catalog was not found. Check that the demo families are installed with BIMaestro."),
-                        UiLanguage.T("BIMaestro · Formation", "BIMaestro · Training"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show(this, UiLanguage.Get("FamilyBrowserPlugin.xaml.TheTrainingCatalogWasNotFoundCheckThat"),
+                        UiLanguage.Get("FamilyBrowserPlugin.xaml.BIMaestroTraining"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 return false;
             }
 
@@ -3509,8 +3501,8 @@ namespace Famille
             {
                 _tutorialCatalogActive = false;
                 if (IsLoaded)
-                    MessageBox.Show(this, UiLanguage.T("Impossible d'ouvrir le catalogue de formation : ", "Unable to open the training catalog: ") + ex.Message,
-                        UiLanguage.T("BIMaestro · Formation", "BIMaestro · Training"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show(this, UiLanguage.Get("FamilyBrowserPlugin.xaml.UnableToOpenTheTrainingCatalog") + ex.Message,
+                        UiLanguage.Get("FamilyBrowserPlugin.xaml.BIMaestroTraining"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 return false;
             }
         }
@@ -3737,8 +3729,8 @@ namespace Famille
             if (e.ClickCount != 2) return;
             if (FamilyBrowserCommand.uiapp?.ActiveUIDocument == null)
             {
-                MessageBox.Show(this, UiLanguage.T("Ouvre d'abord un projet Revit pour charger et placer cette famille.", "Open a Revit project first to load and place this family."),
-                    UiLanguage.T("BIMaestro · Navigateur de familles", "BIMaestro · Family Browser"), MessageBoxButton.OK,
+                MessageBox.Show(this, UiLanguage.Get("FamilyBrowserPlugin.xaml.OpenARevitProjectFirstToLoadAnd"),
+                    UiLanguage.Get("FamilyBrowserPlugin.xaml.BIMaestroFamilyBrowser"), MessageBoxButton.OK,
                     MessageBoxImage.Information);
                 return;
             }
@@ -3993,8 +3985,8 @@ namespace Famille
                 catch (Exception ex)
                 {
                     MessageBox.Show(this,
-                        UiLanguage.T("Impossible d’ouvrir la famille en mode travail :\n", "Unable to open the family in working mode:\n") + ex.Message,
-                        UiLanguage.T("Erreur", "Error"), MessageBoxButton.OK, MessageBoxImage.Error);
+                        UiLanguage.Get("FamilyBrowserPlugin.xaml.UnableToOpenTheFamilyInWorkingMode") + ex.Message,
+                        UiLanguage.Get("FamilyBrowserPlugin.xaml.Error"), MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
         }
@@ -4006,7 +3998,7 @@ namespace Famille
             FamilyItem fam = (sender as FrameworkElement)?.DataContext as FamilyItem;
             if (fam == null || string.IsNullOrWhiteSpace(fam.Path) || !File.Exists(fam.Path))
             {
-                MessageBox.Show(this, UiLanguage.T("Fichier famille introuvable.", "Family file not found."), UiLanguage.T("Aperçu 3D", "3D Preview"),
+                MessageBox.Show(this, UiLanguage.Get("FamilyBrowserPlugin.xaml.FamilyFileNotFound"), UiLanguage.Get("FamilyBrowserPlugin.xaml.3DPreview"),
                                 MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
@@ -4047,8 +4039,8 @@ namespace Famille
             if (_selectedCollection == null || _selectedCollection.Paths.Count == 0)
             {
                 MessageBox.Show(this,
-                    UiLanguage.T("Sélectionne une collection non vide avant de la partager.", "Select a non-empty collection before sharing it."),
-                    UiLanguage.T("Collections", "Collections"),
+                    UiLanguage.Get("FamilyBrowserPlugin.xaml.SelectANonEmptyCollectionBeforeSharingIt"),
+                    UiLanguage.Get("FamilyBrowserPlugin.xaml.Collections"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
                 return;
@@ -4058,8 +4050,8 @@ namespace Famille
 
             var dialog = new SaveFileDialog
             {
-                Title = UiLanguage.T("Exporter la collection", "Export Collection"),
-                Filter = UiLanguage.T("Fichier JSON (*.json)|*.json|Tous les fichiers (*.*)|*.*", "JSON File (*.json)|*.json|All Files (*.*)|*.*"),
+                Title = UiLanguage.Get("FamilyBrowserPlugin.xaml.ExportCollection"),
+                Filter = UiLanguage.Get("FamilyBrowserPlugin.xaml.JSONFileJsonJsonAllFiles"),
                 FileName = defaultName + ".json"
             };
 
@@ -4069,16 +4061,16 @@ namespace Famille
             if (TrySaveCollectionAsJson(dialog.FileName, _selectedCollection, out var errorMessage))
             {
                 MessageBox.Show(this,
-                    UiLanguage.T($"Collection exportée vers :\n{dialog.FileName}", $"Collection exported to:\n{dialog.FileName}"),
-                    UiLanguage.T("Export collection", "Export Collection"),
+                    UiLanguage.Format("FamilyBrowserPlugin.xaml.CollectionExportedTo0", (object)dialog.FileName),
+                    UiLanguage.Get("FamilyBrowserPlugin.xaml.ExportCollection2"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
             }
             else
             {
                 MessageBox.Show(this,
-                    UiLanguage.T("Impossible d'exporter la collection :\n", "Unable to export the collection:\n") + errorMessage,
-                    UiLanguage.T("Export collection", "Export Collection"),
+                    UiLanguage.Get("FamilyBrowserPlugin.xaml.UnableToExportTheCollection") + errorMessage,
+                    UiLanguage.Get("FamilyBrowserPlugin.xaml.ExportCollection2"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
             }
@@ -4088,8 +4080,8 @@ namespace Famille
         {
             var dialog = new OpenFileDialog
             {
-                Title = UiLanguage.T("Importer une collection", "Import Collection"),
-                Filter = UiLanguage.T("Fichier JSON (*.json)|*.json|Tous les fichiers (*.*)|*.*", "JSON File (*.json)|*.json|All Files (*.*)|*.*"),
+                Title = UiLanguage.Get("FamilyBrowserPlugin.xaml.ImportCollection"),
+                Filter = UiLanguage.Get("FamilyBrowserPlugin.xaml.JSONFileJsonJsonAllFiles"),
                 Multiselect = false,
                 CheckFileExists = true,
                 CheckPathExists = true
@@ -4106,8 +4098,8 @@ namespace Famille
                 if (payload?.Paths == null || payload.Paths.Count == 0)
                 {
                     MessageBox.Show(this,
-                        UiLanguage.T("Le fichier sélectionné ne contient aucune collection valide.", "The selected file does not contain a valid collection."),
-                        UiLanguage.T("Import de collection", "Collection Import"),
+                        UiLanguage.Get("FamilyBrowserPlugin.xaml.TheSelectedFileDoesNotContainAValid"),
+                        UiLanguage.Get("FamilyBrowserPlugin.xaml.CollectionImport"),
                         MessageBoxButton.OK,
                         MessageBoxImage.Warning);
                     return;
@@ -4122,19 +4114,19 @@ namespace Famille
                 if (sanitizedPaths.Count == 0)
                 {
                     MessageBox.Show(this,
-                        UiLanguage.T("Aucun chemin exploitable n'a été trouvé dans ce fichier.", "No usable path was found in this file."),
-                        UiLanguage.T("Import de collection", "Collection Import"),
+                        UiLanguage.Get("FamilyBrowserPlugin.xaml.NoUsablePathWasFoundInThisFile"),
+                        UiLanguage.Get("FamilyBrowserPlugin.xaml.CollectionImport"),
                         MessageBoxButton.OK,
                         MessageBoxImage.Warning);
                     return;
                 }
 
                 var desiredName = string.IsNullOrWhiteSpace(payload.Name)
-                    ? UiLanguage.T("Collection importée", "Imported collection")
+                    ? UiLanguage.Get("FamilyBrowserPlugin.xaml.ImportedCollection")
                     : payload.Name.Trim();
 
                 if (string.Equals(desiredName, FavoritesCollectionName, StringComparison.OrdinalIgnoreCase))
-                    desiredName = desiredName + UiLanguage.T(" (importée)", " (imported)");
+                    desiredName = desiredName + UiLanguage.Get("FamilyBrowserPlugin.xaml.Imported");
 
                 var finalName = GenerateUniqueCollectionName(desiredName);
 
@@ -4152,16 +4144,16 @@ namespace Famille
                 RefreshCollectionContent();
 
                 MessageBox.Show(this,
-                    UiLanguage.T($"Collection « {finalName} » importée ({sanitizedPaths.Count} élément(s)).", $"Collection “{finalName}” imported ({sanitizedPaths.Count} item(s))."),
-                    UiLanguage.T("Import de collection", "Collection Import"),
+                    UiLanguage.Format("FamilyBrowserPlugin.xaml.Collection0Imported1ItemS", (object)finalName, (object)sanitizedPaths.Count),
+                    UiLanguage.Get("FamilyBrowserPlugin.xaml.CollectionImport"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
                 MessageBox.Show(this,
-                    UiLanguage.T("Impossible d'importer la collection :\n", "Unable to import the collection:\n") + ex.Message,
-                    UiLanguage.T("Import de collection", "Collection Import"),
+                    UiLanguage.Get("FamilyBrowserPlugin.xaml.UnableToImportTheCollection") + ex.Message,
+                    UiLanguage.Get("FamilyBrowserPlugin.xaml.CollectionImport"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
             }
@@ -4173,13 +4165,13 @@ namespace Famille
 
             if (string.IsNullOrWhiteSpace(filePath))
             {
-                errorMessage = UiLanguage.T("Chemin de fichier invalide.", "Invalid file path.");
+                errorMessage = UiLanguage.Get("FamilyBrowserPlugin.xaml.InvalidFilePath");
                 return false;
             }
 
             if (collection == null)
             {
-                errorMessage = UiLanguage.T("Aucune collection n'est disponible.", "No collection is available.");
+                errorMessage = UiLanguage.Get("FamilyBrowserPlugin.xaml.NoCollectionIsAvailable");
                 return false;
             }
 
@@ -4565,15 +4557,15 @@ namespace Famille
 
             double mb = bytes.Value / (1024d * 1024d);
             if (mb >= 1d)
-                return string.Format(CultureInfo.CurrentCulture, UiLanguage.T("{0:N2} Mo", "{0:N2} MB"), mb);
+                return string.Format(CultureInfo.CurrentCulture, UiLanguage.Get("FamilyBrowserPlugin.xaml.0N2MB"), mb);
 
             double kb = bytes.Value / 1024d;
             if (kb >= 1d)
-                return string.Format(CultureInfo.CurrentCulture, UiLanguage.T("{0:N0} Ko", "{0:N0} KB"), kb);
+                return string.Format(CultureInfo.CurrentCulture, UiLanguage.Get("FamilyBrowserPlugin.xaml.0N0KB"), kb);
 
             return string.Format(
                 CultureInfo.CurrentCulture,
-                UiLanguage.T("{0} octet{1}", "{0} byte{1}"),
+                UiLanguage.Get("FamilyBrowserPlugin.xaml.0Byte1"),
                 bytes.Value,
                 bytes.Value > 1 ? "s" : string.Empty);
         }
@@ -4658,10 +4650,8 @@ namespace Famille
         private bool PromptForFolders()
         {
             MessageBox.Show(this,
-                UiLanguage.T(
-                    "Le dossier par défaut n'a pas été trouvé.\n\n1) Choisis d'abord le dossier qui contient tes familles Revit (.rfa).\n2) Ensuite sélectionne le dossier des images (.png) avec le même nom que les familles.\n\nTu pourras modifier ces chemins plus tard depuis l'onglet Paramètres.",
-                    "The default folder was not found.\n\n1) First select the folder containing your Revit families (.rfa).\n2) Then select the image folder (.png) whose files have the same names as the families.\n\nYou can change these paths later from the Settings tab."),
-                UiLanguage.T("Chemins introuvables", "Paths Not Found"),
+                UiLanguage.Get("FamilyBrowserPlugin.xaml.TheDefaultFolderWasNotFound1First"),
+                UiLanguage.Get("FamilyBrowserPlugin.xaml.PathsNotFound"),
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
 
@@ -4679,7 +4669,7 @@ namespace Famille
 
             var famDialog = new WinForms.FolderBrowserDialog
             {
-                Description = UiLanguage.T("Choisis le dossier avec les fichiers .rfa puis clique sur OK.", "Select the folder containing the .rfa files, then click OK."),
+                Description = UiLanguage.Get("FamilyBrowserPlugin.xaml.SelectTheFolderContainingTheRfaFilesThen"),
                 SelectedPath = Directory.Exists(familiesFolder) ? familiesFolder : string.Empty
             };
             if (famDialog.ShowDialog() != WinForms.DialogResult.OK)
@@ -4689,7 +4679,7 @@ namespace Famille
 
             var imgDialog = new WinForms.FolderBrowserDialog
             {
-                Description = UiLanguage.T("Choisis le dossier avec les images (.png) nommées comme les fichiers .rfa, puis clique sur OK.", "Select the folder containing the images (.png) named like the .rfa files, then click OK."),
+                Description = UiLanguage.Get("FamilyBrowserPlugin.xaml.SelectTheFolderContainingTheImagesPngNamed"),
                 SelectedPath = Directory.Exists(imagesFolder) ? imagesFolder : selectedFamilies
             };
             if (imgDialog.ShowDialog() == WinForms.DialogResult.OK)
@@ -4699,8 +4689,8 @@ namespace Famille
             else
             {
                 MessageBox.Show(this,
-                    UiLanguage.T("Aucun dossier d'images choisi. Les vignettes ne seront pas affichées.", "No image folder was selected. Thumbnails will not be displayed."),
-                    UiLanguage.T("Information", "Information"), MessageBoxButton.OK, MessageBoxImage.Information);
+                    UiLanguage.Get("FamilyBrowserPlugin.xaml.NoImageFolderWasSelectedThumbnailsWillNot"),
+                    UiLanguage.Get("FamilyBrowserPlugin.xaml.Information"), MessageBoxButton.OK, MessageBoxImage.Information);
                 selectedImages = selectedFamilies;
             }
 
@@ -4715,7 +4705,7 @@ namespace Famille
 
             var famDialog = new WinForms.FolderBrowserDialog
             {
-                Description = UiLanguage.T("Choisis le dossier avec les familles .rfa à exporter.", "Select the folder containing the .rfa families to export."),
+                Description = UiLanguage.Get("FamilyBrowserPlugin.xaml.SelectTheFolderContainingTheRfaFamiliesTo"),
                 SelectedPath = Directory.Exists(previewSourceFolder) ? previewSourceFolder : familiesFolder
             };
             if (famDialog.ShowDialog(dialogOwner) != WinForms.DialogResult.OK)
@@ -4725,7 +4715,7 @@ namespace Famille
 
             var imgDialog = new WinForms.FolderBrowserDialog
             {
-                Description = UiLanguage.T("Choisis le dossier miroir pour les PNG générés.", "Select the mirror folder for the generated PNG files."),
+                Description = UiLanguage.Get("FamilyBrowserPlugin.xaml.SelectTheMirrorFolderForTheGeneratedPNG"),
                 SelectedPath = Directory.Exists(previewTargetFolder) ? previewTargetFolder : selectedFamilies
             };
 
@@ -4795,8 +4785,8 @@ namespace Famille
             if (showSuccessMessage)
             {
                 MessageBox.Show(this,
-                    UiLanguage.T("Les dossiers sont enregistrés. Tu peux les modifier à tout moment dans l'onglet Paramètres.", "The folders have been saved. You can change them at any time from the Settings tab."),
-                    UiLanguage.T("Chemins enregistrés", "Paths Saved"), MessageBoxButton.OK, MessageBoxImage.Information);
+                    UiLanguage.Get("FamilyBrowserPlugin.xaml.TheFoldersHaveBeenSavedYouCanChange"),
+                    UiLanguage.Get("FamilyBrowserPlugin.xaml.PathsSaved"), MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
 
@@ -4850,8 +4840,8 @@ namespace Famille
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, UiLanguage.T("Erreur création fichiers config : ", "Error creating configuration files: ") + ex.Message,
-                    UiLanguage.T("Erreur", "Error"), MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(this, UiLanguage.Get("FamilyBrowserPlugin.xaml.ErrorCreatingConfigurationFiles") + ex.Message,
+                    UiLanguage.Get("FamilyBrowserPlugin.xaml.Error"), MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -4937,7 +4927,7 @@ namespace Famille
             };
             Directory.CreateDirectory(Path.GetDirectoryName(configFile));
             File.WriteAllLines(configFile, lines);
-            MessageBox.Show(UiLanguage.T("Configuration enregistrée. Redémarrez pour appliquer.", "Configuration saved. Restart to apply it."));
+            MessageBox.Show(UiLanguage.Get("FamilyBrowserPlugin.xaml.ConfigurationSavedRestartToApplyIt"));
         }
 
         private void ResetConfig_Click(object s, RoutedEventArgs e)
@@ -4963,8 +4953,8 @@ namespace Famille
             {
                 BIMaestro.Tutorials.DemoTourMessage.Show(
                     new System.Windows.Interop.WindowInteropHelper(this).Handle,
-                    UiLanguage.T("Bravo ! Tes chemins sont protégés", "Well done! Your paths are protected"),
-                    UiLanguage.T("Pendant le tutoriel, BIMaestro utilise un catalogue temporaire sans modifier tes chemins enregistrés. Termine ou quitte le guide, puis reviens dans Paramètres > Modifier les chemins… pour choisir ta propre bibliothèque.", "During the tutorial, BIMaestro uses a temporary catalog without changing your saved paths. Finish or exit the guide, then go back to Settings > Edit paths… to choose your own library."));
+                    UiLanguage.Get("FamilyBrowserPlugin.xaml.WellDoneYourPathsAreProtected"),
+                    UiLanguage.Get("FamilyBrowserPlugin.xaml.DuringTheTutorialBIMaestroUsesATemporaryCatalog"));
                 return;
             }
 
@@ -4979,8 +4969,8 @@ namespace Famille
             if (_index == null || !_index.IsReady)
             {
                 MessageBox.Show(this,
-                    UiLanguage.T("La bibliothèque est encore en cours d’indexation. Réessayez dans quelques instants.", "The library is still being indexed. Try again in a few moments."),
-                    UiLanguage.T("Mots-clés intelligents", "Smart Keywords"),
+                    UiLanguage.Get("FamilyBrowserPlugin.xaml.TheLibraryIsStillBeingIndexedTryAgain"),
+                    UiLanguage.Get("FamilyBrowserPlugin.xaml.SmartKeywords"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
                 return;
@@ -4989,8 +4979,8 @@ namespace Famille
             var entries = _index.GetAll(max: 0).ToList();
             if (entries.Count == 0)
             {
-                MessageBox.Show(this, UiLanguage.T("Aucune famille n’a été trouvée dans la bibliothèque.", "No family was found in the library."),
-                    UiLanguage.T("Mots-clés intelligents", "Smart Keywords"), MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(this, UiLanguage.Get("FamilyBrowserPlugin.xaml.NoFamilyWasFoundInTheLibrary"),
+                    UiLanguage.Get("FamilyBrowserPlugin.xaml.SmartKeywords"), MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
@@ -5139,7 +5129,7 @@ namespace Famille
         {
             if (_isGeneratingPreviews)
             {
-                MessageBox.Show(this, UiLanguage.T("Patiente, un export est en cours.", "Please wait, an export is in progress."), UiLanguage.T("Export 3D", "3D Export"), MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(this, UiLanguage.Get("FamilyBrowserPlugin.xaml.PleaseWaitAnExportIsInProgress"), UiLanguage.Get("FamilyBrowserPlugin.xaml.3DExport"), MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
@@ -5151,7 +5141,7 @@ namespace Famille
         {
             if (_isGeneratingPreviews)
             {
-                MessageBox.Show(this, UiLanguage.T("Un export est déjà en cours.", "An export is already in progress."), UiLanguage.T("Export 3D", "3D Export"), MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(this, UiLanguage.Get("FamilyBrowserPlugin.xaml.AnExportIsAlreadyInProgress"), UiLanguage.Get("FamilyBrowserPlugin.xaml.3DExport"), MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
@@ -5170,20 +5160,20 @@ namespace Famille
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, UiLanguage.T("Impossible d'explorer le dossier :\n", "Unable to browse the folder:\n") + ex.Message, UiLanguage.T("Export 3D", "3D Export"), MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(this, UiLanguage.Get("FamilyBrowserPlugin.xaml.UnableToBrowseTheFolder") + ex.Message, UiLanguage.Get("FamilyBrowserPlugin.xaml.3DExport"), MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 
             if (families.Count == 0)
             {
-                MessageBox.Show(this, UiLanguage.T("Aucun fichier RFA trouvé dans ce dossier.", "No RFA file was found in this folder."), UiLanguage.T("Export 3D", "3D Export"), MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(this, UiLanguage.Get("FamilyBrowserPlugin.xaml.NoRFAFileWasFoundInThisFolder"), UiLanguage.Get("FamilyBrowserPlugin.xaml.3DExport"), MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
             if (FamilyBrowserCommand.GeneratePreviewEventInstance == null ||
                 FamilyBrowserCommand.GeneratePreviewHandlerInstance == null)
             {
-                MessageBox.Show(this, UiLanguage.T("L'événement Revit pour l'export 3D n'est pas initialisé.", "The Revit event for 3D export has not been initialized."), UiLanguage.T("Export 3D", "3D Export"), MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(this, UiLanguage.Get("FamilyBrowserPlugin.xaml.TheRevitEventFor3DExportHasNot"), UiLanguage.Get("FamilyBrowserPlugin.xaml.3DExport"), MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 
@@ -5204,8 +5194,8 @@ namespace Famille
             if (PreviewProgressText != null) PreviewProgressText.Text = $"0/{families.Count}";
             PreviewLogTextBox?.Clear();
             AppendPreviewLog(
-                UiLanguage.T("Début de l'export (", "Starting export (") +
-                families.Count + UiLanguage.T(" familles)…", " families)…"));
+                UiLanguage.Get("FamilyBrowserPlugin.xaml.StartingExport") +
+                families.Count + UiLanguage.Get("FamilyBrowserPlugin.xaml.Families2"));
 
             var entries = families.Select(f => new PreviewEntry
             {
@@ -5261,9 +5251,9 @@ namespace Famille
                 if (PreviewProgressText != null)
                 {
                     if (progress.IsCanceled)
-                        PreviewProgressText.Text = UiLanguage.T("Annulé", "Canceled");
+                        PreviewProgressText.Text = UiLanguage.Get("FamilyBrowserPlugin.xaml.Canceled");
                     else if (progress.IsCompleted)
-                        PreviewProgressText.Text = UiLanguage.T("Terminé", "Completed");
+                        PreviewProgressText.Text = UiLanguage.Get("FamilyBrowserPlugin.xaml.Completed");
                     else
                         PreviewProgressText.Text = $"{progress.Completed}/{progress.Total}";
                 }
@@ -5487,13 +5477,13 @@ namespace Famille
         private void CollectionNew_Click(object sender, RoutedEventArgs e)
         {
             var name = Microsoft.VisualBasic.Interaction.InputBox(
-                UiLanguage.T("Nom de la collection :", "Collection name:"),
-                UiLanguage.T("Nouvelle collection", "New Collection"),
-                UiLanguage.T("Nouvelle collection", "New Collection"));
+                UiLanguage.Get("FamilyBrowserPlugin.xaml.CollectionName"),
+                UiLanguage.Get("FamilyBrowserPlugin.xaml.NewCollection"),
+                UiLanguage.Get("FamilyBrowserPlugin.xaml.NewCollection"));
             if (string.IsNullOrWhiteSpace(name)) return;
             if (string.Equals(name, FavoritesCollectionName, StringComparison.OrdinalIgnoreCase))
             {
-                MessageBox.Show(UiLanguage.T("Le nom « Favoris » est réservé.", "The name “Favorites” is reserved."), UiLanguage.T("Info", "Info"), MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(UiLanguage.Get("FamilyBrowserPlugin.xaml.TheNameFavoritesIsReserved"), UiLanguage.Get("FamilyBrowserPlugin.xaml.Info"), MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
             var c = new Collection { Name = name };
@@ -5507,15 +5497,15 @@ namespace Famille
             if (_selectedCollection == null) return;
             if (_selectedCollection.Id == FavoritesCollectionId)
             {
-                MessageBox.Show(UiLanguage.T("La collection « Favoris » ne peut pas être renommée.", "The “Favorites” collection cannot be renamed."), UiLanguage.T("Info", "Info"),
+                MessageBox.Show(UiLanguage.Get("FamilyBrowserPlugin.xaml.TheFavoritesCollectionCannotBeRenamed"), UiLanguage.Get("FamilyBrowserPlugin.xaml.Info"),
                     MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
-            var name = Microsoft.VisualBasic.Interaction.InputBox(UiLanguage.T("Nouveau nom :", "New name:"), UiLanguage.T("Renommer la collection", "Rename Collection"), _selectedCollection.Name);
+            var name = Microsoft.VisualBasic.Interaction.InputBox(UiLanguage.Get("FamilyBrowserPlugin.xaml.NewName"), UiLanguage.Get("FamilyBrowserPlugin.xaml.RenameCollection"), _selectedCollection.Name);
             if (string.IsNullOrWhiteSpace(name)) return;
             if (string.Equals(name, FavoritesCollectionName, StringComparison.OrdinalIgnoreCase))
             {
-                MessageBox.Show(UiLanguage.T("Le nom « Favoris » est réservé.", "The name “Favorites” is reserved."), UiLanguage.T("Info", "Info"), MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(UiLanguage.Get("FamilyBrowserPlugin.xaml.TheNameFavoritesIsReserved"), UiLanguage.Get("FamilyBrowserPlugin.xaml.Info"), MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
             _selectedCollection.Name = name;
@@ -5532,14 +5522,14 @@ namespace Famille
             if (_selectedCollection == null) return;
             if (_selectedCollection.Id == FavoritesCollectionId)
             {
-                MessageBox.Show(UiLanguage.T("La collection « Favoris » ne peut pas être supprimée.", "The “Favorites” collection cannot be deleted."), UiLanguage.T("Info", "Info"),
+                MessageBox.Show(UiLanguage.Get("FamilyBrowserPlugin.xaml.TheFavoritesCollectionCannotBeDeleted"), UiLanguage.Get("FamilyBrowserPlugin.xaml.Info"),
                     MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
             if (MessageBox.Show(
-                UiLanguage.T($"Supprimer la collection « {_selectedCollection.Name} » ?", $"Delete the collection “{_selectedCollection.Name}”?"),
-                UiLanguage.T("Confirmation", "Confirmation"), MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+                UiLanguage.Format("FamilyBrowserPlugin.xaml.DeleteTheCollection0", (object)_selectedCollection.Name),
+                UiLanguage.Get("FamilyBrowserPlugin.xaml.Confirmation"), MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
 
             var idx = CollectionCombo.SelectedIndex;
             _collections.Remove(_selectedCollection);
@@ -5556,11 +5546,11 @@ namespace Famille
         private string GenerateUniqueCollectionName(string desiredName)
         {
             if (string.IsNullOrWhiteSpace(desiredName))
-                desiredName = UiLanguage.T("Collection importée", "Imported collection");
+                desiredName = UiLanguage.Get("FamilyBrowserPlugin.xaml.ImportedCollection");
 
             var baseName = desiredName.Trim();
             if (string.Equals(baseName, FavoritesCollectionName, StringComparison.OrdinalIgnoreCase))
-                baseName += UiLanguage.T(" (importée)", " (imported)");
+                baseName += UiLanguage.Get("FamilyBrowserPlugin.xaml.Imported");
 
             string candidate = baseName;
             int suffix = 2;
@@ -5845,7 +5835,7 @@ namespace Famille
         {
             return new FamilyItem
             {
-                Name = UiLanguage.T("Retour", "Back"),
+                Name = UiLanguage.Get("FamilyBrowserPlugin.xaml.Back"),
                 Path = parentPath,
                 IsFolder = true,
                 IsBackNavigation = true,
@@ -5860,7 +5850,7 @@ namespace Famille
         {
             return new FamilyItem
             {
-                Name = UiLanguage.T("Haut de page", "Back to top"),
+                Name = UiLanguage.Get("FamilyBrowserPlugin.xaml.BackToTop"),
                 IsFolder = true,
                 IsScrollTopNavigation = true,
                 NormalizedName = "haut de page",
@@ -5914,8 +5904,8 @@ namespace Famille
         public void RefreshCountText()
         {
             CountText = Families.Count == 1
-                ? UiLanguage.T("1 famille", "1 family")
-                : Families.Count + " " + UiLanguage.T("familles", "families");
+                ? UiLanguage.Get("FamilyBrowserPlugin.xaml.1Family")
+                : Families.Count + " " + UiLanguage.Get("FamilyBrowserPlugin.xaml.Families");
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
@@ -6106,13 +6096,13 @@ namespace Famille
             get
             {
                 if (IsBackNavigation)
-                    return UiLanguage.T("RETOUR", "BACK");
+                    return UiLanguage.Get("FamilyBrowserPlugin.xaml.BACK");
                 if (IsScrollTopNavigation)
-                    return UiLanguage.T("HAUT", "TOP");
+                    return UiLanguage.Get("FamilyBrowserPlugin.xaml.TOP");
 
                 return FolderFamilyCount == 1
-                    ? UiLanguage.T("1 famille", "1 family")
-                    : FolderFamilyCount + " " + UiLanguage.T("familles", "families");
+                    ? UiLanguage.Get("FamilyBrowserPlugin.xaml.1Family")
+                    : FolderFamilyCount + " " + UiLanguage.Get("FamilyBrowserPlugin.xaml.Families");
             }
         }
 

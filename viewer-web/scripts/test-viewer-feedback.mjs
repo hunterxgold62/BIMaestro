@@ -69,8 +69,8 @@ try {
   await page.locator('.model-opening').waitFor({ state: 'hidden', timeout: 90000 });
   await page.waitForFunction(() => !!window.__viewerTest);
   assert.match(await page.title(), /Maquette 3D/);
-  assert.deepEqual((await page.locator('.view-toolbar button').allTextContents()).map(t => t.trim().replace(/\s*\(\d+\)/, '')), ['Isométrique', 'Coupe', 'Mesurer', 'Analyser les coupes', 'Annotation et Résa']);
-  assert.equal(await page.locator('.view-toolbar button svg').count(), 5);
+  assert.deepEqual((await page.locator('.view-toolbar button').allTextContents()).map(t => t.trim().replace(/\s*\(\d+\)/, '')), ['Isométrique', 'Coupe', 'Mesurer', 'Annotation et Résa']);
+  assert.equal(await page.locator('.view-toolbar button svg').count(), 4);
   await page.getByRole('button', { name: /^Annotation et Résa/ }).click();
   const list = page.locator('.markup-list');
   assert.match(await list.locator('.markup-list-item').first().innerText(), /^R\./);

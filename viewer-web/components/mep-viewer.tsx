@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PanelLeft, PanelRight } from 'lucide-react';
-import { ArrowDown, ArrowUp, ArrowLeftRight, Scissors, ChartNoAxesCombined, MessageSquare, Box, ChevronRight, CircleGauge, Contrast, Eye, EyeOff, Footprints, Hand, Layers3, LoaderCircle, LockKeyhole, Pencil, Plane, RotateCcw, SunMedium, Users, Waves } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowLeftRight, Scissors, MessageSquare, Box, ChevronRight, CircleGauge, Contrast, Eye, EyeOff, Footprints, Hand, Layers3, LoaderCircle, LockKeyhole, Pencil, Plane, RotateCcw, SunMedium, Users, Waves } from 'lucide-react';
 import * as THREE from 'three';
 import { MepVrVisit } from '@/lib/mep-vr';
 import { VrEntry } from './vr-entry';
@@ -24,12 +24,14 @@ import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { acceleratedRaycast, computeBoundsTree, disposeBoundsTree } from 'three-mesh-bvh';
 import { Button } from '@/components/ui/button';
 import { SectionControls } from '@/components/section-controls';
+import { SectionOutline } from '@/lib/mep-section-outline';
 import { sectionFromFace, sectionPlanes, sectionContains, maximumSections, type FaceSection } from '@/lib/mep-section';
 import { BuildingVisibility, blocksView, isObjectVisible } from '@/lib/mep-visibility';
 import { ModelStream, tileBounds, disposeModel } from '@/lib/mep-stream';
 import { isReservationHost, hostDepthCm } from '@/lib/mep-host';
 import { ModelPreparation } from '@/lib/mep-prepare';
 import { AsyncWallCutouts } from '@/lib/mep-cutouts-async';
+import { findLandingFootY, isWalkableHit } from '@/lib/mep-walk';
 import { markupObject, disposeMarkups, reservationLot, reservationLabel, dimensionDistance, dimensionFoot, moveToDimension, editMarkupOnFace, type ReservationDimension, type Markup } from '@/lib/mep-markup';
 import { ReservationFields } from './reservation-fields';
 import { ReservationLotsPanel } from './reservation-lots';
@@ -47,7 +49,6 @@ import { flowPhases, flowPathKey, flowArrowDistance, flowTrace, flowFollowChain,
 import { explainFlowEnd, type FlowEnd } from '@/lib/mep-flow-end';
 import { equipmentStopKind } from '@/lib/mep-equipment-stop';
 import { useMepCalculation } from '@/hooks/use-mep-calculation';
-import { MepImpactPanel } from '@/components/mep-impact-panel';
 import { fetchR2PilotAsset, resolveShare, shareTokenFromLocation, subscribeToScenario, updateSource, updateValve, useR2Storage } from '@/lib/mep-api';
 import { openViewerPackage } from '@/lib/mep-package';
 import { toWebPoint } from '@/lib/mep-point';
@@ -322,6 +323,7 @@ export function MepViewer() {
   const viewActionsRef = useRef<ViewActions | null>(null);
   const [section, setSection] = useState<FaceSection[]>([]);
   const sectionRef = useRef(section);
+  const sectionHandlesRef = useRef<HTMLDivElement>(null);
   const [selectedSection, setSelectedSection] = useState<string | null>(null);
   const selectedSectionRef = useRef(selectedSection);
   const [pickingSection, setPickingSection] = useState(false);
@@ -360,14 +362,14 @@ export function MepViewer() {
   const [valveMarkersVisible, setValveMarkersVisible] = useState(false);
   const [flowRenderStats, setFlowRenderStats] = useState({ paths: 0, arrows: 0, fallbackPaths: 0 });
   const [flightMode, setFlightMode] = useState(false);
+  const [landingUnavailable, setLandingUnavailable] = useState(false);
   const [modelOpacity, setModelOpacity] = useState(1);
   const [realisticLighting, setRealisticLighting] = useState(true);
   const [highContrast, setHighContrast] = useState(true);
   const [resolved, setResolved] = useState<ResolvedShare | null>(null);
   const [viewerPackage, setViewerPackage] = useState<ViewerPackage | null>(null);
   const [scenario, setScenario] = useState<Scenario | null>(null);
-  const { graph, reportText, calculating, calculationError, setReference } = useMepCalculation(viewerPackage?.replay.graph, scenario);
-  const [impactOpen, setImpactOpen] = useState(false);
+  const { graph, calculating, calculationError } = useMepCalculation(viewerPackage?.replay.graph, scenario);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const selectedIndexRef = useRef<number | null>(null);
   const flowPulseRequestRef = useRef(0);
@@ -546,6 +548,19 @@ export function MepViewer() {
     camera.position.set(11, 8, 13);
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
     let activeSection: THREE.Plane[] = [];
+    let renderedSections: FaceSection[] | undefined;
+    const sectionOutline = new SectionOutline();
+    const sectionScene = new THREE.Scene();
+    sectionScene.add(sectionOutline);
+    const renderSectionOutline = (view: THREE.Camera) => {
+      if (!sectionOutline.visible || !activeSection.length) return;
+      // The segments are already trimmed by the other planes. Rendering them
+      // without GPU clipping avoids rounding errors on their own cut plane.
+      const planes = renderer.clippingPlanes;
+      renderer.clippingPlanes = [];
+      renderer.render(sectionScene, view);
+      renderer.clippingPlanes = planes;
+    };
     const sectionBounds = new THREE.Box3(new THREE.Vector3(-10, 0, -10), new THREE.Vector3(10, 12, 10));
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -700,11 +715,22 @@ export function MepViewer() {
       }
       const yaw = configured?.initialYaw || 0; camera.lookAt(camera.position.clone().add(new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw))));
       lastSafeFoot.set(camera.position.x, playerFootY, camera.position.z); unsupportedSince = null;
-      webFlightMode = false; grounded = true; verticalVelocity = 0; wheelMoveRemaining = 0; doubleTapSprint = false; setFlightMode(false);
+      webFlightMode = false; grounded = true; verticalVelocity = 0; wheelMoveRemaining = 0; doubleTapSprint = false; setFlightMode(false); setLandingUnavailable(false);
     };
     const pressed = new Set<string>();
     const setFlight = (enabled: boolean) => {
-      webFlightMode = enabled; setFlightMode(enabled); grounded = false; verticalVelocity = 0; doubleTapSprint = false;
+      if (enabled === webFlightMode) return;
+      if (!enabled) {
+        const footY = findLandingFootY(camera.position, pickables.filter(isObjectVisible),
+          hit => sectionContains(activeSection, hit.point));
+        if (footY === null) { setLandingUnavailable(true); return; }
+        playerFootY = footY;
+        lastSafeFoot.set(camera.position.x, footY, camera.position.z);
+        camera.position.y = footY + currentEyeHeight;
+      }
+      webFlightMode = enabled; grounded = !enabled; verticalVelocity = 0; wheelMoveRemaining = 0;
+      unsupportedSince = null; doubleTapSprint = false;
+      setLandingUnavailable(false); setFlightMode(enabled);
     };
     const applyAppearance = () => {
       ambient.color.set('#ffffff');
@@ -836,6 +862,7 @@ export function MepViewer() {
         try {
           renderer.setRenderTarget(target); renderer.autoClear = true;
           renderer.render(scene, shotCamera);
+          renderer.autoClear = false; renderSectionOutline(shotCamera);
           renderer.readRenderTargetPixels(target, 0, 0, width, height, pixels);
         } finally {
           renderer.setRenderTarget(priorTarget); renderer.autoClear = priorAutoClear; target.dispose();
@@ -1157,12 +1184,12 @@ export function MepViewer() {
       const selectable = pickables.filter(isObjectVisible);
       if (!selectable.length) return null;
       const rect = renderer.domElement.getBoundingClientRect();
-      activeSection = sectionPlanes(sectionRef.current);
-      raycaster.firstHitOnly = activeSection.length === 0;
+      const planes = sectionPlanes(sectionRef.current);
+      raycaster.firstHitOnly = planes.length === 0;
       if (worldRay) raycaster.ray.copy(worldRay);
       else { pointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1); raycaster.setFromCamera(pointer, camera); }
       for (const hit of raycaster.intersectObjects(selectable, false)) {
-        if (!sectionContains(activeSection, hit.point)) continue;
+        if (!sectionContains(planes, hit.point)) continue;
         if (hit.faceIndex == null) continue;
         if (!contextOnly && measurePickRef.current.picking) {
           const rawPoint = hit.point.toArray() as MeasurePoint;
@@ -1341,7 +1368,86 @@ export function MepViewer() {
       setActiveMarkup(null); setRelocating(null); setDraftMarkup(null); setContextMenu(null);
       selectedIndexRef.current = null; setSelectedIndex(null);
     };
-    const resetInput = () => { orbitPointer = null; pointerStart = null; looking = false; pressed.clear(); wheelMoveRemaining = 0; gamepad.read(readBrowserPads(), false); };
+    const sectionHandles = sectionHandlesRef.current;
+    type SectionDrag = {
+      button: HTMLButtonElement; id: string; pointer: number; x: number; y: number;
+      offset: number; axisX: number; axisY: number; unitsPerPixel: number; limit: number;
+    };
+    let sectionDrag: SectionDrag | null = null;
+    const handlePoint = (cut: FaceSection) => new THREE.Vector3(...cut.anchor).addScaledVector(new THREE.Vector3(...cut.normal), cut.offset);
+    const finishSectionDrag = (event?: PointerEvent) => {
+      if (!sectionDrag || (event && event.pointerId !== sectionDrag.pointer)) return;
+      const { button, pointer } = sectionDrag;
+      sectionDrag = null;
+      delete button.dataset.dragging;
+      if (button.hasPointerCapture(pointer)) button.releasePointerCapture(pointer);
+    };
+    const startSectionDrag = (event: PointerEvent) => {
+      if (!sceneReady || event.button !== 0 || !event.isPrimary || sectionDrag || pickingSectionRef.current || draftOpenRef.current) return;
+      const button = (event.target as Element).closest<HTMLButtonElement>('[data-section-handle]');
+      const cut = sectionRef.current.find(item => item.enabled && item.id === button?.dataset.sectionHandle);
+      if (!button || !cut) return;
+
+      camera.updateMatrixWorld();
+      const bounds = renderer.domElement.getBoundingClientRect();
+      const point = handlePoint(cut);
+      const depth = -point.clone().applyMatrix4(camera.matrixWorldInverse).z;
+      const unitsAtDepth = 2 * depth * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) / (bounds.height * camera.zoom);
+      if (!Number.isFinite(unitsAtDepth) || unitsAtDepth <= 0) return;
+      const sample = unitsAtDepth * 50;
+      const projected = point.clone().project(camera);
+      const normal = new THREE.Vector3(...cut.normal);
+      const shifted = point.addScaledVector(normal, sample).project(camera);
+      const dx = (shifted.x - projected.x) * bounds.width / 2;
+      const dy = (projected.y - shifted.y) * bounds.height / 2;
+      const length = Math.hypot(dx, dy);
+      const alongAxis = length >= 12;
+      sectionDrag = {
+        button, id: cut.id, pointer: event.pointerId, x: event.clientX, y: event.clientY, offset: cut.offset,
+        axisX: alongAxis ? dx / length : 0,
+        axisY: alongAxis ? dy / length : (normal.y < 0 ? 1 : -1),
+        unitsPerPixel: alongAxis ? sample / length : unitsAtDepth,
+        limit: Math.max(1 / .3048, sectionBounds.getSize(new THREE.Vector3()).length()),
+      };
+      button.setPointerCapture(event.pointerId);
+      button.dataset.dragging = '';
+      setSelectedSection(cut.id);
+      setContextMenu(null);
+      stopFollowing();
+      pressed.clear();
+      wheelMoveRemaining = 0;
+      event.preventDefault();
+    };
+    const moveSectionDrag = (event: PointerEvent) => {
+      const drag = sectionDrag;
+      if (!drag || drag.pointer !== event.pointerId) return;
+      const pixels = (event.clientX - drag.x) * drag.axisX + (event.clientY - drag.y) * drag.axisY;
+      const offset = THREE.MathUtils.clamp(drag.offset + pixels * drag.unitsPerPixel, -drag.limit, drag.limit);
+      setSection(current => current.map(cut => cut.id === drag.id && cut.offset !== offset ? { ...cut, offset } : cut));
+    };
+    sectionHandles?.addEventListener('pointerdown', startSectionDrag);
+    sectionHandles?.addEventListener('pointermove', moveSectionDrag);
+    sectionHandles?.addEventListener('pointerup', finishSectionDrag);
+    sectionHandles?.addEventListener('pointercancel', finishSectionDrag);
+    sectionHandles?.addEventListener('lostpointercapture', finishSectionDrag);
+
+    const positionSectionHandles = () => {
+      if (!sectionHandles || sectionHandles.hidden || !activeSection.length) return;
+      camera.updateMatrixWorld();
+      const projected = new THREE.Vector3();
+      for (const button of sectionHandles.querySelectorAll<HTMLButtonElement>('[data-section-handle]')) {
+        const cut = sectionRef.current.find(item => item.id === button.dataset.sectionHandle);
+        if (!cut) continue;
+        projected.copy(handlePoint(cut)).project(camera);
+        const dragging = sectionDrag?.button === button;
+        const visible = projected.z >= -1 && projected.z <= 1 && Math.abs(projected.x) < 1 && Math.abs(projected.y) < 1;
+        button.style.visibility = visible || dragging ? 'visible' : 'hidden';
+        if (!visible) continue;
+        button.style.left = `${(projected.x + 1) * 50}%`;
+        button.style.top = `${(1 - projected.y) * 50}%`;
+      }
+    };
+    const resetInput = () => { finishSectionDrag(); orbitPointer = null; pointerStart = null; looking = false; pressed.clear(); wheelMoveRemaining = 0; gamepad.read(readBrowserPads(), false); };
     const onVisibilityChange = () => { if (document.hidden) resetInput(); };
     const onKeyDown = (event: KeyboardEvent) => {
       if (!event.isTrusted) return;
@@ -1622,10 +1728,13 @@ export function MepViewer() {
         move.addScaledVector(camera.getWorldDirection(new THREE.Vector3()), pad.vertical * distance * delta * precision);
         camera.position.add(move); controls.target.add(move);
       }
-      controls.enabled = sceneReady && !draggingEdit && !pickingSectionRef.current && navigationModeRef.current === 'orbit';
+      controls.enabled = sceneReady && !draggingEdit && !sectionDrag && !pickingSectionRef.current && navigationModeRef.current === 'orbit';
       if (!sceneReady) { pressed.clear(); wheelMoveRemaining = 0; return; }
-      activeSection = sectionPlanes(sectionRef.current);
-      renderer.clippingPlanes = activeSection;
+      if (renderedSections !== sectionRef.current) {
+        renderedSections = sectionRef.current;
+        activeSection = sectionPlanes(renderedSections);
+        renderer.clippingPlanes = activeSection;
+      }
       renderer.domElement.style.cursor = pickingSectionRef.current ? 'crosshair' : '';
       // Global planes do not clip shadow passes; removed roofs must not cast ghost shadows.
       if ((activeSection.length > 0) !== sectionWasEnabled) {
@@ -1718,9 +1827,7 @@ export function MepViewer() {
           if (!grounded) { verticalVelocity -= 28 * delta; playerFootY += verticalVelocity * delta; }
           collisionRaycaster.set(new THREE.Vector3(camera.position.x, playerFootY + .86, camera.position.z), new THREE.Vector3(0, -1, 0));
           collisionRaycaster.near = 0; collisionRaycaster.far = 3.26;
-          const ground = collisionRaycaster.intersectObjects(pickables, false).find((hit) => {
-            if (!hit.face) return false; const normal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld); return normal.y > .45;
-          });
+          const ground = collisionRaycaster.intersectObjects(pickables, false).find(isWalkableHit);
           if (ground && verticalVelocity <= 0 && playerFootY <= ground.point.y + .12) { playerFootY = ground.point.y + .04; verticalVelocity = 0; grounded = true; }
           else grounded = false;
           if (grounded && ground) {
@@ -1935,7 +2042,10 @@ export function MepViewer() {
         element.style.left = Math.max(0, Math.min((projected.x + 1) * mount.clientWidth / 2, mount.clientWidth - element.offsetWidth - 12)) + 'px';
         element.style.top = Math.max(element.offsetHeight + 4, (1 - projected.y) * mount.clientHeight / 2) + 'px';
       }
+      positionSectionHandles();
+      sectionOutline.update(pickables, activeSection, now);
       renderer.autoClear = false; renderer.clear(); renderer.render(scene, camera);
+      renderSectionOutline(camera);
       if (sceneReady && now - lastRoomCheck >= 200) {
         lastRoomCheck = now;
         const walking = navigationModeRef.current === 'maquette' && !webFlightMode;
@@ -1966,6 +2076,13 @@ export function MepViewer() {
       buildingVisibility?.dispose();
       cutoutsRef.current?.dispose(); cutoutsRef.current = null;
       disposeMarkups(measureGroup); disposeMarkups(markupGroup); markupGroupRef.current = null;
+      finishSectionDrag();
+      sectionHandles?.removeEventListener('pointerdown', startSectionDrag);
+      sectionHandles?.removeEventListener('pointermove', moveSectionDrag);
+      sectionHandles?.removeEventListener('pointerup', finishSectionDrag);
+      sectionHandles?.removeEventListener('pointercancel', finishSectionDrag);
+      sectionHandles?.removeEventListener('lostpointercapture', finishSectionDrag);
+      sectionOutline.dispose();
       gizmo.dispose(); disposeMarkups(editRoot); selection.dispose(); renderer.domElement.removeEventListener('dblclick', onDoubleClick);
 
       disposed = true; observer.disconnect();
@@ -2144,14 +2261,21 @@ export function MepViewer() {
           <div className="markup-actions"><Button type="button" variant="outline" disabled={saving} onClick={() => setDraftMarkup(null)}>Annuler</Button><Button type="submit" disabled={saving || (draftMarkup.kind === 'note' && !draftMarkup.text.trim())}>{saving ? 'Enregistrement…' : 'Enregistrer'}</Button></div>
         </form>}
       </section>}
-    {impactOpen && <MepImpactPanel graph={graph} reportText={reportText} calculating={calculating} error={calculationError} isEditor={isEditor} token={shareToken} scenario={scenario} publicationRevision={resolved?.publication.revision} selectedKey={selectedProperty?.key} onScenario={next => setScenario(current => !current || next.revision >= current.revision ? next : current)} onClose={() => setImpactOpen(false)} onReference={setReference} onSelect={key => { const property = propertiesByKey.get(key); if (property) { setSelectedIndex(property.index); requestAnimationFrame(() => viewActionsRef.current?.frameSelected()); } }}/>}
     <header className="topbar"><div className="brand-mark"><Waves size={19}/><span>BIMaestro</span><b>Maquette 3D</b></div><div className="model-title"><span>{resolved?.publication.name || 'Démonstration · Local technique'}</span><Badge variant="outline">Révision {resolved?.publication.revision || 'démo'}</Badge></div><div className={`access-badge ${isEditor ? 'editor' : 'reader'}`}>{isEditor ? <Pencil size={15}/> : <LockKeyhole size={15}/>}<span><small>MODE DU LIEN</small>{isEditor ? 'ÉDITION COLLABORATIVE' : 'CONSULTATION · LECTURE SEULE'}</span></div></header>
-    <section className="viewport">{sectionOpen && <SectionControls gamepad={inputDevice === 'gamepad'} gamepadMode={navigationMode} value={section} onChange={setSection} selected={selectedSection} onSelect={setSelectedSection} picking={pickingSection} onPick={value => { cancelMeasure(); setPickingDimension(false); setPickingSection(value); }} extent={sectionExtent}/>}<div ref={mountRef} className="three-mount"/><div className="view-toolbar" aria-label="Outils de la maquette"><VrEntry active={vrActive} disabled={opening || !!draftMarkup || !!relocating || saving} enter={async () => { await vrVisitRef.current?.enter(); }} exit={async () => { await vrVisitRef.current?.exit(); }}/><Button size="sm" variant="secondary" onClick={() => viewActionsRef.current?.isometric()}><Box/> Isométrique</Button><Button size="sm" variant="secondary" aria-expanded={sectionOpen} onClick={() => { setLotsOpen(false); setMarkupListOpen(false); setMeasureOpen(false); cancelMeasure(); setPickingDimension(false); setSectionOpen(value => !value); if (!sectionOpen && section.length === 0) setPickingSection(true); else setPickingSection(false); }}><Scissors/> Coupe{section.length ? ' · ' + section.length : ''}</Button><Button size="sm" variant="secondary" disabled={!!draftMarkup} aria-expanded={measureOpen} onClick={() => { setMeasureOpen(value => !value); setSectionOpen(false); setPickingSection(false); setLotsOpen(false); setMarkupListOpen(false); if (!measureOpen) startMeasure(); else cancelMeasure(); }}><ArrowLeftRight/> Mesurer</Button><Button size="sm" variant="secondary" onClick={() => setImpactOpen(v => !v)}><ChartNoAxesCombined/> Analyser les coupes</Button><Button size="sm" variant="secondary" onClick={() => { setMarkupListOpen(v => !v); setLotsOpen(false); setSectionOpen(false); setPickingSection(false); setMeasureOpen(false); cancelMeasure(); }}><MessageSquare/> Annotation et Résa ({allMarkups.length}){reviewCount > 0 ? ` · ⚠ ${reviewCount} à vérifier` : ''}</Button></div><div className={`viewer-left-column${navigationMode === 'maquette' ? ' with-mini-map' : ''}`}>{navigationMode === 'maquette' && <div className="viewer-mini-map-tools">
+    <section className="viewport">{sectionOpen && <SectionControls gamepad={inputDevice === 'gamepad'} gamepadMode={navigationMode} value={section} onChange={setSection} selected={selectedSection} onSelect={setSelectedSection} picking={pickingSection} onPick={value => { cancelMeasure(); setPickingDimension(false); setPickingSection(value); }} extent={sectionExtent}/>}<div ref={mountRef} className="three-mount">
+      <div ref={sectionHandlesRef} className="section-handles" hidden={pickingSection || opening || vrActive || !!draftMarkup || !!relocating || measureOpen}>
+        {section.filter(cut => cut.enabled).map(cut => <button key={cut.id} type="button" className="section-handle"
+          data-section-handle={cut.id} aria-label={cut.name + ' · Déplacer le plan'} aria-pressed={cut.id === selectedSection}
+          title={cut.name + ' · Glisser pour déplacer le plan'} onClick={() => setSelectedSection(cut.id)}>
+          <Scissors size={19} aria-hidden="true"/>
+        </button>)}
+      </div>
+    </div><div className="view-toolbar" aria-label="Outils de la maquette"><VrEntry active={vrActive} disabled={opening || !!draftMarkup || !!relocating || saving} enter={async () => { await vrVisitRef.current?.enter(); }} exit={async () => { await vrVisitRef.current?.exit(); }}/><Button size="sm" variant="secondary" onClick={() => viewActionsRef.current?.isometric()}><Box/> Isométrique</Button><Button size="sm" variant="secondary" aria-expanded={sectionOpen} onClick={() => { setLotsOpen(false); setMarkupListOpen(false); setMeasureOpen(false); cancelMeasure(); setPickingDimension(false); setSectionOpen(value => !value); if (!sectionOpen && section.length === 0) setPickingSection(true); else setPickingSection(false); }}><Scissors/> Coupe{section.length ? ' · ' + section.length : ''}</Button><Button size="sm" variant="secondary" disabled={!!draftMarkup} aria-expanded={measureOpen} onClick={() => { setMeasureOpen(value => !value); setSectionOpen(false); setPickingSection(false); setLotsOpen(false); setMarkupListOpen(false); if (!measureOpen) startMeasure(); else cancelMeasure(); }}><ArrowLeftRight/> Mesurer</Button><Button size="sm" variant="secondary" onClick={() => { setMarkupListOpen(v => !v); setLotsOpen(false); setSectionOpen(false); setPickingSection(false); setMeasureOpen(false); cancelMeasure(); }}><MessageSquare/> Annotation et Résa ({allMarkups.length}){reviewCount > 0 ? ` · ⚠ ${reviewCount} à vérifier` : ''}</Button></div><div className={`viewer-left-column${navigationMode === 'maquette' ? ' with-mini-map' : ''}`}>{navigationMode === 'maquette' && <div className="viewer-mini-map-tools">
       {!miniMapVisible && <button className="viewer-map-show" aria-controls="viewer-mini-map" onClick={() => setMiniMapVisible(true)} title={inputDevice === 'gamepad' ? 'Afficher la mini-carte (croix ↑)' : 'Afficher la mini-carte (M)'}>Mini-carte <kbd>{inputDevice === 'gamepad' ? '↑' : 'M'}</kbd></button>}
       <div id="viewer-mini-map" className="viewer-mini-map" hidden={!miniMapVisible}><header><strong title={roomLocation ? `${roomLocation.room.levelName} · ${roomLocation.room.number}` : undefined}>{roomLocation?.room.name || 'Plan local'}</strong><button onClick={() => setMiniMapVisible(false)} aria-label="Fermer la mini-carte" title={inputDevice === 'gamepad' ? 'Fermer la mini-carte (croix ↑)' : 'Fermer la mini-carte (M)'}>×</button></header><canvas ref={miniMapRef} width={280} height={280} aria-label="Plan local de 30 mètres, position et direction de la caméra"/></div>
       </div>}<div className="appearance-toolbar" aria-label="Réglages de rendu"><button className={realisticLighting ? 'active' : ''} onClick={() => setRealisticLighting((value) => !value)} title="Basculer entre le mode ombré du plugin et les couleurs uniformes"><SunMedium/><span>{realisticLighting ? 'Ombré' : 'Uniforme'}</span></button><button className={highContrast ? 'active' : ''} onClick={() => setHighContrast((value) => !value)} title="Renforcer les contours et le contraste"><Contrast/><span>Contraste</span></button><button className={modelOpacity < 1 ? 'active' : ''} onClick={cycleOpacity} title="Faire varier la transparence de la maquette"><Layers3/><span>{Math.round(modelOpacity * 100)} %</span></button></div></div><div className="navigation-switch" aria-label="Mode de navigation"><button aria-label="Navigation web" title="Navigation web" className={navigationMode === 'orbit' ? 'active' : ''} onClick={() => changeNavigationMode('orbit')}><Hand size={15}/><span>Navigation web</span></button><button aria-label="Maquette 3D" title="Maquette 3D" className={navigationMode === 'maquette' ? 'active' : ''} onClick={() => changeNavigationMode('maquette')}><Footprints size={15}/><span>Maquette 3D</span></button></div>{navigationMode === 'maquette' && <div className="flight-controls" aria-label="Commandes de déplacement vertical"><button className={flightMode ? 'active' : ''} onClick={() => viewActionsRef.current?.toggleFlight()} title={flightMode ? 'Revenir au mode marche' : 'Activer le vol libre'}><Plane/><span>{flightMode ? 'Quitter le vol' : 'Vol libre'}</span></button>{flightMode && <><button data-gamepad-vertical="1" aria-label="Monter" title="Monter" onPointerDown={() => holdInput('Space', true)} onPointerUp={() => holdInput('Space', false)} onPointerCancel={() => holdInput('Space', false)} onPointerLeave={() => holdInput('Space', false)}><ArrowUp/><span>Monter</span></button><button data-gamepad-vertical="-1" aria-label="Descendre" title="Descendre" onPointerDown={() => holdInput('ShiftLeft', true)} onPointerUp={() => holdInput('ShiftLeft', false)} onPointerCancel={() => holdInput('ShiftLeft', false)} onPointerLeave={() => holdInput('ShiftLeft', false)}><ArrowDown/><span>Descendre</span></button></>}<button onClick={() => viewActionsRef.current?.enterSpectator()} title="Revenir au point de départ"><RotateCcw/><span>Réapparaître</span></button></div>}{contextMenu && contextProperty && <div className="element-context-menu" style={{ left: contextMenu.x, top: contextMenu.y }} role="menu"><header><span>{contextProperty.name}</span><small>#{contextProperty.elementId}</small></header><button disabled={section.length >= maximumSections} onClick={sectionFromContext}>Faire une coupe</button>{isEditor && <><button onClick={() => beginMarkup('note')}>Annoter ici</button><button onClick={() => beginMarkup('reservation')}>Créer une réservation ici</button>{contextMepElement && <>{contextValve && <button disabled={saving} onClick={() => void runScenarioEdit(contextMepElement, 'valve', !contextValve.isClosed)}>{contextValve.isClosed ? 'Ouvrir la vanne' : 'Fermer la vanne'}</button>}<button disabled={saving} className={contextSourceKind === 'inlet' ? 'active' : ''} onClick={() => void runScenarioEdit(contextMepElement, 'source', 'inlet')}>{contextSourceKind === 'inlet' ? '✓ Départ du réseau' : 'Définir comme départ'}</button><button disabled={saving} className={contextSourceKind === 'outlet' ? 'active' : ''} onClick={() => void runScenarioEdit(contextMepElement, 'source', 'outlet')}>{contextSourceKind === 'outlet' ? '✓ Retour du réseau' : 'Définir comme retour'}</button>{contextSourceKind && <button disabled={saving} className="danger" onClick={() => void runScenarioEdit(contextMepElement, 'source', 'none')}>Retirer {contextSourceKind === 'inlet' ? 'le départ' : 'le retour'}</button>}</>}</>}<button onClick={() => setContextMenu(null)}>Fermer</button></div>}<div ref={markupLabelsRef} className="markup-labels">{visibleMarkups.map(mark => <button key={mark.id} data-markup={mark.id} className={`markup-label ${mark.kind}`} style={{ borderColor: lotDetails(reservationLot(mark), lotSettings).color, color: lotDetails(reservationLot(mark), lotSettings).color, background: "white" }} onClick={() => { setActiveMarkup(mark.id); setMarkupError(null); }} title={mark.text || 'Réservation'}>{mark.kind === 'note' ? 'A.' : 'R.'} <span>{mark.kind === 'note' ? mark.text : `${lotDetails(reservationLot(mark), lotSettings).name} · ${reservationLabel(mark)}`}</span></button>)}{dimensionMarks.flatMap(mark => (mark.dimensions || []).map(dimension => <span key={mark.id + dimension.id} data-markup={mark.id} data-dimension={dimension.id} className="markup-label dimension-label">{dimensionDistance(mark, dimension).toFixed(1)} cm</span>))}</div>{activeMark && <div className="markup-card"><strong>{activeMark.kind === 'note' ? 'Annotation' : 'Réservation'}</strong><small>{activeMark.elementName}</small>{activeMark.needsReview && <p aria-live="polite">{activeMark.reviewCandidate ? 'Position proposée sur le support retrouvé. Vérifiez la position et les cotations, puis confirmez. Les autres réservations sont temporairement masquées.' : 'Ancienne position affichée. Le support n’a pas été retrouvé avec certitude : choisissez une nouvelle face. Les autres réservations sont temporairement masquées.'}</p>}<p>{activeMark.text}</p>{activeMark.kind === 'reservation' && <p>{lotDetails(reservationLot(activeMark), lotSettings).name} · {reservationLabel(activeMark)} · Profondeur {activeMark.depthCm} cm</p>}{activeMark.dimensions?.map(dimension => <p key={dimension.id}>{dimension.elementName} · Axe : {dimensionDistance(activeMark, dimension).toFixed(1)} cm</p>)}{markupError && <p role="alert">{markupError}</p>}{isEditor && <>{activeMark.needsReview && activeMark.reviewCandidate && <Button size="sm" disabled={saving} onClick={() => void persistMarkup(activeMark)}>Confirmer cette position et les cotations</Button>}{activeMark.kind === 'note' && !activeMark.needsReview && <Button size="sm" variant="outline" disabled={exporting || !!(viewerPackage?.manifest.tiles && loadedZones < viewerPackage.manifest.tiles.length)} onClick={() => void exportBcf([activeMark])}>Exporter BCF</Button>}<Button size="sm" onClick={() => { setEditMode("translate"); if (activeMark.needsReview) setRelocating(activeMark); else setDraftMarkup({ ...activeMark }); setActiveMarkup(null); }}>Modifier / déplacer</Button>{activeMark.kind === 'note' && <Button size="sm" onClick={() => { setRelocating(activeMark); setActiveMarkup(null); }}>Replacer sur une face</Button>}<Button size="sm" variant="outline" disabled={saving} onClick={() => void persistMarkup(activeMark, true)}>Supprimer</Button></>}<Button size="sm" variant="ghost" onClick={() => setActiveMarkup(null)}>Fermer</Button></div>}{relocating && <div className="relocation-hint">{inputDevice === 'gamepad' ? `Visez la nouvelle face et appuyez sur ${navigationMode === 'maquette' ? 'RT' : 'A'}` : 'Cliquez sur la nouvelle face'} pour replacer « {relocating.text || relocating.elementName} ». {inputDevice === 'gamepad' ? navigationMode === 'maquette' ? 'RS clic' : 'B' : 'Échap'} pour annuler.</div>}
     {markupListOpen && <aside className="markup-list" aria-label="Annotations et réservations"><strong>Annotations et réservations</strong><h2 className="export-heading">Exporter les réservations</h2>{viewerPackage && !viewerPackage.manifest.sharedCoordinates && <p role="status">Pour exporter un IFC en coordonnées partagées, republiez cette maquette depuis Revit avec le plugin corrigé.</p>}<label className="export-lot">Lots à exporter<select value={exportLot} onChange={event => setExportLot(event.target.value)}><option value="">Tous les lots</option>{lots.map(lot => <option key={lot.id} value={lot.id}>{lot.name}</option>)}</select></label><div className="markup-actions"><Button size="sm" variant="outline" disabled={exporting || !allMarkups.some(m => m.kind === 'reservation' && !m.needsReview && (!exportLot || reservationLot(m) === exportLot))} onClick={() => exportReservations(true)}>{exporting ? 'Export en cours…' : 'Exporter IFC'}</Button><Button size="sm" variant="outline" disabled={exporting || !allMarkups.some(m => m.kind === 'reservation' && !m.needsReview && (!exportLot || reservationLot(m) === exportLot))} onClick={() => exportReservations(false)}>Exporter vers Revit</Button></div><p>IFC : coordonnées partagées du site actif Revit. Export vers Revit : repère interne. Les points à vérifier sont exclus. Le choix des lots à exporter est indépendant des lots masqués.</p><h2 className="export-heading">Exporter les annotations</h2><div className="markup-actions"><Button size="sm" variant="outline" disabled={exporting || !allMarkups.some(m => m.kind === 'note' && !m.needsReview)} onClick={() => exportReservations(true, true)}>{exporting ? 'Export en cours…' : 'Exporter annotations IFC'}</Button><Button size="sm" variant="outline" disabled={exporting || !allMarkups.some(m => m.kind === 'note' && !m.needsReview) || !!(viewerPackage?.manifest.tiles && loadedZones < viewerPackage.manifest.tiles.length)} onClick={() => void exportBcf()}>{exporting ? 'Export en cours…' : 'Exporter annotations BCF'}</Button></div><p>Les annotations confirmées sont exportées en coordonnées partagées, avec leur texte et leur élément associé. Cet export est indépendant du filtre par lot des réservations.</p><Button size="sm" variant="ghost" onClick={() => setMarkupListOpen(false)}>Fermer</Button>{!allMarkups.length && <p>Aucune annotation enregistrée.</p>}{listedMarkups.map(mark => <button className="markup-list-item" style={{ color: lotDetails(reservationLot(mark), lotSettings).color, borderLeftColor: lotDetails(reservationLot(mark), lotSettings).color }} key={mark.id} onClick={() => { setActiveMarkup(mark.id); setMarkupListOpen(false); if (mark.needsReview) viewActionsRef.current?.frameMarkup(mark); }}><b>{(mark.kind === 'note' ? 'A.' : 'R.') + ' ' + lotDetails(reservationLot(mark), lotSettings).name} · {mark.elementName}</b><span>{mark.needsReview ? `⚠ À vérifier · ${mark.text || reservationLabel(mark)}` : mark.text || reservationLabel(mark)}</span></button>)}</aside>}
-    <div className="viewer-context-bar" aria-label="Contexte de la maquette">{roomLocation && <span className="room-location" title={roomLocation.approximate ? 'Repérage par emprise et niveau, au-dessus de la hauteur déclarée Revit' : 'Pièce ou espace MEP exporté depuis Revit'}>{roomLocation.room.name}<small>{roomLocation.room.levelName}{roomLocation.approximate ? ' · ≈' : ''}</small></span>}<details className="context-lot"><summary aria-label="Choisir le lot actif"><i className="lot-swatch" style={{ background: lotDetails(currentLot, lotSettings).color }}/><span>{lots.find(lot => lot.id === currentLot)?.name || currentLot}</span><ChevronRight size={13}/></summary><div className="reservation-lot-toolbar"><label>Lot actif <select aria-label="Lot actif" value={currentLot} onChange={event => { setCurrentLot(event.target.value); setActiveMarkup(null); }}>{lots.map(lot => <option key={lot.id} value={lot.id}>{lot.name}</option>)}</select></label><span className="lot-swatch" style={{ background: lotDetails(currentLot, lotSettings).color }}/><label><input type="checkbox" checked={onlyCurrentLot} onChange={event => { setOnlyCurrentLot(event.target.checked); setActiveMarkup(null); }}/> Masquer les autres lots</label><button aria-expanded={lotsOpen} onClick={() => lotsOpen ? setLotsOpen(false) : openLots()}>Lots</button></div></details><details className="navigation-help"><summary aria-label="Aide de navigation">?</summary><div className={`view-hint${inputDevice === 'gamepad' ? ' gamepad-hint' : ''}`}>{inputDevice === 'gamepad' ? <>
+    <div className="viewer-context-bar" aria-label="Contexte de la maquette">{navigationMode === 'maquette' && landingUnavailable && <span role="status">Aucun sol sous vous. Survolez une surface pour quitter le vol.</span>}{roomLocation && <span className="room-location" title={roomLocation.approximate ? 'Repérage par emprise et niveau, au-dessus de la hauteur déclarée Revit' : 'Pièce ou espace MEP exporté depuis Revit'}>{roomLocation.room.name}<small>{roomLocation.room.levelName}{roomLocation.approximate ? ' · ≈' : ''}</small></span>}<details className="context-lot"><summary aria-label="Choisir le lot actif"><i className="lot-swatch" style={{ background: lotDetails(currentLot, lotSettings).color }}/><span>{lots.find(lot => lot.id === currentLot)?.name || currentLot}</span><ChevronRight size={13}/></summary><div className="reservation-lot-toolbar"><label>Lot actif <select aria-label="Lot actif" value={currentLot} onChange={event => { setCurrentLot(event.target.value); setActiveMarkup(null); }}>{lots.map(lot => <option key={lot.id} value={lot.id}>{lot.name}</option>)}</select></label><span className="lot-swatch" style={{ background: lotDetails(currentLot, lotSettings).color }}/><label><input type="checkbox" checked={onlyCurrentLot} onChange={event => { setOnlyCurrentLot(event.target.checked); setActiveMarkup(null); }}/> Masquer les autres lots</label><button aria-expanded={lotsOpen} onClick={() => lotsOpen ? setLotsOpen(false) : openLots()}>Lots</button></div></details><details className="navigation-help"><summary aria-label="Aide de navigation">?</summary><div className={`view-hint${inputDevice === 'gamepad' ? ' gamepad-hint' : ''}`}>{inputDevice === 'gamepad' ? <>
       {gamepadMenu ? <><kbd>↑ ↓</kbd> Parcourir les champs · <kbd>← →</kbd> Régler · <kbd>LB</kbd> ×10 · <kbd className="xbox-a">A</kbd> Ouvrir / valider · <kbd>View ⧉</kbd> Tous les panneaux · <kbd className="xbox-b">B</kbd> Retour</> : draftMarkup && !pickingDimension ? <>
         <kbd>LS</kbd> {editMode === 'translate' ? 'Déplacer sur la face' : 'Largeur / hauteur'} · <kbd>↑ ↓ ← →</kbd> Ajuster de 1 cm · <kbd>LT</kbd> Précision (1 mm) · <kbd>RS</kbd> Tourner la vue · {draftMarkup.kind === 'reservation' && <><kbd>X</kbd> Déplacer / redimensionner · </>}<kbd>Menu ☰</kbd> Champs et enregistrement
       </> : <>

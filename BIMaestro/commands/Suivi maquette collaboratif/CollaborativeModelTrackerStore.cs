@@ -85,7 +85,7 @@ namespace Analyse
             {
                 if (string.IsNullOrWhiteSpace(directory))
                 {
-                    error = UiLanguage.T("Chemin vide.", "The path is empty.");
+                    error = UiLanguage.Get("CollaborativeModelTrackerStore.ThePathIsEmpty");
                     return false;
                 }
 
@@ -96,7 +96,7 @@ namespace Analyse
                 _configuredSharedDirectory = directory;
                 PersistConfiguredDirectory(directory);
                 _activeDirectory = directory;
-                _lastDirectoryResolutionMessage = UiLanguage.T($"Dossier commun personnalisé utilisé : {directory}", $"Custom common folder in use: {directory}");
+                _lastDirectoryResolutionMessage = UiLanguage.Format("CollaborativeModelTrackerStore.CustomCommonFolderInUse0", (object)directory);
                 return true;
             }
         }
@@ -320,14 +320,14 @@ namespace Analyse
 
                 string[] headers =
                 {
-                    UiLanguage.T("Projet", "Project"),
-                    UiLanguage.T("Maquette", "Model"),
-                    UiLanguage.T("Chemin", "Path"),
-                    UiLanguage.T("Utilisateur", "User"),
-                    UiLanguage.T("Créateur (1er ouvert)", "Creator (First Opened)"),
-                    UiLanguage.T("Dernière modification", "Last Modified By"),
-                    UiLanguage.T("Version Revit", "Revit Version"),
-                    UiLanguage.T("Date", "Date")
+                    UiLanguage.Get("CollaborativeModelTrackerStore.Project"),
+                    UiLanguage.Get("CollaborativeModelTrackerStore.Model"),
+                    UiLanguage.Get("CollaborativeModelTrackerStore.Path"),
+                    UiLanguage.Get("CollaborativeModelTrackerStore.User"),
+                    UiLanguage.Get("CollaborativeModelTrackerStore.CreatorFirstOpened"),
+                    UiLanguage.Get("CollaborativeModelTrackerStore.LastModifiedBy"),
+                    UiLanguage.Get("CollaborativeModelTrackerStore.RevitVersion"),
+                    UiLanguage.Get("CollaborativeModelTrackerStore.Date")
                 };
 
                 var headerRow = ws.CreateRow(0);
@@ -478,7 +478,7 @@ namespace Analyse
             if (!string.IsNullOrWhiteSpace(_configuredSharedDirectory) && TryCreateAndWrite(_configuredSharedDirectory, out var customErr))
             {
                 _activeDirectory = _configuredSharedDirectory;
-                _lastDirectoryResolutionMessage = UiLanguage.T($"Dossier commun personnalisé utilisé : {_configuredSharedDirectory}", $"Custom common folder in use: {_configuredSharedDirectory}");
+                _lastDirectoryResolutionMessage = UiLanguage.Format("CollaborativeModelTrackerStore.CustomCommonFolderInUse0", (object)_configuredSharedDirectory);
                 return _activeDirectory;
             }
 
@@ -486,17 +486,13 @@ namespace Analyse
             {
                 _activeDirectory = FallbackDirectory;
                 _lastDirectoryResolutionMessage =
-                    UiLanguage.T(
-                        $"Aucun dossier partagé configuré ou disponible. Dossier local utilisé : {FallbackDirectory}.",
-                        $"No shared folder configured or available. Local folder in use: {FallbackDirectory}.");
+                    UiLanguage.Format("CollaborativeModelTrackerStore.NoSharedFolderConfiguredOrAvailableLocalFolder", (object)FallbackDirectory);
                 return _activeDirectory;
             }
 
             _activeDirectory = FallbackDirectory;
             _lastDirectoryResolutionMessage =
-                UiLanguage.T(
-                    $"Impossible d'initialiser le dossier local : {fallbackError}",
-                    $"Unable to initialize the local folder: {fallbackError}");
+                UiLanguage.Format("CollaborativeModelTrackerStore.UnableToInitializeTheLocalFolder0", (object)fallbackError);
             return _activeDirectory;
         }
 

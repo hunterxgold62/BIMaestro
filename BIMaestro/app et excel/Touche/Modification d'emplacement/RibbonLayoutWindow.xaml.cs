@@ -62,8 +62,7 @@ namespace BIMaestro.RibbonLayout
             if (!ViewHoverPreviewPreferences.SetEnabled(HoverPreviewCheckBox.IsChecked == true))
             {
                 OnHoverPreferencesChanged();
-                MessageBox.Show(UiLanguage.T("Impossible d’enregistrer le réglage des miniatures au survol.",
-                    "Unable to save the hover thumbnail setting."), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(UiLanguage.Get("RibbonLayoutWindow.xaml.UnableToSaveTheHoverThumbnailSetting"), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
@@ -75,7 +74,7 @@ namespace BIMaestro.RibbonLayout
             }
             catch (System.Exception ex)
             {
-                MessageBox.Show(UiLanguage.T($"Impossible d’ouvrir la page d’aide : {ex.Message}", $"Unable to open the help page: {ex.Message}"), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(UiLanguage.Format("RibbonLayoutWindow.xaml.UnableToOpenTheHelpPage0", (object)ex.Message), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
@@ -141,7 +140,7 @@ namespace BIMaestro.RibbonLayout
 
         public string RadialHotkeyText
         {
-            get => string.IsNullOrWhiteSpace(_radialHotkeyText) ? UiLanguage.T("Aucun raccourci", "No shortcut") : _radialHotkeyText;
+            get => string.IsNullOrWhiteSpace(_radialHotkeyText) ? UiLanguage.Get("RibbonLayoutWindow.xaml.NoShortcut") : _radialHotkeyText;
             private set
             {
                 _radialHotkeyText = value;
@@ -233,7 +232,7 @@ namespace BIMaestro.RibbonLayout
             previousPreferences.Hotkey = _radialHotkey;
             if (!RadialButtonsPreferencesManager.Save(previousPreferences))
             {
-                MessageBox.Show(UiLanguage.T("Impossible d’enregistrer le raccourci Rosace Boutons.", "Unable to save the Radial Buttons shortcut."), "BIMaestro",
+                MessageBox.Show(UiLanguage.Get("RibbonLayoutWindow.xaml.UnableToSaveTheRadialButtonsShortcut"), "BIMaestro",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
@@ -247,9 +246,7 @@ namespace BIMaestro.RibbonLayout
             if (!languageSaved)
             {
                 MessageBox.Show(
-                    UiLanguage.T(
-                        "Impossible d’enregistrer le choix de langue dans Documents\\BIMaestro_Revit\\SauvegardePréférence/Option.",
-                        "Unable to save the language choice in Documents\\BIMaestro_Revit\\SauvegardePréférence/Option."),
+                    UiLanguage.Get("RibbonLayoutWindow.xaml.UnableToSaveTheLanguageChoiceInDocuments"),
                     "BIMaestro",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
@@ -257,9 +254,7 @@ namespace BIMaestro.RibbonLayout
             else if (languageChanged)
             {
                 MessageBox.Show(
-                    UiLanguage.T(
-                        "Le choix de langue a bien été enregistré. Pour appliquer la nouvelle langue partout dans BIMaestro, il est préférable de sauvegarder votre travail puis de redémarrer Revit.",
-                        "Your language choice has been saved. To apply the new language everywhere in BIMaestro, we recommend saving your work and restarting Revit."),
+                    UiLanguage.Get("RibbonLayoutWindow.xaml.YourLanguageChoiceHasBeenSavedToApply"),
                     "BIMaestro",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
@@ -295,7 +290,7 @@ namespace BIMaestro.RibbonLayout
             if ((modifiers & ModifierKeys.Windows) != 0) nativeModifiers |= 0x0008;
             if (nativeModifiers == 0)
             {
-                MessageBox.Show(UiLanguage.T("Ajoutez Ctrl, Alt, Maj ou Windows à la touche choisie.", "Add Ctrl, Alt, Shift or Windows to the selected key."), "BIMaestro",
+                MessageBox.Show(UiLanguage.Get("RibbonLayoutWindow.xaml.AddCtrlAltShiftOrWindowsToThe"), "BIMaestro",
                     MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
@@ -316,11 +311,11 @@ namespace BIMaestro.RibbonLayout
 
         private static string FormatHotkey(RadialHotkeyPreference hotkey)
         {
-            if (hotkey == null) return UiLanguage.T("Aucun raccourci", "No shortcut");
+            if (hotkey == null) return UiLanguage.Get("RibbonLayoutWindow.xaml.NoShortcut");
             var parts = new List<string>();
             if ((hotkey.Modifiers & 0x0002) != 0) parts.Add("Ctrl");
             if ((hotkey.Modifiers & 0x0001) != 0) parts.Add("Alt");
-            if ((hotkey.Modifiers & 0x0004) != 0) parts.Add(UiLanguage.T("Maj", "Shift"));
+            if ((hotkey.Modifiers & 0x0004) != 0) parts.Add(UiLanguage.Get("RibbonLayoutWindow.xaml.Shift"));
             if ((hotkey.Modifiers & 0x0008) != 0) parts.Add("Windows");
             parts.Add(KeyInterop.KeyFromVirtualKey(hotkey.VirtualKey).ToString());
             return string.Join(" + ", parts);
@@ -356,7 +351,7 @@ namespace BIMaestro.RibbonLayout
                 if (!File.Exists(documentPath))
                 {
                     MessageBox.Show(
-                        UiLanguage.T($"Le document est introuvable : {documentPath}", $"Document not found: {documentPath}"),
+                        UiLanguage.Format("RibbonLayoutWindow.xaml.DocumentNotFound0", (object)documentPath),
                         "BIMaestro",
                         MessageBoxButton.OK,
                         MessageBoxImage.Warning);
@@ -368,7 +363,7 @@ namespace BIMaestro.RibbonLayout
             catch (System.Exception ex)
             {
                 MessageBox.Show(
-                    UiLanguage.T($"Impossible d’ouvrir le document : {ex.Message}", $"Unable to open the document: {ex.Message}"),
+                    UiLanguage.Format("RibbonLayoutWindow.xaml.UnableToOpenTheDocument0", (object)ex.Message),
                     "BIMaestro",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);

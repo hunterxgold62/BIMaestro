@@ -17,7 +17,7 @@ namespace Analyse
         public void UpdateProgress(int current, int total, string familyName)
         {
             ProgressBar.Value = (double)current / total * 100.0;
-            StatusText.Text = UiLanguage.T($"Analyse de la famille {current}/{total} : {familyName}", $"Analyzing family {current}/{total}: {familyName}");
+            StatusText.Text = UiLanguage.Format("ProgressWindow.xaml.AnalyzingFamily012", (object)current, (object)total, (object)familyName);
         }
 
         private void CancelButton_Click(object sender, RoutedEventArgs e)

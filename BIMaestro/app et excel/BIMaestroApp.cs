@@ -52,12 +52,12 @@ public class BIMaestroApp : IExternalApplication
             var userDataRoot = global::BIMaestro.Storage.UserDataStorage.Root;
             var selectionDataRoot = global::BIMaestro.Storage.UserDataStorage.SelectionPreferencesRoot;
             if (!string.IsNullOrEmpty(global::BIMaestro.Storage.UserDataStorage.MigrationWarning))
-                TaskDialog.Show(UiLanguage.T("BIMaestro — stockage des données", "BIMaestro — data storage"),
+                TaskDialog.Show(UiLanguage.Get("BIMaestroApp.BIMaestroDataStorage"),
                     global::BIMaestro.Storage.UserDataStorage.MigrationWarning);
             global::BIMaestro.Storage.PreferenceStorage.Initialize(userDataRoot);
             global::BIMaestro.Storage.PreferenceStorage.Initialize(selectionDataRoot);
             if (!string.IsNullOrEmpty(global::BIMaestro.Storage.PreferenceStorage.MigrationWarning))
-                TaskDialog.Show(UiLanguage.T("BIMaestro — classement des préférences", "BIMaestro — preferences organization"),
+                TaskDialog.Show(UiLanguage.Get("BIMaestroApp.BIMaestroPreferencesOrganization"),
                     global::BIMaestro.Storage.PreferenceStorage.MigrationWarning);
             UiLanguage.Initialize(application.ControlledApplication.Language.ToString());
 
@@ -127,7 +127,6 @@ public class BIMaestroApp : IExternalApplication
                     install_id = InstallId,
                     revit_version = revitVersion
                 });
-                Telemetry.TrackButton("Tutorial.Catalog", true, new { catalog_version = "1" });
                
             }
             catch (Exception telEx)
@@ -144,6 +143,7 @@ public class BIMaestroApp : IExternalApplication
             application.ViewActivated += OnViewActivatedSafe;
             application.SelectionChanged += OnSelectionChangedSafe;
             application.Idling += OnIdlingSafe;
+            BIMaestro.ModelLoading.ModelOpeningService.Initialize(application);
 
             // --- Ruban ---
             AppUI.CreateRibbonUI(application);
@@ -175,6 +175,7 @@ public class BIMaestroApp : IExternalApplication
 
     public Result OnShutdown(UIControlledApplication application)
     {
+        BIMaestro.ModelLoading.ModelOpeningService.Shutdown(application);
         BIMaestro.Home.HomeAppearanceService.Shutdown(application);
         BIMaestro.Welcome.WelcomeManager.Shutdown(application);
         try
@@ -334,12 +335,10 @@ public class BIMaestroApp : IExternalApplication
             if (_hasShownTimeTrackingError) return;
             _hasShownTimeTrackingError = true;
 
-            var td = new TaskDialog(UiLanguage.T("BIMaestro - Suivi du temps", "BIMaestro - Time Tracking"))
+            var td = new TaskDialog(UiLanguage.Get("BIMaestroApp.BIMaestroTimeTracking"))
             {
-                MainInstruction = UiLanguage.T("Un problème est survenu avec l'enregistrement du temps.", "A problem occurred while recording time."),
-                MainContent = UiLanguage.T(
-                    "BIMaestro n'arrive plus à suivre correctement le temps sur ce projet.\n\nPour rétablir le suivi, enregistre ton travail puis relance Revit.",
-                    "BIMaestro can no longer track time correctly for this project.\n\nTo restore tracking, save your work and restart Revit.")
+                MainInstruction = UiLanguage.Get("BIMaestroApp.AProblemOccurredWhileRecordingTime"),
+                MainContent = UiLanguage.Get("BIMaestroApp.BIMaestroCanNoLongerTrackTimeCorrectlyFor")
             };
             td.CommonButtons = TaskDialogCommonButtons.Close;
             td.Show();
@@ -410,6 +409,19 @@ public class BIMaestroApp : IExternalApplication
         try
         {
             _uiApp ??= new UIApplication(e.Document.Application);
+            // Only a successfully opened learning model counts as tutorial usage.
+            // Keep this on DocumentOpened: Create also schedules the invitation itself.
+            if (BIMaestro.Tutorials.DemoProjectBuilder.IsLearningDocument(e.Document))
+            {
+                try
+                {
+                    Telemetry.TrackButton("Tutorial.ModelOpened", true, new { catalog_version = "2" });
+                }
+                catch (Exception ex)
+                {
+                    AppendLog($"Telemetry.Tutorial.ModelOpened : {ex.Message}");
+                }
+            }
             BIMaestro.Tutorials.DemoTrainingInvitation.OnDocumentOpened(e.Document);
             Analyse.ElementHistoryTracker.ScheduleDeferredPrime(e.Document);
             Analyse.ElementHistoryHoverInfoService.OnDocumentOpened(e.Document);
@@ -422,7 +434,7 @@ public class BIMaestroApp : IExternalApplication
         }
         catch (Exception ex)
         {
-            TaskDialog.Show(UiLanguage.T("Erreur DocumentOpened", "DocumentOpened Error"), ex.ToString());
+            TaskDialog.Show(UiLanguage.Get("BIMaestroApp.DocumentOpenedError"), ex.ToString());
         }
     }
 
@@ -460,7 +472,7 @@ public class BIMaestroApp : IExternalApplication
         }
         catch (Exception ex)
         {
-            TaskDialog.Show(UiLanguage.T("Erreur DocumentClosing", "DocumentClosing Error"), ex.ToString());
+            TaskDialog.Show(UiLanguage.Get("BIMaestroApp.DocumentClosingError"), ex.ToString());
         }
     }
 

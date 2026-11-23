@@ -60,13 +60,13 @@ namespace Couleur
             _selectedTab = Tabs.FirstOrDefault();
             _isGlobalColoringEnabled =
                 RevitRibbonColorPreferences.IsGlobalColoringEnabled;
-            PreferenceFilePath = UiLanguage.T("Sauvegarde : ", "Saved at: ") +
+            PreferenceFilePath = UiLanguage.Get("RevitColorPreferencesWindow.xaml.SavedAt") +
                 RevitRibbonColorPreferences.PreferenceFilePath;
             DiscoveryMessage = Tabs.Count == 0
-                ? UiLanguage.T("Aucun onglet n’a pu être détecté. Fermez cette fenêtre et réessayez une fois le ruban Revit entièrement chargé.", "No Tab Could Be Detected. Close This Window and Try Again Once the Revit Ribbon Is Fully Loaded.")
-                : Tabs.Count + UiLanguage.T(" onglet(s) détecté(s). Une case décochée limite la couleur au bandeau de titre.", " tab(s) detected. An Unchecked Box Limits the Color to the Title Bar.");
+                ? UiLanguage.Get("RevitColorPreferencesWindow.xaml.NoTabCouldBeDetectedCloseThisWindow")
+                : Tabs.Count + UiLanguage.Get("RevitColorPreferencesWindow.xaml.TabSDetectedAnUncheckedBoxLimitsThe");
             _autoSaveStatus =
-                UiLanguage.T("Les modifications sont enregistrées automatiquement.", "Changes Are Saved Automatically.");
+                UiLanguage.Get("RevitColorPreferencesWindow.xaml.ChangesAreSavedAutomatically");
             UniformPresetNames = RibbonColorPresetCatalog.PresetNames;
             _selectedUniformPreset = UniformPresetNames.FirstOrDefault();
 
@@ -255,7 +255,7 @@ namespace Couleur
                 return;
 
             _hasPendingChanges = true;
-            AutoSaveStatus = UiLanguage.T("Modification en cours…", "Applying Changes…");
+            AutoSaveStatus = UiLanguage.Get("RevitColorPreferencesWindow.xaml.ApplyingChanges");
             _autoSaveTimer.Stop();
             _autoSaveTimer.Start();
         }
@@ -279,15 +279,15 @@ namespace Couleur
                     preferences);
                 RevitRibbonGlobalColoring.Apply(_mainWindowHandle);
                 _hasPendingChanges = false;
-                AutoSaveStatus = UiLanguage.T("Modifications enregistrées automatiquement.", "Changes Saved Automatically.");
+                AutoSaveStatus = UiLanguage.Get("RevitColorPreferencesWindow.xaml.ChangesSavedAutomatically");
             }
             catch (Exception ex)
             {
-                AutoSaveStatus = UiLanguage.T("Échec de l’enregistrement : ", "Save Failed: ") + ex.Message;
+                AutoSaveStatus = UiLanguage.Get("RevitColorPreferencesWindow.xaml.SaveFailed") + ex.Message;
                 if (showError)
                 {
                     MessageBox.Show(
-                        UiLanguage.T("Impossible d’enregistrer les couleurs de Revit.\n\n", "Unable to Save Revit Colors.\n\n") + ex.Message,
+                        UiLanguage.Get("RevitColorPreferencesWindow.xaml.UnableToSaveRevitColors") + ex.Message,
                         "BIMaestro",
                         MessageBoxButton.OK,
                         MessageBoxImage.Error);

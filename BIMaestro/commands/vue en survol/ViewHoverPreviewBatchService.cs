@@ -151,8 +151,8 @@ namespace BIMaestro.ViewHover
                     StartedUtc = DateTime.UtcNow,
                     NextItemNotBeforeUtc = DateTime.UtcNow,
                     Status = candidates.Count == 0
-                        ? UiLanguage.T("Aucune miniature à générer.", "No thumbnail needs to be generated.")
-                        : UiLanguage.T("Préparation de la file…", "Preparing the queue…"),
+                        ? UiLanguage.Get("ViewHoverPreviewBatchService.NoThumbnailNeedsToBeGenerated")
+                        : UiLanguage.Get("ViewHoverPreviewBatchService.PreparingTheQueue"),
                     IsCompleted = candidates.Count == 0,
                     FinishedUtc = candidates.Count == 0
                         ? DateTime.UtcNow
@@ -174,7 +174,7 @@ namespace BIMaestro.ViewHover
                     return;
                 }
                 _batchJob.IsPaused = true;
-                _batchJob.Status = UiLanguage.T("Traitement en pause.", "Process paused.");
+                _batchJob.Status = UiLanguage.Get("ViewHoverPreviewBatchService.ProcessPaused");
             }
             PublishBatchProgress();
         }
@@ -190,7 +190,7 @@ namespace BIMaestro.ViewHover
                 }
                 _batchJob.IsPaused = false;
                 _batchJob.NextItemNotBeforeUtc = DateTime.UtcNow;
-                _batchJob.Status = UiLanguage.T("Reprise du traitement…", "Resuming the process…");
+                _batchJob.Status = UiLanguage.Get("ViewHoverPreviewBatchService.ResumingTheProcess");
             }
             PublishBatchProgress();
         }
@@ -205,7 +205,7 @@ namespace BIMaestro.ViewHover
                     return;
                 }
                 _batchJob.StopRequested = true;
-                _batchJob.Status = UiLanguage.T("Arrêt demandé…", "Stop requested…");
+                _batchJob.Status = UiLanguage.Get("ViewHoverPreviewBatchService.StopRequested");
             }
             PublishBatchProgress();
         }
@@ -230,7 +230,7 @@ namespace BIMaestro.ViewHover
                 {
                     job.IsCanceled = true;
                     job.IsPaused = false;
-                    job.Status = UiLanguage.T("Traitement arrêté.", "Process stopped.");
+                    job.Status = UiLanguage.Get("ViewHoverPreviewBatchService.ProcessStopped");
                     job.FinishedUtc = DateTime.UtcNow;
                 }
                 if (job.IsCanceled)
@@ -271,8 +271,8 @@ namespace BIMaestro.ViewHover
                     if (!job.WaitingForDocumentReported)
                     {
                         job.WaitingForDocumentReported = true;
-                        job.Status = UiLanguage.T("En attente du retour au projet « ", "Waiting to return to project “") +
-                                     job.DocumentTitle + UiLanguage.T(" »…", "”…");
+                        job.Status = UiLanguage.Get("ViewHoverPreviewBatchService.WaitingToReturnToProject") +
+                                     job.DocumentTitle + UiLanguage.Get("ViewHoverPreviewBatchService.Text");
                         publishWaiting = true;
                     }
                 }
@@ -299,15 +299,15 @@ namespace BIMaestro.ViewHover
                     job.IsCompleted = true;
                     job.FinishedUtc = DateTime.UtcNow;
                     job.Status = job.Failed > 0
-                        ? UiLanguage.T("Terminé avec ", "Completed with ") + job.Failed + UiLanguage.T(" échec(s).", " failure(s).")
-                        : UiLanguage.T("Toutes les miniatures sont à jour.", "All thumbnails are up to date.");
+                        ? UiLanguage.Get("ViewHoverPreviewBatchService.CompletedWith") + job.Failed + UiLanguage.Get("ViewHoverPreviewBatchService.FailureS")
+                        : UiLanguage.Get("ViewHoverPreviewBatchService.AllThumbnailsAreUpToDate");
                     item = null;
                 }
                 else
                 {
                     item = job.Items.Dequeue();
                     job.CurrentViewName = item.ViewName;
-                    job.Status = UiLanguage.T("Génération de « ", "Generating “") + item.ViewName + UiLanguage.T(" »…", "”…");
+                    job.Status = UiLanguage.Get("ViewHoverPreviewBatchService.Generating") + item.ViewName + UiLanguage.Get("ViewHoverPreviewBatchService.Text");
                 }
             }
 
@@ -334,8 +334,8 @@ namespace BIMaestro.ViewHover
                 lock (Sync)
                 {
                     job.Items.Enqueue(item);
-                    job.Status = UiLanguage.T("En attente de la fin du mode temporaire de « ", "Waiting for temporary mode to end for “") +
-                                 (view.Name ?? item.ViewName) + UiLanguage.T(" »…", "”…");
+                    job.Status = UiLanguage.Get("ViewHoverPreviewBatchService.WaitingForTemporaryModeToEndFor") +
+                                 (view.Name ?? item.ViewName) + UiLanguage.Get("ViewHoverPreviewBatchService.Text");
                     job.NextItemNotBeforeUtc =
                         DateTime.UtcNow.AddSeconds(1);
                 }
@@ -408,13 +408,13 @@ namespace BIMaestro.ViewHover
                 if (completedNow) job.FinishedUtc = DateTime.UtcNow;
                 job.Status = completedNow
                     ? (job.Failed > 0
-                        ? UiLanguage.T("Terminé avec ", "Completed with ") + job.Failed + UiLanguage.T(" échec(s).", " failure(s).")
-                        : UiLanguage.T("Toutes les miniatures sont à jour.", "All thumbnails are up to date."))
+                        ? UiLanguage.Get("ViewHoverPreviewBatchService.CompletedWith") + job.Failed + UiLanguage.Get("ViewHoverPreviewBatchService.FailureS")
+                        : UiLanguage.Get("ViewHoverPreviewBatchService.AllThumbnailsAreUpToDate"))
                     : (refreshed
-                        ? UiLanguage.T("Miniature créée.", "Thumbnail created.")
+                        ? UiLanguage.Get("ViewHoverPreviewBatchService.ThumbnailCreated")
                         : (hadPreviousPreview
-                            ? UiLanguage.T("Capture impossible, ancienne image conservée.", "Capture failed; the previous image was kept.")
-                            : UiLanguage.T("Capture impossible pour cette vue.", "Capture failed for this view.")));
+                            ? UiLanguage.Get("ViewHoverPreviewBatchService.CaptureFailedThePreviousImageWasKept")
+                            : UiLanguage.Get("ViewHoverPreviewBatchService.CaptureFailedForThisView")));
                 job.NextItemNotBeforeUtc =
                     DateTime.UtcNow.AddMilliseconds(150);
             }
@@ -439,7 +439,7 @@ namespace BIMaestro.ViewHover
                         StringComparison.OrdinalIgnoreCase))
                 {
                     _batchJob.IsCanceled = true;
-                    _batchJob.Status = UiLanguage.T("Traitement arrêté : projet fermé.", "Process stopped: project closed.");
+                    _batchJob.Status = UiLanguage.Get("ViewHoverPreviewBatchService.ProcessStoppedProjectClosed");
                     _batchJob.FinishedUtc = DateTime.UtcNow;
                     changed = true;
                 }

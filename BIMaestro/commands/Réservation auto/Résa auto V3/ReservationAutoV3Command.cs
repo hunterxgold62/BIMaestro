@@ -51,17 +51,13 @@ namespace Modification
                 var prof = win.SelectedExecutionProfile ?? GetProfileForRun(cfg, win.SelectedHost, win.SelectedShape);
                 if (prof == null || string.IsNullOrWhiteSpace(prof.FamilyName))
                 {
-                    TaskDialog.Show("BIMaestro", UiLanguage.T(
-                        "Aucune famille configurée pour ce cas.\nVa dans Configuration et charge un .RFA puis mappe les paramètres.",
-                        "No family is configured for this case.\nOpen Settings, load an .RFA file, and map its parameters."));
+                    TaskDialog.Show("BIMaestro", UiLanguage.Get("ReservationAutoV3Command.NoFamilyIsConfiguredForThisCaseOpen"));
                     return Result.Cancelled;
                 }
 
                 if (!TryResolveSymbol(doc, prof, out var reservationSymbol))
                 {
-                    TaskDialog.Show("BIMaestro", UiLanguage.T(
-                        "La famille configurée n’est pas chargée dans ce projet.\nCharge-la (onglet Configuration) ou corrige le mapping.",
-                        "The configured family is not loaded in this project.\nLoad it from Settings or correct the parameter mapping."));
+                    TaskDialog.Show("BIMaestro", UiLanguage.Get("ReservationAutoV3Command.TheConfiguredFamilyIsNotLoadedInThis"));
                     return Result.Cancelled;
                 }
 
@@ -70,17 +66,17 @@ namespace Modification
 
                 if (win.AutomatiqueEnabled && !isWall)
                 {
-                    TaskDialog.Show("BIMaestro", UiLanguage.T("Mode automatique : disponible uniquement pour les murs.", "Automatic mode is available for walls only."));
+                    TaskDialog.Show("BIMaestro", UiLanguage.Get("ReservationAutoV3Command.AutomaticModeIsAvailableForWallsOnly"));
                     return Result.Cancelled;
                 }
 
                 if (guided && !win.AutomatiqueEnabled)
-                    BIMaestro.Tutorials.DemoTourMessage.Show(uiApp.MainWindowHandle, UiLanguage.T("Bulbizarre te guide", "Bulbizarre will guide you"),
+                    BIMaestro.Tutorials.DemoTourMessage.Show(uiApp.MainWindowHandle, UiLanguage.Get("ReservationAutoV3Command.BulbizarreWillGuideYou"),
                         UiLanguage.T("Dans la vue 3D, clique d'abord sur la canalisation qui traverse le mur, puis sur ce mur. " +
                         "BIMaestro placera ta réservation à leur croisement. Appuie sur Échap pour arrêter la sélection.",
                         "In the 3D view, first click the pipe that crosses the wall, then click the wall. " +
                         "BIMaestro will place the opening at their intersection. Press Esc to stop selecting."),
-                        UiLanguage.T("Je choisis les éléments", "Select the elements"));
+                        UiLanguage.Get("ReservationAutoV3Command.SelectTheElements"));
 
                 var reservationsBefore = new HashSet<string>(FindInstances(doc, reservationSymbol.Id)
                     .Select(instance => instance.UniqueId));
@@ -139,9 +135,8 @@ namespace Modification
                             UiLanguage.T("Tu as créé " + createdForTutorial + " réservation(s). Le tutoriel Auto réservation est terminé.",
                                 "You created " + createdForTutorial + " opening(s). The Auto Opening tutorial is complete."));
                     else
-                        BIMaestro.Tutorials.DemoTourMessage.Show(uiApp.MainWindowHandle, UiLanguage.T("Bulbizarre t’aide à réessayer", "Bulbizarre will help you try again"),
-                            UiLanguage.T("Aucune réservation n’a été créée. Relance le parcours et sélectionne d’abord la canalisation, puis le mur.",
-                                "No opening was created. Restart the tour and select the pipe first, then the wall."));
+                        BIMaestro.Tutorials.DemoTourMessage.Show(uiApp.MainWindowHandle, UiLanguage.Get("ReservationAutoV3Command.BulbizarreWillHelpYouTryAgain"),
+                            UiLanguage.Get("ReservationAutoV3Command.NoOpeningWasCreatedRestartTheTourAnd"));
                 }
 
                 // Dynamo
@@ -368,19 +363,15 @@ namespace Modification
             bool isRect = win.SelectedShape == ReservationAutoV3Window.ShapeTarget.Rectangulaire;
 
             string linkScope = win.DoubleLinkEnabled
-                ? UiLanguage.T(" Les deux éléments doivent appartenir à un lien.", " Both elements must belong to a linked model.")
+                ? UiLanguage.Get("ReservationAutoV3Command.BothElementsMustBelongToALinkedModel")
                 : "";
-            string hostLabel = isWall ? UiLanguage.T("mur", "wall") : UiLanguage.T("sol", "floor");
+            string hostLabel = isWall ? UiLanguage.Get("ReservationAutoV3Command.Wall") : UiLanguage.Get("ReservationAutoV3Command.Floor");
             bool flexibleOrder = CanCreateReservationWithoutHost(reservationSymbol)
                                  && !guided && !(win.MultiEnabled && isRect);
             if (!guided)
                 TaskDialog.Show("BIMaestro", flexibleOrder
-                    ? UiLanguage.T(
-                        $"Famille sans hôte : sélectionne l’objet et le {hostLabel} dans l’ordre de ton choix.{linkScope}\nECHAP pour arrêter.",
-                        $"Unhosted family: select the object and the {hostLabel} in either order.{linkScope}\nPress ESC to stop.")
-                    : UiLanguage.T(
-                        $"Mode manuel : sélectionne l’objet, puis le {hostLabel}.{linkScope}\nECHAP pour arrêter.",
-                        $"Manual mode: select the object, then the {hostLabel}.{linkScope}\nPress ESC to stop."));
+                    ? UiLanguage.Format("ReservationAutoV3Command.UnhostedFamilySelectTheObjectAndThe0", (object)hostLabel, (object)linkScope)
+                    : UiLanguage.Format("ReservationAutoV3Command.ManualModeSelectTheObjectThenThe0", (object)hostLabel, (object)linkScope));
 
             if (flexibleOrder)
             {
@@ -413,14 +404,8 @@ namespace Modification
                     if (!CanCreateReservationWithoutHost(reservationSymbol))
                     {
                         TaskDialog.Show(
-                            UiLanguage.T("Famille sans hôte requise", "Unhosted Family Required"),
-                            UiLanguage.T(
-                                $"Le {hostLabel} sera sélectionné dans une maquette liée.\n\n" +
-                                $"La famille « {reservationSymbol.Family.Name} » est une famille avec hôte et ne peut pas être créée dans ce cas.\n\n" +
-                                "Relance la commande et choisis une famille sans hôte.",
-                                $"The {hostLabel} will be selected from a linked model.\n\n" +
-                                $"The family '{reservationSymbol.Family.Name}' is hosted and cannot be created in this case.\n\n" +
-                                "Run the command again and choose an unhosted family."));
+                            UiLanguage.Get("ReservationAutoV3Command.UnhostedFamilyRequired"),
+                            UiLanguage.Format("ReservationAutoV3Command.HostedFamilyInLink", hostLabel, reservationSymbol.Family.Name));
                         break;
                     }
 
@@ -435,9 +420,7 @@ namespace Modification
 
                     if (picked.Any(p => IsSameTransformedElement(p, linkedHost)))
                     {
-                        TaskDialog.Show("BIMaestro", UiLanguage.T(
-                            "L’objet traversant et le mur ou sol doivent être distincts.",
-                            "The crossing object and the wall or floor must be different elements."));
+                        TaskDialog.Show("BIMaestro", UiLanguage.Get("ReservationAutoV3Command.TheCrossingObjectAndTheWallOrFloor"));
                         continue;
                     }
 
@@ -485,7 +468,7 @@ namespace Modification
 
                     var tdLinked = new TaskDialog("BIMaestro")
                     {
-                        MainInstruction = UiLanguage.T("Créer une autre réservation ?", "Create Another Opening?"),
+                        MainInstruction = UiLanguage.Get("ReservationAutoV3Command.CreateAnotherOpening"),
                         CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No
                     };
                     if (tdLinked.Show() != TaskDialogResult.Yes)
@@ -499,11 +482,11 @@ namespace Modification
                 {
                     string hostPrompt = pickComesFromLink
                         ? (isWall
-                            ? UiLanguage.T("Sélectionne le mur de ta maquette", "Select the wall in your model")
-                            : UiLanguage.T("Sélectionne le sol de ta maquette", "Select the floor in your model"))
+                            ? UiLanguage.Get("ReservationAutoV3Command.SelectTheWallInYourModel")
+                            : UiLanguage.Get("ReservationAutoV3Command.SelectTheFloorInYourModel"))
                         : (isWall
-                            ? UiLanguage.T("Sélectionne le mur", "Select the wall")
-                            : UiLanguage.T("Sélectionne le sol", "Select the floor"));
+                            ? UiLanguage.Get("ReservationAutoV3Command.SelectTheWall")
+                            : UiLanguage.Get("ReservationAutoV3Command.SelectTheFloor"));
 
                     if (guided && isWall && !pickComesFromLink)
                         host = PickGuidedWall(uiDoc, doc);
@@ -511,7 +494,7 @@ namespace Modification
                     {
                         var rHost = uiDoc.Selection.PickObject(ObjectType.Element,
                             new LocalHostSelectionFilter(win.SelectedHost),
-                            hostPrompt + UiLanguage.T(" (ESC pour annuler)", " (press ESC to cancel)"));
+                            hostPrompt + UiLanguage.Get("ReservationAutoV3Command.PressESCToCancel"));
                         host = doc.GetElement(rHost);
                     }
                 }
@@ -523,20 +506,18 @@ namespace Modification
 
                 if (picked.Any(p => !p.IsLinked && p.Element.Id.Equals(host.Id)))
                 {
-                    TaskDialog.Show("BIMaestro", UiLanguage.T(
-                        "L’objet traversant et le mur ou sol doivent être distincts.",
-                        "The crossing object and the wall or floor must be different elements."));
+                    TaskDialog.Show("BIMaestro", UiLanguage.Get("ReservationAutoV3Command.TheCrossingObjectAndTheWallOrFloor"));
                     continue;
                 }
 
                 if (isWall && host is not Wall)
                 {
-                    TaskDialog.Show(UiLanguage.T("Erreur", "Error"), UiLanguage.T("Ce n’est pas un mur.", "The selected element is not a wall."));
+                    TaskDialog.Show(UiLanguage.Get("ReservationAutoV3Command.Error"), UiLanguage.Get("ReservationAutoV3Command.TheSelectedElementIsNotAWall"));
                     continue;
                 }
                 if (!isWall && host is not Floor)
                 {
-                    TaskDialog.Show(UiLanguage.T("Erreur", "Error"), UiLanguage.T("Ce n’est pas un sol.", "The selected element is not a floor."));
+                    TaskDialog.Show(UiLanguage.Get("ReservationAutoV3Command.Error"), UiLanguage.Get("ReservationAutoV3Command.TheSelectedElementIsNotAFloor"));
                     continue;
                 }
 
@@ -577,7 +558,7 @@ namespace Modification
 
                 var td = new TaskDialog("BIMaestro")
                 {
-                    MainInstruction = UiLanguage.T("Créer une autre réservation ?", "Create Another Opening?"),
+                    MainInstruction = UiLanguage.Get("ReservationAutoV3Command.CreateAnotherOpening"),
                     CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No
                 };
                 if (td.Show() != TaskDialogResult.Yes)
@@ -598,7 +579,7 @@ namespace Modification
 
             if (!walls.Any())
             {
-                TaskDialog.Show("BIMaestro", UiLanguage.T("Aucun mur trouvé.", "No walls were found."));
+                TaskDialog.Show("BIMaestro", UiLanguage.Get("ReservationAutoV3Command.NoWallsWereFound"));
                 return;
             }
 
@@ -631,7 +612,7 @@ namespace Modification
 
             if (!targets.Any())
             {
-                TaskDialog.Show("BIMaestro", UiLanguage.T("Aucun objet trouvé.", "No matching objects were found."));
+                TaskDialog.Show("BIMaestro", UiLanguage.Get("ReservationAutoV3Command.NoMatchingObjectsWereFound"));
                 return;
             }
 
@@ -727,7 +708,7 @@ namespace Modification
                 }
             }
 
-            string message = UiLanguage.T($"Réservations créées : {created}", $"Openings created: {created}");
+            string message = UiLanguage.Format("ReservationAutoV3Command.OpeningsCreated0", (object)created);
             if (failedPlacements > 0)
             {
                 message += UiLanguage.T(
@@ -778,9 +759,7 @@ namespace Modification
                 if (host == null) continue;
                 if (IsSameTransformedElement(source, host))
                 {
-                    TaskDialog.Show("BIMaestro", UiLanguage.T(
-                        "L’objet traversant et le mur ou sol doivent être distincts.",
-                        "The crossing object and the wall or floor must be different elements."));
+                    TaskDialog.Show("BIMaestro", UiLanguage.Get("ReservationAutoV3Command.TheCrossingObjectAndTheWallOrFloor"));
                     continue;
                 }
 
@@ -804,7 +783,7 @@ namespace Modification
 
                 var again = new TaskDialog("BIMaestro")
                 {
-                    MainInstruction = UiLanguage.T("Créer une autre réservation ?", "Create Another Opening?"),
+                    MainInstruction = UiLanguage.Get("ReservationAutoV3Command.CreateAnotherOpening"),
                     CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No
                 };
                 if (again.Show() != TaskDialogResult.Yes) return;
@@ -830,15 +809,12 @@ namespace Modification
         {
             bool withLinks = win.DoubleLinkEnabled || IsLinkSource(win.SelectedPipeSource);
             string host = win.SelectedHost == ReservationAutoV3Window.HostTarget.Mur
-                ? UiLanguage.T("le mur", "wall") : UiLanguage.T("le sol", "floor");
+                ? UiLanguage.Get("ReservationAutoV3Command.Wall2") : UiLanguage.Get("ReservationAutoV3Command.Floor2");
             string prompt = role == PairSelectionRole.Either
-                ? UiLanguage.T($"Sélectionne l’objet ou {host} en premier (ESC pour annuler)",
-                    $"Select the object or {host} first (press ESC to cancel)")
+                ? UiLanguage.Format("ReservationAutoV3Command.SelectTheObjectOr0FirstPressESC", (object)host)
                 : role == PairSelectionRole.Host
-                    ? UiLanguage.T($"Sélectionne maintenant {host} (ESC pour annuler)",
-                        $"Now select the {host} (press ESC to cancel)")
-                    : UiLanguage.T("Sélectionne maintenant l’objet traversant (ESC pour annuler)",
-                        "Now select the crossing object (press ESC to cancel)");
+                    ? UiLanguage.Format("ReservationAutoV3Command.NowSelectThe0PressESCToCancel", (object)host)
+                    : UiLanguage.Get("ReservationAutoV3Command.NowSelectTheCrossingObjectPressESCTo");
             var reference = uiDoc.Selection.PickObject(withLinks ? ObjectType.PointOnElement : ObjectType.Element,
                 new UnhostedPairSelectionFilter(uiDoc.Document, win.SelectedPipeSource,
                     win.SelectedObject, win.SelectedHost, role, win.DoubleLinkEnabled), prompt);
@@ -881,8 +857,7 @@ namespace Modification
                 try
                 {
                     reference = uiDoc.Selection.PickObject(ObjectType.Element,
-                        UiLanguage.T("Étape 1/2 : clique sur la canalisation qui traverse le mur (Échap pour arrêter)",
-                            "Step 1/2: click the pipe that crosses the wall (press Esc to stop)"));
+                        UiLanguage.Get("ReservationAutoV3Command.Step12ClickThePipeThatCrosses"));
                 }
                 catch (Autodesk.Revit.Exceptions.OperationCanceledException) { return new List<MepSelection>(); }
 
@@ -892,11 +867,9 @@ namespace Modification
                     {
                         Element = element, TransformToCurrentDocument = Transform.Identity, IsLinked = false
                     } };
-                TaskDialog.Show(UiLanguage.T("Bulbizarre - Auto réservation", "Bulbizarre - Auto Opening"), element is Wall
-                    ? UiLanguage.T("Tu as choisi le mur en premier. Commence par la canalisation qui le traverse ; nous choisirons le mur juste après.",
-                        "You selected the wall first. Start with the pipe that crosses it; you will select the wall right after.")
-                    : UiLanguage.T("Ce n'est pas une canalisation. Clique sur le tuyau de démonstration qui traverse le mur.",
-                        "This is not a pipe. Click the demo pipe that crosses the wall."));
+                TaskDialog.Show(UiLanguage.Get("ReservationAutoV3Command.BulbizarreAutoOpening"), element is Wall
+                    ? UiLanguage.Get("ReservationAutoV3Command.YouSelectedTheWallFirstStartWithThe")
+                    : UiLanguage.Get("ReservationAutoV3Command.ThisIsNotAPipeClickTheDemo"));
             }
         }
 
@@ -908,18 +881,15 @@ namespace Modification
                 try
                 {
                     reference = uiDoc.Selection.PickObject(ObjectType.Element,
-                        UiLanguage.T("Étape 2/2 : clique sur le mur traversé par la canalisation (Échap pour arrêter)",
-                            "Step 2/2: click the wall crossed by the pipe (press Esc to stop)"));
+                        UiLanguage.Get("ReservationAutoV3Command.Step22ClickTheWallCrossedBy"));
                 }
                 catch (Autodesk.Revit.Exceptions.OperationCanceledException) { return null; }
 
                 Element element = doc.GetElement(reference);
                 if (element is Wall) return element;
-                TaskDialog.Show(UiLanguage.T("Bulbizarre - Auto réservation", "Bulbizarre - Auto Opening"), element is Pipe
-                    ? UiLanguage.T("Tu as sélectionné une autre canalisation. La première est mémorisée : clique maintenant sur le mur qu'elle traverse.",
-                        "You selected another pipe. The first one is kept: now click the wall it crosses.")
-                    : UiLanguage.T("Ce n'est pas un mur. Clique sur le mur que traverse la canalisation sélectionnée.",
-                        "This is not a wall. Click the wall crossed by the selected pipe."));
+                TaskDialog.Show(UiLanguage.Get("ReservationAutoV3Command.BulbizarreAutoOpening"), element is Pipe
+                    ? UiLanguage.Get("ReservationAutoV3Command.YouSelectedAnotherPipeTheFirstOneIs")
+                    : UiLanguage.Get("ReservationAutoV3Command.ThisIsNotAWallClickTheWall"));
             }
         }
 
@@ -1058,14 +1028,12 @@ namespace Modification
             try
             {
                 string hostLabel = hostTarget == ReservationAutoV3Window.HostTarget.Sol
-                    ? UiLanguage.T("sol", "floor")
-                    : UiLanguage.T("mur", "wall");
+                    ? UiLanguage.Get("ReservationAutoV3Command.Floor")
+                    : UiLanguage.Get("ReservationAutoV3Command.Wall");
                 Reference reference = uiDoc.Selection.PickObject(
                     ObjectType.LinkedElement,
                     new LinkHostSelectionFilter(doc, source, hostTarget, allowAnyLink),
-                    UiLanguage.T(
-                        $"Sélectionne le {hostLabel} du lien (ESC pour annuler)",
-                        $"Select the linked {hostLabel} (press ESC to cancel)"));
+                    UiLanguage.Format("ReservationAutoV3Command.SelectTheLinked0PressESCToCancel", (object)hostLabel));
 
                 if (reference == null || reference.LinkedElementId == ElementId.InvalidElementId)
                     return null;
@@ -1333,9 +1301,7 @@ namespace Modification
             {
                 TaskDialog.Show(
                     "BIMaestro",
-                    UiLanguage.T(
-                        $"Impossible de créer la réservation sans hôte.\nUtilise une famille de réservation non hébergée pour traverser un {(isWall ? "mur" : "sol")} de lien.",
-                        $"Unable to create the unhosted opening.\nUse an unhosted opening family to cross a linked {(isWall ? "wall" : "floor")}."));
+                    UiLanguage.Format("ReservationAutoV3Command.CannotCreateUnhostedOpening", isWall ? global::BIMaestro.Localization.UiLanguage.Get("ReservationAutoV3Command.Wall") : global::BIMaestro.Localization.UiLanguage.Get("ReservationAutoV3Command.Floor")));
                 return;
             }
 
@@ -1511,9 +1477,7 @@ namespace Modification
             {
                 TaskDialog.Show(
                     "BIMaestro",
-                    UiLanguage.T(
-                        "Impossible de créer la réservation multi sans hôte.\nUtilise une famille de réservation non hébergée pour traverser un mur de lien.",
-                        "Unable to create the multi-opening without a host.\nUse an unhosted opening family to cross a linked wall."));
+                    UiLanguage.Get("ReservationAutoV3Command.UnableToCreateTheMultiOpeningWithoutA"));
                 return;
             }
 
@@ -1611,9 +1575,7 @@ namespace Modification
             {
                 TaskDialog.Show(
                     "BIMaestro",
-                    UiLanguage.T(
-                        "Impossible de créer la réservation multi sans hôte.\nUtilise une famille de réservation non hébergée pour traverser un sol de lien.",
-                        "Unable to create the multi-opening without a host.\nUse an unhosted opening family to cross a linked floor."));
+                    UiLanguage.Get("ReservationAutoV3Command.UnableToCreateTheMultiOpeningWithoutA2"));
                 return;
             }
 
@@ -1857,15 +1819,9 @@ namespace Modification
                         .FirstOrDefault(p => IsLength(p) && p.AsDouble() >= dimension.Value - MmToFt(1));
                 }
                 if (parameter == null || dimension.Value <= 1e-9 || double.IsNaN(dimension.Value) || double.IsInfinity(dimension.Value))
-                    throw new InvalidOperationException(UiLanguage.T(
-                        $"Impossible de régler la {dimension.Label} de la réservation « {instance.Symbol.Family.Name} » (paramètres : {string.Join(", ", names)}).\n" +
-                        "Dans Configuration, choisissez un paramètre de longueur d’occurrence modifiable. Aucune réservation partiellement dimensionnée n’est conservée.",
-                        $"Unable to set the opening dimension '{dimension.Label}' for '{instance.Symbol.Family.Name}' (parameters: {string.Join(", ", names)}).\n" +
-                        "In Settings, choose a writable instance length parameter. No partially sized opening is retained."));
+                    throw new InvalidOperationException(UiLanguage.Format("ReservationAutoV3Command.OpeningDimensionFailed", dimension.Label, instance.Symbol.Family.Name, string.Join(", ", names)));
                 if (!parameterIds.Add(parameter.Id.GetIdLongValue()))
-                    throw new InvalidOperationException(UiLanguage.T(
-                        "La largeur, la hauteur et la profondeur doivent utiliser des paramètres distincts. Corrigez le mapping dans Configuration.",
-                        "Width, height and depth must use different parameters. Correct the mapping in Settings."));
+                    throw new InvalidOperationException(UiLanguage.Get("ReservationAutoV3Command.WidthHeightAndDepthMustUseDifferentParameters"));
                 resolved.Add((parameter, dimension.Value, write));
             }
 
@@ -1874,18 +1830,14 @@ namespace Modification
                 try { dimension.Parameter.Set(dimension.Value); }
                 catch (Exception ex)
                 {
-                    throw new InvalidOperationException(UiLanguage.T(
-                        $"Le paramètre « {dimension.Parameter.Definition.Name} » ne peut pas être modifié. Aucune réservation partiellement dimensionnée n’est conservée.",
-                        $"Parameter '{dimension.Parameter.Definition.Name}' cannot be changed. No partially sized opening is retained."), ex);
+                    throw new InvalidOperationException(UiLanguage.Format("ReservationAutoV3Command.Parameter0CannotBeChangedNoPartiallySized", (object)dimension.Parameter.Definition.Name), ex);
                 }
             }
             instance.Document.Regenerate();
             foreach (var dimension in resolved.Where(d => d.Write))
             {
                 if (Math.Abs(dimension.Parameter.AsDouble() - dimension.Value) > 1e-6)
-                    throw new InvalidOperationException(UiLanguage.T(
-                        $"Revit n’a pas appliqué la dimension au paramètre « {dimension.Parameter.Definition.Name} ». Vérifiez les contraintes de la famille.",
-                        $"Revit did not apply the dimension to '{dimension.Parameter.Definition.Name}'. Check the family constraints."));
+                    throw new InvalidOperationException(UiLanguage.Format("ReservationAutoV3Command.RevitDidNotApplyTheDimensionTo0", (object)dimension.Parameter.Definition.Name));
             }
         }
 
@@ -4020,23 +3972,23 @@ namespace Modification
                 return uiDoc.Selection.PickObject(
                     ObjectType.PointOnElement,
                     hybridFilter,
-                    UiLanguage.T($"Sélectionne {objectName} dans un lien", $"Select the {objectName} in a linked model"));
+                    UiLanguage.Format("ReservationAutoV3Command.SelectThe0InALinkedModel", (object)objectName));
             }
 
             return pipeSource switch
             {
                 ReservationAutoV3Window.PipeSource.Maquette => uiDoc.Selection.PickObject(
                     ObjectType.Element, hostFilter,
-                    UiLanguage.T($"Sélectionne {objectName} (maquette)", $"Select the {objectName} in your model")),
+                    UiLanguage.Format("ReservationAutoV3Command.SelectThe0InYourModel", (object)objectName)),
 
                 ReservationAutoV3Window.PipeSource.LienIFC or ReservationAutoV3Window.PipeSource.LienRVT => uiDoc.Selection.PickObject(
                     ObjectType.PointOnElement, hybridFilter,
-                    UiLanguage.T($"Sélectionne {objectName} dans ta maquette ou dans le lien", $"Select the {objectName} in your model or in the linked model")),
+                    UiLanguage.Format("ReservationAutoV3Command.SelectThe0InYourModelOrIn", (object)objectName)),
 
                 _ => uiDoc.Selection.PickObject(
                     ObjectType.Element,
                     hostFilter,
-                    UiLanguage.T($"Sélectionne {objectName}", $"Select the {objectName}"))
+                    UiLanguage.Format("ReservationAutoV3Command.SelectThe0", (object)objectName))
             };
         }
 
@@ -4044,11 +3996,11 @@ namespace Modification
         {
             return objectType switch
             {
-                ReservationAutoV3Window.ObjectType.Canalisation => plural ? UiLanguage.T("canalisations", "pipes") : UiLanguage.T("la canalisation", "pipe"),
-                ReservationAutoV3Window.ObjectType.Gaine => plural ? UiLanguage.T("gaines", "ducts") : UiLanguage.T("la gaine", "duct"),
-                ReservationAutoV3Window.ObjectType.Porte => plural ? UiLanguage.T("portes", "doors") : UiLanguage.T("la porte", "door"),
-                ReservationAutoV3Window.ObjectType.Fenetre => plural ? UiLanguage.T("fenêtres", "windows") : UiLanguage.T("la fenêtre", "window"),
-                _ => plural ? UiLanguage.T("objets 3D", "3D objects") : UiLanguage.T("l’objet 3D", "3D object")
+                ReservationAutoV3Window.ObjectType.Canalisation => plural ? UiLanguage.Get("ReservationAutoV3Command.Pipes") : UiLanguage.Get("ReservationAutoV3Command.Pipe"),
+                ReservationAutoV3Window.ObjectType.Gaine => plural ? UiLanguage.Get("ReservationAutoV3Command.Ducts") : UiLanguage.Get("ReservationAutoV3Command.Duct"),
+                ReservationAutoV3Window.ObjectType.Porte => plural ? UiLanguage.Get("ReservationAutoV3Command.Doors") : UiLanguage.Get("ReservationAutoV3Command.Door"),
+                ReservationAutoV3Window.ObjectType.Fenetre => plural ? UiLanguage.Get("ReservationAutoV3Command.Windows") : UiLanguage.Get("ReservationAutoV3Command.Window"),
+                _ => plural ? UiLanguage.Get("ReservationAutoV3Command.3DObjects") : UiLanguage.Get("ReservationAutoV3Command.3DObject")
             };
         }
 
@@ -4066,24 +4018,18 @@ namespace Modification
                 return uiDoc.Selection.PickObjects(
                     ObjectType.PointOnElement,
                     hybridFilter,
-                    UiLanguage.T(
-                        $"Sélectionne les {objectLabelPlural} dans les liens (CTRL + clic, ESC pour terminer)",
-                        $"Select {objectLabelPlural} in linked models (CTRL + click, ESC to finish)"));
+                    UiLanguage.Format("ReservationAutoV3Command.Select0InLinkedModelsCTRLClickESC", (object)objectLabelPlural));
             }
 
             return pipeSource switch
             {
                 ReservationAutoV3Window.PipeSource.Maquette => uiDoc.Selection.PickObjects(
                     ObjectType.Element, hostFilter,
-                    UiLanguage.T(
-                        $"Sélectionne les {objectLabelPlural} (CTRL + clic, ESC pour terminer)",
-                        $"Select {objectLabelPlural} (CTRL + click, ESC to finish)")),
+                    UiLanguage.Format("ReservationAutoV3Command.Select0CTRLClickESCToFinish", (object)objectLabelPlural)),
 
                 ReservationAutoV3Window.PipeSource.LienIFC or ReservationAutoV3Window.PipeSource.LienRVT => uiDoc.Selection.PickObjects(
                     ObjectType.PointOnElement, hybridFilter,
-                    UiLanguage.T(
-                        $"Sélectionne les {objectLabelPlural} dans ta maquette ou dans le lien (CTRL + clic, ESC pour terminer)",
-                        $"Select {objectLabelPlural} in your model or in the linked model (CTRL + click, ESC to finish)")),
+                    UiLanguage.Format("ReservationAutoV3Command.Select0InYourModelOrInThe", (object)objectLabelPlural)),
 
                 _ => null
             };

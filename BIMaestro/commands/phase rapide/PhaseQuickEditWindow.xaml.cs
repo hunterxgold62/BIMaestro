@@ -46,7 +46,7 @@ namespace Modification
             catch (System.Exception ex)
             {
                 MessageBox.Show(
-                    UiLanguage.T($"Impossible d’ouvrir la page d’aide : {ex.Message}", $"Unable to open the help page: {ex.Message}"),
+                    UiLanguage.Format("PhaseQuickEditWindow.xaml.UnableToOpenTheHelpPage0", (object)ex.Message),
                     "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
@@ -109,7 +109,7 @@ namespace Modification
 
             public static PhaseOption NoChange()
             {
-                return new PhaseOption(UiLanguage.T("Ne pas modifier", "Do not change"), ElementId.InvalidElementId)
+                return new PhaseOption(UiLanguage.Get("PhaseQuickEditWindow.xaml.DoNotChange"), ElementId.InvalidElementId)
                 {
                     IsNoChange = true
                 };
@@ -117,7 +117,7 @@ namespace Modification
 
             public static PhaseOption None()
             {
-                return new PhaseOption(UiLanguage.T("Aucune demolition", "None"), ElementId.InvalidElementId);
+                return new PhaseOption(UiLanguage.Get("PhaseQuickEditWindow.xaml.None"), ElementId.InvalidElementId);
             }
         }
     }

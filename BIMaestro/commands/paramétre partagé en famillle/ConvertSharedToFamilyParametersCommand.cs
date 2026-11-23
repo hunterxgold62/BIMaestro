@@ -26,7 +26,7 @@ namespace Famille
 
             if (!doc.IsFamilyDocument)
             {
-                TaskDialog.Show("BIMaestro", UiLanguage.T("Cette commande doit être lancée dans l'éditeur de familles (.rfa).", "This command must be run in the Family Editor (.rfa)."));
+                TaskDialog.Show("BIMaestro", UiLanguage.Get("ConvertSharedToFamilyParametersCommand.ThisCommandMustBeRunInTheFamily"));
                 return Result.Cancelled;
             }
 
@@ -38,7 +38,7 @@ namespace Famille
 
             if (sharedParameters.Count == 0)
             {
-                TaskDialog.Show("BIMaestro", UiLanguage.T("Aucun paramètre partagé à convertir.", "No shared parameter is available to convert."));
+                TaskDialog.Show("BIMaestro", UiLanguage.Get("ConvertSharedToFamilyParametersCommand.NoSharedParameterIsAvailableToConvert"));
                 return Result.Succeeded;
             }
 

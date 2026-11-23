@@ -53,30 +53,30 @@ namespace BIMaestro.Welcome
                 WelcomeBody.VerticalScrollBarVisibility = System.Windows.Controls.ScrollBarVisibility.Disabled;
                 SizeToContent = SizeToContent.Height;
                 Height = double.NaN;
-                HeadingSubtitleText.Text = UiLanguage.T("Prenez vos marques dans une maquette d’essai.", "Get familiar with BIMaestro in a practice model.");
-                Title = UiLanguage.T("BIMaestro — Maquette d’essai", "BIMaestro — Practice model");
-                HeadingText.Text = UiLanguage.T("Essayez BIMaestro", "Try BIMaestro");
+                HeadingSubtitleText.Text = UiLanguage.Get("WelcomeWindow.xaml.GetFamiliarWithBIMaestroInAPracticeModel");
+                Title = UiLanguage.Get("WelcomeWindow.xaml.BIMaestroPracticeModel");
+                HeadingText.Text = UiLanguage.Get("WelcomeWindow.xaml.TryBIMaestro");
             }
             if (existing != null) { EmailBox.Text = existing.Email ?? ""; FirstNameBox.Text = existing.FirstName ?? ""; LastNameBox.Text = existing.LastName ?? ""; CompanyBox.Text = existing.Company ?? ""; }
             if (showEmail && !communityProfileRequired && !string.IsNullOrWhiteSpace(existing?.Email))
             {
-                IntroTitleText.Text = UiLanguage.T("Complétez vos informations", "Complete your details");
-                IntroText.Text = UiLanguage.T("Vous pouvez ajouter votre entreprise (facultatif). Vos informations déjà enregistrées sont préremplies.", "You can add your company (optional). Your saved details are pre-filled.");
-                PrimaryButton.Content = UiLanguage.T("Enregistrer", "Save");
-                NoThanksButton.Content = UiLanguage.T("Conserver", "Keep");
-                NoThanksButton.ToolTip = UiLanguage.T("Garder mes informations actuelles sans compléter l’entreprise.", "Keep my current details without adding a company.");
+                IntroTitleText.Text = UiLanguage.Get("WelcomeWindow.xaml.CompleteYourDetails");
+                IntroText.Text = UiLanguage.Get("WelcomeWindow.xaml.YouCanAddYourCompanyOptionalYourSaved");
+                PrimaryButton.Content = UiLanguage.Get("WelcomeWindow.xaml.Save");
+                NoThanksButton.Content = UiLanguage.Get("WelcomeWindow.xaml.Keep");
+                NoThanksButton.ToolTip = UiLanguage.Get("WelcomeWindow.xaml.KeepMyCurrentDetailsWithoutAddingACompany");
             }
             if (communityProfileRequired)
             {
-                Title = UiLanguage.T("BIMaestro — Profil de la bibliothèque commune", "BIMaestro — Shared library profile");
-                HeadingText.Text = UiLanguage.T("Bibliothèque commune", "Shared library"); HeadingSubtitleText.Text = UiLanguage.T("Identifiez votre profil avant un échange de famille.", "Identify your profile before sharing families.");
-                IntroTitleText.Text = UiLanguage.T("Complétez votre profil", "Complete your profile");
-                IntroText.Text = UiLanguage.T("Le nom, le prénom et l’e-mail sont demandés avant de publier ou télécharger une famille.", "Your last name, first name and email are required before publishing or downloading a family.");
-                TrustTitleText.Text = UiLanguage.T("Pourquoi ces informations ?", "Why do we need this?");
-                TrustDetailsText.Text = UiLanguage.T("Elles permettent de reconnaître votre profil. Une identité technique protégée reste conservée sur cet ordinateur afin que vous puissiez ensuite modifier la couverture ou retirer vos propres familles.", "It lets us recognize your profile. A protected technical identity is stored on this computer so you can later change the cover image or remove your own families.");
-                EmailLabel.Text = UiLanguage.T("Votre e-mail (obligatoire)", "Your email (required)"); FirstNameLabel.Text = UiLanguage.T("Prénom (obligatoire)", "First name (required)"); LastNameLabel.Text = UiLanguage.T("Nom (obligatoire)", "Last name (required)");
-                PrivacyText.Text = UiLanguage.T("Ces informations sont enregistrées dans votre profil BIMaestro. Vous pourrez les modifier depuis Options.", "This information is saved in your BIMaestro profile. You can change it from Options.");
-                NoThanksButton.Content = UiLanguage.T("Annuler", "Cancel"); LaterButton.Visibility = Visibility.Collapsed; PrimaryButton.Content = UiLanguage.T("Enregistrer et continuer", "Save and continue");
+                Title = UiLanguage.Get("WelcomeWindow.xaml.BIMaestroSharedLibraryProfile");
+                HeadingText.Text = UiLanguage.Get("WelcomeWindow.xaml.SharedLibrary"); HeadingSubtitleText.Text = UiLanguage.Get("WelcomeWindow.xaml.IdentifyYourProfileBeforeSharingFamilies");
+                IntroTitleText.Text = UiLanguage.Get("WelcomeWindow.xaml.CompleteYourProfile");
+                IntroText.Text = UiLanguage.Get("WelcomeWindow.xaml.YourLastNameFirstNameAndEmailAre");
+                TrustTitleText.Text = UiLanguage.Get("WelcomeWindow.xaml.WhyDoWeNeedThis");
+                TrustDetailsText.Text = UiLanguage.Get("WelcomeWindow.xaml.ItLetsUsRecognizeYourProfileAProtected");
+                EmailLabel.Text = UiLanguage.Get("WelcomeWindow.xaml.YourEmailRequired"); FirstNameLabel.Text = UiLanguage.Get("WelcomeWindow.xaml.FirstNameRequired"); LastNameLabel.Text = UiLanguage.Get("WelcomeWindow.xaml.LastNameRequired");
+                PrivacyText.Text = UiLanguage.Get("WelcomeWindow.xaml.ThisInformationIsSavedInYourBIMaestroProfile");
+                NoThanksButton.Content = UiLanguage.Get("WelcomeWindow.xaml.Cancel"); LaterButton.Visibility = Visibility.Collapsed; PrimaryButton.Content = UiLanguage.Get("WelcomeWindow.xaml.SaveAndContinue");
             }
         }
 
@@ -92,7 +92,7 @@ namespace BIMaestro.Welcome
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, UiLanguage.T("Impossible d’ouvrir LinkedIn : ", "Unable to open LinkedIn: ") + ex.Message,
+                MessageBox.Show(this, UiLanguage.Get("WelcomeWindow.xaml.UnableToOpenLinkedIn") + ex.Message,
                     "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
@@ -101,19 +101,19 @@ namespace BIMaestro.Welcome
         {
             if (communityProfileRequired && (string.IsNullOrWhiteSpace(FirstName) || string.IsNullOrWhiteSpace(LastName)))
             {
-                MessageBox.Show(this, UiLanguage.T("Indiquez votre prénom et votre nom pour continuer avec la bibliothèque commune.", "Enter your first and last name to continue with the shared library."), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(this, UiLanguage.Get("WelcomeWindow.xaml.EnterYourFirstAndLastNameToContinue"), "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
             if (string.IsNullOrWhiteSpace(Email))
             {
-                MessageBox.Show(this, UiLanguage.T("Indique un email, ou clique sur “Plus tard” si tu préfères passer.", "Enter an email, or click “Later” if you prefer to skip."),
+                MessageBox.Show(this, UiLanguage.Get("WelcomeWindow.xaml.EnterAnEmailOrClickLaterIfYou"),
                     "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
             if (!IsValidEmail(Email))
             {
-                MessageBox.Show(this, UiLanguage.T("Cet email ne semble pas valide.", "This email does not appear to be valid."),
+                MessageBox.Show(this, UiLanguage.Get("WelcomeWindow.xaml.ThisEmailDoesNotAppearToBeValid"),
                     "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }

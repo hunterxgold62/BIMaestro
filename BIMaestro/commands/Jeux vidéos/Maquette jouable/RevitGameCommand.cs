@@ -27,17 +27,15 @@ namespace BIMaestro.VideoGames
 
             if (document == null)
             {
-                TaskDialog.Show(UiLanguage.T("Maquette BIM", "BIM Model"), UiLanguage.T("Ouvrez d'abord une maquette Revit.", "Open a Revit model first."));
+                TaskDialog.Show(UiLanguage.Get("RevitGameCommand.BIMModel"), UiLanguage.Get("RevitGameCommand.OpenARevitModelFirst"));
                 return Result.Cancelled;
             }
 
             if (!(document.ActiveView is View3D view3D) || view3D.IsTemplate)
             {
                 TaskDialog.Show(
-                    UiLanguage.T("Maquette BIM", "BIM Model"),
-                    UiLanguage.T(
-                        "Affichez la vue 3D que vous voulez explorer, puis relancez le bouton.\n\nBIMaestro reprend exactement la visibilité, la boîte de coupe et les couleurs de cette vue.",
-                        "Display the 3D view you want to explore, then run the command again.\n\nBIMaestro uses that view's visibility, section box, and colours exactly as displayed."));
+                    UiLanguage.Get("RevitGameCommand.BIMModel"),
+                    UiLanguage.Get("RevitGameCommand.DisplayThe3DViewYouWantToExplore"));
                 return Result.Cancelled;
             }
 
@@ -52,8 +50,8 @@ namespace BIMaestro.VideoGames
                 if (scene.TriangleCount == 0)
                 {
                     TaskDialog.Show(
-                        UiLanguage.T("Maquette BIM", "BIM Model"),
-                        UiLanguage.T("Aucune géométrie 3D visible n'a été trouvée dans la vue active.", "No visible 3D geometry was found in the active view."));
+                        UiLanguage.Get("RevitGameCommand.BIMModel"),
+                        UiLanguage.Get("RevitGameCommand.NoVisible3DGeometryWasFoundInThe"));
                     return Result.Cancelled;
                 }
 
@@ -64,7 +62,7 @@ namespace BIMaestro.VideoGames
             {
                 message = exception.Message;
                 TaskDialog.Show(
-                    UiLanguage.T("Maquette BIM", "BIM Model"),
+                    UiLanguage.Get("RevitGameCommand.BIMModel"),
                     UiLanguage.T("La conversion de la vue 3D n'a pas pu être terminée.\n\n" + exception.Message, "The 3D view conversion could not be completed.\n\n" + exception.Message));
                 return Result.Failed;
             }

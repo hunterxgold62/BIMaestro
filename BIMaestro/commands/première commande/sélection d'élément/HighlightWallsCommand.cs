@@ -25,7 +25,7 @@ namespace Visualisation
             var selIds = uidoc.Selection.GetElementIds();
             if (!selIds.Any())
             {
-                TaskDialog.Show(UiLanguage.T("Sélection", "Selection"), UiLanguage.T("Veuillez sélectionner au moins un élément.", "Select at Least One Element."));
+                TaskDialog.Show(UiLanguage.Get("HighlightWallsCommand.Selection"), UiLanguage.Get("HighlightWallsCommand.SelectAtLeastOneElement"));
                 return Result.Cancelled;
             }
 
@@ -242,9 +242,9 @@ namespace Visualisation
 
             // 12) Feedback utilisateur
             int totalElements = finalSel.Count;
-            string msg = UiLanguage.T("Portée : ", "Scope: ") +
-                         (entireModel ? UiLanguage.T("maquette entière", "entire model") : UiLanguage.T("vue active", "active view")) + "\n" +
-                         UiLanguage.T("Nombre total d'éléments sélectionnés : ", "Total Number of Selected Elements: ") + totalElements + "\n\n";
+            string msg = UiLanguage.Get("HighlightWallsCommand.Scope") +
+                         (entireModel ? UiLanguage.Get("HighlightWallsCommand.EntireModel") : UiLanguage.Get("HighlightWallsCommand.ActiveView")) + "\n" +
+                         UiLanguage.Get("HighlightWallsCommand.TotalNumberOfSelectedElements") + totalElements + "\n\n";
 
             var famCount = new Dictionary<string, int>(StringComparer.CurrentCultureIgnoreCase);
             foreach (var id in finalSel)
@@ -260,11 +260,11 @@ namespace Visualisation
                 famCount[fName]++;
             }
 
-            msg += UiLanguage.T("Nombre d'éléments par famille :\n", "Number of Elements by Family:\n");
+            msg += UiLanguage.Get("HighlightWallsCommand.NumberOfElementsByFamily");
             foreach (var kv in famCount.OrderBy(k => k.Key, StringComparer.CurrentCultureIgnoreCase))
                 msg += $"- {kv.Value} × {kv.Key}\n";
 
-            TaskDialog.Show(UiLanguage.T("Mon Plugin - Sélection", "My Plugin - Selection"), msg);
+            TaskDialog.Show(UiLanguage.Get("HighlightWallsCommand.MyPluginSelection"), msg);
 
             return Result.Succeeded;
         }

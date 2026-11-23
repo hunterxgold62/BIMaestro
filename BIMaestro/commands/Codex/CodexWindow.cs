@@ -66,39 +66,39 @@ namespace BIMaestro.Codex
         private DateTime activityStarted;
         private readonly HashSet<string> handledToolCalls = new HashSet<string>();
         private readonly WrapPanel attachmentPanel = new WrapPanel();
-        private readonly Expander permissions = new Expander { Header = UiLanguage.T("Autorisations et réglages avancés", "Permissions and advanced settings"), IsExpanded = false };
+        private readonly Expander permissions = new Expander { Header = UiLanguage.Get("CodexWindow.PermissionsAndAdvancedSettings"), IsExpanded = false };
         private CodexFamilyArtifact lastArtifact;
         private readonly TextBox executable = new TextBox { MinWidth = 180, VerticalContentAlignment = VerticalAlignment.Center };
         private readonly TextBox transcript = new TextBox { IsReadOnly = true, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Padding = new Thickness(0, 4, 18, 4), BorderThickness = new Thickness(0) };
         private readonly TextBox input = new TextBox { AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, Height = 64, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Padding = new Thickness(8, 8, 18, 8), MaxLength = 24000 };
-        private readonly TextBlock status = new TextBlock { Text = UiLanguage.T("Non connecté", "Not connected"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 8) };
+        private readonly TextBlock status = new TextBlock { Text = UiLanguage.Get("CodexWindow.NotConnected"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 8) };
         private readonly ComboBox models = new ComboBox { MinWidth = 180, DisplayMemberPath = "Label", Margin = new Thickness(0, 0, 8, 0) };
         private readonly ComboBox provider = new ComboBox { MinWidth = 180, ItemsSource = new[] { "Codex (ChatGPT)", "Claude (Claude Code)" }, SelectedIndex = 0 };
         private readonly ComboBox effort = new ComboBox { MinWidth = 90 };
-        private readonly CheckBox context = new CheckBox { Content = UiLanguage.T("Autoriser la lecture de la sélection et de sa géométrie", "Allow reading the selection and its geometry"), Margin = new Thickness(0, 8, 12, 8), ToolTip = UiLanguage.T("Sur demande : 20 éléments sélectionnés, 30 paramètres par élément, positions, encombrements et contours des sols ; types de murs disponibles. Dans une famille, jusqu'à 150 paramètres avec valeurs, formules, GUID partagés et 64 noms de types, et description d'une famille BIMaestro. Pas de lecture complète du modèle ni de capture d'écran.", "On request: 20 selected elements, 30 parameters per element, positions, bounding extents and floor outlines; available wall types. In a family, up to 150 parameters with values, formulas, shared GUIDs and 64 type names, plus the description of a BIMaestro family. No full model read and no screen capture.") };
-        private readonly CheckBox changes = new CheckBox { Content = UiLanguage.T("Autoriser les créations et modifications dans Revit", "Allow creating and modifying elements in Revit"), Margin = new Thickness(0, 0, 0, 8), ToolTip = UiLanguage.T("Peut créer et valider des familles, les charger, modifier la famille ouverte, créer des murs ou des murailles sur les sols sélectionnés et des volumes libres DirectShape dans le projet. Le projet ouvert n'est jamais enregistré automatiquement.", "Can create and validate families, load them, modify the open family, create walls or parapet walls on the selected floors and free-form DirectShape volumes in the project. The open project is never saved automatically.") };
-        private readonly CheckBox direct = new CheckBox { Content = UiLanguage.T("Appliquer directement, sans confirmation par opération", "Apply directly, without confirming each operation"), Margin = new Thickness(0, 0, 0, 8), ToolTip = UiLanguage.T("Pour cette discussion : familles, murs, murailles et compositions libres DirectShape selon votre demande. Pas d'écrasement des fichiers ou familles existantes, pas de sauvegarde du projet.", "For this conversation: families, walls, parapet walls and free-form DirectShape compositions as requested. Existing files and families are never overwritten and the project is not saved.") };
-        private readonly CheckBox internet = new CheckBox { Content = UiLanguage.T("Accès à Internet", "Internet access"), IsChecked = false, Margin = new Thickness(0, 0, 0, 8), ToolTip = UiLanguage.T("Autorise l'assistant à rechercher des informations sur Internet pour cette discussion.", "Allows the assistant to search the Internet for information during this conversation.") };
-        private readonly Button connect = Button(UiLanguage.T("Connexion ChatGPT", "Sign in to ChatGPT"));
-        private readonly Button disconnect = Button(UiLanguage.T("Déconnexion", "Sign out"));
-        private readonly Button send = Button(UiLanguage.T("Envoyer", "Send"));
-        private readonly Button dictate = Button(UiLanguage.T("Micro", "Mic"));
-        private readonly Button stop = Button(UiLanguage.T("Arrêter", "Stop"));
-        private readonly Button reset = Button(UiLanguage.T("Nouvelle discussion", "New conversation"));
-        private readonly CheckBox separateMode = new CheckBox { Content = UiLanguage.T("Nouvelle famille dans un Revit séparé", "New family in a separate Revit session"), IsChecked = true, Margin = new Thickness(0, 6, 0, 6) };
+        private readonly CheckBox context = new CheckBox { Content = UiLanguage.Get("CodexWindow.AllowReadingTheSelectionAndItsGeometry"), Margin = new Thickness(0, 8, 12, 8), ToolTip = UiLanguage.Get("CodexWindow.OnRequest20SelectedElements30ParametersPer") };
+        private readonly CheckBox changes = new CheckBox { Content = UiLanguage.Get("CodexWindow.AllowCreatingAndModifyingElementsInRevit"), Margin = new Thickness(0, 0, 0, 8), ToolTip = UiLanguage.Get("CodexWindow.CanCreateAndValidateFamiliesLoadThemModify") };
+        private readonly CheckBox direct = new CheckBox { Content = UiLanguage.Get("CodexWindow.ApplyDirectlyWithoutConfirmingEachOperation"), Margin = new Thickness(0, 0, 0, 8), ToolTip = UiLanguage.Get("CodexWindow.ForThisConversationFamiliesWallsParapetWallsAnd") };
+        private readonly CheckBox internet = new CheckBox { Content = UiLanguage.Get("CodexWindow.InternetAccess"), IsChecked = false, Margin = new Thickness(0, 0, 0, 8), ToolTip = UiLanguage.Get("CodexWindow.AllowsTheAssistantToSearchTheInternetFor") };
+        private readonly Button connect = Button(UiLanguage.Get("CodexWindow.SignInToChatGPT"));
+        private readonly Button disconnect = Button(UiLanguage.Get("CodexWindow.SignOut"));
+        private readonly Button send = Button(UiLanguage.Get("CodexWindow.Send"));
+        private readonly Button dictate = Button(UiLanguage.Get("CodexWindow.Mic"));
+        private readonly Button stop = Button(UiLanguage.Get("CodexWindow.Stop"));
+        private readonly Button reset = Button(UiLanguage.Get("CodexWindow.NewConversation"));
+        private readonly CheckBox separateMode = new CheckBox { Content = UiLanguage.Get("CodexWindow.NewFamilyInASeparateRevitSession"), IsChecked = true, Margin = new Thickness(0, 6, 0, 6) };
         private bool separateRevitStarting;
         private CodexDedicatedRevitClient dedicatedClient, pendingDedicatedClient;
         private Process dedicatedProcess;
         private bool IsRemoteTarget => separateMode.IsChecked == true && dedicatedClient != null;
         private bool IsDedicatedTarget => bridge.DedicatedSession || IsRemoteTarget;
-        private readonly Button browse = Button(UiLanguage.T("Parcourir…", "Browse…"));
-        private readonly Button claudeInstall = Button(UiLanguage.T("Installer Claude Code", "Install Claude Code"));
-        private readonly Button attach = Button(UiLanguage.T("Joindre une image", "Attach an image"));
-        private readonly Button pasteImage = Button(UiLanguage.T("Coller une image", "Paste an image"));
-        private readonly Button showArtifact = Button(UiLanguage.T("Voir le RFA créé", "Show created RFA"));
-        private readonly Button openArtifact = Button(UiLanguage.T("Ouvrir dans Revit", "Open in Revit"));
-        private readonly Button community = Button(UiLanguage.T("Bibliothèque commune", "Shared library"));
-        private readonly Button shareArtifact = Button(UiLanguage.T("Partager le RFA", "Share RFA"));
+        private readonly Button browse = Button(UiLanguage.Get("CodexWindow.Browse"));
+        private readonly Button claudeInstall = Button(UiLanguage.Get("CodexWindow.InstallClaudeCode"));
+        private readonly Button attach = Button(UiLanguage.Get("CodexWindow.AttachAnImage"));
+        private readonly Button pasteImage = Button(UiLanguage.Get("CodexWindow.PasteAnImage"));
+        private readonly Button showArtifact = Button(UiLanguage.Get("CodexWindow.ShowCreatedRFA"));
+        private readonly Button openArtifact = Button(UiLanguage.Get("CodexWindow.OpenInRevit"));
+        private readonly Button community = Button(UiLanguage.Get("CodexWindow.SharedLibrary"));
+        private readonly Button shareArtifact = Button(UiLanguage.Get("CodexWindow.ShareRFA"));
         private readonly Button openDiagnostics = Button("Diagnostics");
         private bool publishing;
         private string lastLibraryCheck;
@@ -109,8 +109,8 @@ namespace BIMaestro.Codex
         private async Task<bool> LaunchSeparateRevitAsync()
         {
             if (separateRevitStarting) return false;
-            if (activityPanel.Visibility != Visibility.Visible) BeginActivity(UiLanguage.T("Démarrage du Revit séparé…", "Starting the separate Revit session…"));
-            else SetActivityPhase(UiLanguage.T("Démarrage du Revit séparé…", "Starting the separate Revit session…"));
+            if (activityPanel.Visibility != Visibility.Visible) BeginActivity(UiLanguage.Get("CodexWindow.StartingTheSeparateRevitSession"));
+            else SetActivityPhase(UiLanguage.Get("CodexWindow.StartingTheSeparateRevitSession"));
             separateRevitStarting = true; UpdateControls();
             try
             {
@@ -119,7 +119,7 @@ namespace BIMaestro.Codex
                     dedicatedProcess?.Dispose();
                     string executablePath = Process.GetCurrentProcess().MainModule.FileName;
                     if (!string.Equals(Path.GetFileName(executablePath), "Revit.exe", StringComparison.OrdinalIgnoreCase))
-                        throw new InvalidOperationException(UiLanguage.T("Impossible de retrouver l'exécutable de cette version de Revit.", "Cannot find the executable for this Revit version."));
+                        throw new InvalidOperationException(UiLanguage.Get("CodexWindow.CannotFindTheExecutableForThisRevitVersion"));
                     string pipeName = "BIMaestro-Family-" + Guid.NewGuid().ToString("N");
                     string secret = Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");
                     var launch = new ProcessStartInfo(executablePath) {
@@ -128,18 +128,18 @@ namespace BIMaestro.Codex
                     launch.EnvironmentVariables["BIMAESTRO_FAMILY_DEDICATED"] = "1";
                     launch.EnvironmentVariables["BIMAESTRO_FAMILY_PIPE"] = pipeName;
                     launch.EnvironmentVariables["BIMAESTRO_FAMILY_SECRET"] = secret;
-                    dedicatedProcess = Process.Start(launch) ?? throw new InvalidOperationException(UiLanguage.T("Revit n'a pas démarré.", "Revit did not start."));
+                    dedicatedProcess = Process.Start(launch) ?? throw new InvalidOperationException(UiLanguage.Get("CodexWindow.RevitDidNotStart"));
                     pendingDedicatedClient = new CodexDedicatedRevitClient(pipeName, secret);
                 }
-                status.Text = UiLanguage.T("Démarrage du Revit séparé et connexion à cette page Famille IA…", "Starting the separate Revit session and connecting it to this AI Family page…");
-                SetActivityPhase(UiLanguage.T("Connexion à la nouvelle session Revit…", "Connecting to the new Revit session…"));
+                status.Text = UiLanguage.Get("CodexWindow.StartingTheSeparateRevitSessionAndConnectingIt");
+                SetActivityPhase(UiLanguage.Get("CodexWindow.ConnectingToTheNewRevitSession"));
                 await pendingDedicatedClient.WaitReadyAsync(dedicatedProcess);
                 if (closed) return false;
                 dedicatedClient = pendingDedicatedClient;
                 // A thread opened against the project must not silently continue against another Revit.
-                if (threadId != null) { threadId = turnId = null; Append("BIMaestro", UiLanguage.T("Nouvelle discussion liée au Revit séparé.", "New conversation linked to the separate Revit session.")); }
-                documentLabel.Text = UiLanguage.T("Document : ", "Document: ") + dedicatedClient.DocumentTitle;
-                status.Text = UiLanguage.T("Revit séparé connecté · discussion conservée dans cette fenêtre.", "Separate Revit session connected · conversation kept in this window.");
+                if (threadId != null) { threadId = turnId = null; Append("BIMaestro", UiLanguage.Get("CodexWindow.NewConversationLinkedToTheSeparateRevitSession")); }
+                documentLabel.Text = UiLanguage.Get("CodexWindow.Document") + dedicatedClient.DocumentTitle;
+                status.Text = UiLanguage.Get("CodexWindow.SeparateRevitSessionConnectedConversationKeptInThis");
                 return true;
             }
             catch (Exception ex) { EndActivity(); Error(ex); return false; }
@@ -158,7 +158,7 @@ namespace BIMaestro.Codex
                 {
                     try { await dedicatedClient.CallAsync("revit_open_created_family", new JObject(), bridge.ShareContext,
                         bridge.AllowChanges, bridge.ApplyDirectly, provider.SelectedIndex == 1); }
-                    catch (Exception ex) { Append(UiLanguage.T("Famille enregistrée · ouverture dans le Revit séparé impossible", "Family saved · could not open it in the separate Revit session"), ex.Message); }
+                    catch (Exception ex) { Append(UiLanguage.Get("CodexWindow.FamilySavedCouldNotOpenItInThe"), ex.Message); }
                 }
                 return result;
             }
@@ -215,9 +215,9 @@ namespace BIMaestro.Codex
             try
             {
                 if (await CodexCommunityPublishWindow.ShowAsync(this, bridge, artifact.FilePath, "ai"))
-                    Append(UiLanguage.T("Bibliothèque commune", "Shared library"), UiLanguage.T("Famille partagée : ", "Family shared: ") + Path.GetFileNameWithoutExtension(artifact.FilePath));
+                    Append(UiLanguage.Get("CodexWindow.SharedLibrary"), UiLanguage.Get("CodexWindow.FamilyShared") + Path.GetFileNameWithoutExtension(artifact.FilePath));
             }
-            catch (Exception ex) { Append(UiLanguage.T("Partage non effectué — votre RFA local est conservé", "Sharing failed — your local RFA has been kept"), ex is TaskCanceledException ? UiLanguage.T("Le service ne répond pas. Vérifiez la bibliothèque avant un nouvel envoi.", "The service is not responding. Check the library before sending again.") : ex.Message); }
+            catch (Exception ex) { Append(UiLanguage.Get("CodexWindow.SharingFailedYourLocalRFAHasBeenKept"), ex is TaskCanceledException ? UiLanguage.Get("CodexWindow.TheServiceIsNotRespondingCheckTheLibrary") : ex.Message); }
             finally { publishing = false; if (!closed) UpdateControls(); }
         }
 
@@ -232,8 +232,8 @@ namespace BIMaestro.Codex
             separateMode.IsChecked = !mepMode && !bridge.IsAttachedFamilyDocument;
             activityTimer.Tick += (_, __) => UpdateActivityElapsed();
             bridge.CreationProgress += message => { if (!closed) SetActivityPhase(message); };
-            Title = mepMode ? UiLanguage.T("BIMaestro — Assistant MEP (bêta)", "BIMaestro — MEP Assistant (beta)") :
-                bridge.DedicatedSession ? UiLanguage.T("BIMaestro — Famille IA · session dédiée", "BIMaestro — AI Family · dedicated session") : UiLanguage.T("BIMaestro — Famille IA (bêta)", "BIMaestro — AI Family (beta)");
+            Title = mepMode ? UiLanguage.Get("CodexWindow.BIMaestroMEPAssistantBeta") :
+                bridge.DedicatedSession ? UiLanguage.Get("CodexWindow.BIMaestroAIFamilyDedicatedSession") : UiLanguage.Get("CodexWindow.BIMaestroAIFamilyBeta");
             Width = 720; Height = 900; MinWidth = 640; MinHeight = 720;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
             Resources.MergedDictionaries.Add(theme ?? new ResourceDictionary { Source = new Uri("/BIMaestro;component/Themes/BIMaestroTheme.xaml", UriKind.Relative) });
@@ -322,8 +322,8 @@ namespace BIMaestro.Codex
             Content = layout;
             var top = new StackPanel();
             var heading = new StackPanel();
-            heading.Children.Add(Text(mepMode ? UiLanguage.T("Assistant MEP", "MEP Assistant") : UiLanguage.T("Famille IA", "AI Family"), "H1"));
-            documentLabel.Text = UiLanguage.T("Document : ", "Document: ") + bridge.DocumentTitle;
+            heading.Children.Add(Text(mepMode ? UiLanguage.Get("CodexWindow.MEPAssistant") : UiLanguage.Get("CodexWindow.AIFamily"), "H1"));
+            documentLabel.Text = UiLanguage.Get("CodexWindow.Document") + bridge.DocumentTitle;
             documentLabel.SetResourceReference(TextBlock.ForegroundProperty, "Surface"); documentLabel.Opacity = 0.9;
             documentLabel.Margin = new Thickness(0, 6, 0, 0); heading.Children.Add(documentLabel);
             var header = new Border { CornerRadius = new CornerRadius(14), Padding = new Thickness(18, 9, 18, 9), Child = heading, Margin = new Thickness(0, 0, 0, 10) };
@@ -345,32 +345,32 @@ namespace BIMaestro.Codex
             session.Children.Add(activityPanel);
             var modelRow = new Grid();
             modelRow.ColumnDefinitions.Add(new ColumnDefinition()); modelRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(172) });
-            var modelField = new DockPanel(); var modelLabel = Text(UiLanguage.T("Modèle", "Model"), "Label"); DockPanel.SetDock(modelLabel, Dock.Left); modelField.Children.Add(modelLabel); modelField.Children.Add(models);
-            var effortField = new DockPanel(); var effortLabel = Text(UiLanguage.T("Réflexion", "Reasoning"), "Label"); DockPanel.SetDock(effortLabel, Dock.Left); effortField.Children.Add(effortLabel); effortField.Children.Add(effort);
+            var modelField = new DockPanel(); var modelLabel = Text(UiLanguage.Get("CodexWindow.Model"), "Label"); DockPanel.SetDock(modelLabel, Dock.Left); modelField.Children.Add(modelLabel); modelField.Children.Add(models);
+            var effortField = new DockPanel(); var effortLabel = Text(UiLanguage.Get("CodexWindow.Reasoning"), "Label"); DockPanel.SetDock(effortLabel, Dock.Left); effortField.Children.Add(effortLabel); effortField.Children.Add(effort);
             models.Margin = new Thickness(0, 0, 12, 0); effort.Margin = new Thickness(0);
             Grid.SetColumn(effortField, 1); modelRow.Children.Add(modelField); modelRow.Children.Add(effortField); session.Children.Add(modelRow);
             if (bridge.DedicatedSession)
             {
-                context.Content = UiLanguage.T("Lire uniquement les familles créées dans cette session", "Read only the families created in this session");
-                session.Children.Add(Text(UiLanguage.T("Session séparée : le projet d'origine n'est pas partagé.", "Separate session: the original project is not shared."), "Hint"));
+                context.Content = UiLanguage.Get("CodexWindow.ReadOnlyTheFamiliesCreatedInThisSession");
+                session.Children.Add(Text(UiLanguage.Get("CodexWindow.SeparateSessionTheOriginalProjectIsNotShared"), "Hint"));
                 input.Text = Environment.GetEnvironmentVariable("BIMAESTRO_FAMILY_REQUEST") ?? "";
                 Environment.SetEnvironmentVariable("BIMAESTRO_FAMILY_REQUEST", null, EnvironmentVariableTarget.Process);
             }
             else if (!mepMode)
             {
-                separateMode.ToolTip = UiLanguage.T("Coché : cette discussion et ses pièces jointes restent ici ; les opérations Revit s'exécutent dans une nouvelle session de la même version. Décoché : travailler dans le document actuel.", "Checked: this conversation and its attachments stay here; Revit operations run in a new session of the same version. Unchecked: work in the current document.");
+                separateMode.ToolTip = UiLanguage.Get("CodexWindow.CheckedThisConversationAndItsAttachmentsStayHere");
                 session.Children.Add(separateMode);
                 separateMode.Checked += (_, __) => ChangeRevitTarget();
                 separateMode.Unchecked += (_, __) => ChangeRevitTarget();
             }
             else
             {
-                session.Children.Add(Text(UiLanguage.T("Projet ouvert : les équipements restent en place. L'assistant analyse le P&ID et propose les liaisons et trajets à vérifier.", "Open project: equipment stays in place. The assistant analyzes the P&ID and proposes connections and routes for you to review."), "Hint"));
-                context.Content = UiLanguage.T("Autoriser la lecture des équipements et connecteurs du projet", "Allow reading project equipment and connectors");
-                context.ToolTip = UiLanguage.T("Lit les équipements sélectionnés, leurs connecteurs MEP, les types de tuyaux et les réseaux utiles au raccordement.", "Reads the selected equipment, its MEP connectors, pipe types and the systems relevant to the connection.");
-                changes.Content = UiLanguage.T("Autoriser la création de tuyauteries dans le projet", "Allow creating piping in the project");
-                changes.ToolTip = UiLanguage.T("Après analyse et aperçu, peut créer les trajets de tuyaux pris en charge dans le projet. Une confirmation Revit est demandée par opération.", "After analysis and preview, can create supported pipe routes in the project. A Revit confirmation is requested for each operation.");
-                direct.ToolTip = UiLanguage.T("Autorise l'application d'un trajet pris en charge sans dialogue Revit supplémentaire. À activer uniquement pour cette discussion.", "Allows a supported route to be applied without an additional Revit dialog. Enable only for this conversation.");
+                session.Children.Add(Text(UiLanguage.Get("CodexWindow.OpenProjectEquipmentStaysInPlaceTheAssistant"), "Hint"));
+                context.Content = UiLanguage.Get("CodexWindow.AllowReadingProjectEquipmentAndConnectors");
+                context.ToolTip = UiLanguage.Get("CodexWindow.ReadsTheSelectedEquipmentItsMEPConnectorsPipe");
+                changes.Content = UiLanguage.Get("CodexWindow.AllowCreatingPipingInTheProject");
+                changes.ToolTip = UiLanguage.Get("CodexWindow.AfterAnalysisAndPreviewCanCreateSupportedPipe");
+                direct.ToolTip = UiLanguage.Get("CodexWindow.AllowsASupportedRouteToBeAppliedWithout");
             }
             top.Children.Add(Card(session));
             provider.SelectionChanged += (_, __) =>
@@ -384,16 +384,16 @@ namespace BIMaestro.Codex
                 }
                 bool useClaude = provider.SelectedIndex == 1;
                 bridge.FamilyOutputRoot = useClaude ? CodexFamilyBuilder.ClaudeOutputRoot : CodexFamilyBuilder.OutputRoot;
-                connect.Content = useClaude ? UiLanguage.T("Connexion Claude", "Sign in to Claude") : UiLanguage.T("Connexion ChatGPT", "Sign in to ChatGPT");
-                disconnect.Content = useClaude ? UiLanguage.T("Fermer la session", "End session") : UiLanguage.T("Déconnexion", "Sign out");
+                connect.Content = useClaude ? UiLanguage.Get("CodexWindow.SignInToClaude") : UiLanguage.Get("CodexWindow.SignInToChatGPT");
+                disconnect.Content = useClaude ? UiLanguage.Get("CodexWindow.EndSession") : UiLanguage.Get("CodexWindow.SignOut");
                 executable.Text = useClaude ? ClaudeClient.FindExecutable() ?? "" : CodexClient.FindExecutable() ?? "";
                 claudeInstall.Visibility = useClaude ? Visibility.Visible : Visibility.Collapsed;
                 models.ItemsSource = useClaude ? new[] { new ModelChoice("sonnet", "Claude Sonnet", true), new ModelChoice("opus", "Claude Opus", true), new ModelChoice("haiku", "Claude Haiku", false) } : null;
                 attachments.Clear(); pdfAttachments.Clear(); RefreshAttachments();
                 if (useClaude) models.SelectedIndex = 0;
                 status.Text = useClaude && string.IsNullOrWhiteSpace(executable.Text)
-                    ? UiLanguage.T("Claude Code n'est pas détecté. Utilisez « Installer Claude Code » dans les réglages.", "Claude Code was not detected. Use \"Install Claude Code\" in the settings.")
-                    : UiLanguage.T("Non connecté", "Not connected");
+                    ? UiLanguage.Get("CodexWindow.ClaudeCodeWasNotDetectedUseInstallClaude")
+                    : UiLanguage.Get("CodexWindow.NotConnected");
                 UpdateControls();
             };
 
@@ -404,9 +404,9 @@ namespace BIMaestro.Codex
                 permission.HorizontalContentAlignment = HorizontalAlignment.Stretch;
                 settings.Children.Add(permission);
             }
-            settings.Children.Add(Text(UiLanguage.T("La demande et le contexte autorisé sont transmis à l'assistant choisi. Le mode direct concerne cette discussion.", "The request and authorized context are sent to the selected assistant. Direct mode applies to this conversation only."), "Hint"));
+            settings.Children.Add(Text(UiLanguage.Get("CodexWindow.TheRequestAndAuthorizedContextAreSentTo"), "Hint"));
             var installation = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
-            installation.Children.Add(Text(UiLanguage.T("Exécutable officiel du fournisseur (codex.exe ou claude.exe)", "Official provider executable (codex.exe or claude.exe)"), "Label"));
+            installation.Children.Add(Text(UiLanguage.Get("CodexWindow.OfficialProviderExecutableCodexExeOrClaudeExe"), "Label"));
             var pathRow = new DockPanel();
             executable.Margin = new Thickness(0, 5, 8, 5);
             DockPanel.SetDock(browse, Dock.Right); pathRow.Children.Add(browse); pathRow.Children.Add(executable); installation.Children.Add(pathRow);
@@ -414,51 +414,51 @@ namespace BIMaestro.Codex
             claudeInstall.Visibility = Visibility.Collapsed;
             claudeInstall.Click += (_, __) => Process.Start(new ProcessStartInfo("https://code.claude.com/docs/en/setup") { UseShellExecute = true });
             installation.Children.Add(claudeInstall);
-            settings.Children.Add(new Expander { Header = UiLanguage.T("Installation de l'assistant", "Assistant installation"), Content = installation, Margin = new Thickness(0, 10, 0, 0) });
+            settings.Children.Add(new Expander { Header = UiLanguage.Get("CodexWindow.AssistantInstallation"), Content = installation, Margin = new Thickness(0, 10, 0, 0) });
             settings.Margin = new Thickness(0, 8, 0, 0);
             permissions.Content = settings;
-            permissions.ToolTip = UiLanguage.T("Déplier pour modifier les autorisations Revit et l'installation de l'assistant.", "Expand to change Revit permissions and the assistant installation.");
+            permissions.ToolTip = UiLanguage.Get("CodexWindow.ExpandToChangeRevitPermissionsAndTheAssistant");
             top.Children.Add(Card(permissions, new Thickness(16, 10, 16, 10)));
 
             var bottom = new StackPanel();
             var composer = Card(bottom); composer.Margin = new Thickness(0, 12, 0, 0);
             DockPanel.SetDock(composer, Dock.Bottom); layout.Children.Add(composer);
-            bottom.Children.Add(Text(UiLanguage.T("Votre demande", "Your request"), "H2"));
+            bottom.Children.Add(Text(UiLanguage.Get("CodexWindow.YourRequest"), "H2"));
             input.ToolTip = mepMode
-                ? UiLanguage.T("Décrivez les équipements à raccorder et le circuit attendu. Joignez le P&ID si utile. Ctrl+Entrée pour envoyer.", "Describe the equipment to connect and the expected circuit. Attach the P&ID if useful. Ctrl+Enter to send.")
-                : UiLanguage.T("Décrivez l'objet, ses dimensions ou la modification souhaitée. Ctrl+Entrée pour envoyer.", "Describe the object, its dimensions or the desired change. Ctrl+Enter to send.");
+                ? UiLanguage.Get("CodexWindow.DescribeTheEquipmentToConnectAndTheExpected")
+                : UiLanguage.Get("CodexWindow.DescribeTheObjectItsDimensionsOrTheDesired");
             bottom.Children.Add(input);
             bottom.Children.Add(attachmentPanel);
             var artifacts = new WrapPanel(); artifacts.Children.Add(showArtifact); artifacts.Children.Add(openArtifact); artifacts.Children.Add(shareArtifact);
             if (!mepMode) bottom.Children.Add(artifacts);
             community.Click += (_, __) => new CodexCommunityWindow(bridge, null, UseCommunityFamilyAsBase) { Owner = this }.Show();
             shareArtifact.Click += async (_, __) => await ShareFamilyAsync(lastArtifact);
-            attach.Content = UiLanguage.T("Joindre", "Attach"); attach.ToolTip = mepMode ? UiLanguage.T("Joindre un P&ID PDF ou une image", "Attach a P&ID PDF or an image") : UiLanguage.T("Joindre une image ou une fiche technique PDF", "Attach an image or a PDF datasheet"); attach.MinWidth = 88;
-            pasteImage.Content = UiLanguage.T("Coller", "Paste"); pasteImage.ToolTip = UiLanguage.T("Coller une image du presse-papiers", "Paste an image from the clipboard"); pasteImage.MinWidth = 88;
+            attach.Content = UiLanguage.Get("CodexWindow.Attach"); attach.ToolTip = mepMode ? UiLanguage.Get("CodexWindow.AttachAPIDPDFOrAnImage") : UiLanguage.Get("CodexWindow.AttachAnImageOrAPDFDatasheet"); attach.MinWidth = 88;
+            pasteImage.Content = UiLanguage.Get("CodexWindow.Paste"); pasteImage.ToolTip = UiLanguage.Get("CodexWindow.PasteAnImageFromTheClipboard"); pasteImage.MinWidth = 88;
             send.MinWidth = 120; stop.MinWidth = 72; reset.MinWidth = 90;
             dictate.MinWidth = 88;
             var microphoneLabel = new StackPanel { Orientation = Orientation.Horizontal };
             microphoneLabel.Children.Add(new TextBlock { Text = "\uE720", FontFamily = new FontFamily("Segoe MDL2 Assets"), FontSize = 16, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 7, 0) });
-            microphoneLabel.Children.Add(new TextBlock { Text = UiLanguage.T("Micro", "Mic"), VerticalAlignment = VerticalAlignment.Center });
+            microphoneLabel.Children.Add(new TextBlock { Text = UiLanguage.Get("CodexWindow.Mic"), VerticalAlignment = VerticalAlignment.Center });
             dictate.Content = microphoneLabel;
-            System.Windows.Automation.AutomationProperties.SetName(dictate, UiLanguage.T("Micro : dicter votre demande", "Mic: dictate your request"));
-            dictate.ToolTip = UiLanguage.T("Dicter avec le micro via Windows (Win+H). Micro et Internet nécessaires. Arrêtez la dictée, relisez puis cliquez sur Envoyer.", "Dictate with the microphone through Windows (Win+H). Microphone and Internet access required. Stop dictation, review, then click Send.");
+            System.Windows.Automation.AutomationProperties.SetName(dictate, UiLanguage.Get("CodexWindow.MicDictateYourRequest"));
+            dictate.ToolTip = UiLanguage.Get("CodexWindow.DictateWithTheMicrophoneThroughWindowsWinH");
             var buttons = new WrapPanel(); buttons.Children.Add(attach); buttons.Children.Add(pasteImage); buttons.Children.Add(dictate); buttons.Children.Add(send); buttons.Children.Add(stop); bottom.Children.Add(buttons);
             var conversation = new DockPanel();
             var discussionHeader = new DockPanel { Margin = new Thickness(0, 0, 0, 6) };
             var discussionActions = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right };
-            community.Content = UiLanguage.T("Bibliothèque", "Library");
-            community.ToolTip = UiLanguage.T("Ouvrir la bibliothèque commune de familles.", "Open the shared family library.");
+            community.Content = UiLanguage.Get("CodexWindow.Library");
+            community.ToolTip = UiLanguage.Get("CodexWindow.OpenTheSharedFamilyLibrary");
             reset.Content = "Nouveau";
-            reset.ToolTip = UiLanguage.T("Commencer un nouvel échange. Les modifications Revit et les fichiers créés restent en place.", "Start a new conversation. Revit changes and created files remain in place.");
-            openDiagnostics.ToolTip = UiLanguage.T("Ouvrir le journal local de cette session MEP dans le Bloc-notes.", "Open the local log of this MEP session in Notepad.");
+            reset.ToolTip = UiLanguage.Get("CodexWindow.StartANewConversationRevitChangesAndCreated");
+            openDiagnostics.ToolTip = UiLanguage.Get("CodexWindow.OpenTheLocalLogOfThisMEPSession");
             openDiagnostics.Click += (_, __) => OpenMepDiagnostics();
             if (mepMode) discussionActions.Children.Add(openDiagnostics);
             if (!mepMode) discussionActions.Children.Add(community);
             discussionActions.Children.Add(reset);
             discussionActions.Children.Add(historyButton);
             DockPanel.SetDock(discussionActions, Dock.Right); discussionHeader.Children.Add(discussionActions);
-            discussionHeader.Children.Add(Text(UiLanguage.T("Discussion", "Conversation"), "H2"));
+            discussionHeader.Children.Add(Text(UiLanguage.Get("CodexWindow.Conversation"), "H2"));
             DockPanel.SetDock(discussionHeader, Dock.Top); conversation.Children.Add(discussionHeader);
             conversation.Children.Add(transcript);
             // Keep the composer and conversation reachable at the minimum window size.
@@ -472,20 +472,20 @@ namespace BIMaestro.Codex
             var discussionCard = Card(conversation); discussionCard.Margin = new Thickness(0); Grid.SetRow(discussionCard, 1); middle.Children.Add(discussionCard);
             layout.Children.Add(middle);
             Append("BIMaestro", mepMode
-                ? UiLanguage.T("Sélectionnez les équipements déjà placés dans le projet et joignez votre P&ID. L'assistant compare les piquages Revit au schéma, propose les raccordements et un ou plusieurs trajets 3D, puis vérifie chaque trajet avant de créer les tuyaux. Il vous demandera uniquement les décisions qui restent ambiguës. Le premier pilote traite une liaison à la fois.\n\nExemple : Inspecte les pompes et l'échangeur sélectionnés. À partir du P&ID joint, propose les liaisons aller/retour et deux trajets possibles pour le premier raccordement. Signale les points à confirmer avant de modéliser.", "Select the equipment already placed in the project and attach your P&ID. The assistant compares the Revit connectors with the diagram, proposes connections and one or more 3D routes, then checks each route before creating the pipes. It will only ask you about decisions that remain ambiguous. The first pilot handles one connection at a time.\n\nExample: Inspect the selected pumps and heat exchanger. Based on the attached P&ID, propose the supply/return connections and two possible routes for the first connection. Flag the points to confirm before modeling.")
-                : UiLanguage.T("Décrivez la famille à créer ou la modification souhaitée. Précisez les dimensions connues et joignez une image ou un PDF si utile.", "Describe the family to create or the desired change. Specify any known dimensions and attach an image or a PDF if useful."));
-            if (mepMode) Append(UiLanguage.T("Diagnostic", "Diagnostics"), UiLanguage.T("Les erreurs de cette session portent un identifiant. Le bouton « Diagnostics » ouvre leur journal détaillé.", "Errors in this session carry an identifier. The \"Diagnostics\" button opens their detailed log."));
+                ? UiLanguage.Get("CodexWindow.SelectTheEquipmentAlreadyPlacedInTheProject")
+                : UiLanguage.Get("CodexWindow.DescribeTheFamilyToCreateOrTheDesired"));
+            if (mepMode) Append(UiLanguage.Get("CodexWindow.Diagnostics"), UiLanguage.Get("CodexWindow.ErrorsInThisSessionCarryAnIdentifierThe"));
 
             browse.Click += (_, __) =>
             {
                 var dialog = provider.SelectedIndex == 1
-                    ? new OpenFileDialog { Title = UiLanguage.T("Choisir l'exécutable officiel Claude Code", "Select the official Claude Code executable"), Filter = "Claude Code|claude.exe", CheckFileExists = true }
-                    : new OpenFileDialog { Title = UiLanguage.T("Choisir l'exécutable officiel Codex", "Select the official Codex executable"), Filter = "Codex|codex.exe", CheckFileExists = true };
+                    ? new OpenFileDialog { Title = UiLanguage.Get("CodexWindow.SelectTheOfficialClaudeCodeExecutable"), Filter = "Claude Code|claude.exe", CheckFileExists = true }
+                    : new OpenFileDialog { Title = UiLanguage.Get("CodexWindow.SelectTheOfficialCodexExecutable"), Filter = "Codex|codex.exe", CheckFileExists = true };
                 if (dialog.ShowDialog(this) == true) executable.Text = dialog.FileName;
             };
             attach.Click += async (_, __) =>
             {
-                var dialog = new OpenFileDialog { Title = mepMode ? UiLanguage.T("P&ID ou image", "P&ID or image") : UiLanguage.T("Images ou fiche technique PDF", "Images or PDF datasheet"), Filter = UiLanguage.T("Images et PDF|*.png;*.jpg;*.jpeg;*.bmp;*.pdf|Images|*.png;*.jpg;*.jpeg;*.bmp|PDF|*.pdf", "Images and PDF|*.png;*.jpg;*.jpeg;*.bmp;*.pdf|Images|*.png;*.jpg;*.jpeg;*.bmp|PDF|*.pdf"), Multiselect = true, CheckFileExists = true };
+                var dialog = new OpenFileDialog { Title = mepMode ? UiLanguage.Get("CodexWindow.PIDOrImage") : UiLanguage.Get("CodexWindow.ImagesOrPDFDatasheet"), Filter = UiLanguage.Get("CodexWindow.ImagesAndPDFPngJpgJpegBmpPdf"), Multiselect = true, CheckFileExists = true };
                 if (dialog.ShowDialog(this) != true) return;
                 await AddFilesAsync(dialog.FileNames);
             };
@@ -507,8 +507,8 @@ namespace BIMaestro.Codex
                 try
                 {
                     if (attachments.Count + pdfAttachments.Sum(p => p.PageImages.Length) >= 3) throw new InvalidOperationException("Trois images maximum par message, pages PDF comprises.");
-                    if (!Clipboard.ContainsImage()) throw new InvalidOperationException(UiLanguage.T("Le presse-papiers ne contient pas d'image.", "The clipboard does not contain an image."));
-                    attachments.Add(CodexImageAttachment.FromBitmap(Clipboard.GetImage(), UiLanguage.T("Image collée", "Pasted image"))); RefreshAttachments();
+                    if (!Clipboard.ContainsImage()) throw new InvalidOperationException(UiLanguage.Get("CodexWindow.TheClipboardDoesNotContainAnImage"));
+                    attachments.Add(CodexImageAttachment.FromBitmap(Clipboard.GetImage(), UiLanguage.Get("CodexWindow.PastedImage"))); RefreshAttachments();
                 }
                 catch (Exception ex) { Error(ex); }
             };
@@ -528,7 +528,7 @@ namespace BIMaestro.Codex
                 try
                 {
                     var result = await CallRevitAsync("revit_open_created_family", new JObject());
-                    documentLabel.Text = UiLanguage.T("Document : ", "Document: ") + TargetDocumentTitle;
+                    documentLabel.Text = UiLanguage.Get("CodexWindow.Document") + TargetDocumentTitle;
                     AppendToolResult("revit_open_created_family", JsonConvert.SerializeObject(result));
                 }
                 catch (Exception ex) { Error(ex); }
@@ -539,7 +539,7 @@ namespace BIMaestro.Codex
             send.Click += async (_, __) => await SendAsync();
             dictate.Click += (_, __) => StartDictation();
             stop.Click += async (_, __) => await StopAsync();
-            reset.Click += (_, __) => { if (!ReleaseHistory()) return; threadId = null; turnId = null; claudeClient?.NewDiscussion(); lastArtifact = null; lastLibraryCheck = null; input.Clear(); SelectPreferredModel(); direct.IsChecked = false; attachments.Clear(); pdfAttachments.Clear(); RefreshAttachments(); transcript.Clear(); Append("BIMaestro", UiLanguage.T("Nouvelle discussion. Les modifications déjà faites dans Revit et les fichiers créés sont conservés.", "New conversation. Changes already made in Revit and created files are kept.")); UpdateControls(); };
+            reset.Click += (_, __) => { if (!ReleaseHistory()) return; threadId = null; turnId = null; claudeClient?.NewDiscussion(); lastArtifact = null; lastLibraryCheck = null; input.Clear(); SelectPreferredModel(); direct.IsChecked = false; attachments.Clear(); pdfAttachments.Clear(); RefreshAttachments(); transcript.Clear(); Append("BIMaestro", UiLanguage.Get("CodexWindow.NewConversationChangesAlreadyMadeInRevitAnd")); UpdateControls(); };
             input.PreviewKeyDown += async (_, e) =>
             {
                 if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.Control) { e.Handled = true; await SendAsync(); }
@@ -567,7 +567,7 @@ namespace BIMaestro.Codex
                 if (Environment.GetEnvironmentVariable("BIMAESTRO_FAMILY_PROVIDER") == "1") provider.SelectedIndex = 1;
                 Environment.SetEnvironmentVariable("BIMAESTRO_FAMILY_PROVIDER", null, EnvironmentVariableTarget.Process);
             }
-            Closing += (_, e) => { if (!SaveHistory()) { e.Cancel = true; MessageBox.Show(this, status.Text, UiLanguage.T("Sauvegarde de la discussion", "Saving the conversation"), MessageBoxButton.OK, MessageBoxImage.Warning); } };
+            Closing += (_, e) => { if (!SaveHistory()) { e.Cancel = true; MessageBox.Show(this, status.Text, UiLanguage.Get("CodexWindow.SavingTheConversation"), MessageBoxButton.OK, MessageBoxImage.Warning); } };
             Closed += (_, __) => { historyTimer.Stop(); discussionLock?.Dispose(); discussionLock = null; closed = true; activityTimer.Stop(); CancelRecovery(); CancelRevit(); claudeClient?.Dispose(); bridge.Dispose(); client?.Dispose(); dedicatedProcess?.Dispose(); };
             UpdateControls();
         }
@@ -596,22 +596,22 @@ namespace BIMaestro.Codex
         private void AppendToolResult(string tool, string data) => Append("Revit", ToolResultSummary(RevitDoneLabel(tool), data));
 
         private void AppendFamilyReport(CodexFamilyArtifact artifact, string report) =>
-            Append(artifact.FilePath == null ? UiLanguage.T("Validation de la famille", "Family validation") : UiLanguage.T("Famille enregistrée", "Family saved"),
-                ToolResultSummary(artifact.FilePath == null ? UiLanguage.T("Contrôle terminé", "Check completed") : Path.GetFileName(artifact.FilePath), report));
+            Append(artifact.FilePath == null ? UiLanguage.Get("CodexWindow.FamilyValidation") : UiLanguage.Get("CodexWindow.FamilySaved"),
+                ToolResultSummary(artifact.FilePath == null ? UiLanguage.Get("CodexWindow.CheckCompleted") : Path.GetFileName(artifact.FilePath), report));
 
         private static string RevitDoneLabel(string tool)
         {
             string label;
-            if (tool == "revit_create_family" || tool == "revit_create_parametric_family" || tool == "revit_create_family_program") label = UiLanguage.T("Construction terminée", "Build completed");
-            else if (tool != null && tool.StartsWith("revit_validate", StringComparison.Ordinal)) label = UiLanguage.T("Validation terminée", "Validation completed");
-            else if (tool == "revit_open_created_family") label = UiLanguage.T("RFA ouvert dans Revit", "RFA opened in Revit");
+            if (tool == "revit_create_family" || tool == "revit_create_parametric_family" || tool == "revit_create_family_program") label = UiLanguage.Get("CodexWindow.BuildCompleted");
+            else if (tool != null && tool.StartsWith("revit_validate", StringComparison.Ordinal)) label = UiLanguage.Get("CodexWindow.ValidationCompleted");
+            else if (tool == "revit_open_created_family") label = UiLanguage.Get("CodexWindow.RFAOpenedInRevit");
             else if (tool != null && (tool.StartsWith("revit_set_", StringComparison.Ordinal) || tool.Contains("_create_") || tool.Contains("_edit_") ||
                 tool.Contains("_import_") || tool.Contains("_cut_") || tool.Contains("_from_")))
-                label = UiLanguage.T("Modification terminée", "Change completed");
+                label = UiLanguage.Get("CodexWindow.ChangeCompleted");
             else if (tool != null && (tool.Contains("inspect") || tool.Contains("read") || tool.Contains("prepare") || tool.Contains("info") ||
                 tool.Contains("context") || tool.Contains("contract") || tool.Contains("geometry") || tool.EndsWith("_parameters", StringComparison.Ordinal)))
-                label = UiLanguage.T("Lecture terminée", "Read completed");
-            else label = UiLanguage.T("Opération terminée", "Operation completed");
+                label = UiLanguage.Get("CodexWindow.ReadCompleted");
+            else label = UiLanguage.Get("CodexWindow.OperationCompleted");
             return string.IsNullOrEmpty(tool) ? label : label + " · " + tool;
         }
 
@@ -621,7 +621,7 @@ namespace BIMaestro.Codex
             {
                 if (JToken.Parse(data ?? "") is JObject result)
                 {
-                    if (result["success"]?.Type == JTokenType.Boolean && !(bool)result["success"]) label = UiLanguage.T("Problème signalé · ", "Issue reported · ") + label;
+                    if (result["success"]?.Type == JTokenType.Boolean && !(bool)result["success"]) label = UiLanguage.Get("CodexWindow.IssueReported") + label;
                     foreach (string key in new[] { "error", "message", "summary", "status" })
                         if (result[key]?.Type == JTokenType.String)
                         {
@@ -629,15 +629,15 @@ namespace BIMaestro.Codex
                             if (text.Length > 0) return label + "\n" + (text.Length > 300 ? text.Substring(0, 300) + "…" : text);
                         }
                     if (result["warnings"] is JArray warnings && warnings.Count > 0)
-                        return label + "\n" + warnings.Count + UiLanguage.T(" avertissement(s) Revit", " Revit warning(s)");
+                        return label + "\n" + warnings.Count + UiLanguage.Get("CodexWindow.RevitWarningS");
                 }
             }
             catch (JsonException) { }
             return label;
         }
 
-        private string PdfSummary() => pdfAttachments.Count == 0 ? "" : UiLanguage.T("\n[PDF : ", "\n[PDF: ") + pdfAttachments[0].Name +
-            (pdfAttachments[0].VisualPages.Length == 0 ? UiLanguage.T(" · texte seul", " · text only") : " · pages " + string.Join(", ", pdfAttachments[0].VisualPages) + UiLanguage.T(" en images", " as images")) + "]";
+        private string PdfSummary() => pdfAttachments.Count == 0 ? "" : UiLanguage.Get("CodexWindow.PDF") + pdfAttachments[0].Name +
+            (pdfAttachments[0].VisualPages.Length == 0 ? UiLanguage.Get("CodexWindow.TextOnly") : " · pages " + string.Join(", ", pdfAttachments[0].VisualPages) + UiLanguage.Get("CodexWindow.AsImages")) + "]";
         private string PdfContext() => pdfAttachments.Count == 0 ? "" :
             (mepMode ? "\n\nP&ID ou document PDF « " : "\n\nFiche technique PDF « ") + pdfAttachments[0].Name + " » (" + pdfAttachments[0].PageCount + " pages). " +
             (pdfAttachments[0].VisualPages.Length == 0 ? "Aucune page n'est visible en image : les schémas, plans et cotes graphiques ne sont pas vérifiables. Demande une page précise si elle est nécessaire. " :
@@ -653,8 +653,8 @@ namespace BIMaestro.Codex
             string[] required = { "UglyToad.PdfPig.dll", "UglyToad.PdfPig.Rendering.Skia.dll", "SkiaSharp.dll", "libSkiaSharp.dll" };
             string[] missing = required.Where(name => !File.Exists(Path.Combine(directory, name))).ToArray();
             if (missing.Length > 0)
-                throw new FileNotFoundException(UiLanguage.T("Installation BIMaestro incomplète : ", "Incomplete BIMaestro installation: ") + string.Join(", ", missing) +
-                    UiLanguage.T(" manquant(s). Réinstallez BIMaestro avec toutes les dépendances, puis redémarrez Revit.", " missing. Reinstall BIMaestro with all dependencies, then restart Revit."), missing[0]);
+                throw new FileNotFoundException(UiLanguage.Get("CodexWindow.IncompleteBIMaestroInstallation") + string.Join(", ", missing) +
+                    UiLanguage.Get("CodexWindow.MissingReinstallBIMaestroWithAllDependenciesThenRestart"), missing[0]);
         }
 
         private static CodexMepDiagnostics.CodexMepDiagnosticMetadata PdfDiagnostic(string path, CodexPdfAttachment pdf = null)
@@ -681,7 +681,7 @@ namespace BIMaestro.Codex
             if (busy || connecting) return;
             var files = paths?.ToArray() ?? new string[0];
             if (files.Length == 0) return;
-            connecting = true; status.Text = UiLanguage.T("Lecture des pièces jointes…", "Reading attachments…"); UpdateControls();
+            connecting = true; status.Text = UiLanguage.Get("CodexWindow.ReadingAttachments"); UpdateControls();
             string pdfPath = null;
             string stage = "attachments.add";
             CodexPdfAttachment pdfForDiagnostic = null;
@@ -707,7 +707,7 @@ namespace BIMaestro.Codex
                             throw new InvalidOperationException("Trois images maximum par message, pages PDF comprises.");
                         images.Add(CodexImageAttachment.FromFile(path));
                     }
-                    else throw new InvalidOperationException(UiLanguage.T("Format non pris en charge : ", "Unsupported format: ") + Path.GetFileName(path));
+                    else throw new InvalidOperationException(UiLanguage.Get("CodexWindow.UnsupportedFormat") + Path.GetFileName(path));
                 }
                 string warning = null;
                 if (pdfs.Count > 0)
@@ -717,19 +717,19 @@ namespace BIMaestro.Codex
                     stage = "pdf.render";
                     try { await ConfigurePdfPagesAsync(pdf, available); }
                     catch (Exception ex) when (!mepMode && !string.IsNullOrWhiteSpace(pdf.Text))
-                    { warning = UiLanguage.T("Rendu visuel indisponible : ", "Visual rendering unavailable: ") + ex.Message + UiLanguage.T(" Joignez une capture de la page utile.", " Attach a screenshot of the relevant page."); }
+                    { warning = UiLanguage.Get("CodexWindow.VisualRenderingUnavailable") + ex.Message + UiLanguage.Get("CodexWindow.AttachAScreenshotOfTheRelevantPage"); }
                     if (mepMode && pdf.PageImages.Length == 0)
-                        throw new InvalidOperationException(UiLanguage.T("Aucune page du P&ID n'a été convertie en image. Choisissez au moins une page pour que l'assistant puisse lire le schéma.", "No P&ID page was converted to an image. Choose at least one page so the assistant can read the diagram."));
+                        throw new InvalidOperationException(UiLanguage.Get("CodexWindow.NoPIDPageWasConvertedToAn"));
                     if (pdf.PageImages.Length == 0 && string.IsNullOrWhiteSpace(pdf.Text))
-                        throw new InvalidOperationException(UiLanguage.T("Ce PDF est un scan sans texte. Choisissez une à trois pages à convertir en images, ou joignez une capture de la page utile.", "This PDF is a scan without text. Choose one to three pages to convert to images, or attach a screenshot of the relevant page."));
+                        throw new InvalidOperationException(UiLanguage.Get("CodexWindow.ThisPDFIsAScanWithoutTextChoose"));
                 }
                 attachments.AddRange(images); pdfAttachments.AddRange(pdfs); RefreshAttachments();
-                status.Text = warning ?? (pdfs.Count == 0 ? UiLanguage.T("Pièces jointes prêtes", "Attachments ready") : pdfs[0].PageImages.Length > 0
-                    ? pdfs[0].PageImages.Length + UiLanguage.T(" page(s) du PDF convertie(s) en images ; elles seront envoyées avec le texte extrait.", " PDF page(s) converted to images; they will be sent with the extracted text.")
-                    : UiLanguage.T("PDF joint en texte seul. Choisissez les pages utiles pour voir aussi les schémas.", "PDF attached as text only. Choose the relevant pages to include the diagrams as well."));
+                status.Text = warning ?? (pdfs.Count == 0 ? UiLanguage.Get("CodexWindow.AttachmentsReady") : pdfs[0].PageImages.Length > 0
+                    ? pdfs[0].PageImages.Length + UiLanguage.Get("CodexWindow.PDFPageSConvertedToImagesTheyWill")
+                    : UiLanguage.Get("CodexWindow.PDFAttachedAsTextOnlyChooseTheRelevant"));
                 if (warning != null) Append("BIMaestro", warning);
                 if (mepMode && pdfs.Count > 0)
-                    Append(UiLanguage.T("Lecture P&ID", "P&ID reading"), UiLanguage.T("Le schéma et son texte sont joints. L'assistant doit d'abord relever le circuit et les repères concernés, demander un zoom si un détail est illisible, puis obtenir votre validation avant de créer un tuyau.", "The diagram and its text are attached. The assistant must first identify the circuit and tags involved, request a zoom if a detail is unreadable, then get your approval before creating any pipe."));
+                    Append(UiLanguage.Get("CodexWindow.PIDReading"), UiLanguage.Get("CodexWindow.TheDiagramAndItsTextAreAttachedThe"));
                 mepDiagnostics?.RecordEvent("attachments.add", "succeeded", pdfPath == null
                     ? new CodexMepDiagnostics.CodexMepDiagnosticMetadata { ImageCount = images.Count }
                     : PdfDiagnostic(pdfPath, pdfForDiagnostic));
@@ -740,7 +740,7 @@ namespace BIMaestro.Codex
         private async Task ConfigurePdfPagesAsync(CodexPdfAttachment pdf, int available, bool choosePages = false)
         {
             if (available < 1)
-                throw new InvalidOperationException(UiLanguage.T("Trois images maximum par message. Retirez une image pour choisir une page PDF.", "Three images maximum per message. Remove an image to choose a PDF page."));
+                throw new InvalidOperationException(UiLanguage.Get("CodexWindow.ThreeImagesMaximumPerMessageRemoveAnImage"));
             int[] pages = !choosePages && pdf.FileSizeBytes <= 8 * 1024 * 1024 && pdf.PageCount <= available && pdf.PageCount <= 3
                 ? Enumerable.Range(1, pdf.PageCount).ToArray()
                 : AskPdfPages(pdf, Math.Min(3, available));
@@ -755,17 +755,17 @@ namespace BIMaestro.Codex
 
         private int[] AskPdfPages(CodexPdfAttachment pdf, int maximum)
         {
-            var dialog = new Window { Owner = this, Title = UiLanguage.T("Pages PDF à voir en image", "PDF pages to view as images"), Width = 450, Height = 230,
+            var dialog = new Window { Owner = this, Title = UiLanguage.Get("CodexWindow.PDFPagesToViewAsImages"), Width = 450, Height = 230,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner, ResizeMode = ResizeMode.NoResize };
             var content = new StackPanel { Margin = new Thickness(20) };
-            content.Children.Add(new TextBlock { Text = pdf.Name + " · " + pdf.PageCount + UiLanguage.T(" pages. Indiquez jusqu'à ", " pages. Enter up to ") + maximum +
-                UiLanguage.T(" page(s) utiles, séparées par des virgules (ex. 2, 5). L'IA recevra ces pages en images avec le texte extractible du PDF.", " relevant page(s), separated by commas (e.g. 2, 5). The AI will receive these pages as images along with the PDF's extractable text."),
+            content.Children.Add(new TextBlock { Text = pdf.Name + " · " + pdf.PageCount + UiLanguage.Get("CodexWindow.PagesEnterUpTo") + maximum +
+                UiLanguage.Get("CodexWindow.RelevantPageSSeparatedByCommasEG"),
                 TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 10) });
             var entry = new TextBox { MaxLength = 24, Text = pdf.VisualPages.Length == 0 ? "" : string.Join(", ", pdf.VisualPages) };
             content.Children.Add(entry);
             var buttons = new WrapPanel { Margin = new Thickness(0, 12, 0, 0) };
-            var apply = Button(UiLanguage.T("Convertir les pages", "Convert pages"));
-            var textOnly = Button(UiLanguage.T("Texte seul / annuler", "Text only / cancel"));
+            var apply = Button(UiLanguage.Get("CodexWindow.ConvertPages"));
+            var textOnly = Button(UiLanguage.Get("CodexWindow.TextOnlyCancel"));
             int[] result = null;
             apply.Click += (_, __) =>
             {
@@ -775,8 +775,8 @@ namespace BIMaestro.Codex
                     numbers.Any(number => number < 1 || number > pdf.PageCount) ||
                     numbers.Distinct().Count() != numbers.Length)
                 {
-                    MessageBox.Show(dialog, UiLanguage.T("Indiquez une à ", "Enter one to ") + maximum + UiLanguage.T(" pages distinctes entre 1 et ", " distinct pages between 1 and ") + pdf.PageCount + ".",
-                        UiLanguage.T("Pages PDF", "PDF pages"), MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show(dialog, UiLanguage.Get("CodexWindow.EnterOneTo") + maximum + UiLanguage.Get("CodexWindow.DistinctPagesBetween1And") + pdf.PageCount + ".",
+                        UiLanguage.Get("CodexWindow.PDFPages"), MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
                 }
                 result = numbers; dialog.DialogResult = true;
@@ -793,15 +793,15 @@ namespace BIMaestro.Codex
             {
                 var box = new StackPanel { Margin = new Thickness(0, 0, 12, 6) };
                 box.Children.Add(new Image { Source = attachment.Thumbnail, Width = 72, Height = 54, Stretch = Stretch.Uniform, ToolTip = attachment.Name });
-                var remove = Button(UiLanguage.T("Retirer", "Remove")); remove.Click += (_, __) => { attachments.Remove(attachment); RefreshAttachments(); };
+                var remove = Button(UiLanguage.Get("CodexWindow.Remove")); remove.Click += (_, __) => { attachments.Remove(attachment); RefreshAttachments(); };
                 box.Children.Add(remove); attachmentPanel.Children.Add(box);
             }
             foreach (var pdf in pdfAttachments)
             {
                 var box = new StackPanel { Margin = new Thickness(0, 0, 12, 6) };
                 box.Children.Add(Text("PDF · " + pdf.Name + " · " + pdf.PageCount + " pages" +
-                    (pdf.VisualPages.Length == 0 ? UiLanguage.T(" · texte seul", " · text only") : UiLanguage.T(" · images : ", " · images: ") + string.Join(", ", pdf.VisualPages)), "Hint"));
-                var choose = Button(UiLanguage.T("Choisir les pages en images", "Choose pages as images"));
+                    (pdf.VisualPages.Length == 0 ? UiLanguage.Get("CodexWindow.TextOnly") : UiLanguage.Get("CodexWindow.Images") + string.Join(", ", pdf.VisualPages)), "Hint"));
+                var choose = Button(UiLanguage.Get("CodexWindow.ChoosePagesAsImages"));
                 choose.Click += async (_, __) =>
                 {
                     connecting = true; UpdateControls();
@@ -809,14 +809,14 @@ namespace BIMaestro.Codex
                     {
                         await ConfigurePdfPagesAsync(pdf, 3 - attachments.Count, true);
                         RefreshAttachments();
-                        status.Text = pdf.VisualPages.Length == 0 ? UiLanguage.T("PDF conservé en texte seul.", "PDF kept as text only.") :
-                            "Pages " + string.Join(", ", pdf.VisualPages) + UiLanguage.T(" prêtes en images.", " ready as images.");
+                        status.Text = pdf.VisualPages.Length == 0 ? UiLanguage.Get("CodexWindow.PDFKeptAsTextOnly") :
+                            "Pages " + string.Join(", ", pdf.VisualPages) + UiLanguage.Get("CodexWindow.ReadyAsImages");
                     }
                     catch (Exception ex) { Error(ex, "pdf.render", PdfDiagnostic(pdf.SourcePath, pdf)); }
                     finally { connecting = false; UpdateControls(); }
                 };
                 box.Children.Add(choose);
-                var remove = Button(UiLanguage.T("Retirer", "Remove")); remove.Click += (_, __) => { pdfAttachments.Remove(pdf); RefreshAttachments(); };
+                var remove = Button(UiLanguage.Get("CodexWindow.Remove")); remove.Click += (_, __) => { pdfAttachments.Remove(pdf); RefreshAttachments(); };
                 box.Children.Add(remove); attachmentPanel.Children.Add(box);
             }
         }
@@ -826,9 +826,9 @@ namespace BIMaestro.Codex
             {
                 threadId = turnId = null;
                 claudeClient?.NewDiscussion();
-                Append("BIMaestro", UiLanguage.T("Nouvelle discussion pour le changement de session Revit ; le contenu affiché reste ici.", "New conversation for the Revit session change; the displayed content stays here."));
+                Append("BIMaestro", UiLanguage.Get("CodexWindow.NewConversationForTheRevitSessionChangeThe"));
             }
-            documentLabel.Text = UiLanguage.T("Document : ", "Document: ") + TargetDocumentTitle;
+            documentLabel.Text = UiLanguage.Get("CodexWindow.Document") + TargetDocumentTitle;
             UpdateControls();
         }
 
@@ -853,8 +853,8 @@ namespace BIMaestro.Codex
         {
             if (activityPanel.Visibility != Visibility.Visible) return;
             var elapsed = DateTime.UtcNow - activityStarted;
-            activityElapsedText.Text = UiLanguage.T("Temps écoulé : ", "Elapsed time: ") + (elapsed.TotalHours >= 1 ? elapsed.ToString(@"h\:mm\:ss") : elapsed.ToString(@"m\:ss")) +
-                UiLanguage.T(" · la durée dépend de la complexité de la famille", " · duration depends on the family's complexity");
+            activityElapsedText.Text = UiLanguage.Get("CodexWindow.ElapsedTime") + (elapsed.TotalHours >= 1 ? elapsed.ToString(@"h\:mm\:ss") : elapsed.ToString(@"m\:ss")) +
+                UiLanguage.Get("CodexWindow.DurationDependsOnTheFamilySComplexity");
         }
 
         private void EndActivity()
@@ -865,21 +865,21 @@ namespace BIMaestro.Codex
 
         private static string RevitActivity(string tool)
         {
-            if (tool == "revit_create_family" || tool == "revit_create_parametric_family") return UiLanguage.T("Construction de la famille dans Revit…", "Building the family in Revit…");
-            if (tool == "revit_validate_family" || tool == "revit_validate_parametric_family") return UiLanguage.T("Validation de la famille dans Revit…", "Validating the family in Revit…");
-            if (tool == "revit_open_created_family") return UiLanguage.T("Ouverture du RFA créé…", "Opening the created RFA…");
-            if (tool != null && tool.StartsWith("revit_inspect", StringComparison.Ordinal)) return UiLanguage.T("Lecture de la famille Revit…", "Reading the Revit family…");
-            return UiLanguage.T("Opération Revit en cours…", "Revit operation in progress…");
+            if (tool == "revit_create_family" || tool == "revit_create_parametric_family") return UiLanguage.Get("CodexWindow.BuildingTheFamilyInRevit");
+            if (tool == "revit_validate_family" || tool == "revit_validate_parametric_family") return UiLanguage.Get("CodexWindow.ValidatingTheFamilyInRevit");
+            if (tool == "revit_open_created_family") return UiLanguage.Get("CodexWindow.OpeningTheCreatedRFA");
+            if (tool != null && tool.StartsWith("revit_inspect", StringComparison.Ordinal)) return UiLanguage.Get("CodexWindow.ReadingTheRevitFamily");
+            return UiLanguage.Get("CodexWindow.RevitOperationInProgress");
         }
 
         private void UpdateControls()
         {
-            permissions.Header = direct.IsChecked == true ? UiLanguage.T("Autorisations Revit : application directe", "Revit permissions: direct apply") :
-                changes.IsChecked == true ? UiLanguage.T("Autorisations Revit : confirmation", "Revit permissions: confirmation") :
-                context.IsChecked == true ? UiLanguage.T("Autorisations Revit : lecture seule", "Revit permissions: read-only") : UiLanguage.T("Autorisations Revit : désactivées", "Revit permissions: disabled");
+            permissions.Header = direct.IsChecked == true ? UiLanguage.Get("CodexWindow.RevitPermissionsDirectApply") :
+                changes.IsChecked == true ? UiLanguage.Get("CodexWindow.RevitPermissionsConfirmation") :
+                context.IsChecked == true ? UiLanguage.Get("CodexWindow.RevitPermissionsReadOnly") : UiLanguage.Get("CodexWindow.RevitPermissionsDisabled");
             send.IsEnabled = !busy && !connecting && !checkingLibrary && !separateRevitStarting && ready && models.SelectedItem != null;
             dictate.IsEnabled = !busy && !connecting && !checkingLibrary && !separateRevitStarting;
-            send.Content = !bridge.DedicatedSession && separateMode.IsChecked == true ? UiLanguage.T("Envoyer dans le Revit séparé", "Send to the separate Revit session") : UiLanguage.T("Envoyer", "Send");
+            send.Content = !bridge.DedicatedSession && separateMode.IsChecked == true ? UiLanguage.Get("CodexWindow.SendToTheSeparateRevitSession") : UiLanguage.Get("CodexWindow.Send");
             separateMode.IsEnabled = !busy && !connecting && !checkingLibrary && !separateRevitStarting;
             stop.IsEnabled = busy;
             stop.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
@@ -921,23 +921,23 @@ namespace BIMaestro.Codex
                         if (client != created) return;
                         string reference = MepEventReference("codex.process", "disconnected",
                             new CodexMepDiagnostics.CodexMepDiagnosticMetadata { Provider = "codex" });
-                        DisconnectLocal(); status.Text = UiLanguage.T("Codex s'est arrêté. Vous pouvez vous reconnecter.", "Codex has stopped. You can sign in again.");
+                        DisconnectLocal(); status.Text = UiLanguage.Get("CodexWindow.CodexHasStoppedYouCanSignInAgain");
                         if (reference.Length > 0) Append("BIMaestro", status.Text + reference);
                     });
                     created.ServerRequest = (method, data) => Dispatcher.InvokeAsync(() => HandleRequestAsync(created, method, data)).Task.Unwrap();
-                    status.Text = UiLanguage.T("Démarrage de Codex…", "Starting Codex…");
+                    status.Text = UiLanguage.Get("CodexWindow.StartingCodex");
                     await created.StartAsync(executable.Text.Trim());
                 }
                 if (await RefreshAccountAsync()) return;
-                status.Text = UiLanguage.T("Connexion dans votre navigateur…", "Signing in through your browser…");
+                status.Text = UiLanguage.Get("CodexWindow.SigningInThroughYourBrowser");
                 var login = await client.RequestAsync("account/login/start", new { type = "chatgpt" });
                 string url = (string)login["authUrl"];
                 if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme != "https" ||
                     (uri.Host != "auth.openai.com" && uri.Host != "chatgpt.com"))
-                    throw new InvalidOperationException(UiLanguage.T("Codex n'a pas renvoyé une adresse de connexion officielle reconnue.", "Codex did not return a recognized official sign-in address."));
+                    throw new InvalidOperationException(UiLanguage.Get("CodexWindow.CodexDidNotReturnARecognizedOfficialSign"));
                 Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
-                status.Text = UiLanguage.T("Terminez la connexion dans le navigateur. Puis cliquez sur « Vérifier connexion » si nécessaire.", "Complete sign-in in your browser, then click \"Check connection\" if needed.");
-                connect.Content = UiLanguage.T("Vérifier connexion", "Check connection");
+                status.Text = UiLanguage.Get("CodexWindow.CompleteSignInInYourBrowserThenClick");
+                connect.Content = UiLanguage.Get("CodexWindow.CheckConnection");
             }
             catch (Exception ex) { Error(ex, "codex.connect"); DisconnectLocal(); }
             finally { connecting = false; UpdateControls(); }
@@ -958,14 +958,14 @@ namespace BIMaestro.Codex
                 if (await claudeClient.IsAuthenticatedAsync())
                 {
                     claudeLoginStarted = false;
-                    ready = true; status.Text = UiLanguage.T("Connecté avec Claude Code", "Connected with Claude Code");
-                    connect.Content = UiLanguage.T("Vérifier connexion", "Check connection");
+                    ready = true; status.Text = UiLanguage.Get("CodexWindow.ConnectedWithClaudeCode");
+                    connect.Content = UiLanguage.Get("CodexWindow.CheckConnection");
                 }
                 else
                 {
                     if (!claudeLoginStarted) { claudeClient.StartLogin(); claudeLoginStarted = true; }
-                    status.Text = UiLanguage.T("Terminez la connexion Claude dans la fenêtre ouverte, puis cliquez sur « Vérifier connexion ».", "Complete the Claude sign-in in the opened window, then click \"Check connection\".");
-                    connect.Content = UiLanguage.T("Vérifier connexion", "Check connection");
+                    status.Text = UiLanguage.Get("CodexWindow.CompleteTheClaudeSignInInTheOpened");
+                    connect.Content = UiLanguage.Get("CodexWindow.CheckConnection");
                 }
             }
             catch (Exception ex)
@@ -986,21 +986,21 @@ namespace BIMaestro.Codex
             string prompt = request + PdfContext() + HistoryContext();
             var images = attachments.Concat(pdfAttachments.SelectMany(p => p.PageImages)).ToArray();
             busy = true; claudeCancellation = cancellation; UpdateControls();
-            if (activityPanel.Visibility != Visibility.Visible) BeginActivity(UiLanguage.T("Claude analyse la demande…", "Claude is analyzing the request…"));
-            else SetActivityPhase(UiLanguage.T("Claude analyse la demande…", "Claude is analyzing the request…"));
-            status.Text = UiLanguage.T("Claude travaille…", "Claude is working…");
-            Append(UiLanguage.T("Vous", "You"), request + (attachments.Count > 0 ? "\n[" + attachments.Count + UiLanguage.T(" image(s) jointe(s)]", " image(s) attached]") : "") + PdfSummary());
+            if (activityPanel.Visibility != Visibility.Visible) BeginActivity(UiLanguage.Get("CodexWindow.ClaudeIsAnalyzingTheRequest"));
+            else SetActivityPhase(UiLanguage.Get("CodexWindow.ClaudeIsAnalyzingTheRequest"));
+            status.Text = UiLanguage.Get("CodexWindow.ClaudeIsWorking");
+            Append(UiLanguage.Get("CodexWindow.You"), request + (attachments.Count > 0 ? "\n[" + attachments.Count + UiLanguage.Get("CodexWindow.ImageSAttached") : "") + PdfSummary());
             input.Clear(); attachments.Clear(); pdfAttachments.Clear(); RefreshAttachments();
             try
             {
                 await origin.AskAsync(prompt, images, model.Id, effort.SelectedItem as string,
                     async (tool, args) =>
                     {
-                        activeRevitCalls++; status.Text = UiLanguage.T("Opération Revit en attente…", "Revit operation pending…"); SetActivityPhase(RevitActivity(tool));
+                        activeRevitCalls++; status.Text = UiLanguage.Get("CodexWindow.RevitOperationPending"); SetActivityPhase(RevitActivity(tool));
                         try
                         {
                             object result = await CallWithRecoveryAsync(recovery, tool, args, cancellation.Token);
-                            documentLabel.Text = UiLanguage.T("Document : ", "Document: ") + TargetDocumentTitle;
+                            documentLabel.Text = UiLanguage.Get("CodexWindow.Document") + TargetDocumentTitle;
                             if (result is CodexFamilyArtifact artifact)
                             {
                                 if (artifact.FilePath != null) lastArtifact = artifact;
@@ -1013,20 +1013,20 @@ namespace BIMaestro.Codex
                         }
                         catch (Exception ex)
                         {
-                            documentLabel.Text = UiLanguage.T("Document : ", "Document: ") + TargetDocumentTitle;
-                            string detail = ex is TaskCanceledException ? UiLanguage.T("Opération annulée.", "Operation canceled.") : ex.Message;
+                            documentLabel.Text = UiLanguage.Get("CodexWindow.Document") + TargetDocumentTitle;
+                            string detail = ex is TaskCanceledException ? UiLanguage.Get("CodexWindow.OperationCanceled") : ex.Message;
                             string reference = MepErrorReference("revit.tool", ex,
                                 new CodexMepDiagnostics.CodexMepDiagnosticMetadata { Provider = "claude", Tool = tool });
-                            Append(UiLanguage.T("Échec · ", "Failed · ") + tool, detail + reference);
+                            Append(UiLanguage.Get("CodexWindow.Failed") + tool, detail + reference);
                             return ToolFailureDetail(tool, ex);
                         }
                         finally { activeRevitCalls--; }
                     },
                     message => { if (!closed) Append("Claude", message); }, cancellation.Token, IsDedicatedTarget, internet.IsChecked == true, recovery, mepMode);
-                status.Text = UiLanguage.T("Prêt", "Ready");
+                status.Text = UiLanguage.Get("CodexWindow.Ready");
                 historyContextPending = false;
             }
-            catch (OperationCanceledException) { status.Text = UiLanguage.T("Réponse arrêtée", "Response stopped"); }
+            catch (OperationCanceledException) { status.Text = UiLanguage.Get("CodexWindow.ResponseStopped"); }
             catch (Exception ex) { Error(ex, "claude.send"); }
             finally
             {
@@ -1047,7 +1047,7 @@ namespace BIMaestro.Codex
             var result = await activeClient.RequestAsync("account/read", new { refreshToken = true });
             var account = result["account"];
             ready = account != null && account.Type == JTokenType.Object && (string)account["type"] == "chatgpt";
-            if (!ready) { status.Text = UiLanguage.T("Connexion ChatGPT nécessaire. Les clés API ne sont pas utilisées par ce panneau.", "ChatGPT sign-in required. API keys are not used by this panel."); return false; }
+            if (!ready) { status.Text = UiLanguage.Get("CodexWindow.ChatGPTSignInRequiredAPIKeysAreNot"); return false; }
             var choices = new System.Collections.Generic.List<ModelChoice>();
             string cursor = null;
             do
@@ -1059,16 +1059,16 @@ namespace BIMaestro.Codex
             models.ItemsSource = choices;
             SelectPreferredModel();
             RestoreHistoryModel();
-            status.Text = UiLanguage.T("Connecté avec ChatGPT · ", "Connected with ChatGPT · ") + (string)account["planType"];
-            if (choices.Count == 0) status.Text += UiLanguage.T(" · aucun modèle disponible.", " · no model available.");
-            connect.Content = UiLanguage.T("Actualiser les modèles", "Refresh models");
+            status.Text = UiLanguage.Get("CodexWindow.ConnectedWithChatGPT") + (string)account["planType"];
+            if (choices.Count == 0) status.Text += UiLanguage.Get("CodexWindow.NoModelAvailable");
+            connect.Content = UiLanguage.Get("CodexWindow.RefreshModels");
             UpdateControls(); return true;
         }
 
         private async Task SendAsync()
         {
             if (!ready || busy || connecting || checkingLibrary || string.IsNullOrWhiteSpace(input.Text)) return;
-            BeginActivity(UiLanguage.T("Préparation de la demande…", "Preparing the request…"));
+            BeginActivity(UiLanguage.Get("CodexWindow.PreparingTheRequest"));
             if (!mepMode && !bridge.DedicatedSession && separateMode.IsChecked == true &&
                 (dedicatedClient == null || dedicatedProcess == null || dedicatedProcess.HasExited))
             {
@@ -1077,7 +1077,7 @@ namespace BIMaestro.Codex
             }
             if (!mepMode)
             {
-                checkingLibrary = true; SetActivityPhase(UiLanguage.T("Recherche de familles proches…", "Searching for similar families…")); UpdateControls();
+                checkingLibrary = true; SetActivityPhase(UiLanguage.Get("CodexWindow.SearchingForSimilarFamilies")); UpdateControls();
                 bool proceed;
                 try { proceed = await CheckLibraryBeforeCreationAsync(input.Text.Trim()); }
                 finally { checkingLibrary = false; UpdateControls(); }
@@ -1086,7 +1086,7 @@ namespace BIMaestro.Codex
             if (provider.SelectedIndex == 1) { await SendClaudeAsync(); return; }
             if (!ready || busy || connecting || !(models.SelectedItem is ModelChoice model) || string.IsNullOrWhiteSpace(input.Text)) return;
             if (attachments.Count + pdfAttachments.Sum(p => p.PageImages.Length) > 0 && !model.SupportsImages)
-            { Error(new InvalidOperationException(UiLanguage.T("Ce modèle n'accepte pas d'images. Choisissez un modèle avec vision ou retirez les images et pages PDF.", "This model does not accept images. Choose a vision-capable model or remove the images and PDF pages.")), "codex.model"); return; }
+            { Error(new InvalidOperationException(UiLanguage.Get("CodexWindow.ThisModelDoesNotAcceptImagesChooseA")), "codex.model"); return; }
             string text = input.Text.Trim();
             BeginHistory(text);
             var messageInput = new List<object> { new { type = "text", text = text + PdfContext() + HistoryContext() } };
@@ -1096,7 +1096,7 @@ namespace BIMaestro.Codex
             var requestCancellation = new CancellationTokenSource(); codexCancellation = requestCancellation;
             toolRecovery = new CodexToolRecovery();
             codexMayContinue = codexTurnStartPending = codexContinuationPending = false;
-            busy = true; SetActivityPhase(UiLanguage.T("Codex analyse la demande…", "Codex is analyzing the request…")); UpdateControls();
+            busy = true; SetActivityPhase(UiLanguage.Get("CodexWindow.CodexIsAnalyzingTheRequest")); UpdateControls();
             handledToolCalls.Clear();
             try
             {
@@ -1133,23 +1133,23 @@ namespace BIMaestro.Codex
                         if (discussion != null) discussion.SessionId = null;
                         historyContextPending = true;
                         messageInput[0] = new { type = "text", text = text + PdfContext() + HistoryContext() };
-                        Append("BIMaestro", UiLanguage.T("La session Codex précédente est introuvable. Reprise avec un extrait de la discussion ; l'historique complet et les fichiers Revit sont conservés.", "The previous Codex session could not be found. Resuming with an excerpt of the conversation; the full history and Revit files are kept."));
+                        Append("BIMaestro", UiLanguage.Get("CodexWindow.ThePreviousCodexSessionCouldNotBeFound"));
                         threadOptions.Remove("threadId"); threadOptions["ephemeral"] = false;
                         requestCancellation.Token.ThrowIfCancellationRequested();
                         thread = await client.RequestAsync("thread/start", threadOptions);
                     }
-                    threadId = (string)thread["thread"]?["id"] ?? throw new InvalidOperationException(UiLanguage.T("Codex n'a pas créé ou repris la discussion.", "Codex did not create or resume the conversation."));
+                    threadId = (string)thread["thread"]?["id"] ?? throw new InvalidOperationException(UiLanguage.Get("CodexWindow.CodexDidNotCreateOrResumeTheConversation"));
                     pendingHistorySession = null;
                     SaveHistory();
                 }
                 requestCancellation.Token.ThrowIfCancellationRequested();
-                Append(UiLanguage.T("Vous", "You"), text + (attachments.Count > 0 ? "\n[" + attachments.Count + UiLanguage.T(" image(s) jointe(s)]", " image(s) attached]") : "") + PdfSummary());
+                Append(UiLanguage.Get("CodexWindow.You"), text + (attachments.Count > 0 ? "\n[" + attachments.Count + UiLanguage.Get("CodexWindow.ImageSAttached") : "") + PdfSummary());
                 await StartCodexTurnAsync(client, threadId, messageInput.ToArray(), requestCancellation);
                 historyContextPending = false;
                 input.Clear(); attachments.Clear(); pdfAttachments.Clear(); RefreshAttachments();
                 SaveHistory();
             }
-            catch (OperationCanceledException) { if (!closed) { status.Text = UiLanguage.T("Réponse arrêtée", "Response stopped"); FinishCodexResponse(); } }
+            catch (OperationCanceledException) { if (!closed) { status.Text = UiLanguage.Get("CodexWindow.ResponseStopped"); FinishCodexResponse(); } }
             catch (Exception ex) { EndActivity(); DisconnectLocal(); Error(ex, "codex.send"); }
         }
 
@@ -1157,7 +1157,7 @@ namespace BIMaestro.Codex
             CancellationTokenSource requestCancellation)
         {
             requestCancellation.Token.ThrowIfCancellationRequested();
-            var model = models.SelectedItem as ModelChoice ?? throw new InvalidOperationException(UiLanguage.T("Choisissez un modèle.", "Choose a model."));
+            var model = models.SelectedItem as ModelChoice ?? throw new InvalidOperationException(UiLanguage.Get("CodexWindow.ChooseAModel"));
             codexTurnStartPending = true;
             try
             {
@@ -1174,7 +1174,7 @@ namespace BIMaestro.Codex
                     if (turnId != null) await origin.RequestAsync("turn/interrupt", new { threadId = requestThread, turnId });
                     return;
                 }
-                if (turnId != null) { status.Text = UiLanguage.T("Codex travaille…", "Codex is working…"); SetActivityPhase(UiLanguage.T("Codex prépare la réponse…", "Codex is preparing the response…")); }
+                if (turnId != null) { status.Text = UiLanguage.Get("CodexWindow.CodexIsWorking"); SetActivityPhase(UiLanguage.Get("CodexWindow.CodexIsPreparingTheResponse")); }
             }
             finally
             {
@@ -1198,8 +1198,8 @@ namespace BIMaestro.Codex
             {
                 codexMayContinue = false;
                 codexContinuationPending = busy = true;
-                SetActivityPhase(UiLanguage.T("Reprise automatique avec une autre approche…", "Automatically retrying with another approach…"));
-                Append("BIMaestro", UiLanguage.T("Je poursuis la demande avec une correction ou une autre approche, en conservant ce qui a déjà réussi.", "Continuing the request with a fix or a different approach, keeping what has already succeeded."));
+                SetActivityPhase(UiLanguage.Get("CodexWindow.AutomaticallyRetryingWithAnotherApproach"));
+                Append("BIMaestro", UiLanguage.Get("CodexWindow.ContinuingTheRequestWithAFixOrA"));
                 UpdateControls();
                 _ = ContinueCodexAsync(client, threadId, toolRecovery, codexCancellation, continuation);
                 return;
@@ -1255,7 +1255,7 @@ namespace BIMaestro.Codex
             if (terms.Length == 0) return true;
             try
             {
-                status.Text = UiLanguage.T("Recherche de familles proches dans la bibliothèque…", "Searching the library for similar families…");
+                status.Text = UiLanguage.Get("CodexWindow.SearchingTheLibraryForSimilarFamilies");
                 JObject best = null; int bestScore = 0;
                 using (var service = new CodexCommunityLibrary())
                 {
@@ -1274,13 +1274,13 @@ namespace BIMaestro.Codex
                         cursor = (string)page["nextCursor"];
                     } while (!string.IsNullOrEmpty(cursor));
                 }
-                status.Text = UiLanguage.T("Prêt", "Ready");
+                status.Text = UiLanguage.Get("CodexWindow.Ready");
                 if (best == null || bestScore < 3) return true;
                 string name = (string)best["name"] ?? "Famille";
                 var choice = MessageBox.Show(this,
-                    UiLanguage.T("Une famille de la bibliothèque pourrait correspondre à votre demande :\n\n« ", "A library family may match your request:\n\n\"") + name + UiLanguage.T(" » · ", "\" · ") + CommunityStyle.Category((string)best["category"]) +
-                    UiLanguage.T("\n\nOui : consulter la bibliothèque\nNon : poursuivre la création\nAnnuler : conserver la demande sans l'envoyer", "\n\nYes: browse the library\nNo: continue creating\nCancel: keep the request without sending it"),
-                    UiLanguage.T("Famille existante à vérifier", "Existing family to check"), MessageBoxButton.YesNoCancel, MessageBoxImage.Information, MessageBoxResult.Yes);
+                    UiLanguage.Get("CodexWindow.ALibraryFamilyMayMatchYourRequest") + name + UiLanguage.Get("CodexWindow.Text") + CommunityStyle.Category((string)best["category"]) +
+                    UiLanguage.Get("CodexWindow.YesBrowseTheLibraryNoContinueCreatingCancel"),
+                    UiLanguage.Get("CodexWindow.ExistingFamilyToCheck"), MessageBoxButton.YesNoCancel, MessageBoxImage.Information, MessageBoxResult.Yes);
                 if (choice == MessageBoxResult.Yes)
                 {
                     new CodexCommunityWindow(bridge, name, UseCommunityFamilyAsBase) { Owner = this }.Show();
@@ -1290,8 +1290,8 @@ namespace BIMaestro.Codex
             }
             catch (Exception ex)
             {
-                status.Text = UiLanguage.T("Bibliothèque indisponible · création possible", "Library unavailable · creation still possible");
-                Append(UiLanguage.T("Bibliothèque commune", "Shared library"), UiLanguage.T("Vérification impossible : ", "Check failed: ") + ex.Message);
+                status.Text = UiLanguage.Get("CodexWindow.LibraryUnavailableCreationStillPossible");
+                Append(UiLanguage.Get("CodexWindow.SharedLibrary"), UiLanguage.Get("CodexWindow.CheckFailed") + ex.Message);
                 return true;
             }
         }
@@ -1302,8 +1302,8 @@ namespace BIMaestro.Codex
             input.Text = "La famille communautaire « " + ((string)item["name"] ?? "Famille") + " » est maintenant ouverte comme copie dans l'éditeur Revit. " +
                 "Lis ses paramètres et ses types réels avec revit_family_parameters et inspecte la famille avant toute modification. " +
                 "Propose les valeurs adaptées à ma demande, signale celles qui manquent, puis modifie uniquement les paramètres existants que j'ai demandés :\n" + original;
-            documentLabel.Text = UiLanguage.T("Document : ", "Document: ") + TargetDocumentTitle;
-            Append(UiLanguage.T("Bibliothèque commune", "Shared library"), UiLanguage.T("Copie de « ", "Copy of \"") + (string)item["name"] + UiLanguage.T(" » ouverte dans Revit. Vérifiez la demande préparée avant de l'envoyer.", "\" opened in Revit. Review the prepared request before sending it."));
+            documentLabel.Text = UiLanguage.Get("CodexWindow.Document") + TargetDocumentTitle;
+            Append(UiLanguage.Get("CodexWindow.SharedLibrary"), UiLanguage.Get("CodexWindow.CopyOf") + (string)item["name"] + UiLanguage.Get("CodexWindow.OpenedInRevitReviewThePreparedRequestBefore"));
             input.Focus();
         }
 
@@ -1319,7 +1319,7 @@ namespace BIMaestro.Codex
             if (method == "account/login/completed")
             {
                 bool succeeded = data.Value<bool?>("success") == true;
-                status.Text = succeeded ? UiLanguage.T("Connexion réussie. Cliquez sur « Vérifier connexion ».", "Sign-in successful. Click \"Check connection\".") : UiLanguage.T("Connexion non terminée. Réessayez.", "Sign-in not completed. Please try again.");
+                status.Text = succeeded ? UiLanguage.Get("CodexWindow.SignInSuccessfulClickCheckConnection") : UiLanguage.Get("CodexWindow.SignInNotCompletedPleaseTryAgain");
                 if (!succeeded) Append("BIMaestro", status.Text + MepEventReference("codex.login", "failed",
                     new CodexMepDiagnostics.CodexMepDiagnosticMetadata { Provider = "codex" }));
                 return;
@@ -1334,7 +1334,7 @@ namespace BIMaestro.Codex
             }
             if (method == "item/agentMessage/delta")
             {
-                SetActivityPhase(UiLanguage.T("Codex rédige la réponse…", "Codex is writing the response…"));
+                SetActivityPhase(UiLanguage.Get("CodexWindow.CodexIsWritingTheResponse"));
                 transcript.AppendText((string)data["delta"] ?? ""); transcript.ScrollToEnd();
             }
             if (method == "item/completed" && (string)item?["type"] == "agentMessage") transcript.AppendText("\n\n");
@@ -1346,10 +1346,10 @@ namespace BIMaestro.Codex
                 {
                     string detail = string.Join("\n", (item["contentItems"] as JArray ?? new JArray()).OfType<JObject>()
                         .Where(c => (string)c["type"] == "inputText").Select(c => (string)c["text"]));
-                    if (string.IsNullOrWhiteSpace(detail)) detail = UiLanguage.T("Codex signale un échec d'outil sans détail exploitable. La passerelle ne peut pas en déduire la cause.", "Codex reported a tool failure without usable details. The bridge cannot determine the cause.");
+                    if (string.IsNullOrWhiteSpace(detail)) detail = UiLanguage.Get("CodexWindow.CodexReportedAToolFailureWithoutUsableDetails");
                     string reference = MepEventReference("codex.tool", "failed",
                         new CodexMepDiagnostics.CodexMepDiagnosticMetadata { Provider = "codex", Tool = (string)item["tool"] });
-                    Append(UiLanguage.T("Échec signalé par Codex · ", "Failure reported by Codex · ") + (string)item["tool"], detail + reference);
+                    Append(UiLanguage.Get("CodexWindow.FailureReportedByCodex") + (string)item["tool"], detail + reference);
                 }
             }
             if (method == "turn/completed")
@@ -1362,17 +1362,17 @@ namespace BIMaestro.Codex
                 codexMayContinue = state == "completed";
                 if (state != "completed") { CancelRecovery(); CancelRevit("fin du tour Codex : " + state); }
                 turnId = null;
-                status.Text = activeRevitCalls > 0 ? UiLanguage.T("Revit termine l’opération en cours…", "Revit is finishing the current operation…") : state == "completed" ? UiLanguage.T("Prêt", "Ready") : state == "interrupted" ? UiLanguage.T("Réponse arrêtée", "Response stopped") : UiLanguage.T("La réponse a échoué.", "The response failed.");
-                if (activeRevitCalls > 0) SetActivityPhase(UiLanguage.T("Revit termine l’opération en cours…", "Revit is finishing the current operation…"));
+                status.Text = activeRevitCalls > 0 ? UiLanguage.Get("CodexWindow.RevitIsFinishingTheCurrentOperation") : state == "completed" ? UiLanguage.Get("CodexWindow.Ready") : state == "interrupted" ? UiLanguage.Get("CodexWindow.ResponseStopped") : UiLanguage.Get("CodexWindow.TheResponseFailed");
+                if (activeRevitCalls > 0) SetActivityPhase(UiLanguage.Get("CodexWindow.RevitIsFinishingTheCurrentOperation"));
                 // JSON null is a non-null JValue. ?. alone does not protect its indexer.
                 string error = (string)(turn?["error"] as JObject)?["message"];
                 string turnReference = state == "failed" ? MepEventReference("codex.turn", "failed",
                     new CodexMepDiagnostics.CodexMepDiagnosticMetadata { Provider = "codex" }) : "";
                 if (!string.IsNullOrEmpty(error)) Append("Codex", error + turnReference);
-                else if (turnReference.Length > 0) Append("BIMaestro", UiLanguage.T("La réponse Codex a échoué.", "The Codex response failed.") + turnReference);
+                else if (turnReference.Length > 0) Append("BIMaestro", UiLanguage.Get("CodexWindow.TheCodexResponseFailed") + turnReference);
                 FinishCodexResponse();
             }
-            if (method == "error") Append("Codex", ((string)(data["error"] as JObject)?["message"] ?? UiLanguage.T("Erreur de traitement.", "Processing error.")) +
+            if (method == "error") Append("Codex", ((string)(data["error"] as JObject)?["message"] ?? UiLanguage.Get("CodexWindow.ProcessingError")) +
                 MepEventReference("codex.protocol", "error", new CodexMepDiagnostics.CodexMepDiagnosticMetadata { Provider = "codex" }));
         }
 
@@ -1392,10 +1392,10 @@ namespace BIMaestro.Codex
                     var recovery = toolRecovery;
                     var cancellation = codexCancellation?.Token ?? CancellationToken.None;
                     activeRevitCalls++; accepted = true;
-                    status.Text = UiLanguage.T("Opération Revit en attente…", "Revit operation pending…"); SetActivityPhase(RevitActivity(tool));
+                    status.Text = UiLanguage.Get("CodexWindow.RevitOperationPending"); SetActivityPhase(RevitActivity(tool));
                     object result = await CallWithRecoveryAsync(recovery, tool, args, cancellation);
-                    if (turnId == null) status.Text = UiLanguage.T("Opération Revit terminée", "Revit operation completed");
-                    documentLabel.Text = UiLanguage.T("Document : ", "Document: ") + TargetDocumentTitle;
+                    if (turnId == null) status.Text = UiLanguage.Get("CodexWindow.RevitOperationCompleted");
+                    documentLabel.Text = UiLanguage.Get("CodexWindow.Document") + TargetDocumentTitle;
                     if (result is CodexFamilyArtifact artifact)
                     {
                         if (artifact.FilePath != null)
@@ -1414,7 +1414,7 @@ namespace BIMaestro.Codex
                                 content.Add(new { type = "inputText", text = "Vue du résultat : " + Path.GetFileNameWithoutExtension(previewPath) });
                                 content.Add(new { type = "inputImage", imageUrl = "data:image/png;base64," + Convert.ToBase64String(File.ReadAllBytes(previewPath)) });
                             }
-                            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { Append(UiLanguage.T("Aperçu indisponible (RFA enregistré)", "Preview unavailable (RFA saved)"), ex.Message); }
+                            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { Append(UiLanguage.Get("CodexWindow.PreviewUnavailableRFASaved"), ex.Message); }
                         }
                         return new { success = true, contentItems = content };
                     }
@@ -1424,13 +1424,13 @@ namespace BIMaestro.Codex
                 }
                 catch (Exception ex)
                 {
-                    documentLabel.Text = UiLanguage.T("Document : ", "Document: ") + TargetDocumentTitle;
-                    string text = ex is TaskCanceledException ? UiLanguage.T("Opération annulée.", "Operation canceled.") : ex.Message;
-                    status.Text = UiLanguage.T("Opération Revit échouée", "Revit operation failed");
+                    documentLabel.Text = UiLanguage.Get("CodexWindow.Document") + TargetDocumentTitle;
+                    string text = ex is TaskCanceledException ? UiLanguage.Get("CodexWindow.OperationCanceled") : ex.Message;
+                    status.Text = UiLanguage.Get("CodexWindow.RevitOperationFailed");
                     string tool = (string)data["tool"];
                     string reference = MepErrorReference("revit.tool", ex,
                         new CodexMepDiagnostics.CodexMepDiagnosticMetadata { Provider = "codex", Tool = tool });
-                    Append(UiLanguage.T("Échec · ", "Failed · ") + tool, text + reference);
+                    Append(UiLanguage.Get("CodexWindow.Failed") + tool, text + reference);
                     string detail = ToolFailureDetail((string)data["tool"], ex);
                     return new { success = false, contentItems = new[] { new { type = "inputText", text = detail } } };
                 }
@@ -1456,7 +1456,7 @@ namespace BIMaestro.Codex
             if (claudeClient != null)
             {
                 claudeCancellation?.Cancel(); claudeClient.Stop();
-                status.Text = UiLanguage.T("Arrêt demandé · fin de l’opération en cours…", "Stop requested · finishing the current operation…");
+                status.Text = UiLanguage.Get("CodexWindow.StopRequestedFinishingTheCurrentOperation");
                 SetActivityPhase(status.Text); UpdateControls(); return;
             }
             try
@@ -1473,8 +1473,8 @@ namespace BIMaestro.Codex
                 SaveHistory(); pendingHistorySession = claudeClient.SessionId;
                 claudeCancellation?.Cancel(); claudeClient.Dispose(); claudeClient = null;
                 claudeLoginStarted = false;
-                ready = false; busy = false; status.Text = UiLanguage.T("Déconnecté du panneau", "Disconnected from the panel");
-                connect.Content = UiLanguage.T("Connexion Claude", "Sign in to Claude"); UpdateControls(); return;
+                ready = false; busy = false; status.Text = UiLanguage.Get("CodexWindow.DisconnectedFromThePanel");
+                connect.Content = UiLanguage.Get("CodexWindow.SignInToClaude"); UpdateControls(); return;
             }
             try { if (client != null) await client.RequestAsync("account/logout", new { }); }
             catch (Exception ex) { Error(ex, "codex.logout"); }
@@ -1489,7 +1489,7 @@ namespace BIMaestro.Codex
             CancelRevit(); ready = false; busy = false; threadId = turnId = null;
             codexTurnStartPending = codexContinuationPending = false;
             direct.IsChecked = false;
-            connect.Content = UiLanguage.T("Connexion ChatGPT", "Sign in to ChatGPT"); status.Text = UiLanguage.T("Non connecté", "Not connected"); EndActivity();
+            connect.Content = UiLanguage.Get("CodexWindow.SignInToChatGPT"); status.Text = UiLanguage.Get("CodexWindow.NotConnected"); EndActivity();
             models.ItemsSource = null; effort.ItemsSource = null; UpdateControls();
         }
         private string MepErrorReference(string stage, Exception error, CodexMepDiagnostics.CodexMepDiagnosticMetadata metadata = null)
@@ -1515,8 +1515,8 @@ namespace BIMaestro.Codex
             {
                 if (!File.Exists(mepDiagnostics.FilePath))
                 {
-                    MessageBox.Show(this, UiLanguage.T("Le journal n'a pas pu être écrit. Emplacement prévu :\n", "The log could not be written. Expected location:\n") + mepDiagnostics.FilePath,
-                        UiLanguage.T("Diagnostics MEP", "MEP diagnostics"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show(this, UiLanguage.Get("CodexWindow.TheLogCouldNotBeWrittenExpectedLocation") + mepDiagnostics.FilePath,
+                        UiLanguage.Get("CodexWindow.MEPDiagnostics"), MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
                 Process.Start(new ProcessStartInfo("notepad.exe", "\"" + mepDiagnostics.FilePath + "\"") { UseShellExecute = true });

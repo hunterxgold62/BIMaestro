@@ -117,9 +117,9 @@ namespace Page
                 var btn = info?.PushButton;
                 if (btn == null) return;
 
-                btn.ItemText = UiLanguage.T("Note\nMAJ !", "Update\nAvailable!");
-                btn.ToolTip = UiLanguage.T("Une mise à jour BIMaestro est disponible.\nInstallée: v", "A BIMaestro Update Is Available.\nInstalled: v") + _currentVersion +
-                    UiLanguage.T("\nDisponible: v", "\nAvailable: v") + _latestVersion;
+                btn.ItemText = UiLanguage.Get("UpdateNotificationManager.UpdateAvailable");
+                btn.ToolTip = UiLanguage.Get("UpdateNotificationManager.ABIMaestroUpdateIsAvailableInstalledV") + _currentVersion +
+                    UiLanguage.Get("UpdateNotificationManager.AvailableV") + _latestVersion;
                 _passiveSignalApplied = true;
             }
             catch

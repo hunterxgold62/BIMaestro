@@ -150,7 +150,7 @@ namespace Visualisation
 
                 if (initialRefs == null || initialRefs.Count == 0)
                 {
-                    TaskDialog.Show(UiLanguage.T("Sélection similaire", "Similar Selection"), UiLanguage.T("Aucun élément de référence sélectionné.", "No reference element was selected."));
+                    TaskDialog.Show(UiLanguage.Get("SelectSimilarCommand.SimilarSelection"), UiLanguage.Get("SelectSimilarCommand.NoReferenceElementWasSelected"));
                     return Result.Cancelled;
                 }
 
@@ -163,28 +163,26 @@ namespace Visualisation
 
             if (referenceElements.Count == 0)
             {
-                TaskDialog.Show(UiLanguage.T("Sélection similaire", "Similar Selection"), UiLanguage.T("Impossible d’identifier des éléments de référence.", "Unable to identify reference elements."));
+                TaskDialog.Show(UiLanguage.Get("SelectSimilarCommand.SimilarSelection"), UiLanguage.Get("SelectSimilarCommand.UnableToIdentifyReferenceElements"));
                 return Result.Cancelled;
             }
 
             // 2) TaskDialog (identique)
             var prefs = SelectSimilarPreferences.Load();
 
-            var dlg = new TaskDialog(UiLanguage.T("Sélection similaire", "Similar Selection"))
+            var dlg = new TaskDialog(UiLanguage.Get("SelectSimilarCommand.SimilarSelection"))
             {
                 MainInstruction = hasPreselection
-                    ? UiLanguage.T("Choisissez comment retrouver les éléments similaires à la sélection actuelle.", "Choose how to find elements similar to the current selection.")
-                    : UiLanguage.T("Choisissez comment retrouver les éléments similaires aux éléments de référence.", "Choose how to find elements similar to the reference elements."),
-                MainContent = UiLanguage.T(
-                    "1. Choisissez le critère.\n2. Cliquez les éléments à garder dans la vue.\n3. Terminez pour appliquer la sélection.\n\nCatégorie : même catégorie (Murs, Sols, Portes, ...)\nFamille : même famille (Murs et Sols : nom du type)\nType : type exact.",
-                    "1. Choose the criterion.\n2. Click the elements to keep in the view.\n3. Finish to apply the selection.\n\nCategory: same category (Walls, Floors, Doors, ...)\nFamily: same family (Walls and Floors: type name)\nType: exact type."),
+                    ? UiLanguage.Get("SelectSimilarCommand.ChooseHowToFindElementsSimilarToThe")
+                    : UiLanguage.Get("SelectSimilarCommand.ChooseHowToFindElementsSimilarToThe2"),
+                MainContent = UiLanguage.Get("SelectSimilarCommand.1ChooseTheCriterion2ClickTheElements"),
                 CommonButtons = TaskDialogCommonButtons.Close,
-                VerificationText = UiLanguage.T("Colorier les éléments sélectionnés", "Color selected elements")
+                VerificationText = UiLanguage.Get("SelectSimilarCommand.ColorSelectedElements")
             };
-            dlg.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, UiLanguage.T("Sélectionner par Catégorie", "Select by Category"));
-            dlg.AddCommandLink(TaskDialogCommandLinkId.CommandLink2, UiLanguage.T("Sélectionner par Famille", "Select by Family"));
-            dlg.AddCommandLink(TaskDialogCommandLinkId.CommandLink3, UiLanguage.T("Sélectionner par Type", "Select by Type"));
-            dlg.AddCommandLink(TaskDialogCommandLinkId.CommandLink4, UiLanguage.T("Effacer mes dernières couleurs (mémorisées)", "Clear my last saved colors"));
+            dlg.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, UiLanguage.Get("SelectSimilarCommand.SelectByCategory"));
+            dlg.AddCommandLink(TaskDialogCommandLinkId.CommandLink2, UiLanguage.Get("SelectSimilarCommand.SelectByFamily"));
+            dlg.AddCommandLink(TaskDialogCommandLinkId.CommandLink3, UiLanguage.Get("SelectSimilarCommand.SelectByType"));
+            dlg.AddCommandLink(TaskDialogCommandLinkId.CommandLink4, UiLanguage.Get("SelectSimilarCommand.ClearMyLastSavedColors"));
 
             var dr = dlg.Show();
             prefs.Colorize = dlg.WasVerificationChecked();
@@ -304,7 +302,7 @@ namespace Visualisation
             var last = LastColoredSet.Load();
             if (last == null || last.ElementUniqueIds == null || last.ElementUniqueIds.Count == 0)
             {
-                TaskDialog.Show(UiLanguage.T("Nettoyage", "Cleanup"), UiLanguage.T("Aucune série colorée mémorisée à effacer.", "No saved color set is available to clear."));
+                TaskDialog.Show(UiLanguage.Get("SelectSimilarCommand.Cleanup"), UiLanguage.Get("SelectSimilarCommand.NoSavedColorSetIsAvailableToClear"));
                 return Result.Cancelled;
             }
 
@@ -315,7 +313,7 @@ namespace Visualisation
 
             if (targetView == null)
             {
-                TaskDialog.Show(UiLanguage.T("Nettoyage", "Cleanup"), UiLanguage.T("La vue mémorisée n’existe plus dans ce document. Rien n’a été effacé.", "The saved view no longer exists in this document. Nothing was cleared."));
+                TaskDialog.Show(UiLanguage.Get("SelectSimilarCommand.Cleanup"), UiLanguage.Get("SelectSimilarCommand.TheSavedViewNoLongerExistsInThis"));
                 LastColoredSet.ClearFile();
                 return Result.Cancelled;
             }
@@ -339,11 +337,7 @@ namespace Visualisation
 
             LastColoredSet.ClearFile();
 
-            TaskDialog.Show(UiLanguage.T("Nettoyage", "Cleanup"), UiLanguage.T(
-                $"Dernière série effacée sur la vue : {targetView.Name}\nÉléments nettoyés : {cleared}" +
-                (missing > 0 ? $"\nIntrouvables : {missing}" : string.Empty),
-                $"Last color set cleared on view: {targetView.Name}\nElements cleared: {cleared}" +
-                (missing > 0 ? $"\nNot found: {missing}" : string.Empty)));
+            TaskDialog.Show(UiLanguage.Get("SelectSimilarCommand.Cleanup"), UiLanguage.Format("SelectSimilarCommand.LastSetCleared", targetView.Name, cleared) + (missing > 0 ? UiLanguage.Format("SelectSimilarCommand.NotFound", missing) : string.Empty));
             return Result.Succeeded;
         }
 

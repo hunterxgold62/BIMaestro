@@ -134,19 +134,19 @@ namespace BIMaestro.MepBooster
         internal long TransparencySortCount => _transparencySorts;
         internal long TransparencyOrderChangeCount => _transparencyOrderChanges;
         internal double LastTransparencySortMilliseconds { get; private set; }
-        internal string TimingScope => UiLanguage.T("Derniers 240 échantillons ; pauses > 250 ms exclues des intervalles. Entrée → prochain callback de rendu WPF : estimation, pas une mesure de présentation à l’écran. Aucun échantillon ne signifie pas une latence nulle.", "Last 240 samples; pauses > 250 ms excluded from intervals. Input → next WPF render callback: an estimate, not a measurement of on-screen presentation. No samples does not mean zero latency.");
+        internal string TimingScope => UiLanguage.Get("MaintenancePreview.Last240SamplesPauses250MsExcludedFrom");
         internal double CaptureMilliseconds { get; private set; }
         internal double RenderFramesPerSecond { get; private set; }
         internal double SceneUpdatesPerSecond { get; private set; }
         internal int RenderingTier => RenderCapability.Tier >> 16;
         internal bool IsFastRenderingActive => RenderOptions.GetEdgeMode(_viewport)==EdgeMode.Aliased;
         internal bool UsesGeometryHitTesting => _viewport.IsHitTestVisible;
-        internal string PreviewTiming => UiLanguage.T("Pose ", "Pose ") + LastUpdateMilliseconds.ToString("0.00") + UiLanguage.T(" ms (moy. ", " ms (avg. ")
-            + _meanUpdateMilliseconds.ToString("0.00") + UiLanguage.T(") ; animation ", "); animation ") + SceneUpdatesPerSecond.ToString("0.0")
-            + UiLanguage.T(" poses/s ; cadence WPF ", " poses/s; WPF frame rate ") + RenderFramesPerSecond.ToString("0.0")
-            + UiLanguage.T(" i/s (niveau ", " fps (tier ") + RenderingTier + UiLanguage.T(") ; intervalles pose P95/P99 ", "); pose intervals P95/P99 ") + SceneIntervalP95Milliseconds.ToString("0.0") + "/" + SceneIntervalP99Milliseconds.ToString("0.0")
-            + UiLanguage.T(" ms ; entrée→rendu ", " ms; input→render ") + (InputLatencySampleCount==0?UiLanguage.T("non mesurée", "not measured"):InputToRenderP95Milliseconds.ToString("0.0")+"/"+InputToRenderP99Milliseconds.ToString("0.0")+" ms")
-            + " ; " + _sceneUpdates + UiLanguage.T(" poses, ", " poses, ") + _geometryBuilds + UiLanguage.T(" constructions de modèles. ", " model builds. ") + TimingScope;
+        internal string PreviewTiming => UiLanguage.Get("MaintenancePreview.Pose") + LastUpdateMilliseconds.ToString("0.00") + UiLanguage.Get("MaintenancePreview.MsAvg")
+            + _meanUpdateMilliseconds.ToString("0.00") + UiLanguage.Get("MaintenancePreview.Animation") + SceneUpdatesPerSecond.ToString("0.0")
+            + UiLanguage.Get("MaintenancePreview.PosesSWPFFrameRate") + RenderFramesPerSecond.ToString("0.0")
+            + UiLanguage.Get("MaintenancePreview.FpsTier") + RenderingTier + UiLanguage.Get("MaintenancePreview.PoseIntervalsP95P99") + SceneIntervalP95Milliseconds.ToString("0.0") + "/" + SceneIntervalP99Milliseconds.ToString("0.0")
+            + UiLanguage.Get("MaintenancePreview.MsInputRender") + (InputLatencySampleCount==0?UiLanguage.Get("MaintenancePreview.NotMeasured"):InputToRenderP95Milliseconds.ToString("0.0")+"/"+InputToRenderP99Milliseconds.ToString("0.0")+" ms")
+            + " ; " + _sceneUpdates + UiLanguage.Get("MaintenancePreview.Poses") + _geometryBuilds + UiLanguage.Get("MaintenancePreview.ModelBuilds") + TimingScope;
 
         internal MaintenancePreview(Document doc, Element source) : this(doc, source, null, null) { }
 
@@ -228,7 +228,7 @@ namespace BIMaestro.MepBooster
 
             var legend = new TextBlock
             {
-                Text = UiLanguage.T("Équipement bleu · Environnement gris · Obstacle rouge", "Equipment blue · Surroundings grey · Obstacle red"),
+                Text = UiLanguage.Get("MaintenancePreview.EquipmentBlueSurroundingsGreyObstacleRed"),
                 Foreground = new SolidColorBrush(MediaColor.FromRgb(44, 65, 80)), FontSize = 11,
                 Margin = new Thickness(10, 8, 10, 0), IsHitTestVisible = false,
                 VerticalAlignment = VerticalAlignment.Top, HorizontalAlignment = HorizontalAlignment.Left
@@ -246,17 +246,17 @@ namespace BIMaestro.MepBooster
             var captions = new StackPanel();
             captions.Children.Add(new TextBlock
             {
-                Text = UiLanguage.T("Glisser : tourner · Molette : zoomer", "Drag: rotate · Wheel: zoom"), FontSize = 11,
+                Text = UiLanguage.Get("MaintenancePreview.DragRotateWheelZoom"), FontSize = 11,
                 Foreground = new SolidColorBrush(MediaColor.FromRgb(39, 64, 80))
             });
-            CaptureNote = UiLanguage.T("Coupe locale : ", "Local section box: ") + _contextElements + UiLanguage.T(" éléments, ", " elements, ") + _contextTriangles.ToString("N0")
-                + UiLanguage.T(" triangles ; bloc équipement, intervention et poste + 50 cm de chaque côté.", " triangles; equipment, intervention and position block + 50 cm on each side.")
-                + (_truncated ? UiLanguage.T(" Capture limitée : certains détails ou éléments sont omis.", " Limited capture: some details or elements are omitted.") : "")
-                + (_sourceMissing ? UiLanguage.T(" Équipement sans surface lisible dans cet aperçu.", " Equipment has no readable surface in this preview.") : "")
-                + (_failedElements > 0 ? " " + _failedElements + UiLanguage.T(" géométrie(s) illisible(s).", " unreadable geometry(ies).") : "")
-                + (_unknownGeometry > 0 ? " " + _unknownGeometry + UiLanguage.T(" fragment(s) sans géométrie exploitable ; aperçu incomplet.", " fragment(s) without usable geometry; incomplete preview.") : "")
-                + (_unloadedLinks > 0 ? " " + _unloadedLinks + UiLanguage.T(" lien(s) non chargé(s).", " link(s) not loaded.") : "")
-                + UiLanguage.T(" Instantané visuel, distinct du calcul de collision.", " Visual snapshot, separate from the collision calculation.");
+            CaptureNote = UiLanguage.Get("MaintenancePreview.LocalSectionBox") + _contextElements + UiLanguage.Get("MaintenancePreview.Elements") + _contextTriangles.ToString("N0")
+                + UiLanguage.Get("MaintenancePreview.TrianglesEquipmentInterventionAndPositionBlock50Cm")
+                + (_truncated ? UiLanguage.Get("MaintenancePreview.LimitedCaptureSomeDetailsOrElementsAreOmitted") : "")
+                + (_sourceMissing ? UiLanguage.Get("MaintenancePreview.EquipmentHasNoReadableSurfaceInThisPreview") : "")
+                + (_failedElements > 0 ? " " + _failedElements + UiLanguage.Get("MaintenancePreview.UnreadableGeometryIes") : "")
+                + (_unknownGeometry > 0 ? " " + _unknownGeometry + UiLanguage.Get("MaintenancePreview.FragmentSWithoutUsableGeometryIncompletePreview") : "")
+                + (_unloadedLinks > 0 ? " " + _unloadedLinks + UiLanguage.Get("MaintenancePreview.LinkSNotLoaded") : "")
+                + UiLanguage.Get("MaintenancePreview.VisualSnapshotSeparateFromTheCollisionCalculation");
             _modelCaptureNote=CaptureNote;
             _captureLabel = new TextBlock
             {
@@ -306,7 +306,7 @@ namespace BIMaestro.MepBooster
             _selectedVisual.Content=enabled?null:SelectedSnapshot();
             _contextVisual.Content=enabled?null:_contextSnapshot;
             _blockedVisual.Content=enabled?null:_blockedSnapshot;
-            if(_legendLabel!=null)_legendLabel.Text=enabled?UiLanguage.T("Démonstration du geste · hors maquette", "Gesture demonstration · outside the model"):UiLanguage.T("Équipement bleu · Environnement gris · Obstacle rouge", "Equipment blue · Surroundings grey · Obstacle red");
+            if(_legendLabel!=null)_legendLabel.Text=enabled?UiLanguage.Get("MaintenancePreview.GestureDemonstrationOutsideTheModel"):UiLanguage.Get("MaintenancePreview.EquipmentBlueSurroundingsGreyObstacleRed");
             RefreshCaptureNote(true);
             _firstScene=true;
             Fit();
@@ -532,18 +532,18 @@ namespace BIMaestro.MepBooster
             _noteRequestedLines=_requestedLines;_noteDisplayedLines=_displayedLines;
             _noteHiddenConflicts=_hiddenConflicts;_noteDemonstration=_demonstration;
             string note=_demonstration
-                ?UiLanguage.T("Démonstration du geste — sol et position illustratifs, aucun poste dans la maquette validé.", "Gesture demonstration — illustrative floor and position, no position in the model validated.")
+                ?UiLanguage.Get("MaintenancePreview.GestureDemonstrationIllustrativeFloorAndPositionNoPosit")
                 :_modelCaptureNote??"";
             if (!_demonstration && _missingBlocked > 0)
-                note += UiLanguage.T(" Capture incomplète : ", " Incomplete capture: ") + _missingBlocked + UiLanguage.T(" obstacle(s) signalé(s) sans surface capturée ; consultez les conflits et la maquette.", " obstacle(s) reported without captured surface; review the conflicts and the model.");
+                note += UiLanguage.Get("MaintenancePreview.IncompleteCapture") + _missingBlocked + UiLanguage.Get("MaintenancePreview.ObstacleSReportedWithoutCapturedSurfaceReviewThe");
             if (!_demonstration && _outsideCapture)
-                note += UiLanguage.T(" Geste hors de la coupe initiale : contexte incomplet hors du bloc ; rouvrez la préparation avec les nouveaux réglages.", " Gesture outside the initial section box: incomplete context outside the block; reopen the preparation with the new settings.");
+                note += UiLanguage.Get("MaintenancePreview.GestureOutsideTheInitialSectionBoxIncompleteContext");
             if(_requestedBoxes>MaxOverlayBoxes||_requestedLines>MaxOverlayLines)
             {
-                note+=UiLanguage.T(" Aperçu limité : ", " Limited preview: ")+_displayedBoxes+UiLanguage.T(" volumes sur ", " volumes out of ")+_requestedBoxes;
-                if(_requestedLines>MaxOverlayLines)note+=", "+_displayedLines+UiLanguage.T(" segments sur ", " segments out of ")+_requestedLines;
-                note+=UiLanguage.T(". Corps et conflits affichés en priorité.", ". Body and conflicts displayed first.");
-                if(_hiddenConflicts>0)note+=" "+_hiddenConflicts+UiLanguage.T(" volume(s) de conflit non affiché(s).", " conflict volume(s) not displayed.");
+                note+=UiLanguage.Get("MaintenancePreview.LimitedPreview")+_displayedBoxes+UiLanguage.Get("MaintenancePreview.VolumesOutOf")+_requestedBoxes;
+                if(_requestedLines>MaxOverlayLines)note+=", "+_displayedLines+UiLanguage.Get("MaintenancePreview.SegmentsOutOf")+_requestedLines;
+                note+=UiLanguage.Get("MaintenancePreview.BodyAndConflictsDisplayedFirst");
+                if(_hiddenConflicts>0)note+=" "+_hiddenConflicts+UiLanguage.Get("MaintenancePreview.ConflictVolumeSNotDisplayed");
             }
             CaptureNote=note;
             if(_captureLabel!=null)_captureLabel.Text=note;

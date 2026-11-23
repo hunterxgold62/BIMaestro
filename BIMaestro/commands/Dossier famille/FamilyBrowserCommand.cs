@@ -77,7 +77,7 @@ namespace Famille
                     BIMaestro.Tutorials.DemoTourMessage.Show(uiapp.MainWindowHandle,
                         "Bulbizarre a besoin d’aide", ex.Message, "Fermer");
                 else
-                    TaskDialog.Show(UiLanguage.T("Erreur", "Error"), ex.Message);
+                    TaskDialog.Show(UiLanguage.Get("FamilyBrowserCommand.Error"), ex.Message);
                 return Result.Failed;
             }
         }

@@ -41,7 +41,7 @@ namespace Visualisation
         {
             var dlg = new CommonOpenFileDialog
             {
-                Title = UiLanguage.T("Choisissez le dossier d’export DWG", "Choose the DWG export folder"),
+                Title = UiLanguage.Get("ExportSheetsWindow.xaml.ChooseTheDWGExportFolder"),
                 IsFolderPicker = true,
                 AllowNonFileSystemItems = false,
                 EnsurePathExists = true,
@@ -61,7 +61,7 @@ namespace Visualisation
             }
             catch (Exception ex)
             {
-                MessageBox.Show(UiLanguage.T($"Impossible d’ouvrir la page d’aide : {ex.Message}", $"Unable to open the help page: {ex.Message}"), "BIMaestro",
+                MessageBox.Show(UiLanguage.Format("ExportSheetsWindow.xaml.UnableToOpenTheHelpPage0", (object)ex.Message), "BIMaestro",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
@@ -70,7 +70,7 @@ namespace Visualisation
             string setName = SheetSetComboBox.Text?.Trim();
             if (string.IsNullOrEmpty(setName))
             {
-                MessageBox.Show(UiLanguage.T("Veuillez saisir un nom de jeu de feuilles.", "Enter a sheet set name."), UiLanguage.T("Erreur", "Error"),
+                MessageBox.Show(UiLanguage.Get("ExportSheetsWindow.xaml.EnterASheetSetName"), UiLanguage.Get("ExportSheetsWindow.xaml.Error"),
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
@@ -80,7 +80,7 @@ namespace Visualisation
 
             if (sheetSet == null)
             {
-                MessageBox.Show(UiLanguage.T($"Le jeu '{setName}' n'existe pas.", $"The sheet set '{setName}' does not exist."), UiLanguage.T("Erreur", "Error"),
+                MessageBox.Show(UiLanguage.Format("ExportSheetsWindow.xaml.TheSheetSet0DoesNotExist", (object)setName), UiLanguage.Get("ExportSheetsWindow.xaml.Error"),
                     MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
@@ -88,7 +88,7 @@ namespace Visualisation
             string exportDir = FolderTextBox.Text;
             if (string.IsNullOrEmpty(exportDir) || !Directory.Exists(exportDir))
             {
-                MessageBox.Show(UiLanguage.T("Veuillez choisir un dossier d’export valide.", "Choose a valid export folder."), UiLanguage.T("Erreur", "Error"),
+                MessageBox.Show(UiLanguage.Get("ExportSheetsWindow.xaml.ChooseAValidExportFolder"), UiLanguage.Get("ExportSheetsWindow.xaml.Error"),
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
@@ -99,7 +99,7 @@ namespace Visualisation
             var sheets = sheetSet.Views.OfType<ViewSheet>().ToList();
             if (sheets.Count == 0)
             {
-                MessageBox.Show(UiLanguage.T("Aucune feuille à exporter dans ce jeu.", "This set contains no sheets to export."), UiLanguage.T("Info", "Information"),
+                MessageBox.Show(UiLanguage.Get("ExportSheetsWindow.xaml.ThisSetContainsNoSheetsToExport"), UiLanguage.Get("ExportSheetsWindow.xaml.Information"),
                     MessageBoxButton.OK, MessageBoxImage.Information);
                 Close();
                 return;
@@ -146,10 +146,8 @@ namespace Visualisation
                 ["sheets_exported"] = exported, ["items_failed"] = sheets.Count - exported };
 
             MessageBox.Show(
-                UiLanguage.T(
-                    $"Export de {exported}/{sheets.Count} feuilles réalisé en {sw.Elapsed:mm\\:ss}.",
-                    $"Exported {exported}/{sheets.Count} sheets in {sw.Elapsed:mm\\:ss}."),
-                UiLanguage.T("Terminé", "Complete"), MessageBoxButton.OK, MessageBoxImage.Information);
+                UiLanguage.Format("ExportSheetsWindow.xaml.Exported01SheetsIn2MmSs", (object)exported, (object)sheets.Count, (object)sw.Elapsed),
+                UiLanguage.Get("ExportSheetsWindow.xaml.Complete"), MessageBoxButton.OK, MessageBoxImage.Information);
 
             Close();
         }

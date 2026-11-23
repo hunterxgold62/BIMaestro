@@ -13,6 +13,7 @@ namespace BIMaestro.VideoGames
     public partial class GameMepShareWindow : Window
     {
         private readonly GameSceneData _scene;
+        private readonly GameMepPublishClient _publishClient = new GameMepPublishClient(() => global::BIMaestroApp.LicenseJwt);
         private GameMepShareState _state;
         private GameSceneData? _lighterScene;
         private GameMepWebPackage.ExportAnalysis? _analysis;
@@ -34,12 +35,12 @@ namespace BIMaestro.VideoGames
             string[] names = scene.Elements.SelectMany(item => item.WebProperties.Keys)
                 .Distinct(StringComparer.CurrentCultureIgnoreCase).OrderBy(item => item).ToArray();
             AuthorizedParametersText.Text = names.Length == 0
-                ? UiLanguage.T("Aucun paramètre métier", "No business parameters")
-                : names.Length + UiLanguage.T(" paramètres sélectionnés", " selected parameters");
+                ? UiLanguage.Get("GameMepShareWindow.xaml.NoBusinessParameters")
+                : names.Length + UiLanguage.Get("GameMepShareWindow.xaml.SelectedParameters");
             AuthorizedParametersText.ToolTip = names.Length == 0
-                ? UiLanguage.T("Seules les informations techniques minimales du graphe seront publiées.", "Only the minimum technical graph information will be published.")
+                ? UiLanguage.Get("GameMepShareWindow.xaml.OnlyTheMinimumTechnicalGraphInformationWillBe")
                 : string.Join(", ", names);
-            EstimatedSizeText.Text = UiLanguage.T("Calcul de la taille compressée…", "Calculating compressed size…");
+            EstimatedSizeText.Text = UiLanguage.Get("GameMepShareWindow.xaml.CalculatingCompressedSize");
             ShowState();
             AnalyzeAsync();
         }
@@ -67,8 +68,8 @@ namespace BIMaestro.VideoGames
             {
                 Debug.WriteLine(exception);
                 if (!token.IsCancellationRequested) {
-                    EstimatedSizeText.Text = UiLanguage.T("Analyse indisponible", "Analysis unavailable");
-                    OptimizationText.Text = UiLanguage.T("L’export original reste disponible. ", "The original export remains available. ") + exception.Message;
+                    EstimatedSizeText.Text = UiLanguage.Get("GameMepShareWindow.xaml.AnalysisUnavailable");
+                    OptimizationText.Text = UiLanguage.Get("GameMepShareWindow.xaml.TheOriginalExportRemainsAvailable") + exception.Message;
                 }
             }
             finally { if (!token.IsCancellationRequested) { _analyzing = false; SetBusy(_busy); } }
@@ -76,21 +77,21 @@ namespace BIMaestro.VideoGames
 
         private void RefreshAnalysis()
         {
-            EstimatedSizeText.Text = UiLanguage.T("Taille compressée : ", "Compressed size: ") + FormatBytes(_useLighter ? _lighterSize : _originalSize) + UiLanguage.T(" / 50 Mo", " / 50 MB");
+            EstimatedSizeText.Text = UiLanguage.Get("GameMepShareWindow.xaml.CompressedSize") + FormatBytes(_useLighter ? _lighterSize : _originalSize) + UiLanguage.Get("GameMepShareWindow.xaml.50MB");
             long gain = Math.Max(0, _originalSize - _lighterSize);
             OptimizationText.Text = gain > 0
-                ? FormatBytes(_originalSize) + " → " + FormatBytes(_lighterSize) + UiLanguage.T("\nGain calculé : ", "\nCalculated reduction: ") + FormatBytes(gain) + " (" + (100.0 * gain / _originalSize).ToString("0.0") + " %)"
-                : UiLanguage.T("Aucun gain utile détecté pour les portes et garde-corps de cette vue.", "No useful size reduction detected for doors and railings in this view.");
-            LightenButton.Content = _useLighter ? UiLanguage.T("Revenir aux détails d’origine", "Restore original details") : UiLanguage.T("Alléger les détails", "Simplify details");
-            EstimatedSizeDetailsText.Text = UiLanguage.T("Géométrie 3D : ", "3D geometry: ") + FormatBytes(ExportScene.WebTiles.Sum(x => x.Size)) +
-                " (" + ExportScene.WebTiles.Count + UiLanguage.T(" fichiers)\n", " files)\n") + BuildGeometryDetails();
+                ? FormatBytes(_originalSize) + " → " + FormatBytes(_lighterSize) + UiLanguage.Get("GameMepShareWindow.xaml.CalculatedReduction") + FormatBytes(gain) + " (" + (100.0 * gain / _originalSize).ToString("0.0") + " %)"
+                : UiLanguage.Get("GameMepShareWindow.xaml.NoUsefulSizeReductionDetectedForDoorsAnd");
+            LightenButton.Content = _useLighter ? UiLanguage.Get("GameMepShareWindow.xaml.RestoreOriginalDetails") : UiLanguage.Get("GameMepShareWindow.xaml.SimplifyDetails");
+            EstimatedSizeDetailsText.Text = UiLanguage.Get("GameMepShareWindow.xaml.3DGeometry") + FormatBytes(ExportScene.WebTiles.Sum(x => x.Size)) +
+                " (" + ExportScene.WebTiles.Count + UiLanguage.Get("GameMepShareWindow.xaml.Files") + BuildGeometryDetails();
         }
 
         private void LightenButton_Click(object sender, RoutedEventArgs e)
         {
             _useLighter = !_useLighter;
             RefreshAnalysis();
-            StatusText.Text = _useLighter ? UiLanguage.T("Détails allégés pour la prochaine publication.", "Simplified details for the next publication.") : UiLanguage.T("Géométrie d’origine pour la prochaine publication.", "Original geometry for the next publication.");
+            StatusText.Text = _useLighter ? UiLanguage.Get("GameMepShareWindow.xaml.SimplifiedDetailsForTheNextPublication") : UiLanguage.Get("GameMepShareWindow.xaml.OriginalGeometryForTheNextPublication");
         }
 
         private string BuildGeometryDetails()
@@ -112,7 +113,7 @@ namespace BIMaestro.VideoGames
                 .ToArray();
             var categories = rankedElements
                 .GroupBy(item => string.IsNullOrWhiteSpace(item.Element.Category)
-                    ? UiLanguage.T("Sans catégorie", "Uncategorized")
+                    ? UiLanguage.Get("GameMepShareWindow.xaml.Uncategorized")
                     : item.Element.Category)
                 .Select(group => new { Name = group.Key, Bytes = group.Sum(item => item.Bytes) })
                 .OrderByDescending(item => item.Bytes)
@@ -129,25 +130,25 @@ namespace BIMaestro.VideoGames
                 .Select(group => new { Name = group.Key, Bytes = group.Sum(item => item.Bytes), Count = group.Count() })
                 .OrderByDescending(item => item.Bytes).Take(5)
                 .Select(item => item.Name + " (" + item.Count + ") ≈ " + FormatBytes(item.Bytes)));
-            return UiLanguage.T("\nDIAGNOSTIC DE L’EXPORT D’ORIGINE\nPoids par élément estimé ; nombre de triangles mesuré.\n\nCATÉGORIES LES PLUS LOURDES\n", "\nORIGINAL EXPORT DIAGNOSTICS\nEstimated size per element; measured triangle count.\n\nLARGEST CATEGORIES\n") +
-                categoryDetails + UiLanguage.T("\n\nTYPES LES PLUS LOURDS\n", "\n\nLARGEST TYPES\n") + typeDetails + UiLanguage.T("\n\nÉLÉMENTS LES PLUS LOURDS\n", "\n\nLARGEST ELEMENTS\n") + elementDetails;
+            return UiLanguage.Get("GameMepShareWindow.xaml.ORIGINALEXPORTDIAGNOSTICSEstimatedSizePerElementMeasure") +
+                categoryDetails + UiLanguage.Get("GameMepShareWindow.xaml.LARGESTTYPES") + typeDetails + UiLanguage.Get("GameMepShareWindow.xaml.LARGESTELEMENTS") + elementDetails;
         }
 
         private static string FormatBytes(long bytes)
         {
-            if (bytes >= 1048576) return (bytes / 1048576.0).ToString("0.0") + UiLanguage.T(" Mo", " MB");
-            return Math.Max(1, bytes / 1024).ToString() + UiLanguage.T(" Ko", " KB");
+            if (bytes >= 1048576) return (bytes / 1048576.0).ToString("0.0") + UiLanguage.Get("GameMepShareWindow.xaml.MB");
+            return Math.Max(1, bytes / 1024).ToString() + UiLanguage.Get("GameMepShareWindow.xaml.KB");
         }
 
         private async void LocalExportButton_Click(object sender, RoutedEventArgs e)
         {
             string name = PublicationNameTextBox.Text.Trim();
-            if (string.IsNullOrWhiteSpace(name)) name = UiLanguage.T("Maquette MEP", "MEP model");
+            if (string.IsNullOrWhiteSpace(name)) name = UiLanguage.Get("GameMepShareWindow.xaml.MEPModel");
             string safeName = new string(name.Select(character =>
                 Path.GetInvalidFileNameChars().Contains(character) ? '_' : character).ToArray());
             var dialog = new Microsoft.Win32.SaveFileDialog
             {
-                Title = UiLanguage.T("Enregistrer les tuiles GLB en local", "Save GLB tiles locally"),
+                Title = UiLanguage.Get("GameMepShareWindow.xaml.SaveGLBTilesLocally"),
                 Filter = "Archive ZIP (*.zip)|*.zip", DefaultExt = ".zip",
                 AddExtension = true, FileName = safeName + " - GLB.zip"
             };
@@ -157,7 +158,7 @@ namespace BIMaestro.VideoGames
             SetBusy(true);
             _cancellation = new CancellationTokenSource();
             var token = _cancellation.Token;
-            StatusText.Text = UiLanguage.T("Création du ZIP local…", "Creating local ZIP…");
+            StatusText.Text = UiLanguage.Get("GameMepShareWindow.xaml.CreatingLocalZIP");
             PublishProgressBar.Value = 0;
             try
             {
@@ -166,13 +167,13 @@ namespace BIMaestro.VideoGames
                 if (File.Exists(dialog.FileName)) File.Replace(temporaryPath, dialog.FileName, null);
                 else File.Move(temporaryPath, dialog.FileName);
                 PublishProgressBar.Value = 100;
-                StatusText.Text = scene.WebTiles.Count + UiLanguage.T(" tuiles GLB enregistrées : ", " GLB tiles saved: ") + dialog.FileName;
+                StatusText.Text = scene.WebTiles.Count + UiLanguage.Get("GameMepShareWindow.xaml.GLBTilesSaved") + dialog.FileName;
             }
-            catch (OperationCanceledException) { StatusText.Text = UiLanguage.T("Export local annulé.", "Local export canceled."); }
+            catch (OperationCanceledException) { StatusText.Text = UiLanguage.Get("GameMepShareWindow.xaml.LocalExportCanceled"); }
             catch (Exception exception)
             {
                 Debug.WriteLine("Export GLB local impossible : " + exception);
-                StatusText.Text = UiLanguage.T("Export local impossible : ", "Unable to export locally: ") + exception.Message;
+                StatusText.Text = UiLanguage.Get("GameMepShareWindow.xaml.UnableToExportLocally") + exception.Message;
             }
             finally
             {
@@ -186,7 +187,7 @@ namespace BIMaestro.VideoGames
         {
             if (string.IsNullOrWhiteSpace(PublicationNameTextBox.Text))
             {
-                StatusText.Text = UiLanguage.T("Donnez un nom à la publication.", "Enter a publication name.");
+                StatusText.Text = UiLanguage.Get("GameMepShareWindow.xaml.EnterAPublicationName");
                 return;
             }
             SetBusy(true);
@@ -198,20 +199,20 @@ namespace BIMaestro.VideoGames
             });
             try
             {
-                _state = await GameMepPublishClient.PublishAsync(
+                _state = await _publishClient.PublishAsync(
                     ExportScene, PublicationNameTextBox.Text.Trim(), progress,
                     _cancellation.Token);
                 ShowState();
-                StatusText.Text = UiLanguage.T("Révision ", "Revision ") + _state.Revision +
-                    UiLanguage.T(" publiée. Les liens restent valables.", " published. The links remain valid.");
+                StatusText.Text = UiLanguage.Get("GameMepShareWindow.xaml.Revision") + _state.Revision +
+                    UiLanguage.Get("GameMepShareWindow.xaml.PublishedTheLinksRemainValid");
             }
-            catch (OperationCanceledException) { StatusText.Text = UiLanguage.T("Publication annulée.", "Publication canceled."); }
+            catch (OperationCanceledException) { StatusText.Text = UiLanguage.Get("GameMepShareWindow.xaml.PublicationCanceled"); }
             catch (Exception exception)
             {
                 Debug.WriteLine("Publication MEP impossible : " + exception);
                 _state = GameMepPublishClient.Load(_scene.MepGraph);
                 ShowState();
-                StatusText.Text = UiLanguage.T("Publication impossible : ", "Unable to publish: ") + exception.Message;
+                StatusText.Text = UiLanguage.Get("GameMepShareWindow.xaml.UnableToPublish") + exception.Message;
             }
             finally { SetBusy(false); }
         }
@@ -221,10 +222,10 @@ namespace BIMaestro.VideoGames
             SetBusy(true);
             try
             {
-                await GameMepPublishClient.ExtendAsync(
+                await _publishClient.ExtendAsync(
                     _scene.MepGraph, _state, 30, CancellationToken.None);
                 ShowState();
-                StatusText.Text = UiLanguage.T("Le partage est prolongé de 30 jours.", "Sharing has been extended by 30 days.");
+                StatusText.Text = UiLanguage.Get("GameMepShareWindow.xaml.SharingHasBeenExtendedBy30Days");
             }
             catch (Exception exception) { StatusText.Text = exception.Message; }
             finally { SetBusy(false); }
@@ -235,24 +236,24 @@ namespace BIMaestro.VideoGames
             string scope = (DeletionScopeComboBox.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Tag as string;
             if (string.IsNullOrWhiteSpace(scope)) return;
             string confirmation = scope == "data"
-                ? UiLanguage.T("Supprimer définitivement les résas, annotations et lots du partage web ? La maquette 3D et les liens sont conservés. Le fichier Revit reste intact.", "Permanently delete openings, annotations and batches from the web publication? The 3D model and links will be kept. The Revit file remains untouched.")
+                ? UiLanguage.Get("GameMepShareWindow.xaml.PermanentlyDeleteOpeningsAnnotationsAndBatchesFromThe")
                 : scope == "model"
-                    ? UiLanguage.T("Supprimer la maquette 3D publiée et désactiver les deux liens ? Les résas et annotations sont conservées pendant 5 mois et seront retrouvées lors d'un nouvel export.", "Delete the published 3D model and disable both links? Openings and annotations will be kept for 5 months and restored on the next export.")
-                    : UiLanguage.T("Supprimer définitivement la maquette publiée ET ses résas, annotations et lots, puis désactiver les deux liens ? Le fichier Revit reste intact.", "Permanently delete the published model AND its openings, annotations and batches, then disable both links? The Revit file remains untouched.");
+                    ? UiLanguage.Get("GameMepShareWindow.xaml.DeleteThePublished3DModelAndDisableBoth")
+                    : UiLanguage.Get("GameMepShareWindow.xaml.PermanentlyDeleteThePublishedModelANDItsOpenings");
             if (MessageBox.Show(this,
                     confirmation,
-                    UiLanguage.T("Supprimer les données du partage", "Delete shared data"), MessageBoxButton.YesNo,
+                    UiLanguage.Get("GameMepShareWindow.xaml.DeleteSharedData"), MessageBoxButton.YesNo,
                     MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
             SetBusy(true);
             try
             {
-                await GameMepPublishClient.DeleteAsync(
+                await _publishClient.DeleteAsync(
                     _scene.MepGraph, _state, scope, CancellationToken.None);
                 ShowState();
                 PublishProgressBar.Value = 0;
-                StatusText.Text = scope == "data" ? UiLanguage.T("Résas et annotations supprimées. La maquette publiée est conservée.", "Openings and annotations deleted. The published model has been kept.")
-                    : scope == "model" ? UiLanguage.T("Maquette 3D supprimée. Résas et annotations conservées ; publiez une nouvelle révision pour les retrouver.", "3D model deleted. Openings and annotations have been kept; publish a new revision to restore them.")
-                    : UiLanguage.T("Maquette publiée, résas et annotations supprimées.", "Published model, openings and annotations deleted.");
+                StatusText.Text = scope == "data" ? UiLanguage.Get("GameMepShareWindow.xaml.OpeningsAndAnnotationsDeletedThePublishedModelHas")
+                    : scope == "model" ? UiLanguage.Get("GameMepShareWindow.xaml.3DModelDeletedOpeningsAndAnnotationsHaveBeen")
+                    : UiLanguage.Get("GameMepShareWindow.xaml.PublishedModelOpeningsAndAnnotationsDeleted");
             }
             catch (Exception exception) { StatusText.Text = exception.Message; }
             finally { ShowState(); SetBusy(false); }
@@ -266,7 +267,7 @@ namespace BIMaestro.VideoGames
             LinksPanel.Visibility = !string.IsNullOrWhiteSpace(_state.PublicationId) ? Visibility.Visible : Visibility.Collapsed;
             ViewerUrlTextBox.Text = _state.ViewerUrl;
             EditorUrlTextBox.Text = _state.EditorUrl;
-            PublishButton.Content = available ? UiLanguage.T("Publier une nouvelle révision", "Publish a new revision") : UiLanguage.T("Partager sur le web", "Share on the web");
+            PublishButton.Content = available ? UiLanguage.Get("GameMepShareWindow.xaml.PublishANewRevision") : UiLanguage.Get("GameMepShareWindow.xaml.ShareOnTheWeb");
         }
 
         private void SetBusy(bool busy)
@@ -280,9 +281,9 @@ namespace BIMaestro.VideoGames
         }
 
         private void CopyViewerButton_Click(object sender, RoutedEventArgs e) =>
-            Copy(_state.ViewerUrl, UiLanguage.T("Lien de consultation copié.", "Viewer link copied."));
+            Copy(_state.ViewerUrl, UiLanguage.Get("GameMepShareWindow.xaml.ViewerLinkCopied"));
         private void CopyEditorButton_Click(object sender, RoutedEventArgs e) =>
-            Copy(_state.EditorUrl, UiLanguage.T("Lien d’édition copié.", "Editor link copied."));
+            Copy(_state.EditorUrl, UiLanguage.Get("GameMepShareWindow.xaml.EditorLinkCopied"));
         private void Copy(string value, string message)
         {
             if (string.IsNullOrWhiteSpace(value)) return;

@@ -33,8 +33,13 @@ namespace BIMaestro.VideoGames
         public double Percentage { get; set; }
     }
 
-    internal static class GameMepPublishClient
+    internal sealed class GameMepPublishClient
     {
+        internal const int RevitLimitMb = 50;
+        internal const int NavisworksLimitMb = 100;
+        internal const long Megabyte = 1024L * 1024;
+        private const long MaxAssetBytes = 48 * Megabyte;
+        private const int MaxAssets = 4096;
         private const string FunctionUrl =
             "https://xqovxfgghbqxwsadzhzl.functions.supabase.co/mep-share";
         private const string AnonKey =
@@ -44,17 +49,32 @@ namespace BIMaestro.VideoGames
             Timeout = TimeSpan.FromMinutes(15)
         };
 
-        public static async Task<GameMepShareState> PublishAsync(
+        private readonly Func<string> _getLicenseToken;
+        private readonly int _packageLimitMb;
+
+        public GameMepPublishClient(Func<string> getLicenseToken, int packageLimitMb = RevitLimitMb)
+        {
+            _getLicenseToken = getLicenseToken ?? throw new ArgumentNullException(nameof(getLicenseToken));
+            _packageLimitMb = packageLimitMb;
+        }
+
+        internal static bool FitsPublication(GameMepWebPackageResult package, int packageLimitMb) =>
+            package.Assets.Count < MaxAssets && package.Bytes.LongLength <= MaxAssetBytes
+            && package.Assets.All(asset => asset.Size <= MaxAssetBytes)
+            && package.Bytes.LongLength + package.Assets.Sum(asset => asset.Size) <= packageLimitMb * Megabyte;
+
+        public async Task<GameMepShareState> PublishAsync(
             GameSceneData scene,
             string name,
             IProgress<GameMepPublishProgress> progress,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            GameMepWebPackageResult preparedPackage = null)
         {
             if (!scene.MepGraph.ScenarioCanPersist)
                 throw new InvalidOperationException(string.IsNullOrWhiteSpace(scene.MepGraph.ScenarioPersistenceError)
                     ? "Enregistrez le fichier Revit avant de publier un partage durable."
                     : scene.MepGraph.ScenarioPersistenceError);
-            try { return await PublishCoreAsync(scene, name, progress, cancellationToken); }
+            try { return await PublishCoreAsync(scene, name, progress, cancellationToken, preparedPackage); }
             catch
             {
                 var interrupted = Load(scene.MepGraph);
@@ -69,18 +89,18 @@ namespace BIMaestro.VideoGames
             }
         }
 
-        private static async Task<GameMepShareState> PublishCoreAsync(
+        private async Task<GameMepShareState> PublishCoreAsync(
             GameSceneData scene, string name, IProgress<GameMepPublishProgress> progress,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken, GameMepWebPackageResult preparedPackage)
         {
             progress?.Report(new GameMepPublishProgress
                 { Message = "Création du paquet web…", Percentage = 0.08 });
-            GameMepWebPackageResult package = await Task.Run(
+            GameMepWebPackageResult package = preparedPackage ?? await Task.Run(
                 () => GameMepWebPackage.Build(scene, name), cancellationToken);
             var assets = new[] { new GameMepWebAsset { Name = "index.zip", Bytes = package.Bytes, Sha256 = package.Sha256 } }.Concat(package.Assets).ToList();
             long totalBytes = assets.Sum(asset => asset.Size);
-            if (assets.Count > 4096 || totalBytes > 50L * 1024 * 1024 || assets.Any(asset => asset.Size > 48L * 1024 * 1024))
-                throw new InvalidOperationException("Export trop volumineux : limite de 50 Mo au total et 48 Mo par fichier. Réduisez la vue publiée.");
+            if (!FitsPublication(package, _packageLimitMb))
+                throw new InvalidOperationException($"Export trop volumineux : limite de {_packageLimitMb} Mo au total et {MaxAssetBytes / Megabyte} Mo par fichier. Réduisez la vue publiée.");
             GameMepShareState state = Load(scene.MepGraph);
             string modelKey = string.IsNullOrWhiteSpace(scene.MepGraph.ScenarioModelKey)
                 ? scene.MepGraph.DocumentTitle
@@ -173,7 +193,7 @@ namespace BIMaestro.VideoGames
             return state;
         }
 
-        private static async Task UploadAssetAsync(GameMepWebAsset asset, string url, CancellationToken token)
+        private async Task UploadAssetAsync(GameMepWebAsset asset, string url, CancellationToken token)
         {
             for (int attempt = 0; ; attempt++)
             {
@@ -183,7 +203,7 @@ namespace BIMaestro.VideoGames
                     {
                         if (new Uri(url).Host.EndsWith(".workers.dev", StringComparison.OrdinalIgnoreCase))
                         {
-                            string jwt = global::BIMaestroApp.LicenseJwt;
+                            string jwt = _getLicenseToken();
                             if (string.IsNullOrWhiteSpace(jwt)) throw new InvalidOperationException("Licence requise pour envoyer la maquette vers Cloudflare.");
                             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
                         }
@@ -205,7 +225,7 @@ namespace BIMaestro.VideoGames
             }
         }
 
-        private static async Task<dynamic> PostWithRetryAsync(object body, CancellationToken token)
+        private async Task<dynamic> PostWithRetryAsync(object body, CancellationToken token)
         {
             for (int attempt = 0; ; attempt++)
             {
@@ -214,7 +234,7 @@ namespace BIMaestro.VideoGames
             }
         }
 
-        public static async Task ExtendAsync(
+        public async Task ExtendAsync(
             GameMepGraphData graph,
             GameMepShareState state,
             int days,
@@ -231,7 +251,7 @@ namespace BIMaestro.VideoGames
             Save(graph, state);
         }
 
-        public static async Task DeleteAsync(
+        public async Task DeleteAsync(
             GameMepGraphData graph,
             GameMepShareState state,
             string scope,
@@ -271,13 +291,13 @@ namespace BIMaestro.VideoGames
             catch { return new GameMepShareState(); }
         }
 
-        private static async Task<dynamic> PostAsync(
+        private async Task<dynamic> PostAsync(
             object body,
             CancellationToken cancellationToken)
         {
             using var request = new HttpRequestMessage(HttpMethod.Post, FunctionUrl);
             request.Headers.Add("apikey", AnonKey);
-            string jwt = global::BIMaestroApp.LicenseJwt;
+            string jwt = _getLicenseToken();
             if (!string.IsNullOrWhiteSpace(jwt))
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
             request.Content = new StringContent(

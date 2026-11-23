@@ -78,7 +78,7 @@ namespace Analyse
                     {
                         TaskDialog.Show(
                             "BIMaestro",
-                            UiLanguage.T("Le document du calcul n'est plus le document actif.", "The document used for the calculation is no longer active."));
+                            UiLanguage.Get("PipeSelectionFilterV2.TheDocumentUsedForTheCalculationIsNo"));
                         return;
                     }
 
@@ -93,7 +93,7 @@ namespace Analyse
                 {
                     TaskDialog.Show(
                         "BIMaestro",
-                        UiLanguage.T("Impossible d'afficher ce réseau sans risque pour Revit.\n\n", "Unable to display this network safely in Revit.\n\n") + ex.Message);
+                        UiLanguage.Get("PipeSelectionFilterV2.UnableToDisplayThisNetworkSafelyInRevit") + ex.Message);
                 }
             }
 
@@ -135,7 +135,7 @@ namespace Analyse
                 bool? dialogResult = selectionWindow.ShowDialog();
                 if (dialogResult != true)
                 {
-                    TaskDialog.Show(UiLanguage.T("Information", "Information"), UiLanguage.T("Opération annulée.", "Operation cancelled."));
+                    TaskDialog.Show(UiLanguage.Get("PipeSelectionFilterV2.Information"), UiLanguage.Get("PipeSelectionFilterV2.OperationCancelled"));
                     return Result.Cancelled;
                 }
 
@@ -147,7 +147,7 @@ namespace Analyse
                 ICollection<ElementId> selectedIds = uidoc.Selection.GetElementIds();
                 if (selectedIds == null || selectedIds.Count == 0)
                 {
-                    TaskDialog.Show(UiLanguage.T("Information", "Information"), UiLanguage.T("Veuillez sélectionner des éléments avant de lancer le script.", "Select elements before running the calculation."));
+                    TaskDialog.Show(UiLanguage.Get("PipeSelectionFilterV2.Information"), UiLanguage.Get("PipeSelectionFilterV2.SelectElementsBeforeRunningTheCalculation"));
                     return Result.Cancelled;
                 }
 
@@ -505,7 +505,7 @@ namespace Analyse
                 double totalPipeLength = 0;
                 if (pipeLengths.Count > 0)
                 {
-                    sb.AppendLine(UiLanguage.T("Longueur totale des canalisations par diamètre (DN) :", "Total pipe length by diameter (DN):"));
+                    sb.AppendLine(UiLanguage.Get("PipeSelectionFilterV2.TotalPipeLengthByDiameterDN"));
                     foreach (var item in pipeLengths.OrderBy(kvp => kvp.Key))
                     {
                         sb.AppendLine($"{item.Key:N0} mm : {item.Value:F2} m");
@@ -517,7 +517,7 @@ namespace Analyse
                 if (pipeVolumes.Count > 0)
                 {
                     double totalWaterVolume = 0;
-                    sb.AppendLine(UiLanguage.T("Volume total d'eau par diamètre intérieur :", "Total water volume by internal diameter:"));
+                    sb.AppendLine(UiLanguage.Get("PipeSelectionFilterV2.TotalWaterVolumeByInternalDiameter"));
                     foreach (var item in pipeVolumes.OrderBy(kvp => kvp.Key))
                     {
                         sb.AppendLine($"{item.Key:N0} mm : {item.Value:F3} m³");
@@ -528,14 +528,14 @@ namespace Analyse
                 }
                 if (elbowCounts.Count > 0)
                 {
-                    sb.AppendLine(UiLanguage.T("Nombre de coudes par diamètre :", "Elbow count by diameter:"));
+                    sb.AppendLine(UiLanguage.Get("PipeSelectionFilterV2.ElbowCountByDiameter"));
                     foreach (var item in elbowCounts.OrderBy(kvp => kvp.Key))
                         sb.AppendLine($"{item.Key} : {item.Value}");
                     sb.AppendLine();
                 }
                 if (teeCounts.Count > 0)
                 {
-                    sb.AppendLine(UiLanguage.T("Nombre de tés par diamètre :", "Tee count by diameter:"));
+                    sb.AppendLine(UiLanguage.Get("PipeSelectionFilterV2.TeeCountByDiameter"));
                     foreach (var item in teeCounts.OrderBy(kvp => kvp.Key))
                         sb.AppendLine($"{item.Key} : {item.Value}");
                     sb.AppendLine();
@@ -543,7 +543,7 @@ namespace Analyse
                 if (includeDucts && ductLengths.Count > 0)
                 {
                     double totalDuctLength = 0;
-                    sb.AppendLine(UiLanguage.T("Longueur totale des gaines par dimension :", "Total duct length by size:"));
+                    sb.AppendLine(UiLanguage.Get("PipeSelectionFilterV2.TotalDuctLengthBySize"));
                     foreach (var item in ductLengths.OrderBy(kvp => kvp.Key))
                     {
                         sb.AppendLine($"{item.Key} : {item.Value:F2} m");
@@ -555,7 +555,7 @@ namespace Analyse
                 if (includeDucts && ductFittingLengths.Count > 0)
                 {
                     double totalDuctFittingLength = 0;
-                    sb.AppendLine(UiLanguage.T("Accessoires de gaines (approximatif) :", "Duct fittings (approximate):"));
+                    sb.AppendLine(UiLanguage.Get("PipeSelectionFilterV2.DuctFittingsApproximate"));
                     foreach (var item in ductFittingLengths.OrderBy(kvp => kvp.Key))
                     {
                         sb.AppendLine($"{item.Key} : {item.Value:F2} m");
@@ -567,11 +567,11 @@ namespace Analyse
                 if (pipeAccessoryCounts.Count > 0)
                 {
                     sb.AppendLine();
-                    sb.AppendLine(UiLanguage.T("Accessoires de canalisation (nombre par famille) :", "Pipe accessories (count by family):"));
+                    sb.AppendLine(UiLanguage.Get("PipeSelectionFilterV2.PipeAccessoriesCountByFamily"));
                     foreach (var accessory in pipeAccessoryCounts.OrderBy(pair => pair.Key))
                         sb.AppendLine(accessory.Key + " : " + accessory.Value);
                 }
-                TaskDialog.Show(UiLanguage.T("Résultats", "Results"), sb.ToString());
+                TaskDialog.Show(UiLanguage.Get("PipeSelectionFilterV2.Results"), sb.ToString());
 
                 // Déterminer le système unique pour le nom du fichier (si applicable)
                 string singleSystemType = "";
@@ -601,10 +601,8 @@ namespace Analyse
 
                     // À la fin, proposer d'ouvrir le fichier
                     if (MessageBox.Show(
-                            UiLanguage.T(
-                                $"Les résultats ont été exportés vers Excel.\n\nFichier : {excelFilePath}\n\nVoulez-vous l'ouvrir ?",
-                                $"The results were exported to Excel.\n\nFile: {excelFilePath}\n\nWould you like to open it?"),
-                            UiLanguage.T("Succès", "Success"), MessageBoxButton.YesNo, MessageBoxImage.Information) == MessageBoxResult.Yes)
+                            UiLanguage.Format("PipeSelectionFilterV2.TheResultsWereExportedToExcelFile0", (object)excelFilePath),
+                            UiLanguage.Get("PipeSelectionFilterV2.Success"), MessageBoxButton.YesNo, MessageBoxImage.Information) == MessageBoxResult.Yes)
                     {
                         Process.Start(new ProcessStartInfo(excelFilePath) { UseShellExecute = true });
                     }
@@ -1013,7 +1011,7 @@ namespace Analyse
                 if (request == ExternalEventRequest.Denied)
                 {
                     MessageBox.Show(
-                        UiLanguage.T("Revit ne peut pas traiter cette demande pour le moment.", "Revit cannot process this request right now."),
+                        UiLanguage.Get("PipeSelectionFilterV2.RevitCannotProcessThisRequestRightNow"),
                         "BIMaestro",
                         MessageBoxButton.OK,
                         MessageBoxImage.Warning);

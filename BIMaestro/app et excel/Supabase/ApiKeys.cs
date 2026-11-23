@@ -10,6 +10,8 @@ namespace Licensing
 {
     public static class AiClient
     {
+        public const string TextModel = "gpt-6-luna";
+
         private const string ProxyUrl =
             "https://xqovxfgghbqxwsadzhzl.functions.supabase.co/ai-proxy";
 
@@ -54,11 +56,24 @@ namespace Licensing
 
         /// <summary>Compat: modèle + prompt (n=1).</summary>
         public static JObject SendOpenAI(string jwtLicense, string model, string prompt)
-            => SendOpenAI(jwtLicense, new { model, prompt });
+            => SendOpenAI(jwtLicense, CreateTextRequest(model, prompt, 1));
 
         /// <summary>Compat: modèle + prompt + n complétions.</summary>
         public static JObject SendOpenAI(string jwtLicense, string model, string prompt, int n)
-            => SendOpenAI(jwtLicense, new { model, prompt, n });
+            => SendOpenAI(jwtLicense, CreateTextRequest(model, prompt, n));
+
+        private static JObject CreateTextRequest(string model, string prompt, int n)
+        {
+            var request = new JObject
+            {
+                ["model"] = model,
+                ["prompt"] = prompt,
+                ["n"] = n
+            };
+            if (model == TextModel)
+                request["reasoning_effort"] = "none";
+            return request;
+        }
 
         /// <summary>DeepSeek (si tu l’utilises encore).</summary>
         public static JObject SendDeepSeek(string jwtLicense, string query)

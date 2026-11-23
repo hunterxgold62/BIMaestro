@@ -1,4 +1,8 @@
 <Project>
+  <ItemGroup><EmbeddedResource Include="Resources\OpeningLogo.png"><LogicalName>BIMaestro.Resources.OpeningLogo.png</LogicalName></EmbeddedResource></ItemGroup>
+  <ItemGroup><Compile Include="app et excel\ModelOpeningService.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="app et excel\ModelOpeningHistory.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="app et excel\ModelOpeningTips.cs" /></ItemGroup>
   <ItemGroup><Compile Include="app et excel\Supabase\UserDataStorage.cs" /><Compile Include="app et excel\Supabase\PreferenceStorage.cs" /></ItemGroup>
   <ItemGroup><Compile Include="les couleurs\Proprietes\*.cs" /></ItemGroup>
   <ItemGroup>
@@ -302,6 +306,10 @@
       <DependentUpon>SimpleColorPicker.xaml</DependentUpon>
     </Compile>
     <Compile Include="Localization\UiLanguage.cs" />
+    <EmbeddedResource Include="Localization\Strings.*.json">
+      <LogicalName>BIMaestro.Localization.%(Filename)%(Extension)</LogicalName>
+      <WithCulture>false</WithCulture>
+    </EmbeddedResource>
     <Compile Include="animation touche\chargement et salto\StuntSpinner.xaml.cs">
       <DependentUpon>StuntSpinner.xaml</DependentUpon>
     </Compile>

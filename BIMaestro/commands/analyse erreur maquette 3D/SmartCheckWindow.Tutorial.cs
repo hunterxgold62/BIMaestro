@@ -43,7 +43,7 @@ namespace Analyse
             if (!prepared || _tutorialPrepared) return;
             if (!DemoClashExercise.IsTraining(OwnerDocument) ||
                 !_setup.Selection.OrderBy(id => id.GetIdLongValue()).SequenceEqual(DemoClashExercise.Sources(OwnerDocument).OrderBy(id => id.GetIdLongValue())))
-                throw new InvalidOperationException(UiLanguage.T("Relance le parcours Clash 3D pour préparer les trois tuyaux d'essai.", "Restart the Clash 3D tour to prepare the three practice pipes."));
+                throw new InvalidOperationException(UiLanguage.Get("SmartCheckWindow.Tutorial.RestartTheClash3DTourToPrepareThe"));
             _tutorialPrepared = true; _tutorialCorrected = false;
             _tutorialInitialVerified = _tutorialDetailOpened = _tutorialFocusObserved = _tutorialExportWritten = _tutorialRescanVerified = false;
             _tutorialWallObserved = _tutorialReservationCreated = _tutorialReservationRescanVerified = _tutorialInspectWall = false;
@@ -114,7 +114,7 @@ namespace Analyse
             if (!_tutorialPrepared) return;
             if (_session.Error != null)
             {
-                RunText.Text += UiLanguage.T(" · Le guide attend une analyse sans erreur. Consulte le bilan pour le diagnostic ; changer les options ne corrige pas une erreur du moteur.", " · The guide expects an error-free analysis. Check the summary for diagnostics; changing options does not fix an engine error.");
+                RunText.Text += UiLanguage.Get("SmartCheckWindow.Tutorial.TheGuideExpectsAnErrorFreeAnalysisCheck");
                 return;
             }
             if (_tutorialReservationCreated)
@@ -124,7 +124,7 @@ namespace Analyse
                     _session.Options.Scope == SmartScanScope.Selection && _session.Options.MinimumVolumeMm3 == 10 &&
                     _session.Options.LocalClashes && _session.Issues.Count <= 1 && _session.Issues.All(issue => DemoClashExercise.IsWall(OwnerDocument, issue));
                 if (_tutorialReservationRescanVerified) DemoTourService.ReportAction(this, "clash-reservation-verified");
-                else RunText.Text += UiLanguage.T(" · Le guide attend une analyse complète des trois tuyaux d'essai après la réservation.", " · The guide expects a full analysis of the three practice pipes after the opening is created.");
+                else RunText.Text += UiLanguage.Get("SmartCheckWindow.Tutorial.TheGuideExpectsAFullAnalysisOfThe");
                 return;
             }
             bool verified = DemoClashExercise.Verify(OwnerDocument, _session, _tutorialCorrected);
@@ -133,13 +133,13 @@ namespace Analyse
             {
                 _tutorialInitialVerified = true;
                 // Freeze the initial report before geometry, statuses or preview files change.
-                _tutorialInitialHtml = SmartClashReport.Html(_setup.Title, _session.Issues, _session, false, UiLanguage.T("État initial du tutoriel · tous les résultats", "Tutorial initial state · all results"));
-                _tutorialInitialCsv = SmartClashReport.CsvPhase(_session.Issues, UiLanguage.T("Avant correction", "Before correction"));
+                _tutorialInitialHtml = SmartClashReport.Html(_setup.Title, _session.Issues, _session, false, UiLanguage.Get("SmartCheckWindow.Tutorial.TutorialInitialStateAllResults"));
+                _tutorialInitialCsv = SmartClashReport.CsvPhase(_session.Issues, UiLanguage.Get("SmartCheckWindow.Tutorial.BeforeCorrection"));
             }
             if (verified)
                 DemoTourService.ReportAction(this, _tutorialCorrected ? "clash-rescan-verified" : "clash-scan-verified");
-            else RunText.Text += UiLanguage.T(" · Le guide attend ", " · The guide expects ") + (_tutorialCorrected ? UiLanguage.T("la seule traversée du mur", "only the wall penetration") : UiLanguage.T("les deux intersections d'essai", "the two practice intersections")) +
-                UiLanguage.T(". Garde Sélection, Tuyaux, Collisions dans la maquette et le seuil de 10 mm³ ; désactive les autres contrôles, puis relance.", ". Keep Selection, Pipes, Clashes in the model and the 10 mm³ threshold; disable the other checks, then run again.");
+            else RunText.Text += UiLanguage.Get("SmartCheckWindow.Tutorial.TheGuideExpects") + (_tutorialCorrected ? UiLanguage.Get("SmartCheckWindow.Tutorial.OnlyTheWallPenetration") : UiLanguage.Get("SmartCheckWindow.Tutorial.TheTwoPracticeIntersections")) +
+                UiLanguage.Get("SmartCheckWindow.Tutorial.KeepSelectionPipesClashesInTheModelAnd");
         }
 
         private bool DemoClashExerciseExportReady() => _tutorialCorrected && _tutorialReservationCreated && _tutorialReservationRescanVerified && _session != null && _session.Complete &&
@@ -159,7 +159,7 @@ namespace Analyse
         private void Tutorial_Click(object sender, RoutedEventArgs args)
         {
             if (_tutorialPrepared && DemoTourService.IsActive(this))
-            { RunText.Text = UiLanguage.T("Poursuis le guide actuel. Pour recommencer la scène, quitte le guide puis relance Clash 3D depuis Parcours guidés.", "Continue the current guide. To restart the scene, exit the guide and relaunch Clash 3D from Guided Tours."); return; }
+            { RunText.Text = UiLanguage.Get("SmartCheckWindow.Tutorial.ContinueTheCurrentGuideToRestartTheScene"); return; }
             DemoTourService.StartInWindow("clash-3d", this);
         }
 
@@ -169,7 +169,7 @@ namespace Analyse
             if (_handler.Action == SmartAction.TutorialCorrect)
             {
                 _tutorialCorrected = true;
-                RunText.Text = UiLanguage.T("Le tuyau d'essai a été relevé de 300 mm. Relance l'analyse pour vérifier la disparition du conflit entre tuyaux.", "The practice pipe was raised by 300 mm. Run the analysis again to confirm the pipe clash is gone.");
+                RunText.Text = UiLanguage.Get("SmartCheckWindow.Tutorial.ThePracticePipeWasRaisedBy300Mm");
                 DemoTourService.ReportAction(this, "clash-corrected");
             }
             else if (_handler.Action == SmartAction.CreateReservation && _handler.TutorialReservation &&
@@ -182,11 +182,11 @@ namespace Analyse
             }
             else if (_handler.Action == SmartAction.FocusApply && _tutorialInspectWall && DemoClashExercise.IsWall(OwnerDocument, _handler.FocusIssue))
                 _tutorialObservation = DemoTourService.ObserveHistoryResult(this, new System.Windows.Interop.WindowInteropHelper(this).Owner,
-                    UiLanguage.T("Observer la traversée du mur", "Observe the wall penetration"), UiLanguage.T("Observe le tuyau orange et le mur bleu. De retour dans Clash 3D, le bouton Créer la réservation utilisera la famille rectangulaire fournie pour cet essai ; tes réglages personnels restent conservés.", "Look at the orange pipe and the blue wall. Back in Clash 3D, the Create opening button will use the rectangular family provided for this exercise; your personal settings are kept."),
+                    UiLanguage.Get("SmartCheckWindow.Tutorial.ObserveTheWallPenetration"), UiLanguage.Get("SmartCheckWindow.Tutorial.LookAtTheOrangePipeAndTheBlue"),
                     () => { _tutorialWallObserved = true; DemoTourService.ReportAction(this, "clash-wall-observed"); });
             else if (_handler.Action == SmartAction.FocusApply && IsTutorialCrossing(_handler.FocusIssue))
                 _tutorialObservation = DemoTourService.ObserveHistoryResult(this, new System.Windows.Interop.WindowInteropHelper(this).Owner,
-                    UiLanguage.T("Observer le conflit dans Revit", "Observe the clash in Revit"), UiLanguage.T("L'objet contrôlé est orange et l'obstacle bleu. Observe leur croisement : le guide va ensuite relever le tuyau d'essai de 300 mm. Dans ton projet, choisis une correction adaptée au réseau et à ses raccordements.", "The checked element is orange and the obstacle is blue. Look at where they cross: the guide will then raise the practice pipe by 300 mm. In your own project, choose a fix suited to the system and its connections."),
+                    UiLanguage.Get("SmartCheckWindow.Tutorial.ObserveTheClashInRevit"), UiLanguage.Get("SmartCheckWindow.Tutorial.TheCheckedElementIsOrangeAndTheObstacle"),
                     () => { _tutorialFocusObserved = true; DemoTourService.ReportAction(this, "clash-focus-observed"); });
         }
     }

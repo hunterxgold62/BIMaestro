@@ -183,6 +183,7 @@ public static class ExcelLogger
                 pair.Value.Classification)).Select(entry => new TimeDashboardEntry
                 {
                     DocumentId = entry.DocumentId, Name = entry.DocumentName,
+                    SessionId = entry.Classification?.SessionId,
                     Version = entry.RevitVersion, When = entry.When,
                     Hours = entry.Duration.TotalHours,
                     Kind = entry.Classification?.DocumentKind,
@@ -1321,6 +1322,7 @@ public static class ExcelLogger
 
 public class TimeDashboardEntry
 {
+    public string SessionId;
     public string DocumentId, Name, Version, Kind, Parameters, Path;
     public DateTime When;
     public double Hours;

@@ -1,0 +1,6 @@
+1.03	Revit de base
+6.04	+ Fond
+11.05	+ Couleurs
+16.07	+ Icônes
+21.07	+ Badges
+26.07	+ Mode nuit

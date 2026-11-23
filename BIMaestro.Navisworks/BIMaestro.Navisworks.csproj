@@ -9,7 +9,8 @@
     <AssemblyName>BIMaestro.Navisworks</AssemblyName>
     <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <PlatformTarget>x64</PlatformTarget>
-    <LangVersion>7.3</LangVersion>
+    <LangVersion>latest</LangVersion>
+    <Nullable>annotations</Nullable>
     <Deterministic>true</Deterministic>
     <NavisworksYear Condition="'$(NavisworksYear)' == ''">2025</NavisworksYear>
     <NavisworksInstallDir Condition="'$(NavisworksInstallDir)' == ''">C:\Program Files\Autodesk\Navisworks Manage $(NavisworksYear)</NavisworksInstallDir>
@@ -23,10 +24,48 @@
     <Reference Include="System.Core" />
     <Reference Include="System.Drawing" />
     <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="WindowsBase" />
+    <Reference Include="PresentationCore" />
+    <Reference Include="PresentationFramework" />
+    <Reference Include="Microsoft.CSharp" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <Reference Include="Autodesk.Navisworks.ComApi">
+      <HintPath>$(NavisworksInstallDir)/Autodesk.Navisworks.ComApi.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Autodesk.Navisworks.Interop.ComApi">
+      <HintPath>$(NavisworksInstallDir)/Autodesk.Navisworks.Interop.ComApi.dll</HintPath>
+      <EmbedInteropTypes>False</EmbedInteropTypes>
+      <Private>False</Private>
+    </Reference>
+    <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameSceneData.cs" />
+    <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameMepData.cs" />
+    <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameMepReplayStore.cs" />
+    <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameMepWebPackage.cs" />
+    <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameMepPublishClient.cs" />
+    <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameMepDirectionExplanation.cs" />
+    <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameMepNetworkTrace.cs" />
+    <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameMepCalculation.cs" />
+    <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameMepImpact.cs" />
+    <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameMepScenarioStore.cs" />
+    <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameMepScenarioHistory.cs" />
+    <Compile Include="..\BIMaestro\app et excel\Supabase\NetSupport.cs" />
     <Reference Include="Autodesk.Navisworks.Api">
       <HintPath>$(NavisworksInstallDir)\Autodesk.Navisworks.Api.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameMepDiagnostics.cs" />
+    <Compile Include="..\BIMaestro\Localization\UiLanguage.cs" />
+    <Compile Include="Services\NavisworksBimMetadata.cs" />
+    <Compile Include="Services\ExteriorVisibility.cs" />
+    <Compile Include="Services\SimplifiedShellMesh.cs" />
+    <Compile Include="Services\NavisworksWebScene.cs" />
+    <Compile Include="UI\PublishWebWindow.cs" />
+    <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameRuntimeDiagnostics.cs" />
+    <Compile Include="..\BIMaestro\app et excel\Supabase\UserDataStorage.cs" />
+    <Compile Include="..\BIMaestro\app et excel\Supabase\PreferenceStorage.cs" />
     <Compile Include="Commands\ModifyLinksCommand.cs" />
     <Compile Include="Services\ReferencePath.cs" />
     <Compile Include="Services\LinkService.cs" />

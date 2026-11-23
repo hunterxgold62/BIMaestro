@@ -32,7 +32,7 @@ namespace Modification
                 var (p1, p2) = PickExactlyTwoPipes(uidoc);
                 if (p1 == null || p2 == null)
                 {
-                    TaskDialog.Show(UiLanguage.T("Connexion canalisations", "Connect Pipes"), UiLanguage.T("Sélectionne exactement deux canalisations.", "Select exactly two pipes."));
+                    TaskDialog.Show(UiLanguage.Get("ConnectPipesCommand.ConnectPipes"), UiLanguage.Get("ConnectPipesCommand.SelectExactlyTwoPipes"));
                     return Result.Cancelled;
                 }
 
@@ -57,7 +57,7 @@ namespace Modification
                 var c2 = GetBestConnector(p2, GetPipeCenter(p1));
                 if (c1 == null || c2 == null)
                 {
-                    TaskDialog.Show(UiLanguage.T("Connexion canalisations", "Connect Pipes"), UiLanguage.T("Connecteurs introuvables.", "No connectors were found."));
+                    TaskDialog.Show(UiLanguage.Get("ConnectPipesCommand.ConnectPipes"), UiLanguage.Get("ConnectPipesCommand.NoConnectorsWereFound"));
                     return Result.Cancelled;
                 }
 
@@ -112,7 +112,7 @@ namespace Modification
 
                 if (routes.Count == 0)
                 {
-                    TaskDialog.Show(UiLanguage.T("Connexion canalisations", "Connect Pipes"), UiLanguage.T("Aucun itinéraire généré.", "No route was generated."));
+                    TaskDialog.Show(UiLanguage.Get("ConnectPipesCommand.ConnectPipes"), UiLanguage.Get("ConnectPipesCommand.NoRouteWasGenerated"));
                     return Result.Cancelled;
                 }
 
@@ -1287,7 +1287,7 @@ namespace Modification
             var filter = new PreviewSelFilter(accepted);
             try
             {
-                var r = uidoc.Selection.PickObject(Autodesk.Revit.UI.Selection.ObjectType.Element, filter, UiLanguage.T("Clique la ligne colorée de l'itinéraire", "Click the route's coloured line"));
+                var r = uidoc.Selection.PickObject(Autodesk.Revit.UI.Selection.ObjectType.Element, filter, UiLanguage.Get("ConnectPipesCommand.ClickTheRouteSColouredLine"));
                 var id = r.ElementId;
                 for (int i = 0; i < sets.Count; i++) if (sets[i].Contains(id)) return i;
             }

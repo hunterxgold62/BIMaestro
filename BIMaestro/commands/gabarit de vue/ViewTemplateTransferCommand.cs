@@ -28,43 +28,37 @@ namespace BIMaestro.ViewTemplates
             View activeView = uiDocument?.ActiveView;
             if (document == null || activeView == null)
             {
-                TaskDialog.Show("BIMaestro", UiLanguage.T("Aucun projet Revit actif.", "No Active Revit Project."));
+                TaskDialog.Show("BIMaestro", UiLanguage.Get("ViewTemplateTransferCommand.NoActiveRevitProject"));
                 return Result.Cancelled;
             }
             if (document.IsFamilyDocument)
             {
                 TaskDialog.Show(
-                    UiLanguage.T("Gabarit de vue", "View Template"),
-                    UiLanguage.T(
-                        "Cette commande s’utilise dans un projet Revit (.rvt), pas dans une famille (.rfa).",
-                        "This Command Is Available in a Revit Project (.rvt), Not in a Family (.rfa)."));
+                    UiLanguage.Get("ViewTemplateTransferCommand.ViewTemplate"),
+                    UiLanguage.Get("ViewTemplateTransferCommand.ThisCommandIsAvailableInARevitProject"));
                 return Result.Cancelled;
             }
             BIMaestro.Tutorials.DemoViewTemplateGuide.OnCommandOpened(document);
 
-            var dialog = new TaskDialog(UiLanguage.T("Transfert de gabarit de vue", "View Template Transfer"))
+            var dialog = new TaskDialog(UiLanguage.Get("ViewTemplateTransferCommand.ViewTemplateTransfer"))
             {
-                MainInstruction = UiLanguage.T(
-                    "Exporter ou importer les réglages complets d’une vue",
-                    "Export or Import Complete View Settings"),
-                MainContent = UiLanguage.T(
-                    "Le fichier BIMaestro est indépendant du projet et des identifiants internes Revit.",
-                    "The BIMaestro File Is Independent of the Project and Revit Internal IDs."),
+                MainInstruction = UiLanguage.Get("ViewTemplateTransferCommand.ExportOrImportCompleteViewSettings"),
+                MainContent = UiLanguage.Get("ViewTemplateTransferCommand.TheBIMaestroFileIsIndependentOfTheProject"),
                 CommonButtons = TaskDialogCommonButtons.Cancel
             };
             dialog.AddCommandLink(
                 TaskDialogCommandLinkId.CommandLink1,
-                UiLanguage.T("Exporter la vue active", "Export Active View"),
-                UiLanguage.T("Enregistrer ses paramètres, graphismes, catégories et sous-projets.", "Save Its Parameters, Graphics, Categories, and Worksets."));
+                UiLanguage.Get("ViewTemplateTransferCommand.ExportActiveView"),
+                UiLanguage.Get("ViewTemplateTransferCommand.SaveItsParametersGraphicsCategoriesAndWorksets"));
             dialog.AddCommandLink(
                 TaskDialogCommandLinkId.CommandLink2,
-                UiLanguage.T("Importer dans la vue active", "Import into Active View"),
-                UiLanguage.T("Créer un vrai gabarit nommé ou appliquer les graphismes directement à la vue.", "Create a Named View Template or Apply Graphics Directly to the View."));
+                UiLanguage.Get("ViewTemplateTransferCommand.ImportIntoActiveView"),
+                UiLanguage.Get("ViewTemplateTransferCommand.CreateANamedViewTemplateOrApplyGraphics"));
 
             TaskDialogResult choice = BIMaestro.Tutorials.DemoViewTemplateGuide.IsGuided(document)
-                ? GuidedChoice(data.Application.MainWindowHandle, UiLanguage.T("Gabarit de vue", "View Template"),
-                    BIMaestro.Tutorials.DemoViewTemplateGuide.IsImportStage(document) ? UiLanguage.T("La cible est bleue. Importe maintenant les réglages rouges de la source.", "The target is blue. Now import the red settings from the source.") : UiLanguage.T("La source est rouge et pointillée. Exporte ses réglages pour les transférer.", "The source is red and dashed. Export its settings to transfer them."),
-                    UiLanguage.T("Exporter la vue active", "Export Active View"), UiLanguage.T("Importer dans la vue active", "Import into Active View"),
+                ? GuidedChoice(data.Application.MainWindowHandle, UiLanguage.Get("ViewTemplateTransferCommand.ViewTemplate"),
+                    BIMaestro.Tutorials.DemoViewTemplateGuide.IsImportStage(document) ? UiLanguage.Get("ViewTemplateTransferCommand.TheTargetIsBlueNowImportTheRed") : UiLanguage.Get("ViewTemplateTransferCommand.TheSourceIsRedAndDashedExportIts"),
+                    UiLanguage.Get("ViewTemplateTransferCommand.ExportActiveView"), UiLanguage.Get("ViewTemplateTransferCommand.ImportIntoActiveView"),
                     BIMaestro.Tutorials.DemoViewTemplateGuide.IsImportStage(document) ? 2 : 1)
                 : dialog.Show();
             if (choice == TaskDialogResult.CommandLink1)
@@ -101,7 +95,7 @@ namespace BIMaestro.ViewTemplates
                 button.Click += (_, __) => { result = selected == 1 ? TaskDialogResult.CommandLink1 : TaskDialogResult.CommandLink2; window.Close(); };
                 panel.Children.Add(button);
             }
-            var cancel = new System.Windows.Controls.Button { Content = UiLanguage.T("Annuler", "Cancel"), Padding = new System.Windows.Thickness(10),
+            var cancel = new System.Windows.Controls.Button { Content = UiLanguage.Get("ViewTemplateTransferCommand.Cancel"), Padding = new System.Windows.Thickness(10),
                 HorizontalAlignment = System.Windows.HorizontalAlignment.Right, Margin = new System.Windows.Thickness(0, 10, 0, 0) };
             cancel.Click += (_, __) => window.Close();
             panel.Children.Add(cancel);
@@ -111,20 +105,20 @@ namespace BIMaestro.ViewTemplates
 
         private static string GuidedName(IntPtr owner, string suggested)
         {
-            var window = new System.Windows.Window { Title = "BIMaestro — " + UiLanguage.T("Nom du gabarit", "Template Name"), Width = 500,
+            var window = new System.Windows.Window { Title = "BIMaestro — " + UiLanguage.Get("ViewTemplateTransferCommand.TemplateName"), Width = 500,
                 SizeToContent = System.Windows.SizeToContent.Height, WindowStartupLocation = System.Windows.WindowStartupLocation.CenterOwner,
                 ShowInTaskbar = false, ResizeMode = System.Windows.ResizeMode.NoResize, Background = System.Windows.Media.Brushes.White };
             new System.Windows.Interop.WindowInteropHelper(window).Owner = owner;
             var panel = new System.Windows.Controls.StackPanel { Margin = new System.Windows.Thickness(22) };
             window.Content = panel;
-            panel.Children.Add(new System.Windows.Controls.TextBlock { Text = UiLanguage.T("Donne un nom au gabarit", "Name the template"), FontSize = 20,
+            panel.Children.Add(new System.Windows.Controls.TextBlock { Text = UiLanguage.Get("ViewTemplateTransferCommand.NameTheTemplate"), FontSize = 20,
                 Foreground = BIMaestro.Tutorials.DemoTourPalette.Accent });
             var input = new System.Windows.Controls.TextBox { Text = suggested, Padding = new System.Windows.Thickness(10),
                 Margin = new System.Windows.Thickness(0, 14, 0, 14), BorderBrush = BIMaestro.Tutorials.DemoTourPalette.Accent,
                 BorderThickness = new System.Windows.Thickness(3) };
             panel.Children.Add(input);
             string result = null;
-            var apply = new System.Windows.Controls.Button { Content = UiLanguage.T("Créer et affecter à la cible", "Create and Assign to Target"), Padding = new System.Windows.Thickness(12),
+            var apply = new System.Windows.Controls.Button { Content = UiLanguage.Get("ViewTemplateTransferCommand.CreateAndAssignToTarget"), Padding = new System.Windows.Thickness(12),
                 Background = BIMaestro.Tutorials.DemoTourPalette.Accent, Foreground = System.Windows.Media.Brushes.White };
             apply.Click += (_, __) => { if (!string.IsNullOrWhiteSpace(input.Text)) { result = input.Text.Trim(); window.Close(); } };
             panel.Children.Add(apply);
@@ -136,25 +130,21 @@ namespace BIMaestro.ViewTemplates
         {
             if (!CanUseView(activeView)) return ShowUnsupportedView();
 
-            var filterDialog = new TaskDialog(UiLanguage.T("Options d’export", "Export Options"))
+            var filterDialog = new TaskDialog(UiLanguage.Get("ViewTemplateTransferCommand.ExportOptions"))
             {
-                MainInstruction = UiLanguage.T(
-                    "Inclure la configuration des filtres ?",
-                    "Include Filter Configuration?"),
-                MainContent = UiLanguage.T(
-                    "Les règles, catégories, visibilité, activation et surcharges graphiques des filtres peuvent être transportées avec le gabarit.",
-                    "Filter Rules, Categories, Visibility, Enabled State, and Graphic Overrides Can Be Transferred with the Template."),
+                MainInstruction = UiLanguage.Get("ViewTemplateTransferCommand.IncludeFilterConfiguration"),
+                MainContent = UiLanguage.Get("ViewTemplateTransferCommand.FilterRulesCategoriesVisibilityEnabledStateAndGraphic"),
                 CommonButtons = TaskDialogCommonButtons.Cancel
             };
             filterDialog.AddCommandLink(
                 TaskDialogCommandLinkId.CommandLink1,
-                UiLanguage.T("Oui, exporter les filtres", "Yes, Export Filters"));
+                UiLanguage.Get("ViewTemplateTransferCommand.YesExportFilters"));
             filterDialog.AddCommandLink(
                 TaskDialogCommandLinkId.CommandLink2,
-                UiLanguage.T("Non, conserver les filtres du projet cible", "No, Keep Target Project Filters"));
+                UiLanguage.Get("ViewTemplateTransferCommand.NoKeepTargetProjectFilters"));
             TaskDialogResult filterChoice = BIMaestro.Tutorials.DemoViewTemplateGuide.IsGuided(document)
-                ? GuidedChoice(data.Application.MainWindowHandle, UiLanguage.T("Options d’export", "Export Options"), UiLanguage.T("Choisis l’option encadrée pour inclure aussi les filtres dans le fichier.", "Choose the highlighted option to also include filters in the file."),
-                    UiLanguage.T("Oui, exporter les filtres", "Yes, Export Filters"), UiLanguage.T("Non, conserver les filtres du projet cible", "No, Keep Target Project Filters"), 1)
+                ? GuidedChoice(data.Application.MainWindowHandle, UiLanguage.Get("ViewTemplateTransferCommand.ExportOptions"), UiLanguage.Get("ViewTemplateTransferCommand.ChooseTheHighlightedOptionToAlsoIncludeFilters"),
+                    UiLanguage.Get("ViewTemplateTransferCommand.YesExportFilters"), UiLanguage.Get("ViewTemplateTransferCommand.NoKeepTargetProjectFilters"), 1)
                 : filterDialog.Show();
             if (filterChoice != TaskDialogResult.CommandLink1 && filterChoice != TaskDialogResult.CommandLink2)
                 return Result.Cancelled;
@@ -168,7 +158,7 @@ namespace BIMaestro.ViewTemplates
 
             var saveDialog = new SaveFileDialog
             {
-                Title = UiLanguage.T("Exporter le gabarit de vue", "Export View Template"),
+                Title = UiLanguage.Get("ViewTemplateTransferCommand.ExportViewTemplate"),
                 Filter = "Gabarit de vue BIMaestro (*.bimaestro-view.json)|*.bimaestro-view.json|JSON (*.json)|*.json",
                 AddExtension = true,
                 DefaultExt = ".bimaestro-view.json",
@@ -184,7 +174,7 @@ namespace BIMaestro.ViewTemplates
                 new Dictionary<string, int> { ["files_exported"] = 1 });
 
             TaskDialog.Show(
-                UiLanguage.T("Export terminé", "Export Complete"),
+                UiLanguage.Get("ViewTemplateTransferCommand.ExportComplete"),
                 UiLanguage.T(
                     "Le gabarit a été exporté avec " + package.Parameters.Count + " paramètre(s), " +
                     package.Categories.Count + " catégorie(s) et " + package.Filters.Count + " filtre(s).\n\n" + saveDialog.FileName,
@@ -200,7 +190,7 @@ namespace BIMaestro.ViewTemplates
 
             var openDialog = new OpenFileDialog
             {
-                Title = UiLanguage.T("Importer un gabarit de vue", "Import View Template"),
+                Title = UiLanguage.Get("ViewTemplateTransferCommand.ImportViewTemplate"),
                 Filter = "Gabarit de vue BIMaestro (*.bimaestro-view.json;*.json)|*.bimaestro-view.json;*.json|Tous les fichiers (*.*)|*.*",
                 CheckFileExists = true,
                 Multiselect = false
@@ -218,19 +208,19 @@ namespace BIMaestro.ViewTemplates
             {
                 package = JsonConvert.DeserializeObject<ViewTemplatePackage>(File.ReadAllText(openDialog.FileName, Encoding.UTF8));
                 if (package == null || !string.Equals(package.Format, "BIMaestro.ViewTemplate", StringComparison.Ordinal))
-                    throw new InvalidDataException(UiLanguage.T("Format de fichier non reconnu.", "Unrecognized File Format."));
+                    throw new InvalidDataException(UiLanguage.Get("ViewTemplateTransferCommand.UnrecognizedFileFormat"));
             }
             catch (Exception ex)
             {
                 TaskDialog.Show(
-                    UiLanguage.T("Import impossible", "Import Failed"),
-                    UiLanguage.T("Le fichier ne peut pas être lu : ", "The File Cannot Be Read: ") + ex.Message);
+                    UiLanguage.Get("ViewTemplateTransferCommand.ImportFailed"),
+                    UiLanguage.Get("ViewTemplateTransferCommand.TheFileCannotBeRead") + ex.Message);
                 return Result.Failed;
             }
 
-            var modeDialog = new TaskDialog(UiLanguage.T("Mode d’import", "Import Mode"))
+            var modeDialog = new TaskDialog(UiLanguage.Get("ViewTemplateTransferCommand.ImportMode"))
             {
-                MainInstruction = UiLanguage.T("Comment appliquer ce fichier ?", "How Should This File Be Applied?"),
+                MainInstruction = UiLanguage.Get("ViewTemplateTransferCommand.HowShouldThisFileBeApplied"),
                 MainContent = UiLanguage.T(
                     "Source : " + package.SourceView +
                     (string.IsNullOrWhiteSpace(package.SourceTemplate) ? string.Empty : "\nGabarit source : " + package.SourceTemplate) +
@@ -244,15 +234,15 @@ namespace BIMaestro.ViewTemplates
             };
             modeDialog.AddCommandLink(
                 TaskDialogCommandLinkId.CommandLink1,
-                UiLanguage.T("Créer / mettre à jour un vrai gabarit nommé", "Create / Update a Named View Template"),
-                UiLanguage.T("Le gabarit sera enregistré dans le projet puis affecté à la vue active.", "The Template Will Be Saved in the Project and Assigned to the Active View."));
+                UiLanguage.Get("ViewTemplateTransferCommand.CreateUpdateANamedViewTemplate"),
+                UiLanguage.Get("ViewTemplateTransferCommand.TheTemplateWillBeSavedInTheProject"));
             modeDialog.AddCommandLink(
                 TaskDialogCommandLinkId.CommandLink2,
-                UiLanguage.T("Personnaliser uniquement la vue active", "Customize Only the Active View"),
-                UiLanguage.T("Le gabarit actuel sera détaché et les réglages deviendront propres à cette vue.", "The Current Template Will Be Detached and the Settings Will Become Specific to This View."));
+                UiLanguage.Get("ViewTemplateTransferCommand.CustomizeOnlyTheActiveView"),
+                UiLanguage.Get("ViewTemplateTransferCommand.TheCurrentTemplateWillBeDetachedAndThe"));
             TaskDialogResult mode = BIMaestro.Tutorials.DemoViewTemplateGuide.IsGuided(document)
-                ? GuidedChoice(app.MainWindowHandle, UiLanguage.T("Mode d’import", "Import Mode"), UiLanguage.T("Choisis l’option encadrée : le gabarit sera enregistré dans le projet et affecté à la vue cible. Ses couleurs et ses traits doivent remplacer le style bleu.", "Choose the highlighted option: the template will be saved in the project and assigned to the target view. Its colors and line styles should replace the blue style."),
-                    UiLanguage.T("Créer / mettre à jour un vrai gabarit nommé", "Create / Update a Named View Template"), UiLanguage.T("Personnaliser uniquement la vue active", "Customize Only the Active View"), 1)
+                ? GuidedChoice(app.MainWindowHandle, UiLanguage.Get("ViewTemplateTransferCommand.ImportMode"), UiLanguage.Get("ViewTemplateTransferCommand.ChooseTheHighlightedOptionTheTemplateWillBe"),
+                    UiLanguage.Get("ViewTemplateTransferCommand.CreateUpdateANamedViewTemplate"), UiLanguage.Get("ViewTemplateTransferCommand.CustomizeOnlyTheActiveView"), 1)
                 : modeDialog.Show();
             if (mode != TaskDialogResult.CommandLink1 && mode != TaskDialogResult.CommandLink2)
                 return Result.Cancelled;
@@ -264,9 +254,9 @@ namespace BIMaestro.ViewTemplates
                 templateName = BIMaestro.Tutorials.DemoViewTemplateGuide.IsGuided(document)
                     ? GuidedName(app.MainWindowHandle, "BIMaestro - Démo rouge pointillée")
                     : Microsoft.VisualBasic.Interaction.InputBox(
-                    UiLanguage.T("Nom du gabarit Revit à créer ou mettre à jour :", "Name of the Revit View Template to Create or Update:"),
-                    UiLanguage.T("Nom du gabarit", "Template Name"),
-                    string.IsNullOrWhiteSpace(package.SuggestedName) ? UiLanguage.T("Gabarit BIMaestro", "BIMaestro Template") : package.SuggestedName);
+                    UiLanguage.Get("ViewTemplateTransferCommand.NameOfTheRevitViewTemplateToCreate"),
+                    UiLanguage.Get("ViewTemplateTransferCommand.TemplateName"),
+                    string.IsNullOrWhiteSpace(package.SuggestedName) ? UiLanguage.Get("ViewTemplateTransferCommand.BIMaestroTemplate") : package.SuggestedName);
                 if (string.IsNullOrWhiteSpace(templateName)) return Result.Cancelled;
             }
 
@@ -283,32 +273,30 @@ namespace BIMaestro.ViewTemplates
             catch (Exception ex)
             {
                 TaskDialog.Show(
-                    UiLanguage.T("Import impossible", "Import Failed"),
+                    UiLanguage.Get("ViewTemplateTransferCommand.ImportFailed"),
                     ex.Message);
                 return Result.Failed;
             }
 
             var summary = new StringBuilder();
             summary.AppendLine(createTemplate
-                ? UiLanguage.T("Gabarit enregistré et affecté : ", "Template Saved and Assigned: ") + report.TargetName
-                : UiLanguage.T("Vue personnalisée : ", "View Customized: ") + report.TargetName);
+                ? UiLanguage.Get("ViewTemplateTransferCommand.TemplateSavedAndAssigned") + report.TargetName
+                : UiLanguage.Get("ViewTemplateTransferCommand.ViewCustomized") + report.TargetName);
             summary.AppendLine();
-            summary.AppendLine(UiLanguage.T("Paramètres appliqués : ", "Parameters Applied: ") + report.ParametersApplied);
-            summary.AppendLine(UiLanguage.T("Catégories appliquées : ", "Categories Applied: ") + report.CategoriesApplied);
-            summary.AppendLine(UiLanguage.T("Sous-projets appliqués : ", "Worksets Applied: ") + report.WorksetsApplied);
-            summary.AppendLine(UiLanguage.T("Filtres appliqués : ", "Filters Applied: ") + report.FiltersApplied);
+            summary.AppendLine(UiLanguage.Get("ViewTemplateTransferCommand.ParametersApplied") + report.ParametersApplied);
+            summary.AppendLine(UiLanguage.Get("ViewTemplateTransferCommand.CategoriesApplied") + report.CategoriesApplied);
+            summary.AppendLine(UiLanguage.Get("ViewTemplateTransferCommand.WorksetsApplied") + report.WorksetsApplied);
+            summary.AppendLine(UiLanguage.Get("ViewTemplateTransferCommand.FiltersApplied") + report.FiltersApplied);
             if (report.Warnings.Count > 0)
             {
                 summary.AppendLine();
-                summary.AppendLine(UiLanguage.T(
-                    "Éléments ignorés car absents ou incompatibles dans ce projet :",
-                    "Items Skipped Because They Are Missing or Incompatible in This Project:"));
+                summary.AppendLine(UiLanguage.Get("ViewTemplateTransferCommand.ItemsSkippedBecauseTheyAreMissingOrIncompatible"));
                 foreach (string warning in report.Warnings.Take(8)) summary.AppendLine("• " + warning);
                 if (report.Warnings.Count > 8)
-                    summary.AppendLine("• … +" + (report.Warnings.Count - 8) + UiLanguage.T(" autre(s)", " More"));
+                    summary.AppendLine("• … +" + (report.Warnings.Count - 8) + UiLanguage.Get("ViewTemplateTransferCommand.More"));
             }
 
-            TaskDialog.Show(UiLanguage.T("Import terminé", "Import Complete"), summary.ToString());
+            TaskDialog.Show(UiLanguage.Get("ViewTemplateTransferCommand.ImportComplete"), summary.ToString());
             BIMaestro.Tutorials.DemoViewTemplateGuide.OnImportCompleted(document, app.MainWindowHandle);
             return Result.Succeeded;
         }
@@ -330,10 +318,8 @@ namespace BIMaestro.ViewTemplates
         private static Result ShowUnsupportedView()
         {
             TaskDialog.Show(
-                UiLanguage.T("Vue non compatible", "Unsupported View"),
-                UiLanguage.T(
-                    "Cette vue Revit ne prend pas en charge les gabarits ou les personnalisations graphiques. Ouvrez une vue de plan, coupe, élévation, 3D, dessin ou nomenclature.",
-                    "This Revit View Does Not Support Templates or Graphic Customization. Open a Plan, Section, Elevation, 3D, Drafting, or Schedule View."));
+                UiLanguage.Get("ViewTemplateTransferCommand.UnsupportedView"),
+                UiLanguage.Get("ViewTemplateTransferCommand.ThisRevitViewDoesNotSupportTemplatesOr"));
             return Result.Cancelled;
         }
 

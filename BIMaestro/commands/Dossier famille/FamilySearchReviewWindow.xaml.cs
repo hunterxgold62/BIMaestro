@@ -44,7 +44,7 @@ namespace Famille
             foreach (var row in _rows.Take(2)) row.IsSelected = true;
             GenerateButton.BorderBrush = BIMaestro.Tutorials.DemoTourPalette.Accent;
             GenerateButton.BorderThickness = new Thickness(3);
-            GenerateButton.ToolTip = UiLanguage.T("Proposer une description et des mots-clés pour les familles cochées. Relis les propositions avant de les enregistrer.", "Suggest a description and keywords for the selected families. Review the suggestions before saving them.");
+            GenerateButton.ToolTip = UiLanguage.Get("FamilySearchReviewWindow.xaml.SuggestADescriptionAndKeywordsForTheSelected");
             UpdateSummary();
         }
 
@@ -77,7 +77,7 @@ namespace Famille
             var selected = _rows.Where(r => r.IsSelected).ToList();
             if (selected.Count == 0)
             {
-                MessageBox.Show(this, UiLanguage.T("Cochez au moins une famille à analyser.", "Select at least one family to analyze."), UiLanguage.T("Mots-clés", "Keywords"), MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(this, UiLanguage.Get("FamilySearchReviewWindow.xaml.SelectAtLeastOneFamilyToAnalyze"), UiLanguage.Get("FamilySearchReviewWindow.xaml.Keywords"), MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
@@ -96,20 +96,20 @@ namespace Famille
                     if (_generationCts.IsCancellationRequested)
                         break;
 
-                    ProgressText.Text = UiLanguage.T($"Analyse IA {completed + 1}/{selected.Count} — {row.Name}", $"AI analysis {completed + 1}/{selected.Count} — {row.Name}");
-                    row.Status = UiLanguage.T("Analyse en cours…", "Analysis in progress...");
+                    ProgressText.Text = UiLanguage.Format("FamilySearchReviewWindow.xaml.AIAnalysis012", (object)(completed + 1), (object)(selected.Count), (object)(row.Name));
+                    row.Status = UiLanguage.Get("FamilySearchReviewWindow.xaml.AnalysisInProgress");
                     try
                     {
                         var suggestion = await FamilySearchAiService.SuggestAsync(row.Name, row.Folder, row.Category);
                         row.Description = suggestion.Description;
                         row.KeywordsText = string.Join(", ", suggestion.Keywords);
                         row.Source = "ai-reviewed";
-                        row.Status = UiLanguage.T("Proposition IA — à vérifier", "AI suggestion — review required");
+                        row.Status = UiLanguage.Get("FamilySearchReviewWindow.xaml.AISuggestionReviewRequired");
                     }
                     catch (Exception ex)
                     {
                         errors++;
-                        row.Status = UiLanguage.T("Échec IA : ", "AI failure: ") + ShortMessage(ex.Message);
+                        row.Status = UiLanguage.Get("FamilySearchReviewWindow.xaml.AIFailure") + ShortMessage(ex.Message);
                     }
 
                     completed++;
@@ -120,8 +120,8 @@ namespace Famille
             {
                 SetBusy(false);
                 ProgressText.Text = _generationCts.IsCancellationRequested
-                    ? UiLanguage.T($"Analyse arrêtée après {completed} famille(s).", $"Analysis stopped after {completed} family/families.")
-                    : UiLanguage.T($"Analyse terminée : {completed - errors} proposition(s), {errors} échec(s).", $"Analysis complete: {completed - errors} suggestion(s), {errors} failure(s).");
+                    ? UiLanguage.Format("FamilySearchReviewWindow.xaml.AnalysisStoppedAfter0FamilyFamilies", (object)completed)
+                    : UiLanguage.Format("FamilySearchReviewWindow.xaml.AnalysisComplete0SuggestionS1FailureS", (object)(completed - errors), (object)(errors));
                 _generationCts.Dispose();
                 _generationCts = null;
                 UpdateSummary(keepProgressText: true);
@@ -132,7 +132,7 @@ namespace Famille
         {
             _generationCts?.Cancel();
             CancelButton.IsEnabled = false;
-            ProgressText.Text = UiLanguage.T("Arrêt demandé…", "Stop requested...");
+            ProgressText.Text = UiLanguage.Get("FamilySearchReviewWindow.xaml.StopRequested");
         }
 
         private void Save_Click(object sender, RoutedEventArgs e)
@@ -143,7 +143,7 @@ namespace Famille
             var dirty = _rows.Where(r => r.IsDirty).ToList();
             if (dirty.Count == 0)
             {
-                MessageBox.Show(this, UiLanguage.T("Aucune modification à enregistrer.", "There are no changes to save."), UiLanguage.T("Mots-clés", "Keywords"), MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(this, UiLanguage.Get("FamilySearchReviewWindow.xaml.ThereAreNoChangesToSave"), UiLanguage.Get("FamilySearchReviewWindow.xaml.Keywords"), MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
@@ -162,7 +162,7 @@ namespace Famille
                 if (!FamilySearchMetadataService.TrySave(
                     row.Path, metadata, row.ExpectedLastWriteUtc, out string error, out DateTime? newWriteUtc))
                 {
-                    row.Status = UiLanguage.T("Non enregistré", "Not saved");
+                    row.Status = UiLanguage.Get("FamilySearchReviewWindow.xaml.NotSaved");
                     errors.Add(row.Name + " : " + error);
                     continue;
                 }
@@ -174,13 +174,13 @@ namespace Famille
             }
 
             UpdateSummary();
-            string message = UiLanguage.T($"{saved} famille(s) enregistrée(s).", $"{saved} family/families saved.");
+            string message = UiLanguage.Format("FamilySearchReviewWindow.xaml.0FamilyFamiliesSaved", (object)saved);
             if (errors.Count > 0)
             {
-                message += UiLanguage.T($"\n\n{errors.Count} échec(s) :\n", $"\n\n{errors.Count} failure(s):\n") + string.Join("\n", errors.Take(8));
-                if (errors.Count > 8) message += UiLanguage.T($"\n… et {errors.Count - 8} autre(s).", $"\n… and {errors.Count - 8} more.");
+                message += UiLanguage.Format("FamilySearchReviewWindow.xaml.0FailureS", (object)errors.Count) + string.Join("\n", errors.Take(8));
+                if (errors.Count > 8) message += UiLanguage.Format("FamilySearchReviewWindow.xaml.And0More", (object)(errors.Count - 8));
             }
-            MessageBox.Show(this, message, UiLanguage.T("Mots-clés", "Keywords"), MessageBoxButton.OK,
+            MessageBox.Show(this, message, UiLanguage.Get("FamilySearchReviewWindow.xaml.Keywords"), MessageBoxButton.OK,
                 errors.Count == 0 ? MessageBoxImage.Information : MessageBoxImage.Warning);
         }
 
@@ -203,7 +203,7 @@ namespace Famille
         {
             if (_isBusy)
             {
-                MessageBox.Show(this, UiLanguage.T("Arrêtez d’abord l’analyse IA en cours.", "Stop the current AI analysis first."), UiLanguage.T("Mots-clés", "Keywords"), MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(this, UiLanguage.Get("FamilySearchReviewWindow.xaml.StopTheCurrentAIAnalysisFirst"), UiLanguage.Get("FamilySearchReviewWindow.xaml.Keywords"), MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
             Close();
@@ -215,7 +215,7 @@ namespace Famille
                 return;
 
             e.Cancel = true;
-            MessageBox.Show(this, UiLanguage.T("Arrêtez d’abord l’analyse IA en cours.", "Stop the current AI analysis first."), UiLanguage.T("Mots-clés", "Keywords"),
+            MessageBox.Show(this, UiLanguage.Get("FamilySearchReviewWindow.xaml.StopTheCurrentAIAnalysisFirst"), UiLanguage.Get("FamilySearchReviewWindow.xaml.Keywords"),
                 MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
@@ -234,14 +234,12 @@ namespace Famille
             int selected = _rows.Count(r => r.IsSelected);
             int enriched = _rows.Count(r => r.HasKeywords);
             int dirty = _rows.Count(r => r.IsDirty);
-            ProgressText.Text = UiLanguage.T(
-                $"{_rows.Count} familles — {selected} cochée(s) — {enriched} avec mots-clés — {dirty} modification(s) non enregistrée(s).",
-                $"{_rows.Count} families — {selected} selected — {enriched} with keywords — {dirty} unsaved change(s).");
+            ProgressText.Text = UiLanguage.Format("FamilySearchReviewWindow.xaml.0Families1Selected2WithKeywords3", (object)_rows.Count, (object)selected, (object)enriched, (object)dirty);
         }
 
         private static string ShortMessage(string message)
         {
-            message = (message ?? UiLanguage.T("Erreur inconnue", "Unknown error")).Replace('\r', ' ').Replace('\n', ' ').Trim();
+            message = (message ?? UiLanguage.Get("FamilySearchReviewWindow.xaml.UnknownError")).Replace('\r', ' ').Replace('\n', ' ').Trim();
             return message.Length <= 100 ? message : message.Substring(0, 100) + "…";
         }
     }
@@ -267,7 +265,7 @@ namespace Famille
             _keywordsText = string.Join(", ", metadata.Keywords);
             Source = metadata.Source;
             ExpectedLastWriteUtc = FamilySearchMetadataService.GetLastWriteUtc(entry.Path);
-            _status = metadata.Keywords.Count > 0 ? UiLanguage.T("Déjà renseignée", "Already filled in") : UiLanguage.T("À enrichir", "To be enriched");
+            _status = metadata.Keywords.Count > 0 ? UiLanguage.Get("FamilySearchReviewWindow.xaml.AlreadyFilledIn") : UiLanguage.Get("FamilySearchReviewWindow.xaml.ToBeEnriched");
             _initialized = true;
         }
 
@@ -317,7 +315,7 @@ namespace Famille
             ExpectedLastWriteUtc = newWriteUtc;
             Source = metadata.Source;
             IsDirty = false;
-            Status = UiLanguage.T("Enregistrée", "Saved");
+            Status = UiLanguage.Get("FamilySearchReviewWindow.xaml.Saved");
             OnPropertyChanged(nameof(IsDirty));
             OnPropertyChanged(nameof(HasKeywords));
         }
@@ -327,7 +325,7 @@ namespace Famille
             if (!_initialized) return;
             IsDirty = true;
             Source = "manual";
-            Status = UiLanguage.T("Modifiée — non enregistrée", "Modified — not saved");
+            Status = UiLanguage.Get("FamilySearchReviewWindow.xaml.ModifiedNotSaved");
             OnPropertyChanged(nameof(IsDirty));
         }
 

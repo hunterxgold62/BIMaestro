@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { Box3, Vector3 } from 'three';
+import { Box3, BoxGeometry, Mesh, Plane, Vector3 } from 'three';
 import { defaultSection, sectionContains, sectionPlane, sectionFromFace, sectionPlanes, faceSectionPlane } from './mep-section';
+
+import { MeshBVH } from 'three-mesh-bvh';
+import { appendSectionOutline } from './mep-section-outline';
 
 const bounds = new Box3(new Vector3(-20, 10, 5), new Vector3(40, 30, 15));
 describe('section plane', () => {
@@ -49,5 +52,49 @@ describe('section plane', () => {
         expect(sectionContains(plane, point)).toBe(false);
       }
     }
+  });
+});
+
+describe('section outline', () => {
+  it.each([false, true])('trims the intersections of transformed geometry against the other planes (BVH: %s)', useBvh => {
+    const mesh = new Mesh(new BoxGeometry(4, 2, 4));
+    mesh.position.set(6, 3, -4);
+    mesh.scale.set(2, 1, 1);
+    mesh.rotation.y = Math.PI / 2;
+    mesh.updateMatrixWorld();
+    if (useBvh) mesh.geometry.boundsTree = new MeshBVH(mesh.geometry);
+
+    const horizontal = new Plane(new Vector3(0, -1, 0), 3);
+    const vertical = new Plane(new Vector3(1, 0, 0), -6);
+    const positions: number[] = [];
+    appendSectionOutline(mesh, [horizontal, vertical], positions);
+
+    let horizontalLength = 0, verticalLength = 0;
+    for (let i = 0; i < positions.length; i += 6) {
+      const start = new Vector3().fromArray(positions, i);
+      const end = new Vector3().fromArray(positions, i + 3);
+      expect(sectionContains([horizontal, vertical], start)).toBe(true);
+      expect(sectionContains([horizontal, vertical], end)).toBe(true);
+      if (Math.abs(start.y - 3) < 1e-6 && Math.abs(end.y - 3) < 1e-6) horizontalLength += start.distanceTo(end);
+      else {
+        expect(start.x).toBeCloseTo(6);
+        expect(end.x).toBeCloseTo(6);
+        verticalLength += start.distanceTo(end);
+      }
+    }
+    expect(horizontalLength).toBeCloseTo(12);
+    expect(verticalLength).toBeCloseTo(10);
+  });
+
+  it('updates when the cut moves and omits triangles lying on the plane', () => {
+    const mesh = new Mesh(new BoxGeometry(2, 2, 2));
+    const top: number[] = [], middle: number[] = [], outside: number[] = [];
+    appendSectionOutline(mesh, [new Plane(new Vector3(0, -1, 0), 1)], top);
+    appendSectionOutline(mesh, [new Plane(new Vector3(0, -1, 0), 0)], middle);
+    appendSectionOutline(mesh, [new Plane(new Vector3(0, -1, 0), 2)], outside);
+    expect(top).toHaveLength(4 * 6);
+    expect(middle).toHaveLength(8 * 6);
+    expect(middle.filter((_, i) => i % 3 === 1).every(y => y === 0)).toBe(true);
+    expect(outside).toHaveLength(0);
   });
 });

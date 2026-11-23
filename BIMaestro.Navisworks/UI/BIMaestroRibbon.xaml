@@ -8,6 +8,8 @@
       <RibbonPanelSource x:Uid="BIMA_PANEL_SOURCE" Title="BIMaestro">
         <local:NWRibbonButton x:Uid="BIMA_LINK_BUTTON" Id="BIMA_MODIFY_LINKS"
           Text="Modifier les liens" ShowText="True" Size="Large" KeyTip="ML" />
+        <local:NWRibbonButton x:Uid="BIMA_WEB_BUTTON" Id="BIMA_PUBLISH_WEB"
+          Text="Publier sur le web" ShowText="True" Size="Large" KeyTip="PW" />
       </RibbonPanelSource>
     </RibbonPanel>
   </RibbonTab>

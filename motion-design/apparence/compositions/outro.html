@@ -1,0 +1,20 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 140px 300px 20px; gap: 28px; }
+    #ot-logo { width: 300px; height: 300px; border-radius: 64px; background: #fff; padding: 30px; object-fit: contain; }
+    #ot-name { color: #fff; font-weight: 900; font-size: 96px; letter-spacing: -0.04em; }
+    #ot-sub { color: #7FD6A6; font-weight: 700; font-size: 44px; max-width: 640px; text-align: center; }
+  </style>
+  <div id="root" data-composition-id="outro" data-width="1080" data-height="1920">
+    <img id="ot-logo" src="assets/logo.png" alt="BIMaestro" />
+    <div id="ot-name">BIMaestro</div>
+    <div id="ot-sub">Le plugin Revit qui bosse pour toi</div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#ot-logo", { scale: 0.3, rotation: 20, opacity: 0 }, { scale: 1, rotation: 0, opacity: 1, duration: 0.45, ease: "back.out(2)" }, 0);
+    tl.fromTo("#ot-name", { y: 60, opacity: 0 }, { y: 0, opacity: 1, duration: 0.3, ease: "power3.out" }, 0.2);
+    tl.fromTo("#ot-sub", { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.3, ease: "power3.out" }, 0.35);
+    window.__timelines["outro"] = tl;
+  </script>
+</template>

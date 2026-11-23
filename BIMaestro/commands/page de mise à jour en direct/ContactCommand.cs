@@ -29,7 +29,7 @@ namespace Page
             }
             catch (Exception ex)
             {
-                TaskDialog.Show(UiLanguage.T("BIMaestro - Contact", "BIMaestro - Contact"), UiLanguage.T($"Impossible d'ouvrir LinkedIn : {ex.Message}", $"Unable to open LinkedIn: {ex.Message}"));
+                TaskDialog.Show(UiLanguage.Get("ContactCommand.BIMaestroContact"), UiLanguage.Format("ContactCommand.UnableToOpenLinkedIn0", (object)ex.Message));
                 return Result.Failed;
             }
         }
@@ -56,7 +56,7 @@ namespace Page
             }
             catch (Exception ex)
             {
-                TaskDialog.Show(UiLanguage.T("BIMaestro - Soutenir", "BIMaestro - Support"), UiLanguage.T($"Impossible d'ouvrir la page Ko-fi : {ex.Message}", $"Unable to open the Ko-fi page: {ex.Message}"));
+                TaskDialog.Show(UiLanguage.Get("ContactCommand.BIMaestroSupport"), UiLanguage.Format("ContactCommand.UnableToOpenTheKoFiPage0", (object)ex.Message));
                 return Result.Failed;
             }
         }

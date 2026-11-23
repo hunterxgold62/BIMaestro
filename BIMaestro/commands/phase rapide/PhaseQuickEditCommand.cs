@@ -19,7 +19,7 @@ namespace Modification
             UIDocument uidoc = data.Application.ActiveUIDocument;
             if (uidoc == null)
             {
-                TaskDialog.Show(UiLanguage.T("Phases rapides", "Quick Phases"), UiLanguage.T("Aucun document Revit actif.", "No active Revit document."));
+                TaskDialog.Show(UiLanguage.Get("PhaseQuickEditCommand.QuickPhases"), UiLanguage.Get("PhaseQuickEditCommand.NoActiveRevitDocument"));
                 return Result.Failed;
             }
 
@@ -27,14 +27,14 @@ namespace Modification
             ICollection<ElementId> selectedIds = uidoc.Selection.GetElementIds();
             if (selectedIds == null || selectedIds.Count == 0)
             {
-                TaskDialog.Show(UiLanguage.T("Phases rapides", "Quick Phases"), UiLanguage.T("Selectionne d'abord les objets a modifier.", "Select the objects to modify first."));
+                TaskDialog.Show(UiLanguage.Get("PhaseQuickEditCommand.QuickPhases"), UiLanguage.Get("PhaseQuickEditCommand.SelectTheObjectsToModifyFirst"));
                 return Result.Cancelled;
             }
 
             List<Phase> phases = doc.Phases.Cast<Phase>().ToList();
             if (phases.Count == 0)
             {
-                TaskDialog.Show(UiLanguage.T("Phases rapides", "Quick Phases"), UiLanguage.T("Aucune phase n'a ete trouvee dans ce projet.", "No phases were found in this project."));
+                TaskDialog.Show(UiLanguage.Get("PhaseQuickEditCommand.QuickPhases"), UiLanguage.Get("PhaseQuickEditCommand.NoPhasesWereFoundInThisProject"));
                 return Result.Failed;
             }
 
@@ -45,7 +45,7 @@ namespace Modification
 
             if (!window.ChangeCreatedPhase && !window.ChangeDemolishedPhase)
             {
-                TaskDialog.Show(UiLanguage.T("Phases rapides", "Quick Phases"), UiLanguage.T("Choisis au moins une phase a modifier.", "Choose at least one phase to modify."));
+                TaskDialog.Show(UiLanguage.Get("PhaseQuickEditCommand.QuickPhases"), UiLanguage.Get("PhaseQuickEditCommand.ChooseAtLeastOnePhaseToModify"));
                 return Result.Cancelled;
             }
 
@@ -92,7 +92,7 @@ namespace Modification
             }
 
             TaskDialog.Show(
-                UiLanguage.T("Phases rapides", "Quick Phases"),
+                UiLanguage.Get("PhaseQuickEditCommand.QuickPhases"),
                 UiLanguage.T(
                     "Modification terminee.\n\n" +
                     $"Objets modifies : {updated}\n" +

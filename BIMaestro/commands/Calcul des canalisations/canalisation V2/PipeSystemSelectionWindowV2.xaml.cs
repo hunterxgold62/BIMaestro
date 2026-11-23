@@ -46,7 +46,7 @@ namespace Analyse
             catch (System.Exception ex)
             {
                 MessageBox.Show(
-                    UiLanguage.T($"Impossible d’ouvrir la page d’aide : {ex.Message}", $"Unable to open the help page: {ex.Message}"),
+                    UiLanguage.Format("PipeSystemSelectionWindowV2.xaml.UnableToOpenTheHelpPage0", (object)ex.Message),
                     "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
@@ -106,8 +106,8 @@ namespace Analyse
                 if (SelectedSystemTypes.Count == 0)
                 {
                     MessageBox.Show(
-                        UiLanguage.T("Veuillez sélectionner au moins un Type de système.", "Select at least one system type."),
-                        UiLanguage.T("Avertissement", "Warning"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                        UiLanguage.Get("PipeSystemSelectionWindowV2.xaml.SelectAtLeastOneSystemType"),
+                        UiLanguage.Get("PipeSystemSelectionWindowV2.xaml.Warning"), MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
             }

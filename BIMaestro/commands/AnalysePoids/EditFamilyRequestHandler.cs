@@ -48,7 +48,7 @@ namespace Analyse
                     .ToList();
                 if (idsToDelete == null || idsToDelete.Count == 0)
                 {
-                    TaskDialog.Show(UiLanguage.T("Suppression", "Deletion"), UiLanguage.T("Aucun élément à supprimer n'a été fourni.", "No element was provided for deletion."));
+                    TaskDialog.Show(UiLanguage.Get("EditFamilyRequestHandler.Deletion"), UiLanguage.Get("EditFamilyRequestHandler.NoElementWasProvidedForDeletion"));
                     return;
                 }
 
@@ -62,7 +62,7 @@ namespace Analyse
             }
             catch (Exception ex)
             {
-                TaskDialog.Show(UiLanguage.T("Suppression", "Deletion"), UiLanguage.T($"Erreur lors de la suppression : {ex.Message}", $"Error while deleting: {ex.Message}"));
+                TaskDialog.Show(UiLanguage.Get("EditFamilyRequestHandler.Deletion"), UiLanguage.Format("EditFamilyRequestHandler.ErrorWhileDeleting0", (object)ex.Message));
             }
             finally
             {

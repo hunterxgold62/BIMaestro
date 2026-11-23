@@ -50,7 +50,7 @@ namespace BIMaestro.PropertiesAppearance
                 UIElement right = i < after.Count ? PreviewCell(after[i], true) : new Border();
                 var pair = Pair(left, right); pair.Margin = new Thickness(0, 0, 3, 3); _rows.Children.Add(pair);
             }
-            if (before.Count == 0) _rows.Children.Add(Label(_context.PreviewRows.Count == 0 ? UiLanguage.T("Ouvrez un projet et affichez la palette Propriétés, puis cliquez sur « Changer de sélection ».", "Open a project and display the Properties palette, then click “Change selection”.") : UiLanguage.T("Aucune propriété ne correspond à cette recherche.", "No property matches this search."), 14, false, true));
+            if (before.Count == 0) _rows.Children.Add(Label(_context.PreviewRows.Count == 0 ? UiLanguage.Get("PropertiesAppearanceWindow.Order.OpenAProjectAndDisplayThePropertiesPalette") : UiLanguage.Get("PropertiesAppearanceWindow.Order.NoPropertyMatchesThisSearch"), 14, false, true));
         }
         private void EnableDragging(Button button, PropertyPreviewRow row)
         {
@@ -71,7 +71,7 @@ namespace BIMaestro.PropertiesAppearance
                 bool valid = CanMove(source, row);
                 e.Effects = valid ? DragDropEffects.Move : DragDropEffects.None; e.Handled = true;
                 ClearDropIndicator();
-                if (!valid) { if (source != null && !source.Header && source.GroupKey != row.GroupKey) Notify(UiLanguage.T("Déposez un paramètre modifiable dans un groupe personnalisé, ou dans son groupe Revit d’origine.", "Drop an editable parameter into a custom group, or into its original Revit group.")); return; }
+                if (!valid) { if (source != null && !source.Header && source.GroupKey != row.GroupKey) Notify(UiLanguage.Get("PropertiesAppearanceWindow.Order.DropAnEditableParameterIntoACustomGroup")); return; }
                 bool after = e.GetPosition(button).Y > button.ActualHeight / 2;
                 _dropIndicator = button; _previousDropBrush = button.BorderBrush; _previousDropThickness = button.BorderThickness;
                 button.BorderBrush = Brush("#19A36E"); button.BorderThickness = after ? new Thickness(1, 1, 1, 4) : new Thickness(1, 4, 1, 1);
@@ -124,12 +124,12 @@ namespace BIMaestro.PropertiesAppearance
             if (index < 0) return; keys.Insert(Math.Min(index, keys.Count), sourceKey);
             if (source.Header) _profile.Layout.Groups = keys; else _profile.Layout.Parameters[source.GroupKey] = keys;
             _loading = true; _enabled.IsChecked = true; _loading = false; _selected = source; Changed(); LoadColors();
-            Notify((source.Header ? UiLanguage.T("Groupe déplacé avec ses paramètres.", "Group moved with its parameters.") : UiLanguage.T("Paramètre déplacé dans son groupe.", "Parameter moved within its group.")) + UiLanguage.T(" Enregistrez pour conserver cet ordre.", " Save to keep this order."));
+            Notify((source.Header ? UiLanguage.Get("PropertiesAppearanceWindow.Order.GroupMovedWithItsParameters") : UiLanguage.Get("PropertiesAppearanceWindow.Order.ParameterMovedWithinItsGroup")) + UiLanguage.Get("PropertiesAppearanceWindow.Order.SaveToKeepThisOrder"));
         }
         private void ResetOrder()
         {
             if (_profile == null) return; var custom=_profile.Layout.CustomGroups;_profile.Layout = new AppearanceLayout{CustomGroups=custom}; Changed();
-            Notify(UiLanguage.T("Ordre personnalisé retiré pour cette portée. Un ordre plus général peut rester applicable.", "Custom order removed for this scope. A more general order may still apply."));
+            Notify(UiLanguage.Get("PropertiesAppearanceWindow.Order.CustomOrderRemovedForThisScopeAMore"));
         }
     }
 }

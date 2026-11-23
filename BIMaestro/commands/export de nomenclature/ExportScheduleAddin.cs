@@ -34,7 +34,7 @@ namespace Visualisation
                 // 1) Vérifier qu'on est sur une nomenclature
                 if (doc.ActiveView is not ViewSchedule schedule)
                 {
-                    TaskDialog.Show(UiLanguage.T("Erreur", "Error"), UiLanguage.T("Activez une vue de nomenclature avant de lancer l'export.", "Activate a schedule view before starting the export."));
+                    TaskDialog.Show(UiLanguage.Get("ExportScheduleAddin.Error"), UiLanguage.Get("ExportScheduleAddin.ActivateAScheduleViewBeforeStartingTheExport"));
                     return Result.Failed;
                 }
 
@@ -56,10 +56,10 @@ namespace Visualisation
                 string fileBaseName = SanitizeFileNamePart($"{projectName}_{scheduleName}");
 
                 // 4) Choix du format
-                TaskDialog dlg = new TaskDialog(UiLanguage.T("Type d'export", "Export Type"))
+                TaskDialog dlg = new TaskDialog(UiLanguage.Get("ExportScheduleAddin.ExportType"))
                 {
-                    MainInstruction = UiLanguage.T("Choisissez le format d'export de la nomenclature :", "Choose the schedule export format:"),
-                    MainContent = UiLanguage.T($"Projet : {projectName}\nNomenclature : {scheduleName}", $"Project: {projectName}\nSchedule: {scheduleName}"),
+                    MainInstruction = UiLanguage.Get("ExportScheduleAddin.ChooseTheScheduleExportFormat"),
+                    MainContent = UiLanguage.Format("ExportScheduleAddin.Project0Schedule1", (object)projectName, (object)scheduleName),
                     CommonButtons = TaskDialogCommonButtons.Close
                 };
                 dlg.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, "Excel");
@@ -91,13 +91,13 @@ namespace Visualisation
             }
             catch (COMException comEx)
             {
-                TaskDialog.Show(UiLanguage.T("Excel/COM", "Excel/COM"), UiLanguage.T($"Erreur COM: {comEx.Message}", $"COM error: {comEx.Message}"));
+                TaskDialog.Show(UiLanguage.Get("ExportScheduleAddin.ExcelCOM"), UiLanguage.Format("ExportScheduleAddin.COMError0", (object)comEx.Message));
                 message = comEx.Message;
                 return Result.Failed;
             }
             catch (Exception ex)
             {
-                TaskDialog.Show(UiLanguage.T("Erreur", "Error"), ex.ToString());
+                TaskDialog.Show(UiLanguage.Get("ExportScheduleAddin.Error"), ex.ToString());
                 message = ex.Message;
                 return Result.Failed;
             }
@@ -230,14 +230,14 @@ namespace Visualisation
 
         private void AskAndOpen(string filePath, string formatLabel)
         {
-            TaskDialog td = new TaskDialog(UiLanguage.T("Export terminé", "Export Completed"))
+            TaskDialog td = new TaskDialog(UiLanguage.Get("ExportScheduleAddin.ExportCompleted"))
             {
-                MainInstruction = UiLanguage.T($"La nomenclature a bien été exportée en {formatLabel}.", $"The schedule was successfully exported as {formatLabel}."),
-                MainContent = UiLanguage.T($"Chemin :{Environment.NewLine}{filePath}", $"Path:{Environment.NewLine}{filePath}"),
+                MainInstruction = UiLanguage.Format("ExportScheduleAddin.TheScheduleWasSuccessfullyExportedAs0", (object)formatLabel),
+                MainContent = UiLanguage.Format("ExportScheduleAddin.Path01", (object)Environment.NewLine, (object)filePath),
                 CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No,
                 DefaultButton = TaskDialogResult.Yes
             };
-            td.MainInstruction += UiLanguage.T("\n\nOuvrir le fichier ?", "\n\nOpen the file?");
+            td.MainInstruction += UiLanguage.Get("ExportScheduleAddin.OpenTheFile");
             if (td.Show() == TaskDialogResult.Yes)
             {
                 Process.Start(new ProcessStartInfo(filePath) { UseShellExecute = true });

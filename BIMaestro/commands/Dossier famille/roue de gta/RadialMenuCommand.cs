@@ -142,9 +142,7 @@ namespace BIMaestro.UI
                 {
                     Items = BuildItems(tutorialPaths).ToList(),
                     IsCollectionMode = false,
-                    PageLabelFactory = (index, count) => UiLanguage.T(
-                        $"Récents démo ({index + 1}/{count})",
-                        $"Demo recent ({index + 1}/{count})")
+                    PageLabelFactory = (index, count) => UiLanguage.Format("RadialMenuCommand.DemoRecent01", (object)(index + 1), (object)(count))
                 };
             }
             var usage = FamilyUsageManager.Load();
@@ -183,9 +181,9 @@ namespace BIMaestro.UI
                 PageLabelFactory = (index, count) => index switch
                 {
                     0 => "Top-8",
-                    1 => UiLanguage.T("Récents (1/2)", "Recent (1/2)"),
-                    2 => UiLanguage.T("Récents (2/2)", "Recent (2/2)"),
-                    _ => UiLanguage.T($"Page {index + 1}/{count}", $"Page {index + 1}/{count}"),
+                    1 => UiLanguage.Get("RadialMenuCommand.Recent12"),
+                    2 => UiLanguage.Get("RadialMenuCommand.Recent22"),
+                    _ => UiLanguage.Format("RadialMenuCommand.Page01", (object)(index + 1), (object)(count)),
                 }
             };
         }
@@ -233,7 +231,7 @@ namespace BIMaestro.UI
                 }
 
                 if (string.IsNullOrEmpty(displayName))
-                    return UiLanguage.T($"Page {index + 1}/{count}", $"Page {index + 1}/{count}");
+                    return UiLanguage.Format("RadialMenuCommand.Page01", (object)(index + 1), (object)(count));
 
                 return $"{displayName}({index + 1}/{count})";
             };

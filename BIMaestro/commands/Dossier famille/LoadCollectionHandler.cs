@@ -45,9 +45,7 @@ namespace Famille
             Licensing.OperationTelemetry.Track("FamilyBrowserCommand", "Navigateur de familles", "load_collection", false,
                 new Dictionary<string, int> { ["families_loaded"] = ok,
                     ["families_unchanged"] = unchanged, ["items_failed"] = fail });
-            TaskDialog.Show("Collections", UiLanguage.T(
-                $"Familles chargées : {ok}\nFamilles inchangées : {unchanged}\nÉchecs : {fail}",
-                $"Families loaded: {ok}\nUnchanged families: {unchanged}\nFailures: {fail}"));
+            TaskDialog.Show("Collections", UiLanguage.Format("LoadCollectionHandler.FamiliesLoaded0UnchangedFamilies1Failures2", (object)ok, (object)unchanged, (object)fail));
         }
 
         public string GetName() => "LoadCollectionHandler";

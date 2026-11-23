@@ -102,7 +102,7 @@ namespace BIMaestro.ViewHover
             close.SetValue(Control.BorderThicknessProperty, new Thickness(0));
             close.SetValue(Control.ForegroundProperty, Brushes.Black);
             close.SetValue(UIElement.FocusableProperty, false);
-            close.SetValue(FrameworkElement.ToolTipProperty, UiLanguage.T("Fermer la vue", "Close view"));
+            close.SetValue(FrameworkElement.ToolTipProperty, UiLanguage.Get("ViewDeckTabDecorator.CloseView"));
             close.SetBinding(UIElement.IsEnabledProperty, new Binding("CanClose") { FallbackValue = false });
             close.AddHandler(Button.ClickEvent, new RoutedEventHandler(OnClose));
             var label = new FrameworkElementFactory(typeof(TextBlock), "ViewDeckTitle");
@@ -170,8 +170,8 @@ namespace BIMaestro.ViewHover
             catch (Exception ex)
             {
                 System.Diagnostics.Trace.WriteLine("BIMaestro ViewDeck close: " + ex);
-                MessageBox.Show(UiLanguage.T("Revit n'a pas pu fermer cette vue. Utilisez sa commande de fermeture native.", "Revit could not close this view. Use Revit's native close command."),
-                    UiLanguage.T("BIMaestro - Onglets", "BIMaestro - Tabs"), MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(UiLanguage.Get("ViewDeckTabDecorator.RevitCouldNotCloseThisViewUseRevit"),
+                    UiLanguage.Get("ViewDeckTabDecorator.BIMaestroTabs"), MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
 

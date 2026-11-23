@@ -57,15 +57,15 @@ namespace Modification
 
             if (finalList.Count == 0)
             {
-                TaskDialog.Show(UiLanguage.T("Supprimer nomenclatures inutilisées", "Delete Unused Schedules"),
-                    UiLanguage.T("Aucune nomenclature non placée à supprimer.", "No unplaced schedule was found to delete."));
+                TaskDialog.Show(UiLanguage.Get("DeleteUnusedSchedulesCommand.DeleteUnusedSchedules"),
+                    UiLanguage.Get("DeleteUnusedSchedulesCommand.NoUnplacedScheduleWasFoundToDelete"));
                 return Result.Succeeded;
             }
 
             // 6) Confirmation utilisateur
-            var dlg = new TaskDialog(UiLanguage.T("Supprimer nomenclatures inutilisées", "Delete Unused Schedules"))
+            var dlg = new TaskDialog(UiLanguage.Get("DeleteUnusedSchedulesCommand.DeleteUnusedSchedules"))
             {
-                MainInstruction = UiLanguage.T($"Vous allez supprimer {finalList.Count} nomenclature(s) non placée(s).", $"You are about to delete {finalList.Count} unplaced schedule(s)."),
+                MainInstruction = UiLanguage.Format("DeleteUnusedSchedulesCommand.YouAreAboutToDelete0UnplacedSchedule", (object)finalList.Count),
                 CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No
             };
             if (dlg.Show() != TaskDialogResult.Yes)
@@ -111,11 +111,8 @@ namespace Modification
                 tx.Commit();
             }
 
-            TaskDialog.Show(UiLanguage.T("Supprimer nomenclatures inutilisées", "Delete Unused Schedules"),
-                UiLanguage.T($"{deletedCount} nomenclature(s) supprimée(s)." +
-                             (skippedCount > 0 ? $"\n{skippedCount} nomenclature(s) ignorée(s) par sécurité." : string.Empty),
-                             $"{deletedCount} schedule(s) deleted." +
-                             (skippedCount > 0 ? $"\n{skippedCount} schedule(s) skipped for safety." : string.Empty)));
+            TaskDialog.Show(UiLanguage.Get("DeleteUnusedSchedulesCommand.DeleteUnusedSchedules"),
+                UiLanguage.Format("DeleteUnusedSchedulesCommand.Deleted", deletedCount) + (skippedCount > 0 ? UiLanguage.Format("DeleteUnusedSchedulesCommand.Skipped", skippedCount) : string.Empty));
             return Result.Succeeded;
         }
 

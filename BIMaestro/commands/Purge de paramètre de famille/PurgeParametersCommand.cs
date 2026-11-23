@@ -28,7 +28,7 @@ namespace Famille
 
             if (!doc.IsFamilyDocument)
             {
-                TaskDialog.Show(UiLanguage.T("Erreur", "Error"), UiLanguage.T("Ce plugin doit être exécuté dans l'éditeur de familles.", "This plugin must be run in the Family Editor."));
+                TaskDialog.Show(UiLanguage.Get("PurgeParametersCommand.Error"), UiLanguage.Get("PurgeParametersCommand.ThisPluginMustBeRunInTheFamily"));
                 return Result.Cancelled;
             }
 
@@ -85,7 +85,7 @@ namespace Famille
 
             if (candidates.Count == 0)
             {
-                TaskDialog.Show(UiLanguage.T("Information", "Information"), UiLanguage.T("Aucun paramètre supprimable n'a été trouvé.", "No removable parameter was found."));
+                TaskDialog.Show(UiLanguage.Get("PurgeParametersCommand.Information"), UiLanguage.Get("PurgeParametersCommand.NoRemovableParameterWasFound"));
                 return Result.Succeeded;
             }
 
@@ -105,7 +105,7 @@ namespace Famille
 
             if (toRemove.Count == 0)
             {
-                TaskDialog.Show(UiLanguage.T("Information", "Information"), UiLanguage.T("Aucun paramètre sélectionné pour la suppression.", "No parameter was selected for deletion."));
+                TaskDialog.Show(UiLanguage.Get("PurgeParametersCommand.Information"), UiLanguage.Get("PurgeParametersCommand.NoParameterWasSelectedForDeletion"));
                 return Result.Succeeded;
             }
 
@@ -117,7 +117,7 @@ namespace Famille
             }
             catch (Exception ex)
             {
-                TaskDialog.Show(UiLanguage.T("Erreur", "Error"), UiLanguage.T($"Impossible de sauvegarder la famille : {ex.Message}", $"Unable to save the family: {ex.Message}"));
+                TaskDialog.Show(UiLanguage.Get("PurgeParametersCommand.Error"), UiLanguage.Format("PurgeParametersCommand.UnableToSaveTheFamily0", (object)ex.Message));
                 return Result.Cancelled;
             }
 
@@ -139,11 +139,11 @@ namespace Famille
             }
 
             removedNames.Sort();
-            string resultMsg = UiLanguage.T($"Nombre total de paramètres supprimés : {removedNames.Count}", $"Total parameters deleted: {removedNames.Count}");
+            string resultMsg = UiLanguage.Format("PurgeParametersCommand.TotalParametersDeleted0", (object)removedNames.Count);
             if (removedNames.Count > 0)
-                resultMsg += UiLanguage.T("\n\nParamètres supprimés :\n", "\n\nDeleted parameters:\n") + string.Join("\n", removedNames);
+                resultMsg += UiLanguage.Get("PurgeParametersCommand.DeletedParameters") + string.Join("\n", removedNames);
 
-            TaskDialog.Show(UiLanguage.T("Résultat", "Result"), resultMsg);
+            TaskDialog.Show(UiLanguage.Get("PurgeParametersCommand.Result"), resultMsg);
             return Result.Succeeded;
         }
 

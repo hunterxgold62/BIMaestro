@@ -2096,6 +2096,18 @@ namespace Couleur
             }
         }
 
+#if BIMAESTRO_DEMO
+        // Build de test uniquement : force la relecture du fichier.
+        internal static void DemoInvalidate()
+        {
+            lock (RibbonColorPreferences.PreferenceSyncRoot)
+            {
+                _cached = null;
+                _projectOverride = null;
+            }
+        }
+#endif
+
         internal static void SetProjectOverride(
             ProjectBrowserColorSettings settings)
         {

@@ -1,0 +1,6 @@
+1.02	Revit de base
+6.04	Architecte
+11.04	Structure
+16.06	Plomberie & CVC
+21.05	Électricité
+26.06	BIM manager

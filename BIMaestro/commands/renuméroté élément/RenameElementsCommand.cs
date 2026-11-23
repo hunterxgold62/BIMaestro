@@ -28,7 +28,7 @@ namespace Modification
             ICollection<ElementId> selectedIds = uiDoc.Selection.GetElementIds();
             if (selectedIds.Count == 0)
             {
-                TaskDialog.Show(UiLanguage.T("Sélection", "Selection"), UiLanguage.T("Aucun élément sélectionné. Veuillez sélectionner des éléments dans Revit.", "No Element Selected. Select Elements in Revit."));
+                TaskDialog.Show(UiLanguage.Get("RenameElementsCommand.Selection"), UiLanguage.Get("RenameElementsCommand.NoElementSelectedSelectElementsInRevit"));
                 return Result.Cancelled;
             }
 
@@ -39,7 +39,7 @@ namespace Modification
             if (selectedElements.Any(element => element is ViewSheet) &&
                 !selectedElements.All(element => element is ViewSheet))
             {
-                TaskDialog.Show(UiLanguage.T("Sélection", "Selection"), UiLanguage.T("Sélectionne uniquement des feuilles pour les renuméroter.", "Select only sheets to renumber them."));
+                TaskDialog.Show(UiLanguage.Get("RenameElementsCommand.Selection"), UiLanguage.Get("RenameElementsCommand.SelectOnlySheetsToRenumberThem"));
                 return Result.Cancelled;
             }
             int viewportCount = selectedElements.Count(element => element is Viewport);
@@ -49,8 +49,8 @@ namespace Modification
                 if (viewportCount != selectedElements.Count)
                 {
                     TaskDialog.Show(
-                        UiLanguage.T("Sélection incompatible", "Incompatible Selection"),
-                        UiLanguage.T("La sélection mélange des fenêtres de vue et d'autres éléments.\n\nSélectionnez uniquement les fenêtres de vue à numéroter.", "The Selection Mixes Viewports and Other Elements.\n\nSelect Only the Viewports to Number."));
+                        UiLanguage.Get("RenameElementsCommand.IncompatibleSelection"),
+                        UiLanguage.Get("RenameElementsCommand.TheSelectionMixesViewportsAndOtherElementsSelect"));
                     return Result.Cancelled;
                 }
 
@@ -63,7 +63,7 @@ namespace Modification
 
             if (!textParameters.Any())
             {
-                TaskDialog.Show(UiLanguage.T("Erreur", "Error"), UiLanguage.T("Aucun paramètre texte modifiable trouvé sur les éléments sélectionnés.", "No Editable Text Parameter Found on the Selected Elements."));
+                TaskDialog.Show(UiLanguage.Get("RenameElementsCommand.Error"), UiLanguage.Get("RenameElementsCommand.NoEditableTextParameterFoundOnTheSelected"));
                 return Result.Failed;
             }
 
@@ -88,7 +88,7 @@ namespace Modification
                 string selectedParameter = renamerWindow.SelectedParameter;
                 var valuesBefore = SnapshotTextValues(doc, selectedIds, selectedParameter);
 
-                using (Transaction tx = new Transaction(doc, UiLanguage.T("Mettre à jour ou réinitialiser les éléments", "Update or reset elements")))
+                using (Transaction tx = new Transaction(doc, UiLanguage.Get("RenameElementsCommand.UpdateOrResetElements")))
                 {
                     try
                     {
@@ -125,7 +125,7 @@ namespace Modification
                             {
                                 if (!int.TryParse(renamerWindow.StartNumber, out currentNumber))
                                 {
-                                    TaskDialog.Show(UiLanguage.T("Erreur", "Error"), UiLanguage.T("Le numéro de départ doit être un nombre entier pour le format sélectionné.", "The Starting Number Must Be an Integer for the Selected Format."));
+                                    TaskDialog.Show(UiLanguage.Get("RenameElementsCommand.Error"), UiLanguage.Get("RenameElementsCommand.TheStartingNumberMustBeAnIntegerFor"));
                                     tx.RollBack();
                                     return Result.Failed;
                                 }
@@ -135,7 +135,7 @@ namespace Modification
                                 currentNumber = LettersToNumber(renamerWindow.StartNumber.ToUpper());
                                 if (currentNumber == -1)
                                 {
-                                    TaskDialog.Show(UiLanguage.T("Erreur", "Error"), UiLanguage.T("Le numéro de départ doit être une lettre (A-Z) ou une séquence alphabétique valide pour le format alphabétique.", "The Starting Number Must Be a Letter (A-Z) or a Valid Alphabetic Sequence."));
+                                    TaskDialog.Show(UiLanguage.Get("RenameElementsCommand.Error"), UiLanguage.Get("RenameElementsCommand.TheStartingNumberMustBeALetterA"));
                                     tx.RollBack();
                                     return Result.Failed;
                                 }
@@ -155,7 +155,7 @@ namespace Modification
                             var sheets = selectedElements.OfType<ViewSheet>().ToList();
                             bool renumberSheets = sheets.Count == selectedElements.Count;
                             if (renumberSheets && renamerWindow.IsSortByLevelEnabled)
-                                throw new InvalidOperationException(UiLanguage.T("Décoche Trier par niveau pour renuméroter des feuilles.", "Uncheck Sort by level to renumber sheets."));
+                                throw new InvalidOperationException(UiLanguage.Get("RenameElementsCommand.UncheckSortByLevelToRenumberSheets"));
                             // Obtenir les éléments avec leurs positions transformées selon la vue active
                             var elementLocations = GetElementsWithLocations(doc, selectedIds, uiDoc.ActiveView);
 
@@ -173,7 +173,7 @@ namespace Modification
                                 // Vérifier si tous les éléments ont un paramètre de niveau
                                 if (!AllElementsHaveLevel(elementLocations))
                                 {
-                                    TaskDialog.Show(UiLanguage.T("Erreur", "Error"), UiLanguage.T("Tous les éléments n'ont pas de paramètre 'Niveau'. Le tri par niveau n'est pas possible pour ces éléments. Veuillez trier niveau par niveau.", "Not All Elements Have a 'Level' Parameter. These Elements Cannot Be Sorted by Level; Process One Level at a Time."));
+                                    TaskDialog.Show(UiLanguage.Get("RenameElementsCommand.Error"), UiLanguage.Get("RenameElementsCommand.NotAllElementsHaveALevelParameterThese"));
                                     tx.RollBack();
                                     return Result.Failed;
                                 }
@@ -192,11 +192,11 @@ namespace Modification
                                 var targets = Enumerable.Range(0, sheets.Count).Select(index => prefix +
                                     (currentNumber + index).ToString(renamerWindow.SelectedNumberFormat == "001,002,003..." ? "D3" :
                                         renamerWindow.SelectedNumberFormat == "0001,0002,0003..." ? "D4" : "D") + suffix).ToList();
-                                if (!isNumeric) throw new InvalidOperationException(UiLanguage.T("Pour les numéros de feuilles, choisis un format numérique.", "For sheet numbers, choose a numeric format."));
+                                if (!isNumeric) throw new InvalidOperationException(UiLanguage.Get("RenameElementsCommand.ForSheetNumbersChooseANumericFormat"));
                                 var selectedSet = new HashSet<ElementId>(selectedIds);
                                 if (new FilteredElementCollector(doc).OfClass(typeof(ViewSheet)).Cast<ViewSheet>()
                                     .Any(sheet => !selectedSet.Contains(sheet.Id) && targets.Contains(sheet.SheetNumber)))
-                                    throw new InvalidOperationException(UiLanguage.T("Un numéro demandé appartient déjà à une feuille hors sélection.", "A requested number is already used by a sheet outside the selection."));
+                                    throw new InvalidOperationException(UiLanguage.Get("RenameElementsCommand.ARequestedNumberIsAlreadyUsedByA"));
                                 // Temporary unique values allow overlapping source/target sequences.
                                 foreach (ViewSheet sheet in sheets) sheet.SheetNumber = "BIMaestro-" + Guid.NewGuid().ToString("N");
                             }
@@ -243,7 +243,7 @@ namespace Modification
                     catch (Exception ex)
                     {
                         if (tx.GetStatus() == TransactionStatus.Started) tx.RollBack();
-                        TaskDialog.Show(UiLanguage.T("Erreur", "Error"), UiLanguage.T("Une erreur est survenue : ", "An Error Occurred: ") + ex.Message);
+                        TaskDialog.Show(UiLanguage.Get("RenameElementsCommand.Error"), UiLanguage.Get("RenameElementsCommand.AnErrorOccurred") + ex.Message);
                         return Result.Failed;
                     }
                 }
@@ -284,8 +284,8 @@ namespace Modification
             if (activeSheet == null)
             {
                 TaskDialog.Show(
-                    UiLanguage.T("Feuille requise", "Sheet required"),
-                    UiLanguage.T("Pour numéroter des fenêtres de vue, ouvrez leur feuille puis relancez Organisateur.", "To Number Viewports, Open Their Sheet and Run Organizer Again."));
+                    UiLanguage.Get("RenameElementsCommand.SheetRequired"),
+                    UiLanguage.Get("RenameElementsCommand.ToNumberViewportsOpenTheirSheetAndRun"));
                 return Result.Cancelled;
             }
 
@@ -294,8 +294,8 @@ namespace Modification
             if (selectedViewports.Any(viewport => !viewportIdsOnSheet.Contains(viewport.Id.GetIdLongValue())))
             {
                 TaskDialog.Show(
-                    UiLanguage.T("Sélection incompatible", "Incompatible Selection"),
-                    UiLanguage.T("Toutes les fenêtres de vue sélectionnées doivent appartenir à la feuille active.", "All Selected Viewports Must Belong to the Active Sheet."));
+                    UiLanguage.Get("RenameElementsCommand.IncompatibleSelection"),
+                    UiLanguage.Get("RenameElementsCommand.AllSelectedViewportsMustBelongToTheActive"));
                 return Result.Cancelled;
             }
 
@@ -331,12 +331,12 @@ namespace Modification
                 out List<string> desiredValues,
                 out string validationError))
             {
-                TaskDialog.Show(UiLanguage.T("Erreur", "Error"), UiLanguage.T(validationError));
+                TaskDialog.Show(UiLanguage.Get("RenameElementsCommand.Error"), UiLanguage.T(validationError));
                 return Result.Failed;
             }
 
             var viewportValuesBefore = SnapshotViewportValues(doc, sortedViewports, renamerWindow.SelectedParameter);
-            using (var transaction = new Transaction(doc, UiLanguage.T("Organiser les fenêtres de vue", "Organize viewports")))
+            using (var transaction = new Transaction(doc, UiLanguage.Get("RenameElementsCommand.OrganizeViewports")))
             {
                 try
                 {
@@ -370,8 +370,8 @@ namespace Modification
                     }
 
                     TaskDialog.Show(
-                        UiLanguage.T("Organisateur", "Organizer"),
-                        UiLanguage.T("La numérotation des fenêtres de vue n'a pas pu être appliquée.\n\n", "Viewport numbering could not be applied.\n\n") +
+                        UiLanguage.Get("RenameElementsCommand.Organizer"),
+                        UiLanguage.Get("RenameElementsCommand.ViewportNumberingCouldNotBeApplied") +
                         ex.Message);
                     return Result.Failed;
                 }
@@ -515,13 +515,13 @@ namespace Modification
                 currentNumber = LettersToNumber((renamerWindow.StartNumber ?? string.Empty).ToUpperInvariant());
                 if (currentNumber < 1)
                 {
-                    error = UiLanguage.T("Le numéro de départ doit être une lettre ou une séquence alphabétique valide.", "The Starting Number Must Be a Letter or a Valid Alphabetic Sequence.");
+                    error = UiLanguage.Get("RenameElementsCommand.TheStartingNumberMustBeALetterOr");
                     return false;
                 }
             }
             else if (!int.TryParse(renamerWindow.StartNumber, out currentNumber))
             {
-                error = UiLanguage.T("Le numéro de départ doit être un nombre entier.", "The Starting Number Must Be an Integer.");
+                error = UiLanguage.Get("RenameElementsCommand.TheStartingNumberMustBeAnInteger");
                 return false;
             }
 
@@ -578,7 +578,7 @@ namespace Modification
             if (conflicts.Count > 0)
             {
                 throw new InvalidOperationException(
-                    UiLanguage.T("Ces numéros sont déjà utilisés par d'autres fenêtres de la feuille : ", "These Numbers Are Already Used by Other Viewports on the Sheet: ") +
+                    UiLanguage.Get("RenameElementsCommand.TheseNumbersAreAlreadyUsedByOtherViewports") +
                     string.Join(", ", conflicts) + ".");
             }
 
@@ -608,7 +608,7 @@ namespace Modification
             if (parameter == null || parameter.IsReadOnly || parameter.StorageType != StorageType.String)
             {
                 throw new InvalidOperationException(
-                    UiLanguage.T("Le numéro de détail d'une fenêtre de vue sélectionnée n'est pas modifiable.", "The Detail Number of a Selected Viewport Cannot Be Modified."));
+                    UiLanguage.Get("RenameElementsCommand.TheDetailNumberOfASelectedViewportCannot"));
             }
 
             parameter.Set(value);
@@ -623,7 +623,7 @@ namespace Modification
             if (views.Count != viewports.Count)
             {
                 throw new InvalidOperationException(
-                    UiLanguage.T("Une même vue est présente plusieurs fois dans la sélection et ne peut pas recevoir plusieurs noms.", "The Same View Appears Multiple Times in the Selection and Cannot Receive Multiple Names."));
+                    UiLanguage.Get("RenameElementsCommand.TheSameViewAppearsMultipleTimesInThe"));
             }
 
             var selectedViewIds = new HashSet<long>(views.Select(view => view.Id.GetIdLongValue()));
@@ -642,7 +642,7 @@ namespace Modification
             if (conflicts.Count > 0)
             {
                 throw new InvalidOperationException(
-                    UiLanguage.T("Ces noms de vue existent déjà dans le projet : ", "These View Names Already Exist in the Project: ") +
+                    UiLanguage.Get("RenameElementsCommand.TheseViewNamesAlreadyExistInTheProject") +
                     string.Join(", ", conflicts) + ".");
             }
 
@@ -673,7 +673,7 @@ namespace Modification
                 if (parameter == null || parameter.IsReadOnly || parameter.StorageType != StorageType.String)
                 {
                     throw new InvalidOperationException(
-                        UiLanguage.T("Le titre sur la feuille d'une vue sélectionnée n'est pas modifiable.", "The Title on Sheet of a Selected View Cannot Be Modified."));
+                        UiLanguage.Get("RenameElementsCommand.TheTitleOnSheetOfASelectedView"));
                 }
 
                 parameter.Set(desiredValues[index]);

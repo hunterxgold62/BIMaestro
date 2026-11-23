@@ -241,9 +241,7 @@ namespace BIMaestro.Codex
                     if ((string)final?["subtype"] == "error_max_turns")
                     {
                         sessionId = (string)final["session_id"] ?? sessionId;
-                        Say(UiLanguage.T(
-                            "J'ai enchaîné beaucoup d'opérations pour cette demande et je fais une pause. Le travail déjà fait est conservé. Répondez « Continuer » pour que je reprenne là où je me suis arrêté, ou donnez une autre consigne.",
-                            "I have run many operations for this request and am pausing. The work already done is kept. Reply \"Continue\" to resume where I stopped, or give another instruction."));
+                        Say(UiLanguage.Get("ClaudeClient.IHaveRunManyOperationsForThisRequest"));
                         return true;
                     }
                     if (result.exitCode != 0)
@@ -382,9 +380,7 @@ namespace BIMaestro.Codex
             // Pause instead of failing: the session and the work already done in Revit are kept,
             // and the last tool results are delivered with the user's next message.
             pendingToolResults = prompt;
-            reply(UiLanguage.T(
-                "J'ai enchaîné 30 opérations Revit pour cette demande et je fais une pause. Le travail déjà fait est conservé. Répondez « Continuer » pour que je reprenne là où je me suis arrêté, ou donnez une autre consigne.",
-                "I have run 30 Revit operations for this request and am pausing. The work already done is kept. Reply \"Continue\" to resume where I stopped, or give another instruction."));
+            reply(UiLanguage.Get("ClaudeClient.IHaveRun30RevitOperationsForThis"));
         }
 
         internal static JObject ReadResult(string output, bool streamed)

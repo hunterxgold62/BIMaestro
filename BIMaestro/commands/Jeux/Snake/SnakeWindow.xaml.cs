@@ -434,7 +434,7 @@ namespace BIMaestro.Bonus
                     if (_isPaused)
                     {
                         Overlay.Visibility = Visibility.Visible;
-                        OverlayText.Text = UiLanguage.T("PAUSE\n(P pour reprendre)", "PAUSED\n(P to Resume)");
+                        OverlayText.Text = UiLanguage.Get("SnakeWindow.xaml.PAUSEDPToResume");
                         ShowToast("PAUSE", TimeSpan.FromSeconds(0.8));
                     }
                     else
@@ -612,8 +612,8 @@ namespace BIMaestro.Bonus
             if (_isWaitingStart)
             {
                 Overlay.Visibility = Visibility.Visible;
-                OverlayText.Text = UiLanguage.T("SNAKE\n\nEspace = démarrer", "SNAKE\n\nSpace = Start");
-                ShowToast(UiLanguage.T("⏯ Appuie sur Espace pour démarrer", "⏯ Press Space to Start"), TimeSpan.FromSeconds(2.2));
+                OverlayText.Text = UiLanguage.Get("SnakeWindow.xaml.SNAKESpaceStart");
+                ShowToast(UiLanguage.Get("SnakeWindow.xaml.PressSpaceToStart"), TimeSpan.FromSeconds(2.2));
             }
             else
             {
@@ -792,7 +792,7 @@ namespace BIMaestro.Bonus
         {
             int segments = _rng.Next(HardcoreWallSegmentsMin, HardcoreWallSegmentsMax + 1);
             AddHardcoreWallSegments(segments);
-            ShowToast(UiLanguage.T("🧱 Hardcore : ", "🧱 Hardcore: ") + segments + UiLanguage.T(" murs générés", " walls generated"), TimeSpan.FromSeconds(1.2));
+            ShowToast(UiLanguage.Get("SnakeWindow.xaml.Hardcore") + segments + UiLanguage.Get("SnakeWindow.xaml.WallsGenerated"), TimeSpan.FromSeconds(1.2));
         }
 
         private void AddHardcoreWallSegments(int countSegments)
@@ -1673,7 +1673,7 @@ namespace BIMaestro.Bonus
         private void UpdateScoreHud(bool fullRefresh)
         {
             ScoreText.Text = $"Score: {_score}";
-            TopText.Text = UiLanguage.T("Top Mode: ", "Mode Best: ") + CurrentModeTopScore + " • Global: " + GlobalTopScore;
+            TopText.Text = UiLanguage.Get("SnakeWindow.xaml.ModeBest") + CurrentModeTopScore + " • Global: " + GlobalTopScore;
 
             ModeText.Text = $"Mode: {_mode}";
             MapInfoText.Text = $"Map: {_cols}×{_rows}";
@@ -1711,7 +1711,7 @@ namespace BIMaestro.Bonus
             if (_rainActive)
             {
                 double secs = Math.Max(0, _rainRemainingSec);
-                RainText.Text = UiLanguage.T("Pluie • ", "Rain • ") + Math.Ceiling(secs) + "s";
+                RainText.Text = UiLanguage.Get("SnakeWindow.xaml.Rain") + Math.Ceiling(secs) + "s";
                 RainBadge.Visibility = Visibility.Visible;
                 RainBarScale.ScaleX = Clamp01(secs / GetRainDuration().TotalSeconds);
             }
@@ -1939,7 +1939,7 @@ namespace BIMaestro.Bonus
             _isWaitingStart = true;
 
             Overlay.Visibility = Visibility.Visible;
-            OverlayText.Text = UiLanguage.T("GAME OVER\n\nEspace = restart", "GAME OVER\n\nSpace = Restart");
+            OverlayText.Text = UiLanguage.Get("SnakeWindow.xaml.GAMEOVERSpaceRestart");
 
             ShowToast(shortReason + "  (Espace = restart)", TimeSpan.FromSeconds(2.0));
             ShakePlayfield(3.3);
@@ -1968,7 +1968,7 @@ namespace BIMaestro.Bonus
             }
             catch
             {
-                ShowToast(UiLanguage.T("📊 Classement indisponible (réseau).", "📊 Leaderboard Unavailable (Network)."), TimeSpan.FromSeconds(1.6));
+                ShowToast(UiLanguage.Get("SnakeWindow.xaml.LeaderboardUnavailableNetwork"), TimeSpan.FromSeconds(1.6));
             }
             finally
             {

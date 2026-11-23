@@ -40,10 +40,10 @@ namespace Analyse
             Document doc = uiDoc.Document;
 
             // 1. Confirmation rapide
-            var td = new TaskDialog(UiLanguage.T("Analyse Poids", "Size Analysis"))
+            var td = new TaskDialog(UiLanguage.Get("CommandAnalysePoids.SizeAnalysis"))
             {
-                MainInstruction = UiLanguage.T("Lancement de l'analyse des familles et imports", "Analyze Families and Imports"),
-                MainContent = UiLanguage.T("Cela peut prendre quelques instants.\nContinuer ?", "This may take a few moments.\nContinue?"),
+                MainInstruction = UiLanguage.Get("CommandAnalysePoids.AnalyzeFamiliesAndImports"),
+                MainContent = UiLanguage.Get("CommandAnalysePoids.ThisMayTakeAFewMomentsContinue"),
                 CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No,
                 DefaultButton = TaskDialogResult.No
             };
