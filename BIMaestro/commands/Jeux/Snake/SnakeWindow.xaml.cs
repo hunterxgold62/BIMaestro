@@ -123,6 +123,7 @@ namespace BIMaestro.Bonus
         private int _topClassic;
         private int _topArcade;
         private int _topHardcore;
+        private int _top3D;
 
         private int CurrentModeTopScore
         {
@@ -132,6 +133,7 @@ namespace BIMaestro.Bonus
                 {
                     case GameMode.Arcade: return _topArcade;
                     case GameMode.Hardcore: return _topHardcore;
+                    case GameMode.Mode3D: return _top3D;
                     default: return _topClassic;
                 }
             }
@@ -144,11 +146,12 @@ namespace BIMaestro.Bonus
             {
                 case GameMode.Arcade: _topArcade = value; break;
                 case GameMode.Hardcore: _topHardcore = value; break;
+                case GameMode.Mode3D: _top3D = value; break;
                 default: _topClassic = value; break;
             }
         }
 
-        private int GlobalTopScore => Math.Max(_topClassic, Math.Max(_topArcade, _topHardcore));
+        private int GlobalTopScore => Math.Max(Math.Max(_topClassic, _top3D), Math.Max(_topArcade, _topHardcore));
 
         private bool _isGameOver;
         private bool _isPaused;
@@ -373,6 +376,7 @@ namespace BIMaestro.Bonus
                 new ModeChoice(GameMode.Classic,  "Classic",  "Murs mortels, stable (bonus plus rares)"),
                 new ModeChoice(GameMode.Arcade,   "Arcade",   "Wrap-around, plus fun (bonus un peu plus fréquents)"),
                 new ModeChoice(GameMode.Hardcore, "Hardcore", "Accélère + murs internes (speed désactivée)"),
+                new ModeChoice(GameMode.Mode3D,   "3D",       "Plateau en 2D, passe en 3D au démarrage (caméra derrière le serpent)"),
             };
 
             ModeCombo.ItemsSource = items;
@@ -427,7 +431,7 @@ namespace BIMaestro.Bonus
 
             if (e.Key == Key.P)
             {
-                if (!_isGameOver && !_isWaitingStart)
+                if (!_isGameOver && !_isWaitingStart && !Is3DLogicFrozen)
                 {
                     _isPaused = !_isPaused;
 
@@ -447,7 +451,16 @@ namespace BIMaestro.Bonus
                 return;
             }
 
+            if (e.Key == Key.C && TryCycleCamera3D())
+            {
+                e.Handled = true;
+                return;
+            }
+
             if (_isGameOver || _isPaused || _isWaitingStart)
+                return;
+
+            if (TryHandle3DKey(e))
                 return;
 
             Direction wanted;
@@ -493,7 +506,7 @@ namespace BIMaestro.Bonus
 
             AutoHideToast();
 
-            if (!_isPaused && !_isGameOver && !_isWaitingStart)
+            if (!_isPaused && !_isGameOver && !_isWaitingStart && !Is3DLogicFrozen)
             {
                 UpdateEffectTimers(delta.TotalSeconds);
 
@@ -501,7 +514,7 @@ namespace BIMaestro.Bonus
 
                 double stepMs = GetCurrentStepMs();
                 int safety = 0;
-                while (_accumMs >= stepMs && safety < 6)
+                while (_accumMs >= stepMs && safety < 6 && !_isGameOver && !Is3DLogicFrozen)
                 {
                     _accumMs -= stepMs;
                     StepLogic();
@@ -509,7 +522,12 @@ namespace BIMaestro.Bonus
                 }
             }
 
-            RenderFrame(now.TotalSeconds);
+            // En 3D, le rendu 2D ne sert qu'à la mini-carte : il est limité à 10 images/s.
+            if (ShouldRender2DFrame(now.TotalSeconds))
+                RenderFrame(now.TotalSeconds);
+            if (_phase3D != Phase3D.None)
+                Update3D(delta.TotalSeconds, now.TotalSeconds);
+
             UpdateBorderVisual(now.TotalSeconds);
             UpdateScoreHud(fullRefresh: false);
         }
@@ -519,6 +537,7 @@ namespace BIMaestro.Bonus
             double baseMs =
                 (_mode == GameMode.Classic) ? 110.0 :
                 (_mode == GameMode.Arcade) ? 100.0 :
+                (_mode == GameMode.Mode3D) ? 135.0 :
                 90.0;
 
             if (_mode == GameMode.Hardcore)
@@ -547,6 +566,8 @@ namespace BIMaestro.Bonus
             HideToast();
 
             _accumMs = 0;
+
+            Start3DIfNeeded();
         }
 
         private void ResetGame(bool waitingStart)
@@ -581,6 +602,8 @@ namespace BIMaestro.Bonus
 
             _accumMs = 0;
 
+            Reset3D();
+
             RebuildMap(BaseCols, BaseRows, animateWindow: false);
 
             int startX = _cols / 2;
@@ -613,12 +636,12 @@ namespace BIMaestro.Bonus
             {
                 Overlay.Visibility = Visibility.Visible;
                 OverlayText.Text = UiLanguage.Get("SnakeWindow.xaml.SNAKESpaceStart");
-                ShowToast(UiLanguage.Get("SnakeWindow.xaml.PressSpaceToStart"), TimeSpan.FromSeconds(2.2));
             }
             else
             {
                 Overlay.Visibility = Visibility.Collapsed;
                 HideToast();
+                Start3DIfNeeded();
             }
         }
 
@@ -853,6 +876,7 @@ namespace BIMaestro.Bonus
             if (_rainActive && _fruits.Count < TargetFruitCount)
                 EnsureFruits(targetCount: TargetFruitCount, maxAddThisCall: 2);
 
+            Apply3DQueuedTurn();
             _dir = _nextDir;
 
             var head = _snake.First.Value;
@@ -924,6 +948,8 @@ namespace BIMaestro.Bonus
 
         private void HandleEatenFruit(Fruit fruit)
         {
+            On3DFruitEaten(fruit);
+
             switch (fruit.Type)
             {
                 case FruitType.Multiplier:
@@ -1672,7 +1698,7 @@ namespace BIMaestro.Bonus
 
         private void UpdateScoreHud(bool fullRefresh)
         {
-            ScoreText.Text = $"Score: {_score}";
+            ScoreText.Text = _score.ToString();
             TopText.Text = UiLanguage.Get("SnakeWindow.xaml.ModeBest") + CurrentModeTopScore + " • Global: " + GlobalTopScore;
 
             ModeText.Text = $"Mode: {_mode}";
@@ -1959,7 +1985,7 @@ namespace BIMaestro.Bonus
                 var data = await SnakeLeaderboardClient.FetchLeaderboardAsync(SupabaseFunctionsBaseUrl, jwt)
                     .ConfigureAwait(true);
 
-                var window = new SnakeLeaderboardWindow(data)
+                var window = new SnakeLeaderboardWindow(data, GetLeaderboardMode())
                 {
                     Owner = this,
                     WindowStartupLocation = WindowStartupLocation.CenterOwner
@@ -1980,6 +2006,7 @@ namespace BIMaestro.Bonus
         {
             if (!_recordThisRun || _recordScoreThisRun <= 0)
                 return;
+
 
             var jwt = Licensing.LicenseSession.CurrentJwt ?? global::BIMaestroApp.LicenseJwt;
             if (string.IsNullOrWhiteSpace(jwt))
@@ -2006,6 +2033,7 @@ namespace BIMaestro.Bonus
             {
                 GameMode.Arcade => "arcade",
                 GameMode.Hardcore => "hardcore",
+                GameMode.Mode3D => "3d",
                 _ => "classic"
             };
         }
@@ -2033,6 +2061,7 @@ namespace BIMaestro.Bonus
                 _topClassic = Math.Max(0, ReadInt(json, "TopScoreClassic", -1));
                 _topArcade = Math.Max(0, ReadInt(json, "TopScoreArcade", -1));
                 _topHardcore = Math.Max(0, ReadInt(json, "TopScoreHardcore", -1));
+                _top3D = Math.Max(0, ReadInt(json, "TopScore3D", 0));
 
                 if (_topClassic < 0 || _topArcade < 0 || _topHardcore < 0)
                 {
@@ -2047,6 +2076,10 @@ namespace BIMaestro.Bonus
                 var manual = ReadString(json, "ManualSkinId", SkinId.Classic.ToString());
                 if (Enum.TryParse(manual, out SkinId sid))
                     _manualSkin = sid;
+
+                var camStr = ReadString(json, "Camera3D", CameraPreset3D.Close.ToString());
+                if (Enum.TryParse(camStr, out CameraPreset3D cam))
+                    _camPreset = _camPresetPrev = cam;
 
                 var modeStr = ReadString(json, "GameMode", GameMode.Classic.ToString());
                 if (Enum.TryParse(modeStr, out GameMode gm))
@@ -2069,6 +2102,8 @@ namespace BIMaestro.Bonus
                 + "\"TopScoreClassic\":" + _topClassic + ","
                 + "\"TopScoreArcade\":" + _topArcade + ","
                 + "\"TopScoreHardcore\":" + _topHardcore + ","
+                + "\"TopScore3D\":" + _top3D + ","
+                + "\"Camera3D\":\"" + JsonEscape(_camPreset.ToString()) + "\","
                 + "\"SkinAuto\":" + (_skinAuto ? "true" : "false") + ","
                 + "\"ManualSkinId\":\"" + JsonEscape(_manualSkin.ToString()) + "\","
                 + "\"GameMode\":\"" + JsonEscape(_mode.ToString()) + "\""
@@ -2274,7 +2309,7 @@ namespace BIMaestro.Bonus
             }
         }
 
-        private enum GameMode { Classic, Arcade, Hardcore }
+        private enum GameMode { Classic, Arcade, Hardcore, Mode3D }
 
         private sealed class ModeChoice
         {

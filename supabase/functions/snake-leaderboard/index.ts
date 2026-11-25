@@ -22,7 +22,7 @@ const hmacKey = await crypto.subtle.importKey(
   ["verify"],
 );
 
-const allowedModes = new Set(["classic", "arcade", "hardcore", "flappy_bird"]);
+const allowedModes = new Set(["classic", "arcade", "hardcore", "3d", "flappy_bird"]);
 
 function gameForMode(mode: string): string {
   return mode === "flappy_bird" ? "flappy_bird" : "snake";
@@ -40,6 +40,7 @@ function getScoreCap(mode: string): number {
     classic: 5000,
     arcade: 5000,
     hardcore: 5000,
+    "3d": 5000,
     flappy_bird: 500,
   };
 
@@ -47,6 +48,7 @@ function getScoreCap(mode: string): number {
     classic: "SNAKE_MAX_SCORE_CLASSIC",
     arcade: "SNAKE_MAX_SCORE_ARCADE",
     hardcore: "SNAKE_MAX_SCORE_HARDCORE",
+    "3d": "SNAKE_MAX_SCORE_3D",
     flappy_bird: "SNAKE_MAX_SCORE_FLAPPY_BIRD",
   };
 

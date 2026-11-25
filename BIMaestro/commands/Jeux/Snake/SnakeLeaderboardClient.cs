@@ -87,6 +87,7 @@ namespace BIMaestro.Bonus
             data.Classic = ParseEntries(root["classic"]);
             data.Arcade = ParseEntries(root["arcade"]);
             data.Hardcore = ParseEntries(root["hardcore"]);
+            data.Mode3D = ParseEntries(root["3d"]);
             data.FlappyBird = ParseEntries(root["flappy_bird"] ?? root["flappyBird"] ?? root["flappy-bird"]);
             return data;
         }

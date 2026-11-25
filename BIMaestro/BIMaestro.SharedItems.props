@@ -362,6 +362,9 @@
     <Compile Include="commands\Jeux\snake\SnakeWindow.xaml.cs">
       <DependentUpon>SnakeWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="commands\Jeux\snake\SnakeWindow.Mode3D.cs">
+      <DependentUpon>SnakeWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="commands\Jeux vidéos\Maquette jouable\GameCollisionWorld.cs" />
     <Compile Include="commands\Jeux vidéos\Maquette jouable\GameGpuSceneBuilder.cs" />
     <Compile Include="commands\Jeux vidéos\Maquette jouable\GameMepData.cs" />

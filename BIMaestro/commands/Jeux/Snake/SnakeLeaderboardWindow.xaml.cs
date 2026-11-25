@@ -5,10 +5,10 @@ namespace BIMaestro.Bonus
 {
     public partial class SnakeLeaderboardWindow : Window
     {
-        public SnakeLeaderboardWindow(SnakeLeaderboardData data)
+        public SnakeLeaderboardWindow(SnakeLeaderboardData data, string initialMode = null)
         {
             InitializeComponent();
-            DataContext = new SnakeLeaderboardViewModel(data);
+            DataContext = new SnakeLeaderboardViewModel(data, initialMode);
 
             PreviewKeyDown += OnPreviewKeyDown;
         }
