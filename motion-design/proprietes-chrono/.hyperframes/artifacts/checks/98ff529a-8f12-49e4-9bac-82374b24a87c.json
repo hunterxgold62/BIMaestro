@@ -1,0 +1,404 @@
+{
+  "ok": true,
+  "strict": false,
+  "browserSkipped": false,
+  "lint": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 3,
+    "infoCount": 0,
+    "findings": [
+      {
+        "code": "nested_media_start_basis_ambiguous",
+        "severity": "warning",
+        "message": "<video id=\"bv1\"> has data-start=\"0.8\" inside a sub-composition. Nested media timing is local to its composition by default; a nonzero value can be confused with a legacy root-global timestamp.",
+        "selector": "#bv1",
+        "dataAttributes": {},
+        "sourceFile": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\motion-design\\proprietes-chrono\\compositions\\reel.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Keep data-start=\"0.8\" if it is composition-local. If this is a legacy root-global timestamp, add data-hf-media-start-basis=\"global\"; otherwise convert it to local time by subtracting the host start."
+      },
+      {
+        "code": "nested_media_start_basis_ambiguous",
+        "severity": "warning",
+        "message": "<video id=\"bv2\"> has data-start=\"6.4\" inside a sub-composition. Nested media timing is local to its composition by default; a nonzero value can be confused with a legacy root-global timestamp.",
+        "selector": "#bv2",
+        "dataAttributes": {},
+        "sourceFile": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\motion-design\\proprietes-chrono\\compositions\\reel.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Keep data-start=\"6.4\" if it is composition-local. If this is a legacy root-global timestamp, add data-hf-media-start-basis=\"global\"; otherwise convert it to local time by subtracting the host start."
+      },
+      {
+        "code": "duplicate_media_discovery_risk",
+        "severity": "warning",
+        "message": "Detected 2 matching img entries with the same source/start/duration.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\motion-design\\proprietes-chrono\\compositions\\reel.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Avoid duplicated media nodes that can be discovered twice during compilation."
+      }
+    ],
+    "filesScanned": 3
+  },
+  "runtime": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": []
+  },
+  "layout": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 4,
+    "infoCount": 1,
+    "findings": [
+      {
+        "code": "container_overflow",
+        "severity": "warning",
+        "time": 0.761,
+        "selector": "#bl > img:nth-of-type(1)",
+        "message": "Element extends outside a clipping layout container.",
+        "rect": {
+          "left": 60,
+          "top": 230,
+          "right": 520,
+          "bottom": 1320,
+          "width": 460,
+          "height": 1090
+        },
+        "containerSelector": "#bl",
+        "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+        "containerRect": {
+          "left": 60,
+          "top": 230,
+          "right": 520,
+          "bottom": 1090,
+          "width": 460,
+          "height": 860
+        },
+        "overflow": {
+          "bottom": 230
+        },
+        "dataAttributes": {
+          "data-hf-render-id": "hf-media-0",
+          "data-hf-authored-opacity": ""
+        },
+        "sourceFile": "compositions/reel.html",
+        "bbox": {
+          "x": 60,
+          "y": 230,
+          "width": 460,
+          "height": 1090
+        },
+        "firstSeen": 0.761,
+        "lastSeen": 9.894,
+        "occurrences": 7,
+        "heldMs": 0,
+        "times": [
+          0.761,
+          2.283,
+          3.806,
+          5.328,
+          6.85,
+          8.372,
+          9.894
+        ]
+      },
+      {
+        "code": "container_overflow",
+        "severity": "warning",
+        "time": 0.761,
+        "selector": "#br > img:nth-of-type(1)",
+        "message": "Element extends outside a clipping layout container.",
+        "rect": {
+          "left": 560,
+          "top": 230,
+          "right": 1020,
+          "bottom": 1320,
+          "width": 460,
+          "height": 1090
+        },
+        "containerSelector": "#br",
+        "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+        "containerRect": {
+          "left": 560,
+          "top": 230,
+          "right": 1020,
+          "bottom": 1090,
+          "width": 460,
+          "height": 860
+        },
+        "overflow": {
+          "bottom": 230
+        },
+        "dataAttributes": {
+          "data-hf-render-id": "hf-media-2",
+          "data-hf-authored-opacity": ""
+        },
+        "sourceFile": "compositions/reel.html",
+        "bbox": {
+          "x": 560,
+          "y": 230,
+          "width": 460,
+          "height": 1090
+        },
+        "firstSeen": 0.761,
+        "lastSeen": 9.894,
+        "occurrences": 7,
+        "heldMs": 0,
+        "times": [
+          0.761,
+          2.283,
+          3.806,
+          5.328,
+          6.85,
+          8.372,
+          9.894
+        ]
+      },
+      {
+        "code": "container_overflow",
+        "severity": "warning",
+        "time": 2.283,
+        "selector": "#bv1",
+        "message": "Element extends outside a clipping layout container.",
+        "rect": {
+          "left": 560,
+          "top": 230,
+          "right": 1020,
+          "bottom": 1320,
+          "width": 460,
+          "height": 1090
+        },
+        "containerSelector": "#br",
+        "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+        "containerRect": {
+          "left": 560,
+          "top": 230,
+          "right": 1020,
+          "bottom": 1090,
+          "width": 460,
+          "height": 860
+        },
+        "overflow": {
+          "bottom": 230
+        },
+        "dataAttributes": {
+          "data-hf-render-id": "bv1",
+          "data-start": "0.8",
+          "data-duration": "5.9",
+          "data-media-start": "28.5",
+          "data-hf-authored-opacity": ""
+        },
+        "sourceFile": "compositions/reel.html",
+        "bbox": {
+          "x": 560,
+          "y": 230,
+          "width": 460,
+          "height": 1090
+        },
+        "firstSeen": 2.283,
+        "lastSeen": 5.328,
+        "occurrences": 3,
+        "heldMs": 0,
+        "times": [
+          2.283,
+          3.806,
+          5.328
+        ]
+      },
+      {
+        "code": "container_overflow",
+        "severity": "warning",
+        "time": 6.85,
+        "selector": "#bv2",
+        "message": "Element extends outside a clipping layout container.",
+        "rect": {
+          "left": 560,
+          "top": 230,
+          "right": 1020,
+          "bottom": 1320,
+          "width": 460,
+          "height": 1090
+        },
+        "containerSelector": "#br",
+        "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+        "containerRect": {
+          "left": 560,
+          "top": 230,
+          "right": 1020,
+          "bottom": 1090,
+          "width": 460,
+          "height": 860
+        },
+        "overflow": {
+          "bottom": 230
+        },
+        "dataAttributes": {
+          "data-hf-render-id": "bv2",
+          "data-start": "6.4",
+          "data-duration": "4.5",
+          "data-media-start": "38.5",
+          "data-hf-authored-opacity": ""
+        },
+        "sourceFile": "compositions/reel.html",
+        "bbox": {
+          "x": 560,
+          "y": 230,
+          "width": 460,
+          "height": 1090
+        },
+        "firstSeen": 6.85,
+        "lastSeen": 9.894,
+        "occurrences": 3,
+        "heldMs": 0,
+        "times": [
+          6.85,
+          8.372,
+          9.894
+        ]
+      },
+      {
+        "code": "container_overflow",
+        "severity": "info",
+        "time": 9.894,
+        "selector": "#bl-after",
+        "message": "Element extends outside a clipping layout container.",
+        "rect": {
+          "left": 60,
+          "top": 230,
+          "right": 520,
+          "bottom": 1320,
+          "width": 460,
+          "height": 1090
+        },
+        "containerSelector": "#bl",
+        "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+        "containerRect": {
+          "left": 60,
+          "top": 230,
+          "right": 520,
+          "bottom": 1090,
+          "width": 460,
+          "height": 860
+        },
+        "overflow": {
+          "bottom": 230
+        },
+        "dataAttributes": {
+          "data-hf-render-id": "bl-after",
+          "data-hf-authored-opacity": ""
+        },
+        "sourceFile": "compositions/reel.html",
+        "bbox": {
+          "x": 60,
+          "y": 230,
+          "width": 460,
+          "height": 1090
+        },
+        "firstSeen": 9.894,
+        "lastSeen": 9.894,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          9.894
+        ]
+      }
+    ],
+    "duration": 13.7,
+    "samples": [
+      0.761,
+      2.283,
+      3.806,
+      5.328,
+      6.85,
+      8.372,
+      9.894,
+      11.417,
+      12.939
+    ],
+    "transitionSamples": [],
+    "transitionSamplesDropped": 0,
+    "tolerance": 2,
+    "totalIssueCount": 5,
+    "truncated": false,
+    "faceCheck": {
+      "ran": true,
+      "candidates": 0,
+      "faces": 0
+    }
+  },
+  "motion": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "enabled": false,
+    "samples": 0
+  },
+  "contrast": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "enabled": true,
+    "samples": [
+      0.761,
+      3.806,
+      6.85,
+      9.894,
+      12.939
+    ],
+    "checked": 24,
+    "passed": 24
+  },
+  "craft": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "enabled": true,
+    "step": 0.125,
+    "samples": 110
+  },
+  "audio": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": []
+  },
+  "hdr": {
+    "autoPromotion": null,
+    "inspection": "available"
+  },
+  "snapshots": {
+    "enabled": false,
+    "files": [],
+    "times": [],
+    "findingFiles": []
+  }
+}

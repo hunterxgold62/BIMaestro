@@ -17,6 +17,14 @@ namespace BIMaestro.PropertiesAppearance
             internal string Key, Label, Explanation;
             public override string ToString() => Label;
         }
+        // Look layers: one background, the text color, one marker, plus an icon and options.
+        private readonly List<Tuple<Button, string>> _bgButtons = new List<Tuple<Button, string>>(), _markButtons = new List<Tuple<Button, string>>();
+        private string _bgValue = StyleSet.BgFill, _markValue = StyleSet.MarkNone;
+        private readonly CheckBox _textLayer = new CheckBox { Margin = new Thickness(0, 2, 0, 8) };
+        private readonly ComboBox _icon = new ComboBox { Margin = new Thickness(0, 0, 0, 8) };
+        private readonly CheckBox _headerOnly = new CheckBox { Margin = new Thickness(0, 2, 0, 4) }, _zebra = new CheckBox { Margin = new Thickness(0, 2, 0, 4) };
+        private readonly StackPanel _groupOptions = new StackPanel();
+        private readonly CheckBox _autoTint = new CheckBox { Margin = new Thickness(0, 2, 0, 6) };
         internal static Action<string> CustomGroupRequested;
         private AppearanceContext _context;
         private readonly Dictionary<string, AppearanceProfile> _drafts = new Dictionary<string, AppearanceProfile>();
@@ -49,6 +57,8 @@ namespace BIMaestro.PropertiesAppearance
             _lightButton = MakeButton(UiLanguage.Get("PropertiesAppearanceWindow.Light"), () => SetTone(false));
             _darkButton = MakeButton(UiLanguage.Get("PropertiesAppearanceWindow.Dark"), () => SetTone(true));
             _lightButton.MinWidth = _darkButton.MinWidth = 110;
+            _appearanceTab = Tab("TabAppearance", false); _rulesTab = Tab("TabRules", true);
+            _live.IsChecked = true;
             InstallStyles(); ApplyWindowTheme(); Build(); ReloadContext(context.CategoryKey ?? "all");
             _previewTimer.Tick += (_, __) => { _previewTimer.Stop(); if (!_closed && _live.IsChecked == true) Preview(); };
         }
@@ -108,58 +118,52 @@ namespace BIMaestro.PropertiesAppearance
             var b = new Border { Child = child, Padding = new Thickness(padding) };
             b.SetResourceReference(StyleProperty, "Card"); return b;
         }
+        // Framed area inside the page card (no shadow), like the panels of « Arborescence du projet ».
+        private Border InnerPanel(UIElement child, bool subtle)
+        {
+            var b = new Border { Child = child, Padding = new Thickness(16), CornerRadius = new CornerRadius(12), BorderThickness = new Thickness(1), SnapsToDevicePixels = true };
+            b.SetResourceReference(Border.BorderBrushProperty, "Line"); b.SetResourceReference(Border.BackgroundProperty, subtle ? "Tint" : "Surface"); return b;
+        }
         private void Build()
         {
             HorizontalContentAlignment = HorizontalAlignment.Stretch; VerticalContentAlignment = VerticalAlignment.Stretch;
-            var root = new Grid { Margin = new Thickness(0, 8, 4, 4), ClipToBounds = true }; Content = root;
-            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            var title = new StackPanel(); title.Children.Add(Label(UiLanguage.Get("PropertiesAppearanceWindow.Properties"), 14, true));
-            title.Children.Add(Label(UiLanguage.Get("PropertiesAppearanceWindow.CustomizeThePropertiesPaletteGroupAndParameterColors"), 12, false, true)); root.Children.Add(title);
+            // One large white card, like « Mes panneaux BIMaestro » and « Arborescence du projet »:
+            // title and selection on the left, switches on the right, then the useful part.
+            var root = new Grid { ClipToBounds = true };
+            var page = new Border { Child = root, Margin = new Thickness(0, 0, 4, 4) }; page.SetResourceReference(StyleProperty, "Card"); Content = page;
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             var groupCreation=new WrapPanel {Margin=new Thickness(0,4,0,8)};
             _groupName.SetResourceReference(Control.ForegroundProperty,"Ink");_groupRenameName.SetResourceReference(Control.ForegroundProperty,"Ink");
             groupCreation.Children.Add(_groupName);groupCreation.Children.Add(MakeButton(UiLanguage.Get("PropertiesAppearanceWindow.CreateAGroup"),CreateCustomGroup));
-            var context = new Grid(); context.ColumnDefinitions.Add(new ColumnDefinition()); context.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); context.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            BindText(_caption, 13, true); _caption.TextWrapping = TextWrapping.NoWrap; _caption.TextTrimming = TextTrimming.CharacterEllipsis; _caption.VerticalAlignment = VerticalAlignment.Center; _caption.Margin = new Thickness(0, 0, 14, 0); context.Children.Add(_caption);
-            _enabled.Margin = new Thickness(0, 0, 16, 0); _enabled.VerticalAlignment = VerticalAlignment.Center; Grid.SetColumn(_enabled, 1); context.Children.Add(_enabled);
-            var refresh = MakeButton(UiLanguage.Get("PropertiesAppearanceWindow.RefreshSelection"), RefreshContext); Grid.SetColumn(refresh, 2); context.Children.Add(refresh);
-            var contextCard = Card(context, 12); contextCard.Margin = new Thickness(0, 4, 0, 12); Grid.SetRow(contextCard, 1); root.Children.Add(contextCard);
+            var header = new Grid { Margin = new Thickness(0, 0, 0, 14) }; header.ColumnDefinitions.Add(new ColumnDefinition()); header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var title = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+            var heading = new TextBlock { Text = UiLanguage.Get("PropertiesAppearanceWindow.Properties") }; heading.SetResourceReference(StyleProperty, "H2"); title.Children.Add(heading);
+            _caption.SetResourceReference(StyleProperty, "Hint"); _caption.Margin = new Thickness(0, 4, 14, 0); _caption.TextWrapping = TextWrapping.NoWrap; _caption.TextTrimming = TextTrimming.CharacterEllipsis;
+            _caption.ToolTip = UiLanguage.Get("PropertiesAppearanceWindow.CustomizeThePropertiesPaletteGroupAndParameterColors"); title.Children.Add(_caption); header.Children.Add(title);
+            _enabled.Margin = new Thickness(18, 0, 16, 0); _enabled.VerticalAlignment = VerticalAlignment.Center; _enabled.FontWeight = FontWeights.SemiBold; Grid.SetColumn(_enabled, 1); header.Children.Add(_enabled);
+            var refresh = MakeButton(UiLanguage.Get("PropertiesAppearanceWindow.RefreshSelection"), RefreshContext); refresh.Margin = new Thickness(0); refresh.VerticalAlignment = VerticalAlignment.Center; Grid.SetColumn(refresh, 2); header.Children.Add(refresh);
+            root.Children.Add(header);
 
-            var body = new Grid(); body.ColumnDefinitions.Add(new ColumnDefinition()); body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(18) }); body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(330) }); Grid.SetRow(body, 2); root.Children.Add(body);
+            var body = new Grid(); body.ColumnDefinitions.Add(new ColumnDefinition()); body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(14) }); body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(340) }); Grid.SetRow(body, 1); root.Children.Add(body);
             var left = new Grid(); left.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); left.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); left.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); left.RowDefinitions.Add(new RowDefinition());
             var introduction = new StackPanel(); introduction.Children.Add(Label(UiLanguage.Get("PropertiesAppearanceWindow.PropertiesPreview"), 16, true)); BindText(_hint, 12, false, true); _hint.Margin = new Thickness(0, 0, 0, 8); introduction.Children.Add(_hint);
             var groupExpander = GroupExpander = new Expander { Header = UiLanguage.Get("PropertiesAppearanceWindow.CreateACustomGroup"), Content = groupCreation, Margin = new Thickness(0, 0, 0, 10) }; introduction.Children.Add(groupExpander); left.Children.Add(introduction);
             var search = new Grid { Margin = new Thickness(0, 0, 0, 14) }; _search.Padding = new Thickness(10, 8, 10, 8); _search.FontSize = 13; _search.SetResourceReference(Control.ForegroundProperty, "Ink"); _search.SetResourceReference(Control.BackgroundProperty, "Surface"); _search.SetResourceReference(Control.BorderBrushProperty, "Line");
             _search.TextChanged += (_, __) => RenderRows(); search.Children.Add(_search);
             var placeholder = Label(UiLanguage.Get("PropertiesAppearanceWindow.SearchForAGroupOrParameter"), 13, false, true); placeholder.Margin = new Thickness(11, 9, 0, 0); placeholder.IsHitTestVisible = false; search.Children.Add(placeholder); _search.TextChanged += (_, __) => placeholder.Visibility = string.IsNullOrEmpty(_search.Text) ? Visibility.Visible : Visibility.Collapsed;
-            Grid.SetRow(search, 1); left.Children.Add(search);
+            // The preview list is short enough to scan: no search box.
+            search.Visibility = Visibility.Collapsed; Grid.SetRow(search, 1); left.Children.Add(search);
             var headings = Pair(Label(UiLanguage.Get("PropertiesAppearanceWindow.ORIGINALREVIT"), 11, true, true), Label(UiLanguage.Get("PropertiesAppearanceWindow.YOURCUSTOMIZATION"), 11, true)); headings.Margin = new Thickness(8, 0, 8, 5); Grid.SetRow(headings, 2); left.Children.Add(headings);
-            var scroll = new ScrollViewer { Content = _rows, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }; _previewScroll = scroll; scroll.AllowDrop = true; scroll.PreviewDragOver += (_, e) => AutoScrollWhileDragging(e); headings.AllowDrop = true; headings.PreviewDragOver += (_, e) => { AutoScrollWhileDragging(e); e.Effects = DragDropEffects.None; e.Handled = true; }; Grid.SetRow(scroll, 3); left.Children.Add(scroll); body.Children.Add(Card(left));
+            var scroll = new ScrollViewer { Content = _rows, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }; _previewScroll = scroll; scroll.AllowDrop = true; scroll.PreviewDragOver += (_, e) => AutoScrollWhileDragging(e); headings.AllowDrop = true; headings.PreviewDragOver += (_, e) => { AutoScrollWhileDragging(e); e.Effects = DragDropEffects.None; e.Handled = true; }; Grid.SetRow(scroll, 3); left.Children.Add(scroll); body.Children.Add(InnerPanel(left, false));
 
-            var right = new StackPanel(); right.Children.Add(Label(UiLanguage.Get("PropertiesAppearanceWindow.CustomizeTheSelection"), 16, true)); BindText(_selection, 15, true); _selection.Margin = new Thickness(0, 8, 0, 6); right.Children.Add(_selection);
-            BindText(_selectionHint, 12, false, true); _selectionHint.Margin = new Thickness(0, 0, 0, 15); right.Children.Add(_selectionHint);
-            right.Children.Add(_groupTools);
-            right.Children.Add(Label(UiLanguage.Get("PropertiesAppearanceWindow.ApplyTo"), 13, true)); _scope.SelectionChanged += (_, __) => ScopeChanged(); right.Children.Add(_scope);
-            BindText(_scopeHint, 12, false, true); _scopeHint.Margin = new Thickness(0, 7, 0, 14); right.Children.Add(_scopeHint);
-            var tones = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 12) }; tones.Children.Add(_lightButton); tones.Children.Add(_darkButton); right.Children.Add(tones);
-            _editor.Children.Add(Label(UiLanguage.Get("PropertiesAppearanceWindow.OneClickTheme"), 12, true));
-            var presets = new Grid(); presets.ColumnDefinitions.Add(new ColumnDefinition()); presets.ColumnDefinitions.Add(new ColumnDefinition()); presets.RowDefinitions.Add(new RowDefinition()); presets.RowDefinitions.Add(new RowDefinition());
-            AddPreset(presets, UiLanguage.Get("PropertiesAppearanceWindow.Sage"), "#155C42", "#E4F1E9", 0, 0); AddPreset(presets, UiLanguage.Get("PropertiesAppearanceWindow.Blue"), "#234F78", "#E7F1FB", 0, 1);
-            AddPreset(presets, UiLanguage.Get("PropertiesAppearanceWindow.Amber"), "#77521A", "#FBF1D9", 1, 0); AddPreset(presets, UiLanguage.Get("PropertiesAppearanceWindow.Lavender"), "#604483", "#F1EBFA", 1, 1); _editor.Children.Add(presets);
-            var custom = new Expander { Header = UiLanguage.Get("PropertiesAppearanceWindow.ChooseMyOwnColors"), Margin = new Thickness(0, 14, 0, 12) };
-            var customContent = new StackPanel { Margin = new Thickness(0, 10, 0, 0) }; customContent.Children.Add(Label(UiLanguage.Get("PropertiesAppearanceWindow.TextColor"), 12)); _text.Height = 34; customContent.Children.Add(_text); customContent.Children.Add(new Border { Height = 10 }); customContent.Children.Add(Label(UiLanguage.Get("PropertiesAppearanceWindow.BackgroundColor"), 12)); _background.Height = 34; customContent.Children.Add(_background); custom.Content = customContent; _editor.Children.Add(custom);
-            _text.SelectedColorChanged += (_, __) => ColorsChanged(); _background.SelectedColorChanged += (_, __) => ColorsChanged();
-            BindText(_colorHint, 12, false, true); _colorHint.Margin = new Thickness(0, 0, 0, 10); _editor.Children.Add(_colorHint);
-            _editor.Children.Add(MakeButton(UiLanguage.Get("PropertiesAppearanceWindow.RemoveMyColorsHere"), ResetSelection));
-            right.Children.Add(_editor);
-            _live.Margin = new Thickness(0, 14, 0, 12); right.Children.Add(_live);
+            var right = BuildRightPanel();
             _enabled.Checked += (_, __) => EnabledChanged(); _enabled.Unchecked += (_, __) => EnabledChanged();
             _live.Checked += (_, __) => SchedulePreview(); _live.Unchecked += (_, __) => { if (_loading) return; _previewTimer.Stop(); RequestCancelPreview(); };
-            _savedRules.Content = _rules; right.Children.Add(_savedRules); right.Children.Add(MakeButton(UiLanguage.Get("PropertiesAppearanceWindow.RestoreRevitOrder"), ResetOrder)); right.Children.Add(MakeButton(UiLanguage.Get("PropertiesAppearanceWindow.ResetAll"), () => _resetConfirmation.Visibility = Visibility.Visible));
-            var rightScroll = new ScrollViewer { Content = right, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }; var rightCard = Card(rightScroll); Grid.SetColumn(rightCard, 2); body.Children.Add(rightCard);
-            var footer = new Grid { Margin = new Thickness(0, 16, 0, 0) }; footer.ColumnDefinitions.Add(new ColumnDefinition()); footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var rightScroll = new ScrollViewer { Content = right, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }; var rightCard = InnerPanel(rightScroll, true); Grid.SetColumn(rightCard, 2); body.Children.Add(rightCard);
+            var footer = new Grid { Margin = new Thickness(0, 12, 0, 0) }; footer.ColumnDefinitions.Add(new ColumnDefinition()); footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             var messages = new StackPanel { Margin = new Thickness(0, 0, 16, 0) }; BindText(_changeState, 13, true); BindText(_status, 12, false, true); _status.Margin = new Thickness(0, 4, 0, 0); messages.Children.Add(_changeState); messages.Children.Add(_status); footer.Children.Add(messages);
-            Grid.SetRow(footer, 3); root.Children.Add(footer);
-            var confirmation = BuildResetConfirmation(); Grid.SetRowSpan(confirmation, 4); Panel.SetZIndex(confirmation, 10);
+            Grid.SetRow(footer, 2); root.Children.Add(footer);
+            var confirmation = BuildResetConfirmation(); Grid.SetRowSpan(confirmation, 3); Panel.SetZIndex(confirmation, 10);
             _resetConfirmation.MaxWidth = 680; _resetConfirmation.HorizontalAlignment = HorizontalAlignment.Center; _resetConfirmation.VerticalAlignment = VerticalAlignment.Center; root.Children.Add(confirmation);
             Notify(UiLanguage.Get("PropertiesAppearanceWindow.UseSaveMySettingsToKeepYourChanges"));
         }
@@ -193,13 +197,13 @@ namespace BIMaestro.PropertiesAppearance
         private void ScopeChanged()
         {
             if (_loading || !(_scope.SelectedItem is ScopeChoice choice)) return;
-            _profile = _drafts[choice.Key]; _scopeHint.Text = choice.Explanation; LoadColors(); RenderRows(); RefreshRules();
+            _profile = _drafts[choice.Key]; _scopeHint.Text = choice.Explanation; _scope.ToolTip = choice.Explanation; LoadColors(); RenderRows(); RefreshRules(); if (_rulesShown) { CloseRule(); }
         }
-        private AppearanceRule CurrentRule => _selected == null || _profile == null ? null : _profile.Rules.FirstOrDefault(r => r.Kind == (_selected.Header ? "group" : "parameter") && r.TargetKey == (_selected.Header ? _selected.GroupKey : _selected.ParameterKey));
+        private AppearanceRule CurrentRule => _selected == null || _profile == null ? null : _profile.Rules.FirstOrDefault(r => r.When == null && r.Kind == (_selected.Header ? "group" : "parameter") && r.TargetKey == (_selected.Header ? _selected.GroupKey : _selected.ParameterKey));
         private PaletteColors Effective(PropertyPreviewRow row)
         {
             var preferences = new AppearancePreferences { Profiles = _drafts.Values.ToList() };
-            return row.ReadOnly ? null : preferences.Resolve(_context.CategoryKey, _context.TypeKey, row.GroupKey, row.ParameterKey, _darkPreview);
+            return row.ReadOnly ? null : preferences.Resolve(_context.CategoryKey, _context.TypeKey, row.GroupKey, row.ParameterKey, _darkPreview, _context.ValuesOf);
         }
         private void Select(PropertyPreviewRow row)
         {
@@ -209,7 +213,8 @@ namespace BIMaestro.PropertiesAppearance
         private void SetTone(bool dark) { _darkPreview = dark; LoadColors(); RenderRows(); RefreshRules(); }
         private void LoadColors()
         {
-            _loading = true; var c = (_darkPreview ? CurrentRule?.Dark : CurrentRule?.Light) ?? new PaletteColors(); _text.SelectedColor = AppearancePreferences.Parse(c.Text) ?? Colors.Transparent; _background.SelectedColor = AppearancePreferences.Parse(c.Background) ?? Colors.Transparent; _loading = false;
+            _loading = true; var c = (_darkPreview ? CurrentRule?.Dark : CurrentRule?.Light) ?? new PaletteColors(); _text.SelectedColor = AppearancePreferences.Parse(c.Text) ?? Colors.Transparent; _background.SelectedColor = AppearancePreferences.Parse(c.Background) ?? Colors.Transparent;
+            LoadStyle(); _loading = false;
             _selection.Text = _selected == null ? UiLanguage.Get("PropertiesAppearanceWindow.OpenASelectionInRevit") : (_selected.Header ? UiLanguage.Get("PropertiesAppearanceWindow.Group") : UiLanguage.Get("PropertiesAppearanceWindow.Parameter")) + _selected.Label;
             _selectionHint.Text = _selected == null ? UiLanguage.Get("PropertiesAppearanceWindow.OpenThePropertiesPaletteThenChooseAView") : _selected.ReadOnly ? UiLanguage.Get("PropertiesAppearanceWindow.ThisRowKeepsItsNativeAppearance") : _selected.Header ? UiLanguage.Get("PropertiesAppearanceWindow.TheHeaderAndEditableRowsOfThisGroup") : UiLanguage.Get("PropertiesAppearanceWindow.OnlyThisRowChangesOtherParametersKeepTheir");
             _editor.IsEnabled = _selected != null && !_selected.ReadOnly;
@@ -234,6 +239,82 @@ namespace BIMaestro.PropertiesAppearance
             if (rule.Light.IsEmpty && rule.Dark.IsEmpty) _profile.Rules.Remove(rule);
             _loading = true; _enabled.IsChecked = true; _loading = false; Changed();
         }
+        private WrapPanel Segment(string[] keys, string[] labels, List<Tuple<Button, string>> buttons, Action<string> pick)
+        {
+            var panel = new WrapPanel { Margin = new Thickness(0, 0, 0, 8) };
+            for (int i = 0; i < keys.Length; i++)
+            {
+                string key = keys[i];
+                var b = MakeButton(UiLanguage.Get("PropertiesAppearanceWindow." + labels[i]), () => { pick(key); StyleChanged(); });
+                b.MinWidth = 0; b.MinHeight = 30; b.Padding = new Thickness(4, 4, 4, 4); b.Margin = new Thickness(0, 0, 6, 6);
+                buttons.Add(Tuple.Create(b, key)); panel.Children.Add(b);
+            }
+            return panel;
+        }
+        private CheckBox Option(CheckBox box, string key)
+        {
+            var text = new TextBlock { Text = UiLanguage.Get("PropertiesAppearanceWindow." + key), TextWrapping = TextWrapping.Wrap };
+            text.SetResourceReference(TextBlock.ForegroundProperty, "Ink"); box.Content = text;
+            box.Checked += (_, __) => StyleChanged(); box.Unchecked += (_, __) => StyleChanged(); return box;
+        }
+        private void BuildStyleEditor(StackPanel panel)
+        {
+            panel.Children.Add(Label(UiLanguage.Get("PropertiesAppearanceWindow.LayerBackground"), 12, true));
+            panel.Children.Add(Segment(new[] { StyleSet.BgNone, StyleSet.BgFill, StyleSet.BgGradient }, new[] { "None", "BackgroundFill", "BackgroundGradient" }, _bgButtons, k => _bgValue = k));
+            panel.Children.Add(Option(_textLayer, "LayerText"));
+            panel.Children.Add(Label(UiLanguage.Get("PropertiesAppearanceWindow.LayerMarker"), 12, true));
+            panel.Children.Add(Segment(new[] { StyleSet.MarkNone, StyleSet.MarkStripe, StyleSet.MarkDot, StyleSet.MarkOutline }, new[] { "None", "MarkerStripe", "MarkerDot", "MarkerOutline" }, _markButtons, k => _markValue = k));
+            panel.Children.Add(Label(UiLanguage.Get("PropertiesAppearanceWindow.LayerIcon"), 12, true));
+            var none = new ComboBoxItem { Content = UiLanguage.Get("PropertiesAppearanceWindow.NoIcon"), Tag = "" }; _icon.Items.Add(none);
+            foreach (var asset in Couleur.ProjectBrowserIcons.BuiltInIcons)
+            {
+                var row = new StackPanel { Orientation = Orientation.Horizontal };
+                row.Children.Add(new Image { Source = PaletteIcons.Source(asset.Id), Width = 16, Height = 16, Margin = new Thickness(0, 0, 8, 0) });
+                row.Children.Add(new TextBlock { Text = asset.Name, VerticalAlignment = VerticalAlignment.Center });
+                _icon.Items.Add(new ComboBoxItem { Content = row, Tag = asset.Id });
+            }
+            _icon.SelectedIndex = 0; _icon.SelectionChanged += (_, __) => StyleChanged(); panel.Children.Add(_icon);
+            _groupOptions.Children.Add(Option(_headerOnly, "HeaderOnly")); _groupOptions.Children.Add(Option(_zebra, "Zebra")); panel.Children.Add(_groupOptions);
+            panel.Children.Add(Option(_autoTint, "AutoTint"));
+        }
+        private void LoadStyle()
+        {
+            var rule = CurrentRule; var set = AppearanceStyles.Parse(rule?.Style);
+            _bgValue = set.Background; _markValue = set.Marker; _textLayer.IsChecked = set.Text;
+            _headerOnly.IsChecked = set.HeaderOnly; _zebra.IsChecked = set.Zebra; _autoTint.IsChecked = rule?.AutoTint == true;
+            // Header-only and alternate rows only make sense on a group title.
+            _groupOptions.Visibility = _selected?.Header == true ? Visibility.Visible : Visibility.Collapsed;
+            _icon.SelectedItem = _icon.Items.Cast<ComboBoxItem>().FirstOrDefault(i => (string)i.Tag == (rule?.Icon ?? "")) ?? _icon.Items[0];
+            HighlightSegments(); RefreshLooks();
+        }
+        private static string OperatorName(string op)
+        {
+            switch (op) { case "=": return "Equals"; case "!=": return "Differs"; case "contains": return "Contains"; case "empty": return "Empty"; case "notempty": return "NotEmpty"; case ">": return "Greater"; default: return "Less"; }
+        }
+        private void HighlightSegments()
+        {
+            foreach (var b in _bgButtons.Concat(_markButtons))
+            {
+                bool on = b.Item2 == (_bgButtons.Contains(b) ? _bgValue : _markValue);
+                b.Item1.Background = on ? Brush("#DCEEE3") : (Brush)Resources["Surface"]; b.Item1.Foreground = on ? Brush("#155C42") : (Brush)Resources["Ink"];
+                b.Item1.BorderBrush = on ? Brush("#20845D") : (Brush)Resources["Line"];
+            }
+        }
+        private void StyleChanged()
+        {
+            if (_loading || _selected == null || _selected.ReadOnly || _profile == null) return;
+            HighlightSegments();
+            var rule = CurrentRule;
+            if (rule == null) { rule = new AppearanceRule { Kind = _selected.Header ? "group" : "parameter", TargetKey = _selected.Header ? _selected.GroupKey : _selected.ParameterKey, Label = _selected.Label }; _profile.Rules.Add(rule); }
+            var set = new StyleSet { Background = _bgValue, Marker = _markValue, Text = _textLayer.IsChecked == true,
+                HeaderOnly = _selected.Header && _headerOnly.IsChecked == true, Zebra = _selected.Header && _zebra.IsChecked == true };
+            rule.Style = AppearanceStyles.Store(set);
+            rule.Icon = (_icon.SelectedItem as ComboBoxItem)?.Tag as string; if (rule.Icon == "") rule.Icon = null;
+            rule.AutoTint = _autoTint.IsChecked == true;
+            // A style without any color would be invisible: start from the BIMaestro sage.
+            if (rule.Light.IsEmpty && rule.Dark.IsEmpty) rule.Light.Text = "#FF155C42";
+            _loading = true; _enabled.IsChecked = true; _loading = false; Changed(); LoadColors();
+        }
         private void Changed()
         {
             _dirty.Add(_profile.Key); _revision++; RenderRows(); RefreshRules(); UpdateColorHint(); UpdateState(); SchedulePreview();
@@ -245,7 +326,9 @@ namespace BIMaestro.PropertiesAppearance
             var own = _darkPreview ? CurrentRule?.Dark : CurrentRule?.Light;
             string source = own == null || own.IsEmpty ? effective == null ? UiLanguage.Get("PropertiesAppearanceWindow.OriginalRevitColors") : UiLanguage.Get("PropertiesAppearanceWindow.ColorsInheritedFromAMoreGeneralSetting") : UiLanguage.Get("PropertiesAppearanceWindow.CustomColorsForThisSelection");
             var colors = effective ?? new PaletteColors(); var bg = AppearancePreferences.Parse(colors.Background) ?? (_darkPreview ? Color.FromRgb(59, 68, 83) : Colors.White); var fg = AppearancePreferences.Parse(colors.Text) ?? (_darkPreview ? Colors.White : Colors.Black);
-            if (own != null && !own.IsEmpty && effective != null && !ReferenceEquals(own, effective)) source = UiLanguage.Get("PropertiesAppearanceWindow.AMoreSpecificSettingTakesPriorityForThis");
+            var mine = CurrentRule == null ? null : CurrentRule.AutoTint ? AppearanceStyles.Tint(CurrentRule, _darkPreview) : own;
+            bool sameAsMine = mine != null && effective != null && mine.Text == effective.Text && mine.Background == effective.Background && AppearanceStyles.Parse(CurrentRule.Style).ToString() == AppearanceStyles.Parse(effective.Style).ToString();
+            if (own != null && !own.IsEmpty && effective != null && !sameAsMine) source = UiLanguage.Get("PropertiesAppearanceWindow.AMoreSpecificSettingTakesPriorityForThis");
             _colorHint.Text = source + (AppearancePreferences.Contrast(fg, bg) < 4.5 ? UiLanguage.Get("PropertiesAppearanceWindow.TheTextIsAdjustedInThePreviewTo") : "");
             foreach (var preset in _presets)
             {
@@ -263,26 +346,47 @@ namespace BIMaestro.PropertiesAppearance
         private Button PreviewCell(PropertyPreviewRow row, bool modified)
         {
             var nativeBg = _darkPreview ? Color.FromRgb(row.Header ? (byte)44 : (byte)59, row.Header ? (byte)53 : (byte)68, row.Header ? (byte)66 : (byte)83) : row.Header ? Color.FromRgb(233, 237, 234) : Colors.White;
-            var colors = modified ? Effective(row) : null; Color bg = AppearancePreferences.Parse(colors?.Background) ?? nativeBg;
-            Color fg = row.ReadOnly ? (_darkPreview ? Color.FromRgb(165, 175, 187) : Color.FromRgb(138, 146, 143)) : colors == null ? (_darkPreview ? Colors.White : Color.FromRgb(34, 47, 42)) : AppearancePreferences.ReadableText(new PaletteColors { Text = colors.Text, Background = bg.ToString() }, _darkPreview);
+            var colors = modified ? Effective(row) : null;
+            var set = colors == null ? new StyleSet { Background = StyleSet.BgNone, Text = false } : AppearanceStyles.Parse(colors.Style);
+            var accent = AppearanceStyles.Accent(colors);
+            Color chosenBg = AppearancePreferences.Parse(colors?.Background) ?? nativeBg;
+            Color bg = set.Background == StyleSet.BgFill ? chosenBg : nativeBg;
+            Color nativeFg = _darkPreview ? Colors.White : Color.FromRgb(34, 47, 42);
+            bool recolor = set.Text || (set.Background == StyleSet.BgFill && AppearancePreferences.Parse(colors?.Background).HasValue);
+            Color fg = row.ReadOnly ? (_darkPreview ? Color.FromRgb(165, 175, 187) : Color.FromRgb(138, 146, 143)) : !recolor ? nativeFg : AppearancePreferences.ReadableText(new PaletteColors { Text = set.Text ? colors.Text : null, Background = bg.ToString() }, _darkPreview);
             var grid = new Grid(); grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.15, GridUnitType.Star) }); grid.ColumnDefinitions.Add(new ColumnDefinition());
             var label = new TextBlock { Text = (row.Header ? (IsCollapsed(row) ? "›  " : "⌄  ") : "") + row.Label, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center, Foreground = new SolidColorBrush(fg), FontWeight = row.Header ? FontWeights.SemiBold : FontWeights.Normal, FontSize = 12, Margin = new Thickness(0, 0, 8, 0) }; grid.Children.Add(label);
             if (row.Header) Grid.SetColumnSpan(label, 2);
             else { var value = new TextBlock { Text = row.Value, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center, Foreground = new SolidColorBrush(fg), FontSize = 12 }; Grid.SetColumn(value, 1); grid.Children.Add(value); }
+            if (colors?.Icon != null) label.Inlines.Add(new System.Windows.Documents.InlineUIContainer(new Image { Source = PaletteIcons.Source(colors.Icon), Width = 14, Height = 14, Margin = new Thickness(7, 0, 0, -2) }));
+            if (set.Marker == StyleSet.MarkDot && accent.HasValue) label.Inlines.Add(new System.Windows.Documents.Run("  ●") { Foreground = new SolidColorBrush(accent.Value) });
             UIElement cellContent = grid;
+            if (set.Marker == StyleSet.MarkStripe && accent.HasValue)
+            {
+                var striped = new DockPanel { LastChildFill = true };
+                var bar = new Border { Width = 3, CornerRadius = new CornerRadius(1.5), Background = new SolidColorBrush(accent.Value), Margin = new Thickness(-4, -2, 6, -2) };
+                DockPanel.SetDock(bar, Dock.Left); striped.Children.Add(bar); striped.Children.Add(grid); cellContent = striped;
+            }
             if (modified)
             {
                 var handleRow = new Grid(); handleRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(18) }); handleRow.ColumnDefinitions.Add(new ColumnDefinition());
                 handleRow.Children.Add(new TextBlock { Text = "⠿", Foreground = new SolidColorBrush(fg), VerticalAlignment = VerticalAlignment.Center, ToolTip = UiLanguage.Get("PropertiesAppearanceWindow.DragToMove") });
-                Grid.SetColumn(grid, 1); handleRow.Children.Add(grid); cellContent = handleRow;
+                Grid.SetColumn(cellContent, 1); handleRow.Children.Add(cellContent); cellContent = handleRow;
             }
             var numbered = new DockPanel { LastChildFill=true };
             var reference = new TextBlock { Text=_originNumbers.TryGetValue(row,out var origin)?origin:"", MinWidth=38, Margin=new Thickness(8,0,0,0), TextAlignment=TextAlignment.Right, VerticalAlignment=VerticalAlignment.Center, FontSize=11, FontWeight=FontWeights.SemiBold, ToolTip="Position dans l’ordre Revit d’origine" };
             reference.SetResourceReference(TextBlock.ForegroundProperty,"Muted");
             DockPanel.SetDock(reference,Dock.Right);numbered.Children.Add(reference);numbered.Children.Add(cellContent);cellContent=numbered;
-            var button = MakeButton("", () => ClickRow(row)); button.Style = (Style)Resources[typeof(Button)]; button.MinWidth = 0; button.Content = cellContent; button.HorizontalContentAlignment = HorizontalAlignment.Stretch; button.Padding = new Thickness(8, 7, 8, 7); button.Margin = new Thickness(0); button.MinHeight = row.Header ? 34 : 32; button.Background = new SolidColorBrush(bg); button.Foreground = new SolidColorBrush(fg);
+            var button = MakeButton("", () => ClickRow(row)); button.Style = (Style)Resources[typeof(Button)]; button.MinWidth = 0; button.Content = cellContent; button.HorizontalContentAlignment = HorizontalAlignment.Stretch; button.Padding = new Thickness(8, 7, 8, 7); button.Margin = new Thickness(0); button.MinHeight = row.Header ? 34 : 32;
+            button.Background = set.Background == StyleSet.BgGradient
+                ? new LinearGradientBrush(new GradientStopCollection { new GradientStop(chosenBg, 0), new GradientStop(nativeBg, .55) }, new Point(0, .5), new Point(1, .5))
+                : (Brush)new SolidColorBrush(bg); button.Foreground = new SolidColorBrush(fg);
             button.ToolTip = row.Label + (row.Header ? UiLanguage.Get("PropertiesAppearanceWindow.EntireGroup") : " : " + row.Value) + (row.ReadOnly ? UiLanguage.Get("PropertiesAppearanceWindow.NativeAppearanceKept") : UiLanguage.Get("PropertiesAppearanceWindow.ClickToCustomize"));
-            bool selected = ReferenceEquals(row, _selected) && modified; button.BorderBrush = selected ? Brush("#22A875") : new SolidColorBrush(bg); button.BorderThickness = new Thickness(selected ? 2 : 1); if (modified) EnableDragging(button, row); return button;
+            bool selected = ReferenceEquals(row, _selected) && modified;
+            bool outline = set.Marker == StyleSet.MarkOutline && accent.HasValue;
+            button.BorderBrush = selected ? Brush("#22A875") : outline ? new SolidColorBrush(accent.Value) : new SolidColorBrush(bg);
+            button.BorderThickness = new Thickness(selected ? 2 : outline ? 1.5 : 1);
+            if (colors?.Badge != null && accent.HasValue) button.ToolTip = colors.Badge + " · " + button.ToolTip; if (modified) EnableDragging(button, row); return button;
         }
         private void ResetSelection()
         {

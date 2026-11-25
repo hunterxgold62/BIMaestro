@@ -2546,9 +2546,13 @@ __BIMAESTRO_ATMOSPHERE_CSS__
       }).sort((a,b)=>(a.path||'').length-(b.path||'').length);
     };
     const getRowCategoryRules=row=>{
-      const mappedPath=resolveMappedViewPath(row);
-      const visibleRules=row.branch==='views'?getCategoryRules(row):[];
-      const mappedRules=mappedPath?getPlacedViewRules(row):[];
+      const inViews=row.branch==='views';
+      const visibleRules=inViews?getCategoryRules(row):[];
+      // Dans la branche Vues, la lignée visible donne déjà le vrai dossier. Une
+      // recherche par nom seul confondrait un dossier avec une vue homonyme
+      // (ex. dossier Travail / Vue 3D et vue Vue 3D rangée dans Livrable).
+      const mappedRules=!inViews||(row.id&&viewPathsById.has(row.id))
+        ?getPlacedViewRules(row):[];
       return Array.from(new Set(visibleRules.concat(mappedRules)))
         .sort((a,b)=>(a.path||'').length-(b.path||'').length);
     };
@@ -2643,7 +2647,13 @@ __BIMAESTRO_ATMOSPHERE_CSS__
           if(id)viewTypesById.set(id,kind);
           if(name)viewTypesByName.set(name,kind);
           if(id)viewPathsById.set(id,String(entry.path||''));
-          if(name)viewPathsByName.set(name,String(entry.path||''));
+          // Deux vues de types différents peuvent porter le même nom : le nom
+          // seul ne désigne alors plus un dossier fiable, on l'ignore (null).
+          if(name){
+            const entryPath=String(entry.path||'');
+            viewPathsByName.set(name,viewPathsByName.has(name)&&
+              viewPathsByName.get(name)!==entryPath?null:entryPath);
+          }
         });
       paintViewTypes();
     };

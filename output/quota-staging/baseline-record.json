@@ -1,0 +1,47 @@
+{
+  "checkedAt": "2026-11-23T13:40:28.174Z",
+  "seededAt": "2026-11-23T13:40:41.271Z",
+  "added": {
+    "r2_bytes": 187255008,
+    "r2_a": 487,
+    "r2_b": 1728,
+    "worker_requests": 452,
+    "d1_reads": 4166,
+    "d1_writes": 66,
+    "d1_bytes": 114688
+  },
+  "before": {
+    "id": 1,
+    "r2_bytes": 37607737,
+    "r2_a": 67,
+    "r2_b": 2134,
+    "worker_requests": 2874,
+    "d1_reads": 735744,
+    "d1_writes": 45984,
+    "d1_bytes": 720896
+  },
+  "after": {
+    "id": 1,
+    "r2_bytes": 224862745,
+    "r2_a": 554,
+    "r2_b": 3862,
+    "worker_requests": 3326,
+    "d1_reads": 739910,
+    "d1_writes": 46050,
+    "d1_bytes": 835584
+  },
+  "policy": {
+    "id": 1,
+    "enabled": 1,
+    "threshold_percent": 80,
+    "verified_until": "2026-12-27T00:00:00.000Z",
+    "r2_bytes_limit": 10000000000,
+    "r2_a_limit": 1000000,
+    "r2_b_limit": 10000000,
+    "worker_requests_limit": 100000,
+    "d1_reads_limit": 5000000,
+    "d1_writes_limit": 100000,
+    "d1_bytes_limit": 500000000,
+    "scope": "account"
+  }
+}

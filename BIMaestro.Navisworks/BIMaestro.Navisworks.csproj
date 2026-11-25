@@ -61,6 +61,7 @@
     <Compile Include="Services\NavisworksBimMetadata.cs" />
     <Compile Include="Services\ExteriorVisibility.cs" />
     <Compile Include="Services\SimplifiedShellMesh.cs" />
+    <Compile Include="Services\StraightTubeMesh.cs" />
     <Compile Include="Services\NavisworksWebScene.cs" />
     <Compile Include="UI\PublishWebWindow.cs" />
     <Compile Include="..\BIMaestro\commands\Jeux vidéos\Maquette jouable\GameRuntimeDiagnostics.cs" />

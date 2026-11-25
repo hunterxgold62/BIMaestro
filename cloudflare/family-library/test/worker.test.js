@@ -9,7 +9,7 @@ import worker,{MAX_UPLOAD_BYTES,readBounded} from '../worker.js';
 import {reserve,requestCost} from '../quota.js';
 function harness(){
  const sql=new DatabaseSync(':memory:');sql.exec(readFileSync(new URL('../schema.sql',import.meta.url),'utf8'));
- sql.exec("UPDATE quota_policy SET enabled=1,threshold_percent=1,verified_until='2099-01-01T00:00:00.000Z'");
+ sql.exec("UPDATE quota_policy SET enabled=1,scope='account',threshold_percent=1,verified_until='2099-01-01T00:00:00.000Z'");
  const db={prepare(text){return {bind(...args){const stmt=sql.prepare(text);return {
   async first(){return stmt.get(...args)||null;},async all(){return {results:stmt.all(...args)};},async run(){return stmt.run(...args);}
  };}};}};
@@ -26,19 +26,19 @@ test('stalled upload hits wall-clock deadline and cancels the input stream',asyn
  assert.equal(cancelled,true);
 });
 test('1% storage boundary is atomic under simultaneous reservations',async()=>{
- const h=harness();h.sql.exec('UPDATE quota_state SET r2_bytes=99998976');
+ const h=harness();h.sql.exec('UPDATE quota_state SET r2_bytes='+(100000000-2*requestCost('upload',512).r2_bytes));
  const accepted=await Promise.all(Array.from({length:12},()=>reserve(h.db,requestCost('upload',512))));
  assert.equal(accepted.filter(Boolean).length,2);
  assert.equal(h.sql.prepare('SELECT r2_bytes FROM quota_state').get().r2_bytes,100000000);
 });
-test('independent SQLite connections race at 1% without over-reserving',async()=>{
+test('library and model connections race at 1% without over-reserving',async()=>{
  const folder=mkdtempSync(join(tmpdir(),'bimaestro-quota-'));const path=join(folder,'quota.sqlite');
  const db=new DatabaseSync(path);db.exec(readFileSync(new URL('../schema.sql',import.meta.url),'utf8'));
- db.exec("UPDATE quota_policy SET enabled=1,threshold_percent=1,verified_until='2099-01-01T00:00:00.000Z'; UPDATE quota_state SET r2_bytes=99998976");
+ db.exec("UPDATE quota_policy SET enabled=1,scope='account',threshold_percent=1,verified_until='2099-01-01T00:00:00.000Z'; UPDATE quota_state SET r2_bytes="+(100000000-2*requestCost('upload',512).r2_bytes));
  const gate=new SharedArrayBuffer(4);let ready=0;const workers=[];
  try{
-  const results=await Promise.all(Array.from({length:8},()=>new Promise((resolve,reject)=>{
-   const child=new Worker(new URL('./reserve-worker.js',import.meta.url),{workerData:{path,gate}});workers.push(child);
+  const results=await Promise.all(Array.from({length:8},(_,index)=>new Promise((resolve,reject)=>{
+   const child=new Worker(new URL('./reserve-worker.js',import.meta.url),{workerData:{path,gate,kind:index%2?'model':'library'}});workers.push(child);
    child.on('error',reject);child.on('message',message=>{if(message==='ready'){if(++ready===8){Atomics.store(new Int32Array(gate),0,1);Atomics.notify(new Int32Array(gate),0);}}else resolve(message);});
   })));
   assert.equal(results.filter(Boolean).length,2);
@@ -138,7 +138,7 @@ test('download deliveries increment atomically; listing and failed downloads do 
 test('failed R2 write retains reservation and pending claim blocks blind retry',async()=>{
  const h=harness();h.env.FAMILIES.put=async()=>{h.calls.put++;throw new Error('ambiguous network error');};
  assert.equal((await worker.fetch(upload(),h.env)).status,503);
- assert.equal(h.sql.prepare('SELECT r2_bytes FROM quota_state').get().r2_bytes,512);
+ assert.equal(h.sql.prepare('SELECT r2_bytes FROM quota_state').get().r2_bytes,requestCost('upload',512).r2_bytes);
  assert.equal((await worker.fetch(upload(),h.env)).status,409);assert.equal(h.calls.put,1);
 });
 test('expired, disabled, missing state and failed D1 all fail closed',async()=>{

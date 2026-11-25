@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS quota_policy (
  id INTEGER PRIMARY KEY CHECK(id=1), enabled INTEGER NOT NULL DEFAULT 0 CHECK(enabled IN(0,1)),
  threshold_percent INTEGER NOT NULL DEFAULT 80 CHECK(threshold_percent BETWEEN 1 AND 80),
  verified_until TEXT NOT NULL DEFAULT '',
+ scope TEXT NOT NULL DEFAULT 'unverified' CHECK(scope IN('unverified','account')),
  r2_bytes_limit INTEGER NOT NULL DEFAULT 10000000000,
  r2_a_limit INTEGER NOT NULL DEFAULT 1000000,
  r2_b_limit INTEGER NOT NULL DEFAULT 10000000,

@@ -1,0 +1,476 @@
+{
+  "ok": true,
+  "strict": false,
+  "browserSkipped": false,
+  "lint": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "filesScanned": 3
+  },
+  "runtime": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": []
+  },
+  "layout": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 3,
+    "infoCount": 5,
+    "findings": [
+      {
+        "code": "container_overflow",
+        "severity": "warning",
+        "time": 0.958,
+        "selector": "#base",
+        "message": "Element extends outside a clipping layout container.",
+        "rect": {
+          "left": 50,
+          "top": 210,
+          "right": 610,
+          "bottom": 1292,
+          "width": 560,
+          "height": 1082
+        },
+        "containerSelector": "#card",
+        "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+        "containerRect": {
+          "left": 50,
+          "top": 210,
+          "right": 610,
+          "bottom": 1170,
+          "width": 560,
+          "height": 960
+        },
+        "overflow": {
+          "bottom": 122
+        },
+        "dataAttributes": {
+          "data-hf-render-id": "base",
+          "data-hf-authored-opacity": ""
+        },
+        "sourceFile": "compositions/reel.html",
+        "bbox": {
+          "x": 50,
+          "y": 210,
+          "width": 560,
+          "height": 1082
+        },
+        "firstSeen": 0.958,
+        "lastSeen": 14.375,
+        "occurrences": 8,
+        "heldMs": 0,
+        "times": [
+          0.958,
+          2.875,
+          4.792,
+          6.708,
+          8.625,
+          10.542,
+          12.458,
+          14.375
+        ]
+      },
+      {
+        "code": "escaped_container",
+        "severity": "warning",
+        "time": 0.958,
+        "selector": "#cur",
+        "message": "Positioned element renders far outside its offset parent — its coordinates were likely computed in a different frame (canvas/viewport pixels).",
+        "rect": {
+          "left": 1180,
+          "top": 1420,
+          "right": 1244,
+          "bottom": 1484,
+          "width": 64,
+          "height": 64
+        },
+        "containerSelector": "#reel > div:nth-of-type(1)",
+        "text": "",
+        "fixHint": "Compute left/top in the offset parent's frame (subtract its rect), or mark intentional placement with data-layout-allow-overflow.",
+        "containerRect": {
+          "left": 0,
+          "top": 0,
+          "right": 1080,
+          "bottom": 1350,
+          "width": 1080,
+          "height": 1350
+        },
+        "dataAttributes": {},
+        "sourceFile": "compositions/reel.html",
+        "bbox": {
+          "x": 1180,
+          "y": 1420,
+          "width": 64,
+          "height": 64
+        },
+        "firstSeen": 0.958,
+        "lastSeen": 14.375,
+        "occurrences": 3,
+        "heldMs": 0,
+        "times": [
+          0.958,
+          12.458,
+          14.375
+        ]
+      },
+      {
+        "code": "container_overflow",
+        "severity": "warning",
+        "time": 12.458,
+        "selector": "#cv5",
+        "message": "Element extends outside a clipping layout container.",
+        "rect": {
+          "left": 50,
+          "top": 210,
+          "right": 610,
+          "bottom": 1292,
+          "width": 560,
+          "height": 1082
+        },
+        "containerSelector": "#card",
+        "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+        "containerRect": {
+          "left": 50,
+          "top": 210,
+          "right": 610,
+          "bottom": 1170,
+          "width": 560,
+          "height": 960
+        },
+        "overflow": {
+          "bottom": 122
+        },
+        "dataAttributes": {
+          "data-hf-render-id": "cv5",
+          "data-hf-authored-opacity": ""
+        },
+        "sourceFile": "compositions/reel.html",
+        "bbox": {
+          "x": 50,
+          "y": 210,
+          "width": 560,
+          "height": 1082
+        },
+        "firstSeen": 12.458,
+        "lastSeen": 14.375,
+        "occurrences": 2,
+        "heldMs": 0,
+        "times": [
+          12.458,
+          14.375
+        ]
+      },
+      {
+        "code": "container_overflow",
+        "severity": "info",
+        "time": 2.875,
+        "selector": "#cv0",
+        "message": "Element extends outside a clipping layout container.",
+        "rect": {
+          "left": 50,
+          "top": 210,
+          "right": 610,
+          "bottom": 1292,
+          "width": 560,
+          "height": 1082
+        },
+        "containerSelector": "#card",
+        "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+        "containerRect": {
+          "left": 50,
+          "top": 210,
+          "right": 610,
+          "bottom": 1170,
+          "width": 560,
+          "height": 960
+        },
+        "overflow": {
+          "bottom": 122
+        },
+        "dataAttributes": {
+          "data-hf-render-id": "cv0",
+          "data-hf-authored-opacity": ""
+        },
+        "sourceFile": "compositions/reel.html",
+        "bbox": {
+          "x": 50,
+          "y": 210,
+          "width": 560,
+          "height": 1082
+        },
+        "firstSeen": 2.875,
+        "lastSeen": 2.875,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          2.875
+        ]
+      },
+      {
+        "code": "container_overflow",
+        "severity": "info",
+        "time": 4.792,
+        "selector": "#cv1",
+        "message": "Element extends outside a clipping layout container.",
+        "rect": {
+          "left": 50,
+          "top": 210,
+          "right": 610,
+          "bottom": 1292,
+          "width": 560,
+          "height": 1082
+        },
+        "containerSelector": "#card",
+        "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+        "containerRect": {
+          "left": 50,
+          "top": 210,
+          "right": 610,
+          "bottom": 1170,
+          "width": 560,
+          "height": 960
+        },
+        "overflow": {
+          "bottom": 122
+        },
+        "dataAttributes": {
+          "data-hf-render-id": "cv1",
+          "data-hf-authored-opacity": ""
+        },
+        "sourceFile": "compositions/reel.html",
+        "bbox": {
+          "x": 50,
+          "y": 210,
+          "width": 560,
+          "height": 1082
+        },
+        "firstSeen": 4.792,
+        "lastSeen": 4.792,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          4.792
+        ]
+      },
+      {
+        "code": "container_overflow",
+        "severity": "info",
+        "time": 6.708,
+        "selector": "#cv2",
+        "message": "Element extends outside a clipping layout container.",
+        "rect": {
+          "left": 50,
+          "top": 210,
+          "right": 610,
+          "bottom": 1292,
+          "width": 560,
+          "height": 1082
+        },
+        "containerSelector": "#card",
+        "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+        "containerRect": {
+          "left": 50,
+          "top": 210,
+          "right": 610,
+          "bottom": 1170,
+          "width": 560,
+          "height": 960
+        },
+        "overflow": {
+          "bottom": 122
+        },
+        "dataAttributes": {
+          "data-hf-render-id": "cv2",
+          "data-hf-authored-opacity": ""
+        },
+        "sourceFile": "compositions/reel.html",
+        "bbox": {
+          "x": 50,
+          "y": 210,
+          "width": 560,
+          "height": 1082
+        },
+        "firstSeen": 6.708,
+        "lastSeen": 6.708,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          6.708
+        ]
+      },
+      {
+        "code": "container_overflow",
+        "severity": "info",
+        "time": 8.625,
+        "selector": "#cv3",
+        "message": "Element extends outside a clipping layout container.",
+        "rect": {
+          "left": 50,
+          "top": 210,
+          "right": 610,
+          "bottom": 1292,
+          "width": 560,
+          "height": 1082
+        },
+        "containerSelector": "#card",
+        "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+        "containerRect": {
+          "left": 50,
+          "top": 210,
+          "right": 610,
+          "bottom": 1170,
+          "width": 560,
+          "height": 960
+        },
+        "overflow": {
+          "bottom": 122
+        },
+        "dataAttributes": {
+          "data-hf-render-id": "cv3",
+          "data-hf-authored-opacity": ""
+        },
+        "sourceFile": "compositions/reel.html",
+        "bbox": {
+          "x": 50,
+          "y": 210,
+          "width": 560,
+          "height": 1082
+        },
+        "firstSeen": 8.625,
+        "lastSeen": 8.625,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          8.625
+        ]
+      },
+      {
+        "code": "container_overflow",
+        "severity": "info",
+        "time": 10.542,
+        "selector": "#cv4",
+        "message": "Element extends outside a clipping layout container.",
+        "rect": {
+          "left": 50,
+          "top": 210,
+          "right": 610,
+          "bottom": 1292,
+          "width": 560,
+          "height": 1082
+        },
+        "containerSelector": "#card",
+        "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+        "containerRect": {
+          "left": 50,
+          "top": 210,
+          "right": 610,
+          "bottom": 1170,
+          "width": 560,
+          "height": 960
+        },
+        "overflow": {
+          "bottom": 122
+        },
+        "dataAttributes": {
+          "data-hf-render-id": "cv4",
+          "data-hf-authored-opacity": ""
+        },
+        "sourceFile": "compositions/reel.html",
+        "bbox": {
+          "x": 50,
+          "y": 210,
+          "width": 560,
+          "height": 1082
+        },
+        "firstSeen": 10.542,
+        "lastSeen": 10.542,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          10.542
+        ]
+      }
+    ],
+    "duration": 17.25,
+    "samples": [
+      0.958,
+      2.875,
+      4.792,
+      6.708,
+      8.625,
+      10.542,
+      12.458,
+      14.375,
+      16.292
+    ],
+    "transitionSamples": [],
+    "transitionSamplesDropped": 0,
+    "tolerance": 2,
+    "totalIssueCount": 8,
+    "truncated": false,
+    "faceCheck": {
+      "ran": true,
+      "candidates": 0,
+      "faces": 0
+    }
+  },
+  "motion": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "enabled": false,
+    "samples": 0
+  },
+  "contrast": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "enabled": true,
+    "samples": [
+      0.958,
+      4.792,
+      8.625,
+      12.458,
+      16.292
+    ],
+    "checked": 37,
+    "passed": 37
+  },
+  "craft": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "enabled": true,
+    "step": 0.125,
+    "samples": 138
+  },
+  "audio": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": []
+  },
+  "hdr": {
+    "autoPromotion": null,
+    "inspection": "available"
+  },
+  "snapshots": {
+    "enabled": false,
+    "files": [],
+    "times": [],
+    "findingFiles": []
+  }
+}

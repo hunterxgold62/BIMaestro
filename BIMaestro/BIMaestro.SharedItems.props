@@ -476,6 +476,7 @@
     <Compile Include="commands\page de mise à jour en direct\SupportPromptWindow.xaml.cs">
       <DependentUpon>SupportPromptWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="app et excel\temps revit\TimeProjectGroups.cs" />
     <Compile Include="app et excel\temps revit\ShowTimeDashboard.cs" />
     <Compile Include="app et excel\temps revit\TimeSeriesDashboardWindow.xaml.cs">
       <DependentUpon>TimeSeriesDashboardWindow.xaml</DependentUpon>

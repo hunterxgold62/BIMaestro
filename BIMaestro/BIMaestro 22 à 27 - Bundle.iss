@@ -19,6 +19,7 @@
 ; ---------------------------------------------------------------------------
 
 #define AppVersion "1.0.6.5"
+#define Branding "..\Installer\branding"
 #define AddInId "{E3B0C442-98FC-1C14-9AF7-7D7CE11B9A09}"
 #define ProductCode "{61D3E380-DC30-49B3-BC8E-B7AD886F29A0}"
 #define UpgradeCode "{49998F77-82A0-4D32-BF80-FFA6542040F6}"
@@ -40,6 +41,8 @@ OutputDir=Output
 OutputBaseFilename=BIMaestroInstaller-Bundle-{#AppVersion}
 Compression=lzma2/ultra64
 SolidCompression=yes
+SetupIconFile={#Branding}\BIMaestro.ico
+UninstallDisplayIcon={app}\BIMaestro.ico
 UninstallDisplayName=BIMaestro
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
@@ -50,6 +53,8 @@ RestartApplications=no
 Name: "french"; MessagesFile: "compiler:Languages\French.isl"
 
 [Files]
+; Icône conservée sur le poste pour l’entrée Applications installées de Windows.
+Source: "{#Branding}\BIMaestro.ico"; DestDir: "{app}"; Flags: ignoreversion
 #if !FileExists("bin\Release\BIMaestro.dll")
   #error Compilez BIMaestro.csproj en Release avant de creer le bundle.
 #endif

@@ -26,6 +26,8 @@ Charge d'abord `/hyperframes` (contrat de rendu, work loop) ; ce skill ajoute le
 - ✅ **Configurateur** : boutons-pastilles cochés par un curseur animé, l'arborescence réelle suit.
 - ✅ **Battle** : Revit figé à gauche, Revit + BIMaestro à droite, « VS ».
 - ✅ Montrer **plusieurs looks** en fin de vidéo (« Ou encore… »).
+- ✅ **Garder l'en-tête natif de la fenêtre Revit** filmée (ex. palette Propriétés : « Propriétés », « Mur de base », « Murs (1) », « Modifier le type »), même s'il ne change pas : c'est ce qui fait reconnaître l'outil à tout utilisateur Revit au premier coup d'œil. Ne recadrer que le bas (nom du projet).
+- ✅ Pour LinkedIn, **« Couche par couche »** (configurateur où chaque clic ajoute une couche) explique mieux qu'un défilé de looks ; le défilé convient mieux au 9:16.
 - ❌ Fond vert, punch-in/zooms brusques, coupes sèches sans transition.
 - ❌ **Trop rapide** : à 0,8 s par look on croit voir des photos. Viser **1,5 s par look**, et privilégier les fonds animés (constellation, rubans, lucioles, aurore, dégradé animé) pour qu'on voie bouger.
 - ❌ Une arborescence entièrement en texte rouge (look « Verre dépoli » avec Texte #BE123C) : illisible et agressive. Garder un texte sombre ou clair neutre, la couleur va sur les dossiers.

@@ -187,13 +187,13 @@ namespace BIMaestro.Navisworks.UI
             ResetPreparation(selected.Length);
             _status.Text = "Extraction de la géométrie…";
             await Task.Delay(1, cancellation);
-            var extraction = new Progress<string>(message => _status.Text = message);
+            IProgress<string> extraction = new Progress<string>(message => _status.Text = message);
             var (scene, modelIndexByElement) = await NavisworksWebScene.CaptureAsync(_document, _title, selected, scopes, extraction, cancellation);
             var compressedBytesPerModel = new double[selected.Length];
             _status.Text = "Préparation et compression des GLB…";
             IProgress<int> packing = new Progress<int>(tiles => _status.Text = tiles == 0
                 ? "Préparation et compression des GLB…" : $"Compression des GLB… {tiles:N0} zones préparées");
-            var (package, removedParts, adjustedShellDetail) = await Task.Run(() =>
+            var (package, removedParts, adjustedShellDetail, simplifiedTubes) = await Task.Run(() =>
             {
                 var filtered = ExteriorVisibility.Filter(scene, modelIndexByElement, exterior, extraction, cancellation);
                 GameMepWebPackageResult BuildPackage()
@@ -253,7 +253,30 @@ namespace BIMaestro.Navisworks.UI
                         if (GameMepPublishClient.FitsPublication(candidate, targetWeight)) break;
                     }
                 }
-                return (candidate, filtered.Before - filtered.After, adjusted);
+                int tubes = 0;
+                if (scopes.Contains(WebModelScope.SimplifiedModel) && !GameMepPublishClient.FitsPublication(candidate, targetWeight))
+                {
+                    extraction.Report("Recherche de tronçons droits à alléger…");
+                    for (int i = 0; i < scene.Meshes.Count; i++)
+                    {
+                        cancellation.ThrowIfCancellationRequested();
+                        var mesh = scene.Meshes[i];
+                        int element = mesh.ElementIndices[0];
+                        if (scopes[modelIndexByElement[element]] != WebModelScope.SimplifiedModel) continue;
+                        string category = scene.Elements[element].Category;
+                        if (category == "Murs" || category == "Sols") continue;
+                        var reduced = StraightTubeMesh.Simplify(mesh, cancellation);
+                        if (ReferenceEquals(mesh, reduced)) continue;
+                        scene.Meshes[i] = reduced;
+                        tubes++;
+                    }
+                    if (tubes > 0)
+                    {
+                        scene.OriginalRenderTriangleCount = scene.Meshes.Sum(mesh => mesh.Indices.Count / 3);
+                        candidate = BuildPackage();
+                    }
+                }
+                return (candidate, filtered.Before - filtered.After, adjusted, tubes);
             }, cancellation);
 
             cancellation.ThrowIfCancellationRequested();
@@ -269,10 +292,11 @@ namespace BIMaestro.Navisworks.UI
             _canPublish = GameMepPublishClient.FitsPublication(_package, PublicationLimitMb);
             _size.Text = $"Géométrie GLB : {geometryBytes / 1048576d:F1} Mo · Transfert : {transferBytes / 1048576d:F1} Mo / {PublicationLimitMb} Mo";
             _status.Text = _canPublish ? "Prêt à publier." : "Limite de publication dépassée. Décochez des maquettes puis recalculez le poids.";
-            if (adjustDetail && targetWeight < PublicationLimitMb && transferBytes > targetWeight * GameMepPublishClient.Megabyte)
-                _status.Text += $" Le poids cible de {targetWeight} Mo est dépassé.";
+            if (adjustDetail && transferBytes > targetWeight * GameMepPublishClient.Megabyte)
+                _status.Text += $" Cible de {targetWeight} Mo non atteinte avec les réductions disponibles.";
             if (removedParts > 0) _status.Text += $" {removedParts:N0} pièces masquées écartées de l’export.";
-            if (adjustedShellDetail) _status.Text += " Réduction prioritaire des surfaces planes.";
+            if (adjustedShellDetail) _status.Text += " Surfaces planes secondaires réduites.";
+            if (simplifiedTubes > 0) _status.Text += $" {simplifiedTubes:N0} tronçons droits allégés.";
             LoadLinks();
         }
 

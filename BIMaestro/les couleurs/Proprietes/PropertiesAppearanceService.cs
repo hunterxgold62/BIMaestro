@@ -11,6 +11,8 @@ namespace BIMaestro.PropertiesAppearance
     internal sealed class PropertyTarget
     {
         internal string Key, Name, GroupKey, NativeName, DisplayValue;
+        // Displayed value for each selected element, only for parameters used by a condition.
+        internal List<string> Values;
         internal bool ReadOnly;
         internal long? NativeParameterId;
         public override string ToString() => Name;
@@ -24,6 +26,7 @@ namespace BIMaestro.PropertiesAppearance
         internal List<PropertyTarget> Parameters = new List<PropertyTarget>();
         internal Dictionary<string, PropertyTarget> ParameterMap = new Dictionary<string, PropertyTarget>();
         internal Dictionary<string, string> GroupMap = new Dictionary<string, string>();
+        internal IList<string> ValuesOf(string parameterKey) => Parameters.FirstOrDefault(p => p.Key == parameterKey)?.Values;
 
         internal static AppearanceContext ForEditor(UIApplication app)
         {
@@ -87,7 +90,7 @@ namespace BIMaestro.PropertiesAppearance
             return "";
         }
 
-        internal static AppearanceContext Capture(UIApplication app, bool displayValues = false)
+        internal static AppearanceContext Capture(UIApplication app, bool displayValues = false, ICollection<string> valueKeys = null)
         {
             var result = new AppearanceContext { Caption = UiLanguage.Get("PropertiesAppearanceService.OpenAProjectAndSelectAnElementOr"), Signature = "none" };
             var ui = app.ActiveUIDocument;
@@ -120,9 +123,13 @@ namespace BIMaestro.PropertiesAppearance
                     if (string.IsNullOrWhiteSpace(label)) label = "Autres";
                     if (!result.Groups.Any(g => g.Key == group)) result.Groups.Add(new PropertyTarget { Key = group, Name = label, NativeName = AppearancePreferences.Normalize(label) });
                     string identity = p.IsShared ? "shared:" + p.GUID : p.Id.ToString().StartsWith("-", StringComparison.Ordinal) ? "builtin:" + p.Id : "name:" + p.Definition.Name;
-                    string value=displayValues?DisplayValue(p):null;
+                    string key = group + "/" + identity;
+                    // Above 500 elements the per-element reading would slow Revit down.
+                    List<string> values = (displayValues || valueKeys?.Contains(key) == true) && selected.Length <= 500
+                        ? new[] { DisplayValue(p) }.Concat(common.Select(map => DisplayValue(map[nativeId]))).ToList() : null;
+                    string value=displayValues?values?[0]??DisplayValue(p):null;
                     if(displayValues&&common.Any(map=>DisplayValue(map[nativeId])!=value))value="<multiples>";
-                    targets.Add(new PropertyTarget { Key = group + "/" + identity, GroupKey = group, Name = label + " · " + p.Definition.Name, NativeName = AppearancePreferences.Normalize(p.Definition.Name), NativeParameterId = long.Parse(nativeId, System.Globalization.CultureInfo.InvariantCulture), DisplayValue = value, ReadOnly = p.IsReadOnly||common.Any(map=>map[nativeId].IsReadOnly) });
+                    targets.Add(new PropertyTarget { Key = key, Values = values, GroupKey = group, Name = label + " · " + p.Definition.Name, NativeName = AppearancePreferences.Normalize(p.Definition.Name), NativeParameterId = long.Parse(nativeId, System.Globalization.CultureInfo.InvariantCulture), DisplayValue = value, ReadOnly = p.IsReadOnly||common.Any(map=>map[nativeId].IsReadOnly) });
                 }
                 catch { /* A missing label must not interrupt native selection. */ }
             }
@@ -203,6 +210,9 @@ namespace BIMaestro.PropertiesAppearance
         internal static void Commit(IEnumerable<AppearanceProfile> profiles, bool enabled) { _saved = AppearanceStore.SaveMany(profiles, enabled); _preview = null; Invalidate(); }
         internal static void ResetAll() { _saved = AppearanceStore.ResetAll(); _preview = null; Invalidate(); }
         internal static void CancelPreview() { _preview = null; Invalidate(); }
+        // Parameters whose value must be read on every selected element (conditional looks).
+        private static HashSet<string> ConditionKeys(AppearancePreferences preferences) =>
+            new HashSet<string>(preferences.Profiles.SelectMany(p => p.Rules).Where(r => r.When != null && r.Kind == "parameter").Select(r => r.TargetKey));
         private static void Invalidate() { _signature = null; _next = DateTime.MinValue; _renderer?.Dispose(); _renderer = null; }
         internal static void Shutdown() { if(_observedApplication!=null){_observedApplication.DocumentChanged-=ModelChanged;_observedApplication=null;} Presentation.Dispose();_presentationEvent?.Dispose();_presentationEvent=null; PropertiesAppearanceCommand.Shutdown(); _preview = null; _renderer?.Dispose(); _renderer = null; }
 
@@ -223,6 +233,7 @@ namespace BIMaestro.PropertiesAppearance
                     () => renderer.Update(grid, new List<PropertiesPaletteRenderer.CellPlan>(), false));
             var cells = new List<PropertiesPaletteRenderer.CellPlan>();
             string group = null;
+            int index = 0; // position of the editable row inside its group, for alternate rows
             if (hasColors)
                 for (uint row = 1; row <= grid.RowCount; row++)
                 {
@@ -233,14 +244,15 @@ namespace BIMaestro.PropertiesAppearance
                     if(customColors!=null && (header || grid.CanStyle(row)))
                     { cells.Add(new PropertiesPaletteRenderer.CellPlan { Row=row,Label=raw,Header=header,Colors=customColors,Dark=dark });continue; }
 #endif
-                    if (header) {context.GroupMap.TryGetValue(AppearancePreferences.Normalize(raw), out group);group=PropertiesPaletteLayout.CustomGroupAt(grid,row)??group;}
+                    if (header) {context.GroupMap.TryGetValue(AppearancePreferences.Normalize(raw), out group);group=PropertiesPaletteLayout.CustomGroupAt(grid,row)??group;index=0;}
                     if (group == null) continue;
                     PropertyTarget parameter = null;
                     if (!header) context.ParameterMap.TryGetValue(group + "|" + AppearancePreferences.Normalize(raw), out parameter);
                     if(!header)parameter=PropertiesPaletteLayout.ParameterAt(grid,context,row)??parameter;
                     if (!header && (parameter == null || parameter.ReadOnly)) continue;
-                    var colors = preferences.Resolve(context.CategoryKey, context.TypeKey, group, parameter?.Key, dark);
-                    if (colors != null) cells.Add(new PropertiesPaletteRenderer.CellPlan { Row = row, Label = raw, Header = header, Colors = colors, Dark = dark });
+                    var colors = preferences.Resolve(context.CategoryKey, context.TypeKey, group, parameter?.Key, dark, context.ValuesOf);
+                    int position = header ? -1 : index++;
+                    if (colors != null) cells.Add(new PropertiesPaletteRenderer.CellPlan { Row = row, Label = raw, Header = header, Colors = colors, Dark = dark, Index = position });
                 }
             renderer.Update(grid, cells, redraw);
             return cells.Count;
@@ -287,7 +299,7 @@ namespace BIMaestro.PropertiesAppearance
                 if (grid == null) { _renderer?.Dispose(); _renderer = null; Status = UiLanguage.Get("PropertiesAppearanceService.DisplayThePropertiesPaletteToSeeYourColors"); return; }
                 long contextTime = PropertiesAppearanceMetrics.Begin();
                 AppearanceContext context;
-                try { context = AppearanceContext.Capture(app); }
+                try { context = AppearanceContext.Capture(app, false, ConditionKeys(preferences)); }
                 finally { PropertiesAppearanceMetrics.End("Context", contextTime); }
                 if (context.CategoryKey == null)
                 {

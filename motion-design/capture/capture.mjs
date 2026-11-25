@@ -27,12 +27,17 @@ function run(args) {
 
 if (mode === "still") {
   run(["-v", "error", "-y", "-f", "gdigrab", "-i", "desktop", "-frames:v", "1", join(out, "ecran.png")]);
+} else if (mode === "zone") {
+  // Une seule image de la zone (sans le reste de l'écran) pour vérifier le cadrage.
+  const z = JSON.parse(readFileSync(join(here, process.env.ZONE || "zone.json"), "utf8"));
+  run(["-v", "error", "-y", "-f", "gdigrab", "-offset_x", String(z.x), "-offset_y", String(z.y),
+    "-video_size", `${even(z.w)}x${even(z.h)}`, "-i", "desktop", "-frames:v", "1", join(out, `${name}.png`)]);
 } else if (mode === "record") {
   const full = a === "full";
   const secs = full ? b : a;
   const args = ["-v", "warning", "-y", "-f", "gdigrab", "-framerate", "60", "-draw_mouse", "1"];
   if (!full) {
-    const z = JSON.parse(readFileSync(join(here, "zone.json"), "utf8"));
+    const z = JSON.parse(readFileSync(join(here, process.env.ZONE || "zone.json"), "utf8"));
     args.push("-offset_x", String(z.x), "-offset_y", String(z.y), "-video_size", `${even(z.w)}x${even(z.h)}`);
   }
   if (secs) args.push("-t", String(secs));

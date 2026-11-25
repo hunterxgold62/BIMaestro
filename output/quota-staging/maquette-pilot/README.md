@@ -1,0 +1,1 @@
+This folder contains the built output assets for the worker "bimaestro-maquette-pilot" generated at 2026-11-23T13:34:32.559Z.

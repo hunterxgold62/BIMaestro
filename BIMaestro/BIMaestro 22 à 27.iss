@@ -25,7 +25,7 @@ PrivilegesRequired=lowest
 ; Apparence aux couleurs de BIMaestro (images générées depuis Resources\OLD\BIMaestro.png).
 WizardStyle=modern
 SetupIconFile={#Branding}\BIMaestro.ico
-UninstallDisplayIcon={uninstallexe}
+UninstallDisplayIcon={app}\BIMaestro.ico
 WizardImageFile={#Branding}\wizard-100.bmp,{#Branding}\wizard-150.bmp,{#Branding}\wizard-200.bmp
 WizardSmallImageFile={#Branding}\small-100.bmp,{#Branding}\small-150.bmp,{#Branding}\small-200.bmp
 ShowLanguageDialog=no
@@ -61,6 +61,8 @@ fr.FinishedLabel=Ouvre Revit : BIMaestro apparaît dans son onglet du ruban.%n%n
 #define CoreExcludes "*.pdb,BIMaestro - Copie.dll,BIMaestro.Updater.*,\runtimes\win-x86\*,\runtimes\win-arm64\*,\runtimes\osx*,\runtimes\linux*,\runtimes\browser\*"
 
 [Files]
+; Icône conservée sur le poste pour l’entrée Applications installées de Windows.
+Source: "{#Branding}\BIMaestro.ico"; DestDir: "{app}"; Flags: ignoreversion
 #if !FileExists("bin\Release\BIMaestro.dll")
   #error Compilez BIMaestro.csproj en Release (Revit 2023) avant de creer l'installateur.
 #endif

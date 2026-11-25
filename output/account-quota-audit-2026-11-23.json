@@ -1,0 +1,196 @@
+{
+  "checkedAt": "2026-11-23T13:40:28.174Z",
+  "account": "fafe3694a73c1a868a3d02097f0d6448",
+  "database": "1918916c-c5cb-4165-8db2-0532291d859c",
+  "windows": {
+    "operationsSince": "2026-10-23T13:41:28.174Z",
+    "dailyConservativeSince": "2026-11-21T13:40:28.174Z"
+  },
+  "totals": {
+    "r2_bytes": 187255008,
+    "r2_a": 387,
+    "r2_b": 1628,
+    "worker_requests": 352,
+    "d1_reads": 70,
+    "d1_writes": 2,
+    "d1_bytes": 49152
+  },
+  "analytics": {
+    "d1AnalyticsAdaptiveGroups": [
+      {
+        "sum": {
+          "rowsRead": 70,
+          "rowsWritten": 2
+        }
+      }
+    ],
+    "r2OperationsAdaptiveGroups": [
+      {
+        "dimensions": {
+          "actionType": "ListBuckets"
+        },
+        "sum": {
+          "requests": 8
+        }
+      },
+      {
+        "dimensions": {
+          "actionType": "DeleteObjects"
+        },
+        "sum": {
+          "requests": 28
+        }
+      },
+      {
+        "dimensions": {
+          "actionType": "HeadObject"
+        },
+        "sum": {
+          "requests": 375
+        }
+      },
+      {
+        "dimensions": {
+          "actionType": "PutObject"
+        },
+        "sum": {
+          "requests": 379
+        }
+      },
+      {
+        "dimensions": {
+          "actionType": "GetObject"
+        },
+        "sum": {
+          "requests": 1249
+        }
+      },
+      {
+        "dimensions": {
+          "actionType": "HeadBucket"
+        },
+        "sum": {
+          "requests": 4
+        }
+      }
+    ],
+    "r2StorageAdaptiveGroups": [
+      {
+        "dimensions": {
+          "bucketName": "bimaestro-maquettes",
+          "storageClass": "Standard"
+        },
+        "max": {
+          "metadataSize": 22596,
+          "objectCount": 218,
+          "payloadSize": 141468550
+        }
+      },
+      {
+        "dimensions": {
+          "bucketName": "bimaestro-maquettes-test",
+          "storageClass": "Standard"
+        },
+        "max": {
+          "metadataSize": 645,
+          "objectCount": 15,
+          "payloadSize": 16633642
+        }
+      },
+      {
+        "dimensions": {
+          "bucketName": "bimaestro-maquettes",
+          "storageClass": "InfrequentAccess"
+        },
+        "max": {
+          "metadataSize": 0,
+          "objectCount": 0,
+          "payloadSize": 0
+        }
+      },
+      {
+        "dimensions": {
+          "bucketName": "bimaestro-maquettes-test",
+          "storageClass": "InfrequentAccess"
+        },
+        "max": {
+          "metadataSize": 0,
+          "objectCount": 0,
+          "payloadSize": 0
+        }
+      },
+      {
+        "dimensions": {
+          "bucketName": "bimaestro-families",
+          "storageClass": "Standard"
+        },
+        "max": {
+          "metadataSize": 2840,
+          "objectCount": 56,
+          "payloadSize": 29126735
+        }
+      },
+      {
+        "dimensions": {
+          "bucketName": "bimaestro-families",
+          "storageClass": "InfrequentAccess"
+        },
+        "max": {
+          "metadataSize": 0,
+          "objectCount": 0,
+          "payloadSize": 0
+        }
+      }
+    ],
+    "workersInvocationsAdaptive": [
+      {
+        "sum": {
+          "errors": 0,
+          "requests": 352
+        }
+      }
+    ]
+  },
+  "databases": [
+    {
+      "uuid": "1918916c-c5cb-4165-8db2-0532291d859c",
+      "file_size": 49152
+    }
+  ],
+  "scripts": [
+    {
+      "id": "bimaestro-family-library",
+      "modified_on": "2026-09-21T16:32:19.330129Z"
+    },
+    {
+      "id": "bimaestro-maquette-pilot",
+      "modified_on": "2026-09-30T07:43:55.803197Z"
+    }
+  ],
+  "bucketInventoryError": "Cloudflare 403: accounts/fafe3694a73c1a868a3d02097f0d6448/r2/buckets",
+  "subscriptionError": "Cloudflare 403: accounts/fafe3694a73c1a868a3d02097f0d6448/subscriptions",
+  "policy": {
+    "id": 1,
+    "enabled": 1,
+    "threshold_percent": 80,
+    "verified_until": "2026-12-27T00:00:00.000Z",
+    "r2_bytes_limit": 10000000000,
+    "r2_a_limit": 1000000,
+    "r2_b_limit": 10000000,
+    "worker_requests_limit": 100000,
+    "d1_reads_limit": 5000000,
+    "d1_writes_limit": 100000,
+    "d1_bytes_limit": 500000000,
+    "scope": "unverified"
+  },
+  "reserved": {
+    "id": 1,
+    "r2_bytes": 37607737,
+    "r2_a": 67,
+    "r2_b": 2134,
+    "worker_requests": 2874,
+    "d1_reads": 735744,
+    "d1_writes": 45984,
+    "d1_bytes": 720896
+  }
+}

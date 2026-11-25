@@ -1,0 +1,102 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; }
+    .bcard { position: absolute; top: 140px; width: 460px; height: 940px; border-radius: 26px; overflow: hidden; background: #fff; box-shadow: 0 30px 80px rgba(17,24,39,.18), 0 0 0 2px #E5E7EB; }
+    #bl { left: 60px; }
+    #br { left: 560px; box-shadow: 0 30px 80px rgba(17,24,39,.22), 0 0 0 6px #0F5132; }
+    .bimg, .bv { position: absolute; left: 0; top: 0; width: 460px; height: 1090px; object-fit: fill; }
+    #bl-after { clip-path: inset(0% 100% 0% 0%); z-index: 3; }
+    #bline { position: absolute; left: 0; right: 0; top: 0; height: 7px; background: #0F5132; box-shadow: 0 0 22px #7FD6A6; z-index: 60; opacity: 0; }
+    #bvline { position: absolute; top: 0; bottom: 0; left: 0; width: 7px; background: #0F5132; box-shadow: 0 0 22px #7FD6A6; z-index: 60; opacity: 0; }
+    .bpill { position: absolute; top: 58px; width: 460px; text-align: center; }
+    .bpill span { display: inline-block; font-weight: 900; font-size: 36px; padding: 10px 24px; border-radius: 999px; }
+    #bpl { left: 60px; } #bpl span { background: #E5E7EB; color: #374151; }
+    #bpr { left: 560px; } #bpr span { background: #0F5132; color: #fff; }
+    #bvs { position: absolute; left: 490px; top: 560px; width: 100px; height: 100px; border-radius: 50%; background: #111827; color: #fff; font-weight: 900; font-size: 40px; display: flex; align-items: center; justify-content: center; z-index: 70; }
+    .bsub { position: absolute; top: 1140px; left: 40px; right: 40px; text-align: center; font-weight: 900; font-size: 60px; letter-spacing: -0.03em; color: #111827; opacity: 0; white-space: nowrap; }
+    .bsub b { color: #0F5132; }
+  </style>
+  <div id="root" data-composition-id="reel" data-width="1080" data-height="1350">
+    <div id="bpl" class="bpill"><span>Revit</span></div>
+    <div id="bpr" class="bpill"><span>Revit + BIMaestro</span></div>
+    <div id="bl" class="bcard">
+      <img class="bimg" src="assets/base.png" alt="" />
+      <img id="bl-after" class="bimg" src="assets/tout.png" alt="" />
+      <div id="bvline"></div>
+    </div>
+    <div id="br" class="bcard">
+      <img class="bimg" src="assets/base.png" alt="" style="z-index:1" />
+      <video id="bv0" class="clip bv" src="assets/proprietes.mp4" data-start="1.9" data-duration="1.9" data-media-start="8.5" muted playsinline style="z-index:2"></video>
+      <video id="bv1" class="clip bv" src="assets/proprietes.mp4" data-start="3.5" data-duration="1.9" data-media-start="13.5" muted playsinline style="z-index:3"></video>
+      <video id="bv2" class="clip bv" src="assets/proprietes.mp4" data-start="5.1" data-duration="1.9" data-media-start="18.5" muted playsinline style="z-index:4"></video>
+      <video id="bv3" class="clip bv" src="assets/proprietes.mp4" data-start="6.7" data-duration="1.9" data-media-start="23.5" muted playsinline style="z-index:5"></video>
+      <video id="bv4" class="clip bv" src="assets/proprietes.mp4" data-start="8.3" data-duration="1.9" data-media-start="28.5" muted playsinline style="z-index:6"></video>
+      <video id="bv5" class="clip bv" src="assets/proprietes.mp4" data-start="9.9" data-duration="1.9" data-media-start="33.5" muted playsinline style="z-index:7"></video>
+      <video id="bv6" class="clip bv" src="assets/proprietes.mp4" data-start="11.5" data-duration="2.7" data-media-start="38.5" muted playsinline style="z-index:8"></video>
+      <div id="bline"></div>
+    </div>
+    <div id="bvs">VS</div>
+    <div id="bs1" class="bsub" style="opacity:1">La palette <b>Propriétés</b>.</div>
+    <div id="cap0" class="bsub"><b>Une couleur</b> par groupe</div>
+    <div id="cap1" class="bsub">En-têtes <b>vert BIMaestro</b></div>
+    <div id="cap2" class="bsub">Tes <b>paramètres clés</b> surlignés</div>
+    <div id="cap3" class="bsub"><b>Ton ordre</b> de groupes</div>
+    <div id="cap4" class="bsub"><b>Mes paramètres</b> tout en haut</div>
+    <div id="cap5" class="bsub">Mode <b>ardoise</b></div>
+    <div id="cap6" class="bsub"><b>Tout en un</b></div>
+    <div id="bs3" class="bsub">Et toi, <b>tu ranges comment ?</b></div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#bl", { scale: 0.96 }, { scale: 1, duration: 0.6, ease: "expo.out" }, 0);
+    tl.fromTo("#br", { scale: 0.96 }, { scale: 1, duration: 0.6, ease: "expo.out" }, 0.05);
+    tl.fromTo(["#bpl", "#bpr"], { y: -8 }, { y: 0, duration: 0.4, ease: "expo.out", stagger: 0.08 }, 0);
+    tl.fromTo("#bvs", { scale: 0.7, rotation: -20 }, { scale: 1, rotation: 0, duration: 0.4, ease: "back.out(2.5)" }, 0);
+    tl.to("#bvs", { scale: 0, duration: 0.2, ease: "power2.in" }, 1.7999999999999998);
+    tl.fromTo("#bs1", { y: 12 }, { y: 0, duration: 0.4, ease: "expo.out" }, 0);
+    tl.to("#bs1", { opacity: 0, y: -20, duration: 0.2 }, 1.7);
+    tl.fromTo("#bv0", { clipPath: "inset(0% 0% 100% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.3, ease: "power3.inOut" }, 1.9);
+    tl.fromTo("#bline", { y: 0, opacity: 1 }, { y: 940, opacity: 1, duration: 0.3, ease: "power3.inOut", immediateRender: false }, 1.9);
+    tl.to("#bline", { opacity: 0, duration: 0.03 }, 2.2);
+    tl.fromTo("#cap0", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.3, ease: "expo.out" }, 2);
+    tl.to("#cap0", { opacity: 0, y: -20, duration: 0.18 }, 3.3);
+    tl.fromTo("#bv1", { clipPath: "inset(0% 0% 100% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.3, ease: "power3.inOut" }, 3.5);
+    tl.fromTo("#bline", { y: 0, opacity: 1 }, { y: 940, opacity: 1, duration: 0.3, ease: "power3.inOut", immediateRender: false }, 3.5);
+    tl.to("#bline", { opacity: 0, duration: 0.03 }, 3.8);
+    tl.fromTo("#cap1", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.3, ease: "expo.out" }, 3.6);
+    tl.to("#cap1", { opacity: 0, y: -20, duration: 0.18 }, 4.9);
+    tl.fromTo("#bv2", { clipPath: "inset(0% 0% 100% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.3, ease: "power3.inOut" }, 5.1);
+    tl.fromTo("#bline", { y: 0, opacity: 1 }, { y: 940, opacity: 1, duration: 0.3, ease: "power3.inOut", immediateRender: false }, 5.1);
+    tl.to("#bline", { opacity: 0, duration: 0.03 }, 5.4);
+    tl.fromTo("#cap2", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.3, ease: "expo.out" }, 5.2);
+    tl.to("#cap2", { opacity: 0, y: -20, duration: 0.18 }, 6.5);
+    tl.fromTo("#bv3", { clipPath: "inset(0% 0% 100% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.3, ease: "power3.inOut" }, 6.7);
+    tl.fromTo("#bline", { y: 0, opacity: 1 }, { y: 940, opacity: 1, duration: 0.3, ease: "power3.inOut", immediateRender: false }, 6.7);
+    tl.to("#bline", { opacity: 0, duration: 0.03 }, 7);
+    tl.fromTo("#cap3", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.3, ease: "expo.out" }, 6.8);
+    tl.to("#cap3", { opacity: 0, y: -20, duration: 0.18 }, 8.1);
+    tl.fromTo("#bv4", { clipPath: "inset(0% 0% 100% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.3, ease: "power3.inOut" }, 8.3);
+    tl.fromTo("#bline", { y: 0, opacity: 1 }, { y: 940, opacity: 1, duration: 0.3, ease: "power3.inOut", immediateRender: false }, 8.3);
+    tl.to("#bline", { opacity: 0, duration: 0.03 }, 8.6);
+    tl.fromTo("#cap4", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.3, ease: "expo.out" }, 8.4);
+    tl.to("#cap4", { opacity: 0, y: -20, duration: 0.18 }, 9.7);
+    tl.fromTo("#bv5", { clipPath: "inset(0% 0% 100% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.3, ease: "power3.inOut" }, 9.9);
+    tl.fromTo("#bline", { y: 0, opacity: 1 }, { y: 940, opacity: 1, duration: 0.3, ease: "power3.inOut", immediateRender: false }, 9.9);
+    tl.to("#bline", { opacity: 0, duration: 0.03 }, 10.2);
+    tl.fromTo("#cap5", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.3, ease: "expo.out" }, 10);
+    tl.to("#cap5", { opacity: 0, y: -20, duration: 0.18 }, 11.3);
+    tl.fromTo("#bv6", { clipPath: "inset(0% 0% 100% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.3, ease: "power3.inOut" }, 11.5);
+    tl.fromTo("#bline", { y: 0, opacity: 1 }, { y: 940, opacity: 1, duration: 0.3, ease: "power3.inOut", immediateRender: false }, 11.5);
+    tl.to("#bline", { opacity: 0, duration: 0.03 }, 11.8);
+    tl.fromTo("#cap6", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.3, ease: "expo.out" }, 11.6);
+    tl.to("#cap6", { opacity: 0, y: -20, duration: 0.18 }, 12.95);
+    // finale : le côté Revit bascule aussi, balayage horizontal
+    tl.to("#bpl span", { backgroundColor: "#0F5132", color: "#ffffff", duration: 0.3 }, 13.2);
+    tl.to("#bl-after", { clipPath: "inset(0% 0% 0% 0%)", duration: 0.5, ease: "power3.inOut" }, 13.2);
+    tl.fromTo("#bvline", { x: 0, opacity: 1 }, { x: 460, opacity: 1, duration: 0.5, ease: "power3.inOut" }, 13.2);
+    tl.to("#bvline", { opacity: 0, duration: 0.03 }, 13.7);
+    tl.fromTo("#bs3", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.3, ease: "expo.out" }, 13.4);
+    tl.to(["#bl", "#br", "#bpl", "#bpr", "#bs3"], { y: -80, opacity: 0, duration: 0.35, ease: "power2.in" }, 14.85);
+    window.__timelines["reel"] = tl;
+  </script>
+</template>

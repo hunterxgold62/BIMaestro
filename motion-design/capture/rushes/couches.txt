@@ -1,0 +1,8 @@
+1.01	Revit de base
+6.02	+ Texte
+11.04	+ Fond
+16.04	+ Liseré
+21.05	+ Icônes
+26.06	+ Zébrage
+31.07	+ Contour
+36.09	Revit de base (fin)

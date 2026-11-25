@@ -1,0 +1,10 @@
+  Identification des projets à restaurer...
+C:\Users\plemert\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\Documents\BIMaestro\tmp\dotnet10\sdk\10.0.403\NuGet.targets(782,5): error : Value cannot be null. (Parameter 'path1') [C:\Users\plemert\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\Documents\BIMaestro\BIMaestro\BIMaestro.Revit2025.csproj]
+
+ÉCHEC de la build.
+
+C:\Users\plemert\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\Documents\BIMaestro\tmp\dotnet10\sdk\10.0.403\NuGet.targets(782,5): error : Value cannot be null. (Parameter 'path1') [C:\Users\plemert\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\Documents\BIMaestro\BIMaestro\BIMaestro.Revit2025.csproj]
+    0 Avertissement(s)
+    1 Erreur(s)
+
+Temps écoulé 00:00:00.87

@@ -1,0 +1,131 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; }
+    #title, #fin { position: absolute; top: 46px; left: 40px; right: 40px; text-align: center; font-weight: 900; font-size: 64px; letter-spacing: -0.04em; color: #111827; }
+    #title b, #fin b { color: #0F5132; }
+    #sub { position: absolute; top: 124px; left: 40px; right: 40px; text-align: center; font-weight: 800; font-size: 38px; color: #6B7280; opacity: 0; }
+    #fin { opacity: 0; }
+    #card { position: absolute; left: 50px; top: 210px; width: 560px; height: 960px; border-radius: 26px; overflow: hidden; background: #fff; box-shadow: 0 30px 80px rgba(17,24,39,.18), 0 0 0 6px #0F5132; }
+    .cv, #base { position: absolute; left: 0; top: 0; width: 560px; height: 1082px; }
+    .cv { clip-path: inset(0% 0% 100% 0%); }
+    #line { position: absolute; left: 0; right: 0; top: 0; height: 8px; background: #0F5132; box-shadow: 0 0 24px #7FD6A6; z-index: 60; opacity: 0; }
+    .chip { position: absolute; width: 400px; height: 88px; border-radius: 999px; background: #fff; border: 3px solid #D1D5DB; display: flex; align-items: center; gap: 16px; padding: 0 26px; font-weight: 900; font-size: 34px; color: #111827; box-shadow: 0 12px 30px rgba(17,24,39,.08); }
+    .hole { position: absolute; left: 0; width: 560px; height: 28.2px; background: #E5E7EB; box-shadow: inset 0 0 0 2px #7FD6A6; z-index: 15; opacity: 0; }
+    .cvf { position: absolute; left: 0; top: 0; width: 560px; height: 1082px; z-index: 20; opacity: 0; }
+    .mv { position: absolute; left: 0; width: 560px; height: 28.2px; overflow: hidden; z-index: 40; opacity: 0; }
+    .mv img { position: absolute; left: 0; width: 560px; height: 1082px; }
+    .chip.fav { border-style: dashed; border-color: #0F5132; opacity: 0; }
+    .box { width: 32px; height: 32px; border-radius: 10px; border: 3px solid #9CA3AF; background: #fff; flex: none; }
+    #cur { position: absolute; left: 0; top: 0; width: 64px; height: 64px; z-index: 90; }
+    #ring { position: absolute; left: -40px; top: -40px; width: 80px; height: 80px; border-radius: 50%; border: 6px solid #0F5132; z-index: 89; }
+  </style>
+  <div id="root" data-composition-id="reel" data-width="1080" data-height="1350">
+    <div id="title">Construis ta <b>palette</b></div>
+    <div id="sub">couche par couche.</div>
+    <div id="fin">Tes couches. <b>Ton ordre.</b></div>
+    <div id="ch0" class="chip" style="left:640px;top:256px"><i id="cb0" class="box"></i><span>Texte coloré</span></div>
+    <div id="ch1" class="chip" style="left:640px;top:378px"><i id="cb1" class="box"></i><span>Fond dégradé</span></div>
+    <div id="ch2" class="chip" style="left:640px;top:500px"><i id="cb2" class="box"></i><span>Liseré</span></div>
+    <div id="ch3" class="chip" style="left:640px;top:622px"><i id="cb3" class="box"></i><span>Icônes</span></div>
+    <div id="ch4" class="chip" style="left:640px;top:744px"><i id="cb4" class="box"></i><span>Lignes alternées</span></div>
+    <div id="ch5" class="chip" style="left:640px;top:866px"><i id="cb5" class="box"></i><span>Contour</span></div>
+    <div id="chF" class="chip fav" style="left:640px;top:988px"><i id="cbF" class="box"></i><span>Ton paramètre</span></div>
+    <div id="card">
+      <img id="base" src="assets/looks/c0.png" alt="" />
+      <img id="cv0" class="cv" src="assets/looks/c1.png" alt="" style="z-index:2" />
+      <img id="cv1" class="cv" src="assets/looks/c2.png" alt="" style="z-index:3" />
+      <img id="cv2" class="cv" src="assets/looks/c3.png" alt="" style="z-index:4" />
+      <img id="cv3" class="cv" src="assets/looks/c4.png" alt="" style="z-index:5" />
+      <img id="cv4" class="cv" src="assets/looks/c5.png" alt="" style="z-index:6" />
+      <img id="cv5" class="cv" src="assets/looks/f0.png" alt="" style="z-index:7" />
+      <i id="ho0" class="hole" style="top:367.1px"></i>
+      <i id="ho1" class="hole" style="top:338.8px"></i>
+      <i id="ho2" class="hole" style="top:988.2px"></i>
+      <img id="cvF" class="cvf" src="assets/looks/f1.png" alt="" />
+      <div id="mv0" class="mv" style="top:367.1px"><img src="assets/looks/f0.png" alt="" style="top:-367.1px" /></div>
+      <div id="mv1" class="mv" style="top:338.8px"><img src="assets/looks/f0.png" alt="" style="top:-338.8px" /></div>
+      <div id="mv2" class="mv" style="top:988.2px"><img src="assets/looks/f0.png" alt="" style="top:-988.2px" /></div>
+      <div id="line"></div>
+    </div>
+    <div id="ring"></div>
+    <div id="cur"><svg width="64" height="64" viewBox="0 0 24 24"><path d="M3 2l7 19 2.5-7.5L20 11z" fill="#fff" stroke="#111827" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#card", { scale: 0.97 }, { scale: 1, duration: 0.6, ease: "expo.out" }, 0);
+    tl.fromTo(".chip", { x: 14 }, { x: 0, duration: 0.35, ease: "expo.out", stagger: 0.05 }, 0);
+    tl.fromTo("#sub", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.3, ease: "expo.out" }, 0.8);
+    tl.set("#cur", { x: 1180, y: 1420 }, 0);
+    tl.set("#ring", { scale: 0, opacity: 0 }, 0);
+    tl.to("#cur", { x: 720, y: 308, duration: 0.45, ease: "power3.inOut" }, 1.55);
+    tl.fromTo("#ring", { x: 720, y: 308, scale: 0.3, opacity: 1 }, { x: 720, y: 308, scale: 1.8, opacity: 0, duration: 0.35, ease: "power2.out", immediateRender: false }, 2.02);
+    tl.to("#ch0", { backgroundColor: "#0F5132", color: "#ffffff", borderColor: "#0F5132", duration: 0.15 }, 2.02);
+    tl.fromTo("#cb0", { scale: 1 }, { scale: 1.35, duration: 0.1, ease: "power2.out" }, 2.02);
+    tl.to("#cb0", { scale: 1, backgroundColor: "#7FD6A6", borderColor: "#7FD6A6", duration: 0.15, ease: "back.out(3)" }, 2.12);
+    tl.fromTo("#cv0", { clipPath: "inset(0% 0% 100% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.3, ease: "power3.inOut" }, 2.1);
+    tl.fromTo("#line", { y: 0, opacity: 1 }, { y: 960, opacity: 1, duration: 0.3, ease: "power3.inOut", immediateRender: false }, 2.1);
+    tl.to("#line", { opacity: 0, duration: 0.03 }, 2.4);
+    tl.to("#cur", { x: 720, y: 430, duration: 0.45, ease: "power3.inOut" }, 3.3);
+    tl.fromTo("#ring", { x: 720, y: 430, scale: 0.3, opacity: 1 }, { x: 720, y: 430, scale: 1.8, opacity: 0, duration: 0.35, ease: "power2.out", immediateRender: false }, 3.77);
+    tl.to("#ch1", { backgroundColor: "#0F5132", color: "#ffffff", borderColor: "#0F5132", duration: 0.15 }, 3.77);
+    tl.fromTo("#cb1", { scale: 1 }, { scale: 1.35, duration: 0.1, ease: "power2.out" }, 3.77);
+    tl.to("#cb1", { scale: 1, backgroundColor: "#7FD6A6", borderColor: "#7FD6A6", duration: 0.15, ease: "back.out(3)" }, 3.87);
+    tl.fromTo("#cv1", { clipPath: "inset(0% 0% 100% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.3, ease: "power3.inOut" }, 3.85);
+    tl.fromTo("#line", { y: 0, opacity: 1 }, { y: 960, opacity: 1, duration: 0.3, ease: "power3.inOut", immediateRender: false }, 3.85);
+    tl.to("#line", { opacity: 0, duration: 0.03 }, 4.15);
+    tl.to("#cur", { x: 720, y: 552, duration: 0.45, ease: "power3.inOut" }, 5.05);
+    tl.fromTo("#ring", { x: 720, y: 552, scale: 0.3, opacity: 1 }, { x: 720, y: 552, scale: 1.8, opacity: 0, duration: 0.35, ease: "power2.out", immediateRender: false }, 5.52);
+    tl.to("#ch2", { backgroundColor: "#0F5132", color: "#ffffff", borderColor: "#0F5132", duration: 0.15 }, 5.52);
+    tl.fromTo("#cb2", { scale: 1 }, { scale: 1.35, duration: 0.1, ease: "power2.out" }, 5.52);
+    tl.to("#cb2", { scale: 1, backgroundColor: "#7FD6A6", borderColor: "#7FD6A6", duration: 0.15, ease: "back.out(3)" }, 5.62);
+    tl.fromTo("#cv2", { clipPath: "inset(0% 0% 100% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.3, ease: "power3.inOut" }, 5.6);
+    tl.fromTo("#line", { y: 0, opacity: 1 }, { y: 960, opacity: 1, duration: 0.3, ease: "power3.inOut", immediateRender: false }, 5.6);
+    tl.to("#line", { opacity: 0, duration: 0.03 }, 5.9);
+    tl.to("#cur", { x: 720, y: 674, duration: 0.45, ease: "power3.inOut" }, 6.8);
+    tl.fromTo("#ring", { x: 720, y: 674, scale: 0.3, opacity: 1 }, { x: 720, y: 674, scale: 1.8, opacity: 0, duration: 0.35, ease: "power2.out", immediateRender: false }, 7.27);
+    tl.to("#ch3", { backgroundColor: "#0F5132", color: "#ffffff", borderColor: "#0F5132", duration: 0.15 }, 7.27);
+    tl.fromTo("#cb3", { scale: 1 }, { scale: 1.35, duration: 0.1, ease: "power2.out" }, 7.27);
+    tl.to("#cb3", { scale: 1, backgroundColor: "#7FD6A6", borderColor: "#7FD6A6", duration: 0.15, ease: "back.out(3)" }, 7.37);
+    tl.fromTo("#cv3", { clipPath: "inset(0% 0% 100% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.3, ease: "power3.inOut" }, 7.35);
+    tl.fromTo("#line", { y: 0, opacity: 1 }, { y: 960, opacity: 1, duration: 0.3, ease: "power3.inOut", immediateRender: false }, 7.35);
+    tl.to("#line", { opacity: 0, duration: 0.03 }, 7.65);
+    tl.to("#cur", { x: 720, y: 796, duration: 0.45, ease: "power3.inOut" }, 8.55);
+    tl.fromTo("#ring", { x: 720, y: 796, scale: 0.3, opacity: 1 }, { x: 720, y: 796, scale: 1.8, opacity: 0, duration: 0.35, ease: "power2.out", immediateRender: false }, 9.02);
+    tl.to("#ch4", { backgroundColor: "#0F5132", color: "#ffffff", borderColor: "#0F5132", duration: 0.15 }, 9.02);
+    tl.fromTo("#cb4", { scale: 1 }, { scale: 1.35, duration: 0.1, ease: "power2.out" }, 9.02);
+    tl.to("#cb4", { scale: 1, backgroundColor: "#7FD6A6", borderColor: "#7FD6A6", duration: 0.15, ease: "back.out(3)" }, 9.12);
+    tl.fromTo("#cv4", { clipPath: "inset(0% 0% 100% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.3, ease: "power3.inOut" }, 9.1);
+    tl.fromTo("#line", { y: 0, opacity: 1 }, { y: 960, opacity: 1, duration: 0.3, ease: "power3.inOut", immediateRender: false }, 9.1);
+    tl.to("#line", { opacity: 0, duration: 0.03 }, 9.4);
+    tl.to("#cur", { x: 720, y: 918, duration: 0.45, ease: "power3.inOut" }, 10.3);
+    tl.fromTo("#ring", { x: 720, y: 918, scale: 0.3, opacity: 1 }, { x: 720, y: 918, scale: 1.8, opacity: 0, duration: 0.35, ease: "power2.out", immediateRender: false }, 10.77);
+    tl.to("#ch5", { backgroundColor: "#0F5132", color: "#ffffff", borderColor: "#0F5132", duration: 0.15 }, 10.77);
+    tl.fromTo("#cb5", { scale: 1 }, { scale: 1.35, duration: 0.1, ease: "power2.out" }, 10.77);
+    tl.to("#cb5", { scale: 1, backgroundColor: "#7FD6A6", borderColor: "#7FD6A6", duration: 0.15, ease: "back.out(3)" }, 10.87);
+    tl.fromTo("#cv5", { clipPath: "inset(0% 0% 100% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.3, ease: "power3.inOut" }, 10.85);
+    tl.fromTo("#line", { y: 0, opacity: 1 }, { y: 960, opacity: 1, duration: 0.3, ease: "power3.inOut", immediateRender: false }, 10.85);
+    tl.to("#line", { opacity: 0, duration: 0.03 }, 11.15);
+    tl.fromTo("#chF", { opacity: 0, x: 30 }, { opacity: 1, x: 0, duration: 0.35, ease: "back.out(2)" }, 11.2);
+    tl.to("#cur", { x: 720, y: 1040, duration: 0.45, ease: "power3.inOut" }, 12.05);
+    tl.fromTo("#ring", { x: 720, y: 1040, scale: 0.3, opacity: 1 }, { x: 720, y: 1040, scale: 1.8, opacity: 0, duration: 0.35, ease: "power2.out", immediateRender: false }, 12.52);
+    tl.to("#chF", { backgroundColor: "#0F5132", color: "#ffffff", borderColor: "#0F5132", duration: 0.15 }, 12.52);
+    tl.fromTo("#cbF", { scale: 1 }, { scale: 1.35, duration: 0.1, ease: "power2.out" }, 12.52);
+    tl.to("#cbF", { scale: 1, backgroundColor: "#7FD6A6", borderColor: "#7FD6A6", duration: 0.15, ease: "back.out(3)" }, 12.62);
+    tl.to("#cur", { x: 1180, y: 1420, duration: 0.4, ease: "power3.in" }, 12.9);
+    tl.set(".mv", { opacity: 1 }, 12.65);
+    tl.to(".mv", { scale: 1.04, boxShadow: "0 14px 30px rgba(17,24,39,0.28), 0 0 0 3px rgba(127,214,166,1)", duration: 0.25, ease: "power2.out", stagger: 0.06 }, 12.66);
+    tl.to(".hole", { opacity: 1, duration: 0.2, stagger: 0.06 }, 12.66);
+    tl.to("#mv0", { y: -169.4, duration: 0.8, ease: "power3.inOut" }, 12.95);
+    tl.to("#mv1", { y: -112.9, duration: 0.8, ease: "power3.inOut" }, 13.05);
+    tl.to("#mv2", { y: -734.1, duration: 0.8, ease: "power3.inOut" }, 13.15);
+    tl.to("#cvF", { opacity: 1, duration: 0.25, ease: "power1.inOut" }, 13.45);
+    tl.to(".hole", { opacity: 0, duration: 0.15 }, 13.6);
+    tl.to(".mv", { scale: 1, boxShadow: "0 0px 0px rgba(17,24,39,0), 0 0 0 0px rgba(127,214,166,0)", duration: 0.2, ease: "power2.in", stagger: 0.1 }, 13.7);
+    tl.to(".mv", { opacity: 0, duration: 0.15 }, 14.2);
+    tl.to(["#title", "#sub"], { opacity: 0, y: -14, duration: 0.2 }, 14.45);
+    tl.fromTo("#fin", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.35, ease: "expo.out" }, 14.7);
+    tl.fromTo(".chip", { scale: 1 }, { scale: 1.06, duration: 0.18, yoyo: true, repeat: 1, ease: "power2.out", stagger: 0.05 }, 14.7);
+    tl.to(["#card", ".chip", "#fin"], { y: -60, opacity: 0, duration: 0.35, ease: "power2.in" }, 16.75);
+    window.__timelines["reel"] = tl;
+  </script>
+</template>

@@ -1,3 +1,5 @@
+import { reserve, modelRequestCost } from '../family-library/quota.js';
+
 const shareApi = 'https://xqovxfgghbqxwsadzhzl.functions.supabase.co/mep-share';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhxb3Z4ZmdnaGJxeHdzYWR6aHpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI0MDY5MzMsImV4cCI6MjA2Nzk4MjkzM30.ocKoeuUTLQ_oOr83TtpaJD3RUDOBbwLQ5nJNvOinYlo';
 const allowedOrigins = new Set(['https://viewer.bimaestro.fr', 'http://localhost:3000', 'http://localhost:3001']);
@@ -44,12 +46,36 @@ function nameMarker(publicationName) {
   return `00 - ${readable || 'Maquette'}.txt`;
 }
 
+async function readModelBody(request, expectedBytes) {
+  if (!request.body) throw new Error('Missing upload');
+  const reader = request.body.getReader();
+  const bytes = new Uint8Array(expectedBytes);
+  let offset = 0, timer;
+  const deadline = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Upload timeout')), 90000); });
+  try {
+    while (true) {
+      const { done, value } = await Promise.race([reader.read(), deadline]);
+      if (done) break;
+      if (offset + value.length > expectedBytes) throw new Error('Upload too large');
+      bytes.set(value, offset); offset += value.length;
+    }
+    if (offset !== expectedBytes) throw new Error('Incomplete upload');
+    return bytes;
+  } catch (error) {
+    // Do not wait indefinitely for a stalled client to acknowledge cancellation.
+    void reader.cancel().catch(() => {}); throw error;
+  } finally { clearTimeout(timer); reader.releaseLock(); }
+}
+
 export default {
   async fetch(request, env) {
     const origin = request.headers.get('Origin') || '';
     const path = new URL(request.url).pathname;
     if (request.method === 'OPTIONS' && ['/asset', '/upload', '/verify', '/delete'].includes(path)) return new Response(null, { status: 204, headers: headers(origin) });
     if (origin && !allowedOrigins.has(origin)) return failure(origin, 403, 'Origine refusée');
+    // No bypass or fallback if the shared binding, policy or accounting is unavailable.
+    if (env.QUOTA_ENABLED !== 'true') return failure(origin, 503, 'Service temporairement fermé');
+    try {
     if (request.method === 'PUT' && path === '/upload') {
       const url = new URL(request.url);
       const publicationId = url.searchParams.get('publicationId');
@@ -66,14 +92,24 @@ export default {
           !Number.isSafeInteger(asset.bytes) || asset.bytes < 1 || asset.bytes > 48 * 1024 * 1024 ||
           !/^[0-9a-f]{64}$/.test(asset.sha256 || '')) return failure(origin, 403, 'Manifeste invalide');
       if (Number(request.headers.get('content-length')) > asset.bytes) return failure(origin, 413, 'Fichier trop volumineux');
-      const bytes = await request.arrayBuffer();
+      let markerKey = '', markerBody = '', markerBytes = 0;
+      if (name === 'index.zip' && typeof access.publicationName === 'string') {
+        if (access.publicationName.length > 1000) return failure(origin, 403, 'Nom de publication invalide');
+        markerKey = `${publicationId}/${revision}/${nameMarker(access.publicationName)}`;
+        markerBody = `Maquette : ${access.publicationName}\nPublication : ${publicationId}\nRévision : ${revision}\n`;
+        markerBytes = new TextEncoder().encode(markerBody).byteLength;
+      }
+      if (!await reserve(env.CATALOG, modelRequestCost('upload', { bytes: asset.bytes, markerBytes })))
+        return failure(origin, 429, 'Quota commun atteint ou contrôle expiré');
+      let bytes;
+      try { bytes = await readModelBody(request, asset.bytes); }
+      catch { return failure(origin, 413, 'Envoi incomplet, trop volumineux ou expiré'); }
       if (bytes.byteLength !== asset.bytes || await sha256(bytes) !== asset.sha256) return failure(origin, 409, 'Intégrité incorrecte');
       const key = `${publicationId}/${revision}/${name}`;
       const stored = await env.MODELS.put(key, bytes, { customMetadata: { sha256: asset.sha256 } });
       if (!stored || stored.size !== asset.bytes) return failure(origin, 503, 'Envoi R2 incomplet');
-      if (name === 'index.zip' && typeof access.publicationName === 'string') {
-        const marker = `${publicationId}/${revision}/${nameMarker(access.publicationName)}`;
-        await env.MODELS.put(marker, `Maquette : ${access.publicationName}\nPublication : ${publicationId}\nRévision : ${revision}\n`);
+      if (markerKey) {
+        await env.MODELS.put(markerKey, markerBody);
       }
       return new Response(null, { status: 201, headers: headers(origin) });
     }
@@ -89,6 +125,11 @@ export default {
       try { access = await authorize({ action: 'r2-verify-authorize', publicationId, revision, names }, bearer); }
       catch { return failure(origin, 403, 'Publication non autorisée'); }
       if (access.publicationId !== publicationId || access.revision !== revision || access.assets?.length !== names.length) return failure(origin, 403, 'Manifeste invalide');
+      if (new Set(access.assets.map(asset => asset.name)).size !== names.length || access.assets.some(asset =>
+        !names.includes(asset.name) || !Number.isSafeInteger(asset.bytes) || asset.bytes < 1 ||
+        !/^[0-9a-f]{64}$/.test(asset.sha256 || ''))) return failure(origin, 403, 'Manifeste invalide');
+      if (!await reserve(env.CATALOG, modelRequestCost('verify', { count: access.assets.length })))
+        return failure(origin, 429, 'Quota commun atteint ou contrôle expiré');
       const objects = await Promise.all(access.assets.map(asset => env.MODELS.head(`${publicationId}/${revision}/${asset.name}`)));
       const valid = objects.filter((object, index) => object?.size === access.assets[index].bytes && object.customMetadata?.sha256 === access.assets[index].sha256);
       return new Response(JSON.stringify({ expected: names.length, valid: valid.length, bytes: valid.reduce((sum, item) => sum + item.size, 0) }),
@@ -107,9 +148,13 @@ export default {
       catch { return failure(origin, 403, 'Suppression non autorisée'); }
       if (access.publicationId !== publicationId || access.revision !== revision || access.names?.length !== names.length ||
           names.some(name => !access.names.includes(name))) return failure(origin, 403, 'Manifeste invalide');
+      // R2 deletes are free, but listing the marker files consumes one Class A op.
+      if (!await reserve(env.CATALOG, modelRequestCost('delete')))
+        return failure(origin, 429, 'Quota commun atteint ou contrôle expiré');
       await env.MODELS.delete(names.map(name => `${publicationId}/${revision}/${name}`));
-      const markers = await env.MODELS.list({ prefix: `${publicationId}/${revision}/00 - ` });
+      const markers = await env.MODELS.list({ prefix: `${publicationId}/${revision}/00 - `, limit: 1000 });
       if (markers.objects.length) await env.MODELS.delete(markers.objects.map(object => object.key));
+      if (markers.truncated) return failure(origin, 503, 'Nettoyage incomplet ; aucune réservation remboursée');
       return new Response(null, { status: 204, headers: headers(origin) });
     }
     if (request.method !== 'POST' || path !== '/asset') return failure(origin, 404, 'Introuvable');
@@ -129,10 +174,15 @@ export default {
     }
     const asset = access.asset;
     if (asset?.name !== name || !Number.isSafeInteger(asset.bytes) || asset.bytes <= 0 || !/^[0-9a-f]{64}$/.test(asset.sha256 || '')) return failure(origin, 404, 'Fichier inconnu');
+    if (!await reserve(env.CATALOG, modelRequestCost('download')))
+      return failure(origin, 429, 'Quota commun atteint ou contrôle expiré');
     const object = await env.MODELS.get(`${access.publicationId}/${revision}/${name}`);
     if (!object || object.size !== asset.bytes) return failure(origin, 503, 'Copie R2 absente ou incomplète');
     return new Response(object.body, {
       headers: { ...headers(origin), 'Content-Type': 'application/octet-stream', 'Content-Length': String(object.size) },
     });
+    } catch {
+      return failure(origin, 503, 'Contrôle du quota ou stockage indisponible ; aucun accès supplémentaire');
+    }
   },
 };

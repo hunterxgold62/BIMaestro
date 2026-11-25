@@ -1,0 +1,35 @@
+{
+  "settings": {
+    "placement": {},
+    "compatibility_date": "2026-09-20",
+    "compatibility_flags": [
+      "nodejs_compat"
+    ],
+    "usage_model": "standard",
+    "tags": [],
+    "tail_consumers": [],
+    "logpush": false,
+    "annotations": {
+      "workers/triggered_by": "version_upload"
+    },
+    "bindings": [
+      {
+        "database_id": "1918916c-c5cb-4165-8db2-0532291d859c",
+        "id": "1918916c-c5cb-4165-8db2-0532291d859c",
+        "name": "CATALOG",
+        "type": "d1"
+      },
+      {
+        "bucket_name": "bimaestro-families",
+        "name": "FAMILIES",
+        "type": "r2_bucket"
+      },
+      {
+        "name": "LIBRARY_ENABLED",
+        "text": "true",
+        "type": "plain_text"
+      }
+    ]
+  },
+  "contentType": "multipart/form-data; boundary=68dec35c5a501dba24ac57ea0a0d93f5c78d1a5589a02f209ba6e45f520d"
+}

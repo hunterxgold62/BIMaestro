@@ -1,0 +1,112 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; }
+    .hook { position: absolute; left: 40px; right: 40px; text-align: center; font-weight: 900; letter-spacing: -0.04em; color: #111827; }
+    #hook1 { top: 40px; font-size: 60px; }
+    #hook2 { top: 112px; font-size: 44px; color: #6B7280; }
+    #hook1 b, #hook2 b { color: #0F5132; }
+    #count { position: absolute; top: 70px; left: 0; right: 0; text-align: center; font-weight: 800; font-size: 34px; color: #6B7280; opacity: 0; }
+    #card { position: absolute; left: 190px; top: 190px; width: 700px; height: 930px; border-radius: 28px; overflow: hidden; background: #fff; box-shadow: 0 30px 80px rgba(17,24,39,.18), 0 0 0 6px #0F5132; }
+    .lk, #base { position: absolute; left: 0; top: 0; width: 700px; height: 1353px; }
+    .lk { clip-path: inset(0% 0% 100% 0%); }
+    #line { position: absolute; left: 0; right: 0; top: 0; height: 8px; background: #0F5132; box-shadow: 0 0 24px #7FD6A6; z-index: 60; opacity: 0; }
+    .name { position: absolute; top: 1150px; left: 0; right: 0; text-align: center; opacity: 0; z-index: 70; }
+    .name span { display: inline-block; font-weight: 900; font-size: 58px; letter-spacing: -0.03em; color: #fff; background: #0F5132; padding: 12px 34px; border-radius: 999px; }
+    .tile { position: absolute; width: 300px; height: 490px; border-radius: 22px; overflow: hidden; background: #fff; box-shadow: 0 24px 60px rgba(17,24,39,.18), 0 0 0 2px #E5E7EB; opacity: 0; }
+    .tile img { position: absolute; left: 0; top: 0; width: 300px; height: 580px; }
+    #fin { position: absolute; top: 70px; left: 0; right: 0; text-align: center; font-weight: 900; font-size: 72px; letter-spacing: -0.04em; color: #111827; opacity: 0; }
+    #fin b { color: #0F5132; }
+  </style>
+  <div id="root" data-composition-id="reel" data-width="1080" data-height="1350">
+    <div id="hook1" class="hook">Ta palette <b>Propriétés</b></div>
+    <div id="hook2" class="hook" style="opacity:0">comme tu ne l'as jamais vue.</div>
+    <div id="count">1 / 8</div>
+    <div id="card">
+      <img id="base" src="assets/looks/s0.png" alt="" />
+      <img id="lk0" class="lk" src="assets/looks/s1.png" alt="" style="z-index:2" />
+      <img id="lk1" class="lk" src="assets/looks/s2.png" alt="" style="z-index:3" />
+      <img id="lk2" class="lk" src="assets/looks/s3.png" alt="" style="z-index:4" />
+      <img id="lk3" class="lk" src="assets/looks/s4.png" alt="" style="z-index:5" />
+      <img id="lk4" class="lk" src="assets/looks/s5.png" alt="" style="z-index:6" />
+      <img id="lk5" class="lk" src="assets/looks/s6.png" alt="" style="z-index:7" />
+      <img id="lk6" class="lk" src="assets/looks/s7.png" alt="" style="z-index:8" />
+      <img id="lk7" class="lk" src="assets/looks/s8.png" alt="" style="z-index:9" />
+      <div id="line"></div>
+    </div>
+    <div id="nm0" class="name"><span>Liserés</span></div>
+    <div id="nm1" class="name"><span>Texte coloré</span></div>
+    <div id="nm2" class="name"><span>Dégradé + pastille</span></div>
+    <div id="nm3" class="name"><span>Titres + icônes</span></div>
+    <div id="nm4" class="name"><span>Lignes alternées</span></div>
+    <div id="nm5" class="name"><span>Contours</span></div>
+    <div id="nm6" class="name"><span>Tes favoris en haut</span></div>
+    <div id="nm7" class="name"><span>Tout en un</span></div>
+    <div id="tl0" class="tile" style="left:60px;top:230px"><img src="assets/looks/s1.png" alt="" /></div>
+    <div id="tl1" class="tile" style="left:390px;top:230px"><img src="assets/looks/s3.png" alt="" /></div>
+    <div id="tl2" class="tile" style="left:720px;top:230px"><img src="assets/looks/s4.png" alt="" /></div>
+    <div id="tl3" class="tile" style="left:60px;top:750px"><img src="assets/looks/s5.png" alt="" /></div>
+    <div id="tl4" class="tile" style="left:390px;top:750px"><img src="assets/looks/s7.png" alt="" /></div>
+    <div id="tl5" class="tile" style="left:720px;top:750px"><img src="assets/looks/s8.png" alt="" /></div>
+    <div id="fin">Choisis <b>ton style.</b></div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#card", { y: 40, scale: 0.97 }, { y: 0, scale: 1, duration: 0.6, ease: "expo.out" }, 0);
+    tl.fromTo("#hook2", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.35, ease: "expo.out" }, 0.9);
+    tl.to(["#hook1", "#hook2"], { opacity: 0, y: -14, duration: 0.2 }, 1.85);
+    tl.fromTo("#count", { opacity: 0, y: -10 }, { opacity: 1, y: 0, duration: 0.3, ease: "expo.out" }, 2);
+    tl.fromTo("#lk0", { clipPath: "inset(0% 0% 100% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.3, ease: "power3.inOut" }, 2);
+    tl.fromTo("#line", { y: 0, opacity: 1 }, { y: 930, opacity: 1, duration: 0.3, ease: "power3.inOut", immediateRender: false }, 2);
+    tl.to("#line", { opacity: 0, duration: 0.03 }, 2.3);
+    tl.fromTo("#nm0", { opacity: 0, y: 24, scale: 0.9 }, { opacity: 1, y: 0, scale: 1, duration: 0.3, ease: "back.out(2)" }, 2.12);
+    tl.to("#nm0", { opacity: 0, y: -16, duration: 0.15 }, 3.45);
+    tl.set("#count", { textContent: "1 / 8" }, 2);
+    tl.fromTo("#lk1", { clipPath: "inset(0% 0% 100% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.3, ease: "power3.inOut" }, 3.6);
+    tl.fromTo("#line", { y: 0, opacity: 1 }, { y: 930, opacity: 1, duration: 0.3, ease: "power3.inOut", immediateRender: false }, 3.6);
+    tl.to("#line", { opacity: 0, duration: 0.03 }, 3.9);
+    tl.fromTo("#nm1", { opacity: 0, y: 24, scale: 0.9 }, { opacity: 1, y: 0, scale: 1, duration: 0.3, ease: "back.out(2)" }, 3.72);
+    tl.to("#nm1", { opacity: 0, y: -16, duration: 0.15 }, 5.05);
+    tl.set("#count", { textContent: "2 / 8" }, 3.6);
+    tl.fromTo("#lk2", { clipPath: "inset(0% 0% 100% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.3, ease: "power3.inOut" }, 5.2);
+    tl.fromTo("#line", { y: 0, opacity: 1 }, { y: 930, opacity: 1, duration: 0.3, ease: "power3.inOut", immediateRender: false }, 5.2);
+    tl.to("#line", { opacity: 0, duration: 0.03 }, 5.5);
+    tl.fromTo("#nm2", { opacity: 0, y: 24, scale: 0.9 }, { opacity: 1, y: 0, scale: 1, duration: 0.3, ease: "back.out(2)" }, 5.32);
+    tl.to("#nm2", { opacity: 0, y: -16, duration: 0.15 }, 6.65);
+    tl.set("#count", { textContent: "3 / 8" }, 5.2);
+    tl.fromTo("#lk3", { clipPath: "inset(0% 0% 100% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.3, ease: "power3.inOut" }, 6.8);
+    tl.fromTo("#line", { y: 0, opacity: 1 }, { y: 930, opacity: 1, duration: 0.3, ease: "power3.inOut", immediateRender: false }, 6.8);
+    tl.to("#line", { opacity: 0, duration: 0.03 }, 7.1);
+    tl.fromTo("#nm3", { opacity: 0, y: 24, scale: 0.9 }, { opacity: 1, y: 0, scale: 1, duration: 0.3, ease: "back.out(2)" }, 6.92);
+    tl.to("#nm3", { opacity: 0, y: -16, duration: 0.15 }, 8.25);
+    tl.set("#count", { textContent: "4 / 8" }, 6.8);
+    tl.fromTo("#lk4", { clipPath: "inset(0% 0% 100% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.3, ease: "power3.inOut" }, 8.4);
+    tl.fromTo("#line", { y: 0, opacity: 1 }, { y: 930, opacity: 1, duration: 0.3, ease: "power3.inOut", immediateRender: false }, 8.4);
+    tl.to("#line", { opacity: 0, duration: 0.03 }, 8.7);
+    tl.fromTo("#nm4", { opacity: 0, y: 24, scale: 0.9 }, { opacity: 1, y: 0, scale: 1, duration: 0.3, ease: "back.out(2)" }, 8.52);
+    tl.to("#nm4", { opacity: 0, y: -16, duration: 0.15 }, 9.85);
+    tl.set("#count", { textContent: "5 / 8" }, 8.4);
+    tl.fromTo("#lk5", { clipPath: "inset(0% 0% 100% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.3, ease: "power3.inOut" }, 10);
+    tl.fromTo("#line", { y: 0, opacity: 1 }, { y: 930, opacity: 1, duration: 0.3, ease: "power3.inOut", immediateRender: false }, 10);
+    tl.to("#line", { opacity: 0, duration: 0.03 }, 10.3);
+    tl.fromTo("#nm5", { opacity: 0, y: 24, scale: 0.9 }, { opacity: 1, y: 0, scale: 1, duration: 0.3, ease: "back.out(2)" }, 10.12);
+    tl.to("#nm5", { opacity: 0, y: -16, duration: 0.15 }, 11.45);
+    tl.set("#count", { textContent: "6 / 8" }, 10);
+    tl.fromTo("#lk6", { clipPath: "inset(0% 0% 100% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.3, ease: "power3.inOut" }, 11.6);
+    tl.fromTo("#line", { y: 0, opacity: 1 }, { y: 930, opacity: 1, duration: 0.3, ease: "power3.inOut", immediateRender: false }, 11.6);
+    tl.to("#line", { opacity: 0, duration: 0.03 }, 11.9);
+    tl.fromTo("#nm6", { opacity: 0, y: 24, scale: 0.9 }, { opacity: 1, y: 0, scale: 1, duration: 0.3, ease: "back.out(2)" }, 11.72);
+    tl.to("#nm6", { opacity: 0, y: -16, duration: 0.15 }, 13.05);
+    tl.set("#count", { textContent: "7 / 8" }, 11.6);
+    tl.fromTo("#lk7", { clipPath: "inset(0% 0% 100% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.3, ease: "power3.inOut" }, 13.2);
+    tl.fromTo("#line", { y: 0, opacity: 1 }, { y: 930, opacity: 1, duration: 0.3, ease: "power3.inOut", immediateRender: false }, 13.2);
+    tl.to("#line", { opacity: 0, duration: 0.03 }, 13.5);
+    tl.fromTo("#nm7", { opacity: 0, y: 24, scale: 0.9 }, { opacity: 1, y: 0, scale: 1, duration: 0.3, ease: "back.out(2)" }, 13.32);
+    tl.to("#nm7", { opacity: 0, y: -16, duration: 0.15 }, 14.8);
+    tl.set("#count", { textContent: "8 / 8" }, 13.2);
+    tl.to(["#card", "#count"], { scale: 0.85, opacity: 0, duration: 0.35, ease: "power2.in" }, 14.8);
+    tl.fromTo(".tile", { y: 420, rotation: (i) => (i % 2 ? 6 : -6), opacity: 0 }, { y: 0, rotation: (i) => (i % 2 ? 1.2 : -1.2), opacity: 1, duration: 0.55, ease: "expo.out", stagger: 0.08 }, 15.1);
+    tl.fromTo("#fin", { opacity: 0, y: -20 }, { opacity: 1, y: 0, duration: 0.35, ease: "expo.out" }, 15.45);
+    tl.to([".tile", "#fin"], { y: -60, opacity: 0, duration: 0.35, ease: "power2.in" }, 18.15);
+    window.__timelines["reel"] = tl;
+  </script>
+</template>

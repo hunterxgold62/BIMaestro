@@ -1,0 +1,3 @@
+
+  Identification des projets à restaurer...
+C:\Program Files\dotnet\sdk\9.0.302\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.TargetFrameworkInference.targets(166,5): error NETSDK1045: le SDK .NET actuel ne prend pas en charge le ciblage .NET 10.0.  Ciblez .NET 9.0 ou inférieur, ou utilisez une version du Kit de développement logiciel (SDK) .NET qui prend en charge .NET 10.0. Télécharger le Kit de développement logiciel (SDK) .NET à partir de https://aka.ms/dotnet/download [C:\Users\plemert\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\Documents\BIMaestro\BIMaestro\BIMaestro.Revit2025.csproj]

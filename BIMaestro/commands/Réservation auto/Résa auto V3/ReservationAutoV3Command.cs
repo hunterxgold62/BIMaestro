@@ -1778,6 +1778,12 @@ namespace Modification
             }
         }
 
+        private static bool IsHostedOnHostObject(FamilyInstance instance)
+        {
+            return instance?.Symbol?.Family?.FamilyPlacementType == FamilyPlacementType.OneLevelBasedHosted
+                && instance.Host is HostObject;
+        }
+
         private static void SetOpeningDimensions(FamilyInstance instance, ProfileConfig profile,
             bool rectangular, bool wall, double length, double height, double diameter, double depth)
         {
@@ -1817,6 +1823,9 @@ namespace Modification
                     // A fixed depth may cover the host; never change a shared family type.
                     parameter = names.Select(n => instance.LookupParameter(n) ?? instance.Symbol.LookupParameter(n))
                         .FirstOrDefault(p => IsLength(p) && p.AsDouble() >= dimension.Value - MmToFt(1));
+                    // A hosted family cuts through its host by itself: depth follows the host.
+                    if (parameter == null && IsHostedOnHostObject(instance))
+                        continue;
                 }
                 if (parameter == null || dimension.Value <= 1e-9 || double.IsNaN(dimension.Value) || double.IsInfinity(dimension.Value))
                     throw new InvalidOperationException(UiLanguage.Format("ReservationAutoV3Command.OpeningDimensionFailed", dimension.Label, instance.Symbol.Family.Name, string.Join(", ", names)));

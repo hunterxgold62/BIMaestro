@@ -187,9 +187,14 @@ namespace BIMaestro.Navisworks.Services
             try
             {
                 // Preserve the previous disk version before saving the user's current work.
+                var wasModified = document.IsModified;
                 File.Copy(nwf, diskBackup, false);
-                if (document.IsModified && !document.TrySaveFile(nwf))
+                // Always save: after a previous successful replacement, the reopened document
+                // is not flagged as modified although its redirected links exist only in memory.
+                // Reopening without saving would silently reload the old paths from disk.
+                if (!document.TrySaveFile(nwf))
                     throw new IOException("Impossible d'enregistrer le NWF. Aucun rechargement effectué.");
+                diagnostic.AppendLine("NWF enregistré avant réouverture (modifié : " + wasModified + ").");
                 File.Copy(nwf, recovery, false);
                 Application.FileResolving += resolver;
                 subscribed = true;

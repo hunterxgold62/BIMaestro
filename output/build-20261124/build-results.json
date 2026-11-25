@@ -1,0 +1,37 @@
+[
+  {
+    "year": 2023,
+    "code": 0,
+    "dll": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\BIMaestro\\bin\\Release\\BIMaestro.dll",
+    "sha256": "b5f199cd0eb0ec552cc2627c45441df60a579d9d050f3f37802a10ec5729c30c",
+    "log": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\output\\build-20261124\\revit2023.log"
+  },
+  {
+    "year": 2024,
+    "code": 0,
+    "dll": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\BIMaestro\\bin\\Release2024\\BIMaestro.dll",
+    "sha256": "3137d134ef9fe265c802c3377fc797eac6e5a6f27e2a7a0464ab8b972d7f675d",
+    "log": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\output\\build-20261124\\revit2024.log"
+  },
+  {
+    "year": 2025,
+    "code": 0,
+    "dll": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\BIMaestro\\bin\\Revit2025\\Release\\BIMaestro.dll",
+    "sha256": "e8cb2aed52ce91521a13fce1bdbaa7a5b820d6459ab14731679425817ebec5f9",
+    "log": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\output\\build-20261124\\revit2025.log"
+  },
+  {
+    "year": 2026,
+    "code": 0,
+    "dll": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\BIMaestro\\bin\\Revit2026\\Release\\BIMaestro.dll",
+    "sha256": "e8034aadc7e8f9a2270dde408e75e6672725bef03d51d7dc20466efa561cb1b9",
+    "log": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\output\\build-20261124\\revit2026.log"
+  },
+  {
+    "year": 2027,
+    "code": 0,
+    "dll": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\BIMaestro\\bin\\Revit2027\\Release\\BIMaestro.dll",
+    "sha256": "8e8ded4ccb0c9a55dec9998164f8ab13a538fab69dcc4a3de4842b685ecfcb42",
+    "log": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\output\\build-20261124\\revit2027-env.log"
+  }
+]

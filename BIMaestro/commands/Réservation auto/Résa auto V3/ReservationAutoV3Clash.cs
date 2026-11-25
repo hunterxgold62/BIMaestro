@@ -96,6 +96,8 @@ namespace Modification
                 {
                     bool depth = i == dimensions.Length - 1;
                     var name = FindClashDimension(instance, symbol, dimensions[i], depth, GetHostDepth(host));
+                    if (name == null && depth && IsHostedOnHostObject(instance))
+                        continue;
                     if (name == null)
                         throw new InvalidOperationException("Le paramètre « " + (dimensions[i][0] ?? "non configuré") + " » est absent, verrouillé ou non dimensionné. Corrigez le mapping dans Autoréservation. Aucune réservation conservée.");
                     names.Add(name);

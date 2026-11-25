@@ -14,7 +14,12 @@ namespace BIMaestro.PropertiesAppearance
     {
         public string Text { get; set; }
         public string Background { get; set; }
-        public PaletteColors Copy() => new PaletteColors { Text = Text, Background = Background };
+        // Style of the rule that produced these colors (runtime only, see AppearanceStyles).
+        [JsonIgnore] public string Style { get; set; }
+        [JsonIgnore] public string Icon { get; set; }
+        // "2/5" when a condition matches only part of a multiple selection.
+        [JsonIgnore] public string Badge { get; set; }
+        public PaletteColors Copy() => new PaletteColors { Text = Text, Background = Background, Style = Style, Icon = Icon, Badge = Badge };
         public bool IsEmpty => string.IsNullOrEmpty(Text) && string.IsNullOrEmpty(Background);
     }
 
@@ -25,7 +30,47 @@ namespace BIMaestro.PropertiesAppearance
         public string Label { get; set; } = "";
         public PaletteColors Light { get; set; } = new PaletteColors();
         public PaletteColors Dark { get; set; } = new PaletteColors();
-        public AppearanceRule Copy() => new AppearanceRule { Kind = Kind, TargetKey = TargetKey, Label = Label, Light = Light.Copy(), Dark = Dark.Copy() };
+        // null or "Fond" keeps the historical full-cell painting.
+        public string Style { get; set; }
+        // Derive the pale background and the dark variant from the main color.
+        public bool AutoTint { get; set; }
+        // Built-in project browser icon id shown after the label (for example "structure").
+        public string Icon { get; set; }
+        // Optional: the look applies only when the parameter value matches (parameter rules only).
+        public RuleCondition When { get; set; }
+        public AppearanceRule Copy() => new AppearanceRule { Kind = Kind, TargetKey = TargetKey, Label = Label, Light = Light.Copy(), Dark = Dark.Copy(), Style = Style, AutoTint = AutoTint, Icon = Icon, When = When?.Copy() };
+    }
+
+    public sealed class RuleCondition
+    {
+        internal static readonly string[] Operators = { "=", "!=", "contains", "empty", "notempty", ">", "<" };
+        public string Operator { get; set; } = "=";
+        public string Value { get; set; } = "";
+        public RuleCondition Copy() => new RuleCondition { Operator = Operator, Value = Value };
+        internal bool NeedsValue => Operator != "empty" && Operator != "notempty";
+        // Compares with the value as Revit displays it, in the project units.
+        internal bool Matches(string displayed)
+        {
+            string a = Clean(displayed), b = Clean(Value);
+            switch (Operator)
+            {
+                case "=": return string.Equals(a, b, StringComparison.CurrentCultureIgnoreCase);
+                case "!=": return !string.Equals(a, b, StringComparison.CurrentCultureIgnoreCase);
+                case "contains": return b.Length > 0 && a.IndexOf(b, StringComparison.CurrentCultureIgnoreCase) >= 0;
+                case "empty": return a.Length == 0;
+                case "notempty": return a.Length > 0;
+                case ">": return Number(a, out double x) && Number(b, out double y) && x > y;
+                case "<": return Number(a, out double u) && Number(b, out double v) && u < v;
+            }
+            return false;
+        }
+        private static string Clean(string s) => (s ?? "").Replace(' ', ' ').Trim();
+        private static bool Number(string s, out double value)
+        {
+            // "4.0000", "38.400 m²", "12,5 mm": read the leading number, dot or comma.
+            var m = System.Text.RegularExpressions.Regex.Match(s ?? "", @"-?\d+(?:[.,]\d+)?");
+            return double.TryParse(m.Success ? m.Value.Replace(',', '.') : "", System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out value);
+        }
     }
 
     public sealed class AppearanceCustomGroup
@@ -64,17 +109,45 @@ namespace BIMaestro.PropertiesAppearance
         public IEnumerable<AppearanceProfile> Matching(string category, string type) => new[] { "all", category, type }
             .Where(k => !string.IsNullOrEmpty(k)).Select(k => Profiles.FirstOrDefault(p => p.Key == k)).Where(p => p != null);
 
-        public PaletteColors Resolve(string category, string type, string group, string parameter, bool dark)
+        // values: displayed value of the parameter for each selected element (null when unknown).
+        public PaletteColors Resolve(string category, string type, string group, string parameter, bool dark, Func<string, IList<string>> values = null)
         {
             PaletteColors result = null;
+            PaletteColors zebra = null;
             foreach (var profile in Matching(category, type))
-                foreach (var rule in profile.Rules.OrderBy(r => r.Kind == "parameter" ? 1 : 0))
+                // Group looks first, then parameter looks, then conditional looks (which win when they match).
+                foreach (var rule in profile.Rules.OrderBy(r => r.Kind == "parameter" ? 1 : 0).ThenBy(r => r.When != null ? 1 : 0))
                     if ((rule.Kind == "group" && rule.TargetKey == group) ||
                         (rule.Kind == "parameter" && parameter != null && rule.TargetKey == parameter))
                     {
-                        var colors = dark ? rule.Dark : rule.Light;
-                        if (!colors.IsEmpty) result = colors;
+                        var colors = rule.AutoTint ? AppearanceStyles.Tint(rule, dark) : dark ? rule.Dark : rule.Light;
+                        if (colors == null || colors.IsEmpty) continue;
+                        string badge = null;
+                        if (rule.When != null)
+                        {
+                            // A condition only reads a parameter value: never on a group title.
+                            if (rule.Kind != "parameter" || parameter == null) continue;
+                            var list = values?.Invoke(parameter);
+                            if (list == null || list.Count == 0) continue;
+                            int match = list.Count(v => rule.When.Matches(v));
+                            if (match == 0) continue;
+                            if (match < list.Count) badge = match + "/" + list.Count;
+                        }
+                        var set = AppearanceStyles.Parse(rule.Style);
+                        bool inherited = rule.Kind == "group" && parameter != null;
+                        // Alternate rows come from the group, even when a parameter has its own look.
+                        if (inherited && set.Zebra) { zebra = colors.Copy(); zebra.Style = AppearanceStyles.ZebraOnly; }
+                        if (inherited && set.HeaderOnly) continue;
+                        result = colors.Copy(); result.Style = set.ToString();
+                        // The group icon belongs to the group title, not to each of its rows.
+                        result.Icon = inherited ? null : rule.Icon;
+                        result.Badge = badge;
                     }
+            if (zebra != null)
+            {
+                if (result == null) return zebra;
+                var set = AppearanceStyles.Parse(result.Style); set.Zebra = true; result.Style = set.ToString();
+            }
             return result;
         }
 
@@ -107,6 +180,75 @@ namespace BIMaestro.PropertiesAppearance
             var chosen = Parse(colors.Text);
             if (chosen.HasValue) return chosen.Value;
             return Colors.Black;
+        }
+    }
+
+    // Drawing styles for a rule. Each one keeps Revit values and editors untouched.
+    // A look is made of independent layers: a background, the text color, one marker,
+    // plus the "header only" scope and alternate rows. Stored as "FondDegrade+TexteCouleur+Pastille".
+    internal sealed class StyleSet
+    {
+        internal const string BgNone = "", BgFill = "FondPlein", BgGradient = "FondDegrade";
+        internal const string MarkNone = "", MarkStripe = "Lisere", MarkDot = "Pastille", MarkOutline = "Contour";
+        internal string Background = BgFill, Marker = MarkNone;
+        internal bool Text = true, HeaderOnly, Zebra;
+        internal bool IsClassic => Background == BgFill && Text && Marker == MarkNone && !HeaderOnly && !Zebra;
+        public override string ToString()
+        {
+            var parts = new List<string>();
+            if (Background != BgNone) parts.Add(Background);
+            if (Text) parts.Add("TexteCouleur");
+            if (Marker != MarkNone) parts.Add(Marker);
+            if (HeaderOnly) parts.Add("EnTete");
+            if (Zebra) parts.Add("Zebre");
+            return parts.Count == 0 ? "Aucun" : string.Join("+", parts);
+        }
+    }
+
+    internal static class AppearanceStyles
+    {
+        internal const string ZebraOnly = "Zebre";
+        // Values written by the first test build, one style at a time.
+        private static readonly Dictionary<string, string> Legacy = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Fond"] = "FondPlein+TexteCouleur", ["Texte"] = "TexteCouleur", ["Degrade"] = "FondDegrade+TexteCouleur",
+            ["Lisere"] = "Lisere", ["Pastille"] = "Pastille", ["EnTete"] = "FondPlein+TexteCouleur+EnTete",
+        };
+        internal static StyleSet Parse(string style)
+        {
+            var set = new StyleSet();
+            if (string.IsNullOrWhiteSpace(style)) return set;
+            if (Legacy.TryGetValue(style.Trim(), out var modern)) style = modern;
+            set.Background = StyleSet.BgNone; set.Text = false;
+            foreach (var token in style.Split('+').Select(t => t.Trim()))
+            {
+                if (token.Equals(StyleSet.BgFill, StringComparison.OrdinalIgnoreCase)) set.Background = StyleSet.BgFill;
+                else if (token.Equals(StyleSet.BgGradient, StringComparison.OrdinalIgnoreCase)) set.Background = StyleSet.BgGradient;
+                else if (token.Equals("TexteCouleur", StringComparison.OrdinalIgnoreCase)) set.Text = true;
+                else if (token.Equals(StyleSet.MarkStripe, StringComparison.OrdinalIgnoreCase)) set.Marker = StyleSet.MarkStripe;
+                else if (token.Equals(StyleSet.MarkDot, StringComparison.OrdinalIgnoreCase)) set.Marker = StyleSet.MarkDot;
+                else if (token.Equals(StyleSet.MarkOutline, StringComparison.OrdinalIgnoreCase)) set.Marker = StyleSet.MarkOutline;
+                else if (token.Equals("EnTete", StringComparison.OrdinalIgnoreCase)) set.HeaderOnly = true;
+                else if (token.Equals("Zebre", StringComparison.OrdinalIgnoreCase)) set.Zebra = true;
+            }
+            return set;
+        }
+        // null keeps the file identical to older versions for the classic look.
+        internal static string Store(StyleSet set) => set.IsClassic ? null : set.ToString();
+        // Accent used by the stripe and the dot: the text color, else the background.
+        internal static Color? Accent(PaletteColors colors) => AppearancePreferences.Parse(colors?.Text) ?? AppearancePreferences.Parse(colors?.Background);
+        internal static Color Mix(Color a, Color b, double amount) => Color.FromRgb(
+            (byte)Math.Round(a.R + (b.R - a.R) * amount), (byte)Math.Round(a.G + (b.G - a.G) * amount), (byte)Math.Round(a.B + (b.B - a.B) * amount));
+        // One chosen color gives a pale background in light mode and a readable pair in dark mode.
+        internal static PaletteColors Tint(AppearanceRule rule, bool dark)
+        {
+            var main = AppearancePreferences.Parse(rule.Light?.Text) ?? AppearancePreferences.Parse(rule.Light?.Background)
+                ?? AppearancePreferences.Parse(rule.Dark?.Text) ?? AppearancePreferences.Parse(rule.Dark?.Background);
+            if (!main.HasValue) return null;
+            var c = main.Value;
+            return dark
+                ? new PaletteColors { Text = Mix(c, Colors.White, .55).ToString(), Background = Mix(Color.FromRgb(59, 68, 83), c, .28).ToString() }
+                : new PaletteColors { Text = c.ToString(), Background = Mix(Colors.White, c, .12).ToString() };
         }
     }
 

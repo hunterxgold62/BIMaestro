@@ -103,7 +103,7 @@ namespace BIMaestro.Navisworks.UI
             if (count == 0) return;
             if (MessageBox.Show(this,
                 "Appliquer " + count + " changement(s) de chemin ?\r\n\r\n" +
-                "Votre travail sera enregistré si nécessaire, puis le NWF sera rouvert. " +
+                "Le NWF sera enregistré automatiquement (y compris les changements de liens précédents), puis rouvert. " +
                 "Deux sauvegardes temporaires seront créées à côté du NWF, puis supprimées si le remplacement réussit.\r\n" +
                 "Après vérification du résultat, Ctrl+S enregistrera les nouveaux liens.",
                 Text, MessageBoxButtons.OKCancel, MessageBoxIcon.Information) != DialogResult.OK) return;

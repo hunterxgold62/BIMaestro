@@ -242,6 +242,7 @@
                                         <Button Content="7 j" Tag="7" MinWidth="56" Margin="0,0,4,0" Click="DetailRange_Click" />
                                         <Button Content="15 j" Tag="15" MinWidth="56" Margin="0,0,4,0" Click="DetailRange_Click" />
                                         <Button Content="30 j" Tag="30" MinWidth="56" Margin="0" Click="DetailRange_Click" />
+                                        <Button Content="Tout l’historique" Tag="0" Margin="0,4,0,0" Click="DetailRange_Click" />
                                     </WrapPanel>
                                     <TextBlock Text="Rechercher un document" Style="{StaticResource Hint}" Margin="0,12,0,4" />
                                     <TextBox x:Name="Search" ToolTip="Rechercher dans les noms et chemins des documents." TextChanged="Search_Changed" />
@@ -284,7 +285,12 @@
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
                             </ListBox>
-                            <TextBlock Grid.Row="3" x:Name="SelectionCount" Style="{StaticResource Hint}" Margin="0,10,0,0" />
+                            <StackPanel Grid.Row="3" Margin="0,10,0,0">
+                                <TextBlock x:Name="SelectionCount" Style="{StaticResource Hint}" />
+                                <TextBlock Text="Après une conversion Revit ou un déplacement, cochez les anciens et nouveaux fichiers puis regroupez-les pour cumuler leur temps." Style="{StaticResource Hint}" TextWrapping="Wrap" Margin="0,8,0,8" />
+                                <Button Content="Regrouper en un projet" Click="GroupDocuments_Click" Margin="0,0,0,4" />
+                                <Button Content="Séparer les fichiers" Click="SeparateDocuments_Click" />
+                            </StackPanel>
                         </Grid>
                     </Border>
                     <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -329,7 +335,7 @@
                                     <DataGrid.Columns>
                                         <DataGridTextColumn Header="Jour" Binding="{Binding Day, StringFormat=dd/MM/yyyy}" Width="*" />
                                         <DataGridTextColumn Header="Temps actif" Binding="{Binding Duration}" SortMemberPath="Hours" Width="110" />
-                                        <DataGridTextColumn Header="Plages d’activité" Binding="{Binding Count}" Width="110" />
+                                        <DataGridTextColumn Header="Périodes de travail" Binding="{Binding Count}" Width="130" />
                                         <DataGridTextColumn Header="Dont sessions ouvertes" Binding="{Binding LiveDuration}" SortMemberPath="LiveHours" Width="160" />
                                     </DataGrid.Columns>
                                 </DataGrid>
@@ -337,8 +343,8 @@
                         </Border>
                         <Border Grid.Row="4" Style="{StaticResource Card}" Margin="0,0,0,12">
                             <StackPanel>
-                                <TextBlock Text="Plages d’activité" Style="{StaticResource H2}" />
-                                <TextBlock Text="Une session peut contenir plusieurs plages. La date correspond à la fin de la plage enregistrée." Style="{StaticResource Hint}" TextWrapping="Wrap" Margin="0,0,0,8" />
+                                <TextBlock Text="Périodes de travail" Style="{StaticResource H2}" />
+                                <TextBlock Text="Une période correspond à du temps actif sur un document. Une pause ou un changement de document peut créer une nouvelle période : ce n’est pas un nombre d’ouvertures. La date indique la fin de la période." Style="{StaticResource Hint}" TextWrapping="Wrap" Margin="0,0,0,8" />
                                 <DataGrid x:Name="ActivityTable" MaxHeight="280">
                                     <DataGrid.Columns>
                                         <DataGridTextColumn Header="Date / heure" Binding="{Binding When, StringFormat=dd/MM/yyyy HH:mm}" Width="135" />

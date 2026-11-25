@@ -81,6 +81,9 @@ namespace Couleur
             return result;
         });
 
+        // The 26 icons shipped with BIMaestro, also offered for Properties palette groups.
+        internal static IEnumerable<BrowserIconAsset> BuiltInIcons => BuiltIns.Value;
+
         public static IEnumerable<BrowserIconAsset> Assets(BrowserIconSettings settings) =>
             BuiltIns.Value.Concat(settings.CustomAssets);
 

@@ -38,6 +38,8 @@ namespace BIMaestro.Dashboard
         private int _days = 7;
         private int _invalidRows;
         private string _loadError;
+        private string _groupError;
+        private readonly string _groupsPath = Path.Combine(global::BIMaestro.Storage.UserDataStorage.Root, "TimeProjectGroups.xml");
 
         public TimeSeriesDashboardWindow(string currentDocumentPath = null)
         {
@@ -101,10 +103,17 @@ namespace BIMaestro.Dashboard
             }
             catch (Exception ex) { _loadError = UiLanguage.Get("TimeSeriesDashboardWindow.xaml.UnableToReadHistory") + ex.Message; }
             // Current-process open sessions are not yet present as closed rows in the workbook.
-            _all = _saved.Concat(ExcelLogger.GetDashboardEntries().Select(x => new Entry {
+            _all = _saved.Select(x => new Entry { Id = x.Id, Name = x.Name, Version = x.Version, Kind = x.Kind, Path = x.Path, Parameters = x.Parameters, When = x.When, Hours = x.Hours }).Concat(ExcelLogger.GetDashboardEntries().Select(x => new Entry {
                 Id = Normalize(x.DocumentId), Name = x.Name, Version = x.Version, Kind = x.Kind,
                 Path = First(x.Path, x.DocumentId), Parameters = x.Parameters, When = x.When, Hours = x.Hours, Live = true
             })).Where(x => x.Hours > 0 && !double.IsNaN(x.Hours) && !double.IsInfinity(x.Hours)).ToList();
+            _groupError = null;
+            try
+            {
+                var groups = TimeProjectGroups.Load(_groupsPath);
+                foreach (var entry in _all) { entry.SourceId = entry.Id; entry.Id = groups.Resolve(entry.Id); }
+            }
+            catch (Exception ex) { _groupError = UiLanguage.Get("TimeDashboard.GroupsError") + ex.Message; }
             RebuildChoices();
             _batch = true;
             var version = Version.SelectedItem as string;
@@ -119,7 +128,7 @@ namespace BIMaestro.Dashboard
             var old = _choices.ToDictionary(x => x.Id, x => x.Selected, StringComparer.OrdinalIgnoreCase);
             bool selectNew = old.Count == 0 || old.Values.All(value => value);
             _choices = _all.GroupBy(x => x.Id, StringComparer.OrdinalIgnoreCase).Select(g => new ModelChoice {
-                Id = g.Key, Name = First(g.Last().Name, g.Key), Path = g.Last().Path,
+                Id = g.Key, Name = First(g.OrderBy(x => x.When).Last().Name, g.Key), Path = string.Join("\n", g.Select(x => x.Path).Distinct(StringComparer.OrdinalIgnoreCase)),
                 Selected = old.TryGetValue(g.Key, out bool value) ? value : selectNew
             }).OrderBy(x => x.Name).ToList();
         }
@@ -143,7 +152,32 @@ namespace BIMaestro.Dashboard
         private void DetailRange_Click(object sender, RoutedEventArgs e)
         {
             if (!(sender is Button button) || !int.TryParse(button.Tag?.ToString(), out int days)) return;
-            _batch = true; From.SelectedDate = DateTime.Today.AddDays(1 - days); To.SelectedDate = DateTime.Today; _batch = false; Refresh();
+            _batch = true; From.SelectedDate = days == 0 ? _all.Select(x => x.When.Date).DefaultIfEmpty(DateTime.Today).Min() : DateTime.Today.AddDays(1 - days); To.SelectedDate = DateTime.Today; _batch = false; Refresh();
+        }
+        private void GroupDocuments_Click(object sender, RoutedEventArgs e) => UpdateGroups(false);
+        private void SeparateDocuments_Click(object sender, RoutedEventArgs e) => UpdateGroups(true);
+        private void UpdateGroups(bool separate)
+        {
+            var selected = Picker.Items.Cast<ModelChoice>().Where(x => x.Selected).ToList();
+            if (selected.Count < (separate ? 1 : 2))
+            {
+                MessageBox.Show(this, UiLanguage.Get("TimeDashboard.SelectDocuments"), "BIMaestro");
+                return;
+            }
+            string question = UiLanguage.Get(separate ? "TimeDashboard.SeparateQuestion" : "TimeDashboard.GroupQuestion");
+            if (MessageBox.Show(this, question + "\n\n" + string.Join("\n", selected.Select(x => x.Name + "\n" + x.Path)),
+                "BIMaestro", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+            try
+            {
+                var selectedIds = new HashSet<string>(selected.Select(x => x.Id), StringComparer.OrdinalIgnoreCase);
+                var sources = new HashSet<string>(_all.Where(x => selectedIds.Contains(x.Id)).Select(x => x.SourceId ?? x.Id), StringComparer.OrdinalIgnoreCase);
+                TimeProjectGroups.Update(_groupsPath, selectedIds, separate);
+                Reload();
+                var resultingIds = new HashSet<string>(_all.Where(x => sources.Contains(x.SourceId ?? x.Id)).Select(x => x.Id), StringComparer.OrdinalIgnoreCase);
+                foreach (var choice in _choices) choice.Selected = resultingIds.Contains(choice.Id);
+                Refresh();
+            }
+            catch (Exception ex) { MessageBox.Show(this, UiLanguage.Get("TimeDashboard.GroupsError") + ex.Message, "BIMaestro", MessageBoxButton.OK, MessageBoxImage.Error); }
         }
         private void ResetFilters_Click(object sender, RoutedEventArgs e)
         {
@@ -195,7 +229,7 @@ namespace BIMaestro.Dashboard
             Picker.ItemsSource = _choices.Where(x => available.Contains(x.Id)).ToList();
             _batch = false;
             RefreshDetail();
-            Status.Text = _loadError ?? (UiLanguage.Get("TimeSeriesDashboardWindow.xaml.LocalHistoryActiveTimeAndOngoingSessionsUpdated") + DateTime.Now.ToString("HH:mm") +
+            Status.Text = _loadError ?? _groupError ?? (UiLanguage.Get("TimeSeriesDashboardWindow.xaml.LocalHistoryActiveTimeAndOngoingSessionsUpdated") + DateTime.Now.ToString("HH:mm") +
                 (_invalidRows > 0 ? " · " + _invalidRows + UiLanguage.Get("TimeSeriesDashboardWindow.xaml.UnreadableRowSSkipped") : ""));
         }
         private bool MatchesFilters(Entry x)
@@ -252,7 +286,7 @@ namespace BIMaestro.Dashboard
         {
             double sum = rows.Sum(x => x.Hours);
             return rows.GroupBy(x => x.Id, StringComparer.OrdinalIgnoreCase).Select(g => new Total {
-                Id = g.Key, Name = First(g.Last().Name, g.Key), Path = g.Last().Path,
+                Id = g.Key, Name = First(g.OrderBy(x => x.When).Last().Name, g.Key), Path = string.Join("\n", g.Select(x => x.Path).Distinct(StringComparer.OrdinalIgnoreCase)),
                 Hours = g.Sum(x => x.Hours), Days = g.Select(x => x.When.Date).Distinct().Count(), Last = g.Max(x => x.When),
                 Versions = string.Join(", ", g.Select(x => x.Version).Distinct()), Share = sum > 0 ? 100 * g.Sum(x => x.Hours) / sum : 0
             }).OrderByDescending(x => x.Hours).ThenBy(x => x.Name).ToList();
@@ -352,7 +386,7 @@ namespace BIMaestro.Dashboard
             if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out double days) || double.TryParse(value, NumberStyles.Float, CultureInfo.GetCultureInfo("fr-FR"), out days)) return days * 24;
             return double.NaN;
         }
-        internal class Entry { public string Id, Name, Path, Version, Kind, Parameters; public DateTime When; public double Hours; public bool Live; }
+        internal class Entry { public string Id, SourceId, Name, Path, Version, Kind, Parameters; public DateTime When; public double Hours; public bool Live; }
         [Obfuscation(Exclude = true, ApplyToMembers = true)]
         internal class ActivityDay
         {
