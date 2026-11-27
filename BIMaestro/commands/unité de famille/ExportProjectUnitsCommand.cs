@@ -26,12 +26,22 @@ namespace Famille
         protected override Result OnExecute(ExternalCommandData commandData, ref string message, ElementSet elements)
         {
             // Prépare le dossier et le fichier JSON
-            string docDir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-            string prefDir = global::BIMaestro.Storage.PreferenceStorage.Folder("Unités");
-            Directory.CreateDirectory(prefDir);
-            string filePath = Path.Combine(prefDir, "RevitUnits.json");
+            string filePath = ImportProjectUnitsCommand.UnitsFilePath;
 
             Document doc = commandData.Application.ActiveUIDocument.Document;
+            var list = ExportUnits(doc, filePath);
+            RecordOperationResult(ButtonId, "export_units", false,
+                new Dictionary<string, int> { ["files_exported"] = 1, ["units_exported"] = list.Count });
+
+            var disciplineCount = UnitUtils.GetAllDisciplines().Count();
+            TaskDialog.Show(UiLanguage.Get("ExportProjectUnitsCommand.ExportUnits"), UiLanguage.Format("ExportProjectUnitsCommand.0UnitSExportedAllDisciplines1Discipline", (object)list.Count, (object)disciplineCount, (object)filePath));
+            return Result.Succeeded;
+        }
+
+        /// <summary>Écrit les unités du document dans le fichier JSON, sans fenêtre (utilisé aussi par « Outils famille »).</summary>
+        internal static List<UnitInfo> ExportUnits(Document doc, string filePath)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(filePath));
             Units units = doc.GetUnits();
             var list = new List<UnitInfo>();
             var allSpecs = UnitUtils.GetAllMeasurableSpecs();
@@ -52,12 +62,7 @@ namespace Famille
             }
 
             File.WriteAllText(filePath, JsonConvert.SerializeObject(list, Formatting.Indented));
-            RecordOperationResult(ButtonId, "export_units", false,
-                new Dictionary<string, int> { ["files_exported"] = 1, ["units_exported"] = list.Count });
-
-            var disciplineCount = UnitUtils.GetAllDisciplines().Count();
-            TaskDialog.Show(UiLanguage.Get("ExportProjectUnitsCommand.ExportUnits"), UiLanguage.Format("ExportProjectUnitsCommand.0UnitSExportedAllDisciplines1Discipline", (object)list.Count, (object)disciplineCount, (object)filePath));
-            return Result.Succeeded;
+            return list;
         }
     }
 }

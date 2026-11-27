@@ -32,6 +32,59 @@ namespace Famille
                 return Result.Cancelled;
             }
 
+            var candidates = FindRemovableParameters(doc);
+
+            if (candidates.Count == 0)
+            {
+                TaskDialog.Show(UiLanguage.Get("PurgeParametersCommand.Information"), UiLanguage.Get("PurgeParametersCommand.NoRemovableParameterWasFound"));
+                return Result.Succeeded;
+            }
+
+            // 6) AFFICHAGE DE LA FENÊTRE DE SÉLECTION
+            var selectionWindow = new ParameterSelectionWindow(candidates);
+            var helper = new System.Windows.Interop.WindowInteropHelper(selectionWindow)
+            {
+                Owner = System.Diagnostics.Process.GetCurrentProcess().MainWindowHandle
+            };
+            if (selectionWindow.ShowDialog() != true)
+                return Result.Cancelled;
+
+            // 7) RÉCUPÉRATION & PURGE
+            var toRemove = candidates.Where(ps => ps.IsSelected)
+                                     .Select(ps => ps.Parameter)
+                                     .ToList();
+
+            if (toRemove.Count == 0)
+            {
+                TaskDialog.Show(UiLanguage.Get("PurgeParametersCommand.Information"), UiLanguage.Get("PurgeParametersCommand.NoParameterWasSelectedForDeletion"));
+                return Result.Succeeded;
+            }
+
+            // 8) BACKUP
+            string backupPath = GetBackupFilePath(doc);
+            try
+            {
+                doc.SaveAs(backupPath, new SaveAsOptions { OverwriteExistingFile = true });
+            }
+            catch (Exception ex)
+            {
+                TaskDialog.Show(UiLanguage.Get("PurgeParametersCommand.Error"), UiLanguage.Format("PurgeParametersCommand.UnableToSaveTheFamily0", (object)ex.Message));
+                return Result.Cancelled;
+            }
+
+            // 9) TRANSACTION DE PURGE
+            var removedNames = RemoveParameters(doc, toRemove);
+            string resultMsg = UiLanguage.Format("PurgeParametersCommand.TotalParametersDeleted0", (object)removedNames.Count);
+            if (removedNames.Count > 0)
+                resultMsg += UiLanguage.Get("PurgeParametersCommand.DeletedParameters") + string.Join("\n", removedNames);
+
+            TaskDialog.Show(UiLanguage.Get("PurgeParametersCommand.Result"), resultMsg);
+            return Result.Succeeded;
+        }
+
+        /// <summary>Liste les paramètres supprimables sans fenêtre (utilisé aussi par « Préparer la famille »).</summary>
+        internal static ObservableCollection<ParameterSelection> FindRemovableParameters(Document doc)
+        {
             FamilyManager familyManager = doc.FamilyManager;
             IList<FamilyParameter> allParams = familyManager.GetParameters();
             var candidates = new ObservableCollection<ParameterSelection>();
@@ -83,45 +136,13 @@ namespace Famille
                 }
             }
 
-            if (candidates.Count == 0)
-            {
-                TaskDialog.Show(UiLanguage.Get("PurgeParametersCommand.Information"), UiLanguage.Get("PurgeParametersCommand.NoRemovableParameterWasFound"));
-                return Result.Succeeded;
-            }
+            return candidates;
+        }
 
-            // 6) AFFICHAGE DE LA FENÊTRE DE SÉLECTION
-            var selectionWindow = new ParameterSelectionWindow(candidates);
-            var helper = new System.Windows.Interop.WindowInteropHelper(selectionWindow)
-            {
-                Owner = System.Diagnostics.Process.GetCurrentProcess().MainWindowHandle
-            };
-            if (selectionWindow.ShowDialog() != true)
-                return Result.Cancelled;
-
-            // 7) RÉCUPÉRATION & PURGE
-            var toRemove = candidates.Where(ps => ps.IsSelected)
-                                     .Select(ps => ps.Parameter)
-                                     .ToList();
-
-            if (toRemove.Count == 0)
-            {
-                TaskDialog.Show(UiLanguage.Get("PurgeParametersCommand.Information"), UiLanguage.Get("PurgeParametersCommand.NoParameterWasSelectedForDeletion"));
-                return Result.Succeeded;
-            }
-
-            // 8) BACKUP
-            string backupPath = GetBackupFilePath(doc);
-            try
-            {
-                doc.SaveAs(backupPath, new SaveAsOptions { OverwriteExistingFile = true });
-            }
-            catch (Exception ex)
-            {
-                TaskDialog.Show(UiLanguage.Get("PurgeParametersCommand.Error"), UiLanguage.Format("PurgeParametersCommand.UnableToSaveTheFamily0", (object)ex.Message));
-                return Result.Cancelled;
-            }
-
-            // 9) TRANSACTION DE PURGE
+        /// <summary>Supprime les paramètres donnés dans une transaction et renvoie les noms supprimés, triés.</summary>
+        internal static List<string> RemoveParameters(Document doc, IEnumerable<FamilyParameter> toRemove)
+        {
+            FamilyManager familyManager = doc.FamilyManager;
             var removedNames = new List<string>();
             using (var t = new Transaction(doc, "Purger les paramètres"))
             {
@@ -139,12 +160,7 @@ namespace Famille
             }
 
             removedNames.Sort();
-            string resultMsg = UiLanguage.Format("PurgeParametersCommand.TotalParametersDeleted0", (object)removedNames.Count);
-            if (removedNames.Count > 0)
-                resultMsg += UiLanguage.Get("PurgeParametersCommand.DeletedParameters") + string.Join("\n", removedNames);
-
-            TaskDialog.Show(UiLanguage.Get("PurgeParametersCommand.Result"), resultMsg);
-            return Result.Succeeded;
+            return removedNames;
         }
 
         #region Helpers
@@ -171,7 +187,7 @@ namespace Famille
             return path;
         }
 
-        private bool IsParameterUsed(Document doc, FamilyParameter param)
+        private static bool IsParameterUsed(Document doc, FamilyParameter param)
         {
             // Vérifier dans les cotes
             foreach (Dimension d in new FilteredElementCollector(doc).OfClass(typeof(Dimension)))
@@ -201,14 +217,14 @@ namespace Famille
             return false;
         }
 
-        private bool IsReferencedInFormula(FamilyParameter param, string formula)
+        private static bool IsReferencedInFormula(FamilyParameter param, string formula)
         {
             string name = param.Definition.Name;
             string pattern = $@"\b{System.Text.RegularExpressions.Regex.Escape(name)}\b";
             return System.Text.RegularExpressions.Regex.IsMatch(formula, pattern);
         }
 
-        private string GetParameterTypeName(Definition def)
+        private static string GetParameterTypeName(Definition def)
         {
             // Lecture réflexive de "ParameterType"
             PropertyInfo prop = def.GetType()

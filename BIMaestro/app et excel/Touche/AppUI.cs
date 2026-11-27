@@ -183,20 +183,18 @@ public partial class AppUI : IExternalApplication
                     ("FamilyBrowser", "Navigateur\nde Familles", "Famille.FamilyBrowserCommand", "FamilyBrowser.png","Parcourt vos dossiers de familles Revit et charge les contenus en quelques clics.\r\nInclut aperçu visuel, favoris, recherche et options d'affichage pour accélérer le travail."), 
                     ("Rosace", "Rosace\nfamilles","BIMaestro.UI.RadialMenuCommand", "FamilyRadialMenu.png","Rosace des familles à ajouter en raccourci clavier voir raccourci souris.")
                 }, "Navigateur de Familles", "FamilyBrowser.png", keepDefaultCurrentButton: true, fixedDisplayText: "Famille")),
-        new RibbonItemDefinition("ConvertSharedToFamily", "Convertir les paramètres partagés", panel => AddPushButton(panel, "ConvertSharedToFamily", "Convertir\nparamètres", assemblyPath, "Famille.ConvertSharedToFamilyParametersCommand", "Convertir paramètres (2).png", "Convertit tous les paramètres partagés modifiables de la famille en paramètres de famille (même nom, même groupe et même type instance/type).")),                new RibbonItemDefinition("FamilyUtilitiesStack", "Outils familles", panel => AddStackedFamilyUtilities(
-                    panel,
-                    assemblyPath,
+                // « Outils famille » ouvre une seule fenêtre qui regroupe tous les outils famille ;
+                // la flèche garde l'accès direct à chaque outil (raccourcis et rosace existants).
+                new RibbonItemDefinition("FamilyTools", "Outils famille", panel => AddSplitButton(panel, "FamilyTools", "Outils\nfamille", assemblyPath, new List<(string, string, string, string, string)>
+                {
+                    ("FamilyTools", "Outils\nfamille", "Famille.FamilyToolsCommand", "Convertir paramètres (2).png", "Regroupe dans une seule fenêtre les outils famille : conversion des paramètres partagés, purge, traduction IA des paramètres et des vues, unités.\r\nChaque outil se lance séparément et affiche son résultat sur place."),
+                    ("ConvertSharedToFamily", "Convertir\nparamètres", "Famille.ConvertSharedToFamilyParametersCommand", "Convertir paramètres (2).png", "Convertit tous les paramètres partagés modifiables de la famille en paramètres de famille (même nom, même groupe et même type instance/type)."),
                     ("PurgeFamilyParameters", "Purge", "Famille.PurgeFamilyParametersCommand", "Purge famille.png", "Supprime les paramètres inutilisés d'une famille Revit après vérification des dépendances.\r\nCrée automatiquement une sauvegarde avant nettoyage."),
-                    ("Familytraduction", "Trad.IA", new List<(string, string, string, string, string)>
-                    {
-                        ("Familytraduction", "Trad.IA", "Famille.TraduireParametresFamilleOpenAI", "Tard IA.png","Traduit en français les noms de paramètres utilisateur d'une famille.\r\nIgnore les paramètres déjà francisés et enregistre les changements de façon sécurisée."),
-                        ("FamilyViewtraduction", "Traduction\nde vues IA","Famille.TraduireVuesFamilleOpenAI", "Tard IA.png","Cette commande permet :  \r\n- De traduire automatiquement les noms des vues d'une famille Revit en français.  \r\n- De conserver les vues déjà en français sans modification.  \r\n- D'assurer l'unicité des noms générés même en cas de doublon potentiel.  \r\n- D'utiliser l'API OpenAI et le cache de traduction pour accélérer les traitements récurrents.  \r\n\r\nUtilité :  \r\nGarantit une nomenclature cohérente et francisée des vues de famille, améliorant la compréhension et la conformité des contenus.  ")
-                    }),
-                    ("Export d'unité", "Unités", new List<(string, string, string, string, string)>
-                    {
-                        ("Export d'unité", "Unités", "Famille.ExportProjectUnitsCommand", "Unités.png","Sauvegarde dans un fichier JSON les unités et leur précision (longueur, surface, volume, angle, etc.) du projet en cours, dans le dossier Mes Documents/BIMaestro_Revit/SauvegardePréférence/Unités."),
-                        ("Import d'unité", "Import\nd'unité","Famille.ImportProjectUnitsCommand", "Import unités.png","Recharge depuis le fichier JSON les unités et leur précision pour appliquer rapidement vos préférences au projet.")
-                    })))
+                    ("Familytraduction", "Traduction\nparamètres IA", "Famille.TraduireParametresFamilleOpenAI", "Tard IA.png","Traduit en français les noms de paramètres utilisateur d'une famille.\r\nIgnore les paramètres déjà francisés et enregistre les changements de façon sécurisée."),
+                    ("FamilyViewtraduction", "Traduction\nde vues IA","Famille.TraduireVuesFamilleOpenAI", "Tard IA.png","Cette commande permet :  \r\n- De traduire automatiquement les noms des vues d'une famille Revit en français.  \r\n- De conserver les vues déjà en français sans modification.  \r\n- D'assurer l'unicité des noms générés même en cas de doublon potentiel.  \r\n- D'utiliser l'API OpenAI et le cache de traduction pour accélérer les traitements récurrents.  \r\n\r\nUtilité :  \r\nGarantit une nomenclature cohérente et francisée des vues de famille, améliorant la compréhension et la conformité des contenus.  "),
+                    ("Export d'unité", "Export\nd'unité", "Famille.ExportProjectUnitsCommand", "Unités.png","Sauvegarde dans un fichier JSON les unités et leur précision (longueur, surface, volume, angle, etc.) du projet en cours, dans le dossier Mes Documents/BIMaestro_Revit/SauvegardePréférence/Unités."),
+                    ("Import d'unité", "Import\nd'unité","Famille.ImportProjectUnitsCommand", "Import unités.png","Recharge depuis le fichier JSON les unités et leur précision pour appliquer rapidement vos préférences au projet.")
+                }, "Outils famille", "Convertir paramètres (2).png", keepDefaultCurrentButton: true, fixedDisplayText: "Outils\nfamille"))
             }),
 
            new RibbonPanelDefinition("Couleur et information", new List<RibbonItemDefinition>
@@ -562,42 +560,6 @@ public partial class AppUI : IExternalApplication
     }
 
 
-    private static void AddStackedFamilyUtilities(
-        RibbonPanel panel,
-        string assemblyPath,
-        (string buttonName, string buttonText, string className, string resourceImageName, string toolTip) purgeButton,
-        (string splitButtonName, string splitButtonText, List<(string buttonName, string buttonText, string className, string resourceImageName, string toolTip)> buttons) traductionSplit,
-        (string splitButtonName, string splitButtonText, List<(string buttonName, string buttonText, string className, string resourceImageName, string toolTip)> buttons) unitsSplit)
-    {
-        RegisterButtonDefinition(purgeButton.buttonName, purgeButton.buttonText, purgeButton.className, purgeButton.resourceImageName);
-
-        var purgeData = CreatePushButtonData(purgeButton.buttonName, purgeButton.buttonText, assemblyPath, purgeButton.className, purgeButton.resourceImageName, purgeButton.toolTip);
-        var traductionData = new SplitButtonData(traductionSplit.splitButtonName, UiLanguage.T(traductionSplit.splitButtonText));
-        var unitsData = new SplitButtonData(unitsSplit.splitButtonName, UiLanguage.T(unitsSplit.splitButtonText));
-
-        var stacked = panel.AddStackedItems(purgeData, traductionData, unitsData);
-        if (stacked == null)
-        {
-            return;
-        }
-
-        if (stacked.Count > 0 && stacked[0] is PushButton purge)
-        {
-            RegisterButtonInstance(purgeButton.buttonName, purge);
-            RegisterButtonCommandId(purgeButton.buttonName, TryGetCommandId(purge));
-        }
-
-        if (stacked.Count > 1 && stacked[1] is SplitButton traduction)
-        {
-            ConfigureSplitButton(traduction, assemblyPath, traductionSplit.buttons, null, null);
-        }
-
-        if (stacked.Count > 2 && stacked[2] is SplitButton units)
-        {
-            ConfigureSplitButton(units, assemblyPath, unitsSplit.buttons, null, null);
-        }
-    }
-
     private static void AddPushButton(RibbonPanel panel, string buttonName, string buttonText, string assemblyPath, string className, string resourceImageName, string toolTip)
     {
         RegisterButtonDefinition(buttonName, buttonText, className, resourceImageName);
@@ -722,7 +684,7 @@ public partial class AppUI : IExternalApplication
                 "OpenSheetFromViewButton", "Export Nomenclature", "ViewThumbnailBatch", "ExportDwgBatch", "GetPaintedMaterialsButton", "ReorientViewButton",
                 "MaintenanceWorkbench", "MepBooster", "PipeSystemColors", "RevitGameCommand",
                 "CodexChat", "CommunityFamilies", "GPTBotWindowButton", "TextCorrectionButton", "ScanText", "RealisticViewImage",
-                "FamilyBrowser", "Rosace", "ConvertSharedToFamily", "PurgeFamilyParameters", "Familytraduction", "FamilyViewtraduction", "Export d'unité", "Import d'unité",
+                "FamilyBrowser", "Rosace", "FamilyTools", "ConvertSharedToFamily", "PurgeFamilyParameters", "Familytraduction", "FamilyViewtraduction", "Export d'unité", "Import d'unité",
                 "ElementHistoryHoverToggle", "Suivi maquette collaboratif",
                 "Couleur de projet", "Couleur de maquette", "HomeAppearanceTest", "PropertiesAppearance", "papa Noël", "ViewDeckToggle", "BIMaestro_Exemple", "CreateDemoProject", "DemoTours", "NOTE_MAJ", "Snake", "FlappyBird", "CustomizeRibbon", "ContactCommand", "RadialMenuButtonsCommand", "SupportCommand",
                 "dynamo 1", "dynamo 2", "dynamo 3", "dynamo 4", "dynamo 5", "dynamo réglage",

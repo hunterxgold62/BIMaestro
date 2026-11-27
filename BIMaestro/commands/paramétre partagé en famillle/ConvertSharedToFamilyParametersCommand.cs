@@ -30,20 +30,65 @@ namespace Famille
                 return Result.Cancelled;
             }
 
+            var outcome = ConvertAll(doc);
+            if (outcome.Detected == 0)
+            {
+                TaskDialog.Show("BIMaestro", UiLanguage.Get("ConvertSharedToFamilyParametersCommand.NoSharedParameterIsAvailableToConvert"));
+                return Result.Succeeded;
+            }
+
+            var failed = outcome.Failed;
+            bool fatalFailure = outcome.Fatal;
+            int notConverted = outcome.Detected - outcome.Converted;
+            string report = $"Paramètres partagés détectés : {outcome.Detected}\n" +
+                            $"Convertis en paramètres de famille : {outcome.Converted}\n" +
+                            $"Non convertis : {notConverted}";
+
+            if (fatalFailure)
+            {
+                report += "\n\nSÉCURITÉ : aucune modification n'a été conservée ; la famille est restée dans son état initial.";
+                report += "\n\nDétails :\n- " + string.Join("\n- ", failed.Distinct());
+            }
+            else if (failed.Count > 0)
+            {
+                report += "\n\nLes paramètres ci-dessous ont été ignorés. Chaque tentative concernée a été annulée sans affecter la famille.";
+                report += "\n\nDétails :\n- " + string.Join("\n- ", failed.Distinct());
+            }
+
+            string title = fatalFailure
+                ? "Conversion annulée sans modification"
+                : failed.Count > 0
+                    ? "Conversion partielle sécurisée"
+                    : "Conversion terminée";
+
+            TaskDialog.Show(title, report);
+            return Result.Succeeded;
+        }
+
+        internal sealed class ConversionOutcome
+        {
+            public int Detected { get; set; }
+            public int Converted { get; set; }
+            public bool Fatal { get; set; }
+            public List<string> Failed { get; } = new List<string>();
+        }
+
+        /// <summary>Convertit les paramètres partagés sans afficher de fenêtre (utilisé aussi par « Préparer la famille »).</summary>
+        internal static ConversionOutcome ConvertAll(Document doc)
+        {
+            var outcome = new ConversionOutcome();
             var familyManager = doc.FamilyManager;
             var sharedParameters = familyManager
                 .GetParameters()
                 .Where(p => p != null && p.IsShared)
                 .ToList();
 
+            outcome.Detected = sharedParameters.Count;
             if (sharedParameters.Count == 0)
-            {
-                TaskDialog.Show("BIMaestro", UiLanguage.Get("ConvertSharedToFamilyParametersCommand.NoSharedParameterIsAvailableToConvert"));
-                return Result.Succeeded;
-            }
+                return outcome;
 
             int converted = 0;
-            var failed = new List<string>();
+            var failed = outcome.Failed;
             bool tempTypeCreated = false;
             bool fatalFailure = false;
 
@@ -170,30 +215,9 @@ namespace Famille
                 }
             }
 
-            int notConverted = sharedParameters.Count - converted;
-            string report = $"Paramètres partagés détectés : {sharedParameters.Count}\n" +
-                            $"Convertis en paramètres de famille : {converted}\n" +
-                            $"Non convertis : {notConverted}";
-
-            if (fatalFailure)
-            {
-                report += "\n\nSÉCURITÉ : aucune modification n'a été conservée ; la famille est restée dans son état initial.";
-                report += "\n\nDétails :\n- " + string.Join("\n- ", failed.Distinct());
-            }
-            else if (failed.Count > 0)
-            {
-                report += "\n\nLes paramètres ci-dessous ont été ignorés. Chaque tentative concernée a été annulée sans affecter la famille.";
-                report += "\n\nDétails :\n- " + string.Join("\n- ", failed.Distinct());
-            }
-
-            string title = fatalFailure
-                ? "Conversion annulée sans modification"
-                : failed.Count > 0
-                    ? "Conversion partielle sécurisée"
-                    : "Conversion terminée";
-
-            TaskDialog.Show(title, report);
-            return Result.Succeeded;
+            outcome.Converted = converted;
+            outcome.Fatal = fatalFailure;
+            return outcome;
         }
 
         private static void ConfigureStrictFailureHandling(Transaction transaction, RollBackOnAnyFailure failureGuard)

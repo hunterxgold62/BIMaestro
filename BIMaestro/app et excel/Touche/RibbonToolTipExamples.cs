@@ -38,6 +38,7 @@ public partial class AppUI
             case "RealisticViewImage": return "Générez un rendu de présentation à partir d’une vue Plan, Coupe ou 3D. Préparez une vue propre et sans annotations.";
             case "FamilyBrowser": return "Parcourez vos dossiers de familles avec aperçus, recherche et favoris, puis chargez le contenu choisi.";
             case "Rosace": return "Ouvrez la rosace depuis un raccourci pour accéder rapidement à vos familles.";
+            case "FamilyTools": return "Dans l’éditeur de familles, retrouvez dans une seule fenêtre la conversion des paramètres partagés, la purge, la traduction IA et les unités.";
             case "ConvertSharedToFamily": return "Dans l’éditeur de familles, convertissez les paramètres partagés modifiables en paramètres de famille, en conservant leur nom, groupe et mode instance/type.";
             case "PurgeFamilyParameters": return "Nettoyez les paramètres inutilisés de la famille après vérification des dépendances, avec une sauvegarde préalable.";
             case "Familytraduction": return "Traduisez en français les noms des paramètres utilisateur de la famille ; les noms déjà français sont conservés.";

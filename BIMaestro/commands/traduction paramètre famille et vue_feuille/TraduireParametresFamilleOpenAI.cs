@@ -52,42 +52,12 @@ namespace Famille
 
             string jwt = BIMaestroApp.LicenseJwt;
 
-            // Pour afficher TOUT à la fin
-            var finalWarnings = new List<string>();
-            var finalRenameErrors = new List<string>();
-            var finalRenamed = new List<(string OldName, string NewName)>();
-            int totalParams = 0, userParams = 0, sharedParams = 0, builtinParams = 0;
-
             try
             {
-                var fm = doc.FamilyManager;
-                var all = fm.GetParameters();
+                var o = TranslateParameters(doc, jwt);
+                int totalParams = o.Total, userParams = o.Renameable, sharedParams = o.Shared, builtinParams = o.Locked;
 
-                // 1) Collecte (sans message UI)
-                var candidates = new List<FamilyParameter>();
-                foreach (var fp in all)
-                {
-                    if (fp?.Definition == null) continue;
-                    totalParams++;
-
-                    bool isShared = IsSharedSafe(fp);
-                    var bip = GetBuiltInParameterSafe(fp);
-                    bool isBuiltIn = (bip != BuiltInParameter.INVALID);
-                    bool canRename = !isShared && !isBuiltIn;
-
-                    if (canRename)
-                    {
-                        userParams++;
-                        candidates.Add(fp);
-                    }
-                    else
-                    {
-                        if (isShared) sharedParams++;
-                        else if (isBuiltIn) builtinParams++;
-                    }
-                }
-
-                if (candidates.Count == 0)
+                if (o.Renameable == 0)
                 {
                     TaskDialog.Show(
                         UiLanguage.Get("TraduireParametresFamilleOpenAI.BIMaestroResult"),
@@ -97,139 +67,22 @@ namespace Famille
                     return Result.Succeeded;
                 }
 
-                // Snapshot des noms (pas d'API Revit dans les threads)
-                var items = candidates
-                    .Select(fp => new ParamItem { Param = fp, OriginalName = fp.Definition.Name })
-                    .ToList();
-
-                // 2) Cache
-                var cache = LoadCache();
-
-                // 3) Dédoublonnage et liste à traduire
-                var uniqueNames = items.Select(i => i.OriginalName)
-                                       .Distinct(StringComparer.OrdinalIgnoreCase)
-                                       .ToList();
-                var toTranslate = uniqueNames.Where(n => !cache.ContainsKey(n)).ToList();
-
-                // 4) Traduction IA en batches parallélisés
-                if (toTranslate.Count > 0)
-                {
-                    var batches = Chunk(toTranslate, BatchSize).ToList();
-                    var throttler = new SemaphoreSlim(MaxParallelBatches);
-                    var resultsBag = new ConcurrentBag<Dictionary<string, string>>();
-                    var errorsBag = new ConcurrentBag<string>();
-
-                    var tasks = batches.Select(async batch =>
-                    {
-                        await throttler.WaitAsync().ConfigureAwait(false);
-                        try
-                        {
-                            var dict = await TranslateBatchWithRetry(jwt, batch).ConfigureAwait(false);
-                            resultsBag.Add(dict);
-                        }
-                        catch (InvalidOperationException ex) when (ex.Message == AiClient.QuotaExceededMessage)
-                        {
-                            errorsBag.Add("Quota API dépassé – arrêt.");
-                            throw;
-                        }
-                        catch (Exception ex)
-                        {
-                            errorsBag.Add($"Batch IA échec: {ex.Message}");
-                        }
-                        finally
-                        {
-                            throttler.Release();
-                        }
-                    }).ToArray();
-
-                    Task.WaitAll(tasks);
-
-                    if (!resultsBag.IsEmpty)
-                    {
-                        foreach (var d in resultsBag)
-                        {
-                            foreach (var kv in d)
-                            {
-                                if (!cache.ContainsKey(kv.Key))
-                                    cache[kv.Key] = kv.Value;
-                            }
-                        }
-                        SaveCache(cache);
-                    }
-
-                    if (!errorsBag.IsEmpty)
-                    {
-                        finalWarnings.Add("Certains lots n’ont pas pu être traduits :");
-                        foreach (var e in errorsBag.Take(10)) finalWarnings.Add(" - " + e);
-                        if (errorsBag.Count > 10) finalWarnings.Add($"(+ {errorsBag.Count - 10} erreurs supplémentaires)");
-                    }
-                }
-
-                // 5) Mapping final param -> traduction
-                var renameMap = new Dictionary<FamilyParameter, string>();
-                foreach (var it in items)
-                {
-                    if (cache.TryGetValue(it.OriginalName, out string translated))
-                    {
-                        translated = NormalizeName(translated);
-                        if (!string.IsNullOrEmpty(translated) &&
-                            !translated.Equals(it.OriginalName, StringComparison.OrdinalIgnoreCase))
-                        {
-                            renameMap[it.Param] = translated;
-                        }
-                    }
-                }
-
-                if (renameMap.Count == 0)
+                if (o.Proposed == 0)
                 {
                     TaskDialog.Show(UiLanguage.Get("TraduireParametresFamilleOpenAI.BIMaestroResult"),
                         UiLanguage.Get("TraduireParametresFamilleOpenAI.NoTranslationAppliedEverythingIsAlreadyInFrench") +
-                        UiLanguage.Format("TraduireParametresFamilleOpenAI.ParametersAnalyzed0", (object)items.Count));
+                        UiLanguage.Format("TraduireParametresFamilleOpenAI.ParametersAnalyzed0", (object)o.Renameable));
                     return Result.Succeeded;
                 }
 
-                // 6) Renommage en une transaction
-                using (var tx = new Transaction(doc, "Traduire paramètres via OpenAI (batch)"))
-                {
-                    tx.Start();
+                var finalRenamed = o.Renamed;
+                var finalRenameErrors = o.RenameErrors;
+                var finalWarnings = o.Warnings;
 
-                    var existing = new HashSet<string>(
-                        fm.GetParameters().Select(p => p.Definition?.Name ?? ""),
-                        StringComparer.OrdinalIgnoreCase);
-
-                    foreach (var kvp in renameMap)
-                    {
-                        var param = kvp.Key;
-                        var target = kvp.Value;
-
-                        if (string.IsNullOrWhiteSpace(target))
-                            continue;
-
-                        string current = param.Definition.Name;
-                        if (current.Equals(target, StringComparison.OrdinalIgnoreCase))
-                            continue;
-
-                        string finalName = EnsureUniqueName(existing, target);
-
-                        try
-                        {
-                            fm.RenameParameter(param, finalName);
-                            existing.Add(finalName);
-                            finalRenamed.Add((current, finalName));
-                        }
-                        catch (Exception ex)
-                        {
-                            finalRenameErrors.Add($"'{current}' → '{finalName}' : {ex.Message}");
-                        }
-                    }
-
-                    tx.Commit();
-                }
-
-                // 7) Message FINAL unique
+                // Message FINAL unique
                 {
                     var sb = new StringBuilder();
-                    sb.AppendLine(UiLanguage.Format("TraduireParametresFamilleOpenAI.RenameableParametersFound0", (object)items.Count));
+                    sb.AppendLine(UiLanguage.Format("TraduireParametresFamilleOpenAI.RenameableParametersFound0", (object)o.Renameable));
                     sb.AppendLine(UiLanguage.Format("TraduireParametresFamilleOpenAI.ParametersTranslated0", (object)finalRenamed.Count));
                     sb.AppendLine();
 
@@ -282,6 +135,171 @@ namespace Famille
                 TaskDialog.Show(UiLanguage.Get("TraduireParametresFamilleOpenAI.Error"), ex.Message);
                 return Result.Failed;
             }
+        }
+
+        /// <summary>
+        /// Traduit les paramètres renommables sans afficher de fenêtre (utilisé aussi par « Préparer la famille »).
+        /// Les erreurs de quota et de réseau sont relancées à l'appelant.
+        /// </summary>
+        internal static FamilyTranslationOutcome TranslateParameters(Document doc, string jwt)
+        {
+            var o = new FamilyTranslationOutcome();
+            var fm = doc.FamilyManager;
+            var all = fm.GetParameters();
+
+            // 1) Collecte (sans message UI)
+            var candidates = new List<FamilyParameter>();
+            foreach (var fp in all)
+            {
+                if (fp?.Definition == null) continue;
+                o.Total++;
+
+                bool isShared = IsSharedSafe(fp);
+                var bip = GetBuiltInParameterSafe(fp);
+                bool isBuiltIn = (bip != BuiltInParameter.INVALID);
+                bool canRename = !isShared && !isBuiltIn;
+
+                if (canRename)
+                {
+                    o.Renameable++;
+                    candidates.Add(fp);
+                }
+                else
+                {
+                    if (isShared) o.Shared++;
+                    else if (isBuiltIn) o.Locked++;
+                }
+            }
+
+            if (candidates.Count == 0)
+                return o;
+
+            // Snapshot des noms (pas d'API Revit dans les threads)
+            var items = candidates
+                .Select(fp => new ParamItem { Param = fp, OriginalName = fp.Definition.Name })
+                .ToList();
+
+            // 2) Cache
+            var cache = LoadCache();
+
+            // 3) Dédoublonnage et liste à traduire
+            var uniqueNames = items.Select(i => i.OriginalName)
+                                   .Distinct(StringComparer.OrdinalIgnoreCase)
+                                   .ToList();
+            var toTranslate = uniqueNames.Where(n => !cache.ContainsKey(n)).ToList();
+
+            // 4) Traduction IA en batches parallélisés
+            if (toTranslate.Count > 0)
+            {
+                var batches = Chunk(toTranslate, BatchSize).ToList();
+                var throttler = new SemaphoreSlim(MaxParallelBatches);
+                var resultsBag = new ConcurrentBag<Dictionary<string, string>>();
+                var errorsBag = new ConcurrentBag<string>();
+
+                var tasks = batches.Select(async batch =>
+                {
+                    await throttler.WaitAsync().ConfigureAwait(false);
+                    try
+                    {
+                        var dict = await TranslateBatchWithRetry(jwt, batch).ConfigureAwait(false);
+                        resultsBag.Add(dict);
+                    }
+                    catch (InvalidOperationException ex) when (ex.Message == AiClient.QuotaExceededMessage)
+                    {
+                        errorsBag.Add("Quota API dépassé – arrêt.");
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        errorsBag.Add($"Batch IA échec: {ex.Message}");
+                    }
+                    finally
+                    {
+                        throttler.Release();
+                    }
+                }).ToArray();
+
+                Task.WaitAll(tasks);
+
+                if (!resultsBag.IsEmpty)
+                {
+                    foreach (var d in resultsBag)
+                    {
+                        foreach (var kv in d)
+                        {
+                            if (!cache.ContainsKey(kv.Key))
+                                cache[kv.Key] = kv.Value;
+                        }
+                    }
+                    SaveCache(cache);
+                }
+
+                if (!errorsBag.IsEmpty)
+                {
+                    o.Warnings.Add("Certains lots n’ont pas pu être traduits :");
+                    foreach (var e in errorsBag.Take(10)) o.Warnings.Add(" - " + e);
+                    if (errorsBag.Count > 10) o.Warnings.Add($"(+ {errorsBag.Count - 10} erreurs supplémentaires)");
+                }
+            }
+
+            // 5) Mapping final param -> traduction
+            var renameMap = new Dictionary<FamilyParameter, string>();
+            foreach (var it in items)
+            {
+                if (cache.TryGetValue(it.OriginalName, out string translated))
+                {
+                    translated = NormalizeName(translated);
+                    if (!string.IsNullOrEmpty(translated) &&
+                        !translated.Equals(it.OriginalName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        renameMap[it.Param] = translated;
+                    }
+                }
+            }
+
+            o.Proposed = renameMap.Count;
+            if (renameMap.Count == 0)
+                return o;
+
+            // 6) Renommage en une transaction
+            using (var tx = new Transaction(doc, "Traduire paramètres via OpenAI (batch)"))
+            {
+                tx.Start();
+
+                var existing = new HashSet<string>(
+                    fm.GetParameters().Select(p => p.Definition?.Name ?? ""),
+                    StringComparer.OrdinalIgnoreCase);
+
+                foreach (var kvp in renameMap)
+                {
+                    var param = kvp.Key;
+                    var target = kvp.Value;
+
+                    if (string.IsNullOrWhiteSpace(target))
+                        continue;
+
+                    string current = param.Definition.Name;
+                    if (current.Equals(target, StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    string finalName = EnsureUniqueName(existing, target);
+
+                    try
+                    {
+                        fm.RenameParameter(param, finalName);
+                        existing.Add(finalName);
+                        o.Renamed.Add((current, finalName));
+                    }
+                    catch (Exception ex)
+                    {
+                        o.RenameErrors.Add($"'{current}' → '{finalName}' : {ex.Message}");
+                    }
+                }
+
+                tx.Commit();
+            }
+
+            return o;
         }
 
         // ======== Helpers ========
@@ -491,5 +509,21 @@ namespace Famille
             string dir = global::BIMaestro.Storage.PreferenceStorage.Folder("Trad.IA");
             return Path.Combine(dir, "translation_cache.json");
         }
+    }
+
+    /// <summary>Résultat d'une traduction IA (paramètres ou vues), sans affichage.</summary>
+    internal sealed class FamilyTranslationOutcome
+    {
+        public int Total;
+        public int Renameable;
+        public int Shared;
+        public int Locked;
+        public int Templates;
+        public int Sheets;
+        public int RenameableSheets;
+        public int Proposed;
+        public readonly List<(string OldName, string NewName)> Renamed = new List<(string OldName, string NewName)>();
+        public readonly List<string> RenameErrors = new List<string>();
+        public readonly List<string> Warnings = new List<string>();
     }
 }
