@@ -1,0 +1,29 @@
+PASS Original path adopts its legacy history without a question
+PASS Renamed, moved or upgraded model requires an explicit choice
+PASS Decide later survives reopening the registry
+PASS Multiple deferred sessions stay pending across restarts
+PASS Pending time is excluded from the recognized project until a decision
+PASS Continue same project commits
+PASS Continue adds every deferred session exactly once
+PASS A second concurrent decision cannot overwrite the first
+PASS Returning to either old or new file does not ask again
+PASS A further renamed copy has its own question
+PASS Start new project keeps a separate counter
+PASS Separating a copy does not affect previously accepted paths
+PASS New-project decision persists on reopening
+PASS Path case and separators do not trigger duplicate questions
+PASS Same filename with a different identity is not recognized as the old model
+PASS Copies with separate histories offer a choice of the recognized projects
+PASS An invalid candidate never consumes pending sessions
+PASS Manual separation also separates previously linked identity paths
+PASS Manual separation preserves remembered choices without new prompts
+PASS An unrelated model replacing a file gets its own counter
+PASS 2022/2023 identity is recognized after conversion to 2024 or later
+PASS Upgrade offers the original project instead of starting over
+PASS Old and modern identity rows share the chosen total
+PASS Returning across the old/new API boundary does not repeat the question
+PASS Different native GUIDs are not merged through a shared template element
+PASS Legacy API also recognizes a lineage first seen in the modern API
+PASS The identity bridge survives saving and reopening the registry
+PASS Unreadable registry is reported without overwriting decisions
+28 checks passed

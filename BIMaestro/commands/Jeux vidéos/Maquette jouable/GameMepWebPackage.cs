@@ -47,7 +47,7 @@ namespace BIMaestro.VideoGames
                 cancellation.ThrowIfCancellationRequested();
                 var tile = scene.WebTiles[tileIndex];
                 byte[] bytes;
-                using (var input = new MemoryStream(tile.Bytes))
+                using (var input = tile.OpenRead())
                 using (var gzip = new GZipStream(input, CompressionMode.Decompress))
                 using (var output = new MemoryStream()) { gzip.CopyTo(output); bytes = output.ToArray(); }
                 int jsonLength = BitConverter.ToInt32(bytes, 12), binaryStart = 28 + jsonLength;
@@ -188,16 +188,18 @@ namespace BIMaestro.VideoGames
         }
 
         public static void PrepareStaticAssets(GameSceneData scene, CancellationToken cancellation = default,
-            Action<GameMeshData, double>? reportCompressedShare = null, Action<int>? reportTileCount = null)
+            Action<GameMeshData, double>? reportCompressedShare = null, Action<int>? reportTileCount = null,
+            string? tileDirectory = null, Func<GameMeshData, int>? modelIndex = null,
+            int elementIndexOffset = 0, int firstTileNumber = 0)
         {
             if (scene == null) throw new ArgumentNullException(nameof(scene));
             scene.WebTiles.Clear();
             scene.WebOverviewGlb = Array.Empty<byte>();
-            var pending = new Dictionary<Tuple<int, int, int>, List<Tuple<GameMeshData, GameDoorData?>>>();
-            var sizes = new Dictionary<Tuple<int, int, int>, long>();
+            var pending = new Dictionary<(int Model, int X, int Y, int Z), List<Tuple<GameMeshData, GameDoorData?>>>();
+            var sizes = new Dictionary<(int Model, int X, int Y, int Z), long>();
             var overview = new List<Tuple<GameMeshData, GameDoorData?>>();
             long pendingBytes = 0;
-            void Flush(Tuple<int, int, int> key)
+            void Flush((int Model, int X, int Y, int Z) key)
             {
                 cancellation.ThrowIfCancellationRequested();
                 var batch = pending[key];
@@ -209,8 +211,8 @@ namespace BIMaestro.VideoGames
                     if (parts.Count > 0) merged.Add(Tuple.Create<GameMeshData, GameDoorData?>(MergeMeshes(parts), null));
                 }
                 merged.AddRange(batch.Where(item => item.Item2 != null));
-                string tileName = "tile-" + scene.WebTiles.Count.ToString("D5") + ".glb.gz";
-                byte[] glb = BuildGlb(merged);
+                string tileName = "tile-" + (firstTileNumber + scene.WebTiles.Count).ToString("D5") + ".glb.gz";
+                byte[] glb = BuildGlb(merged, elementIndexOffset);
                 byte[] compressed;
                 using (var output = new MemoryStream())
                 {
@@ -232,11 +234,13 @@ namespace BIMaestro.VideoGames
                     if (hasBounds) bounds.Union(webPoint);
                     else { bounds = new Rect3D(webPoint, new Size3D(0, 0, 0)); hasBounds = true; }
                 }
-                scene.WebTiles.Add(new GameMepWebAsset {
-                    Name = tileName, Bytes = compressed, Sha256 = Hash(compressed), DecodedBytes = glb.LongLength,
+                var tile = new GameMepWebAsset {
+                    Name = tileName, ModelIndex = key.Model, Bytes = compressed, Sha256 = Hash(compressed), DecodedBytes = glb.LongLength,
                     Bounds = new[] { bounds.X, bounds.Y, bounds.Z, bounds.X + bounds.SizeX, bounds.Y + bounds.SizeY, bounds.Z + bounds.SizeZ },
-                    Elements = merged.SelectMany(item => item.Item1.ElementIndices).Where(i => i >= 0).Distinct().ToArray()
-                });
+                    Elements = merged.SelectMany(item => item.Item1.ElementIndices).Where(i => i >= 0).Distinct().Select(i => checked(i + elementIndexOffset)).ToArray()
+                };
+                if (tileDirectory != null) tile.StoreOnDisk(Path.Combine(tileDirectory, tileName));
+                scene.WebTiles.Add(tile);
                 foreach (bool transparent in new[] { false, true })
                 {
                     var parts = merged.Where(item => item.Item1.IsTransparent == transparent).Select(item => SimplifyOverview(item.Item1, 2)).Where(mesh => mesh.Indices.Count > 0).ToList();
@@ -252,7 +256,7 @@ namespace BIMaestro.VideoGames
             {
                 cancellation.ThrowIfCancellationRequested();
                 var a = mesh.Positions[mesh.Indices[0]]; var b = mesh.Positions[mesh.Indices[1]]; var c = mesh.Positions[mesh.Indices[2]];
-                var key = Tuple.Create((int)Math.Floor((a.X + b.X + c.X) / SpatialCellTripleSize), (int)Math.Floor((a.Y + b.Y + c.Y) / SpatialCellTripleSize), (int)Math.Floor((a.Z + b.Z + c.Z) / SpatialCellTripleSize));
+                var key = (modelIndex?.Invoke(mesh) ?? 0, (int)Math.Floor((a.X + b.X + c.X) / SpatialCellTripleSize), (int)Math.Floor((a.Y + b.Y + c.Y) / SpatialCellTripleSize), (int)Math.Floor((a.Z + b.Z + c.Z) / SpatialCellTripleSize));
                 long bytes = MeshPayloadSize(mesh);
                 if (pending.ContainsKey(key) && sizes[key] + bytes > 8 * 1024 * 1024) Flush(key);
                 if (!pending.ContainsKey(key)) { pending[key] = new List<Tuple<GameMeshData, GameDoorData?>>(); sizes[key] = 0; }
@@ -260,10 +264,37 @@ namespace BIMaestro.VideoGames
                 if (pendingBytes > 64 * 1024 * 1024) Flush(sizes.OrderByDescending(item => item.Value).First().Key);
             }
             foreach (var key in pending.Keys.ToList()) Flush(key);
-            // Keep the first download compact while preserving planar faces and
-            // small solid elements. Coarse geometry is never used for wall cuts.
-            for (double step = 4; (overview.Sum(item => (long)item.Item1.Indices.Count) > 1500000 || overview.Sum(item => item.Item1.Positions.Count * 32L + item.Item1.Indices.Count * 4L) > 32 * 1024 * 1024) && step <= 32; step *= 2)
-                overview = overview.Select(item => { var coarse = SimplifyOverview(item.Item1, step); coarse.WebTileName = item.Item1.WebTileName; return Tuple.Create<GameMeshData, GameDoorData?>(coarse, null); }).ToList();
+            if (modelIndex != null)
+                foreach (var mesh in overview) mesh.Item1.WebElementIndexOffset = elementIndexOffset;
+            SetWebMetadata(scene, overview, elementIndexOffset, modelIndex != null);
+        }
+
+        internal static void SetWebMetadata(GameSceneData scene)
+        {
+            var overview = scene.WebTiles.SelectMany(tile => tile.Overview)
+                .Select(mesh => Tuple.Create<GameMeshData, GameDoorData?>(mesh, null)).ToList();
+            SetWebMetadata(scene, overview, 0, false);
+        }
+
+        private static void SetWebMetadata(GameSceneData scene,
+            List<Tuple<GameMeshData, GameDoorData?>> overview, int elementIndexOffset, bool cacheOverview)
+        {
+            // The overview is independent of the detailed tiles. Rebuild only
+            // this small representation when the publication selection changes.
+            for (double step = 4; (overview.Sum(item => (long)item.Item1.Indices.Count) > 1500000 || overview.Sum(item => (long)item.Item1.Positions.Count * 32L + item.Item1.Indices.Count * 4L) > 32 * 1024 * 1024) && step <= 32; step *= 2)
+                overview = overview.Select(item =>
+                {
+                    var coarse = SimplifyOverview(item.Item1, step);
+                    coarse.WebTileName = item.Item1.WebTileName;
+                    coarse.WebElementIndexOffset = item.Item1.WebElementIndexOffset;
+                    return Tuple.Create<GameMeshData, GameDoorData?>(coarse, null);
+                }).ToList();
+            if (cacheOverview)
+            {
+                foreach (var item in overview) item.Item1.Freeze();
+                var byTile = overview.Select(item => item.Item1).ToLookup(mesh => mesh.WebTileName);
+                foreach (var tile in scene.WebTiles) tile.Overview = byTile[tile.Name].ToArray();
+            }
             scene.WebOverviewGlb = BuildGlb(overview);
             scene.WebModelGlb = Array.Empty<byte>();
             scene.WebPropertiesJson = JsonConvert.SerializeObject(
@@ -272,7 +303,7 @@ namespace BIMaestro.VideoGames
                     .OrderBy(element => element.WebElementIndex)
                     .Select(element => new
                     {
-                        index = element.WebElementIndex,
+                        index = element.WebElementIndex + elementIndexOffset,
                         key = element.Key,
                         stableKey = element.StableKey,
                         center = element.HasBounds ? ToWebPoint(new Point3D(element.Bounds.X + element.Bounds.SizeX / 2, element.Bounds.Y + element.Bounds.SizeY / 2, element.Bounds.Z + element.Bounds.SizeZ / 2)) : null,
@@ -303,7 +334,7 @@ namespace BIMaestro.VideoGames
                 {
                     cancellation.ThrowIfCancellationRequested();
                     string fileName = Path.GetFileNameWithoutExtension(tile.Name);
-                    using (var input = new MemoryStream(tile.Bytes))
+                    using (var input = tile.OpenRead())
                     using (var gzip = new GZipStream(input, CompressionMode.Decompress))
                     using (var target = archive.CreateEntry(fileName, CompressionLevel.Optimal).Open())
                         gzip.CopyTo(target);
@@ -591,7 +622,7 @@ namespace BIMaestro.VideoGames
             }
         }
 
-        private static byte[] BuildGlb(List<Tuple<GameMeshData, GameDoorData?>> meshes)
+        private static byte[] BuildGlb(List<Tuple<GameMeshData, GameDoorData?>> meshes, int elementIndexOffset = 0)
         {
             var bufferViews = new List<object>();
             var accessors = new List<object>();
@@ -615,7 +646,7 @@ namespace BIMaestro.VideoGames
                         : ComputeWebNormals(mesh);
                 int normal = WriteVectors(writer, binary, webNormals, bufferViews, accessors, false);
                 int color = WriteColors(writer, binary, mesh, bufferViews, accessors);
-                int element = WriteElements(writer, binary, mesh, bufferViews, accessors);
+                int element = WriteElements(writer, binary, mesh, bufferViews, accessors, elementIndexOffset + mesh.WebElementIndexOffset);
                 int indices = WriteIndices(writer, binary, mesh, bufferViews, accessors);
                 int meshIndex = meshDefinitions.Count;
                 meshDefinitions.Add(new
@@ -783,11 +814,11 @@ namespace BIMaestro.VideoGames
             return accumulated;
         }
 
-        private static int WriteElements(BinaryWriter writer, MemoryStream stream, GameMeshData mesh, IList<object> views, IList<object> accessors)
+        private static int WriteElements(BinaryWriter writer, MemoryStream stream, GameMeshData mesh, IList<object> views, IList<object> accessors, int elementIndexOffset)
         {
             Align(stream, writer); int offset = (int)stream.Position;
             for (int index = 0; index < mesh.Positions.Count; index++)
-                writer.Write((uint)Math.Max(0, index < mesh.ElementIndices.Count ? mesh.ElementIndices[index] : 0));
+                writer.Write((uint)(Math.Max(0, index < mesh.ElementIndices.Count ? mesh.ElementIndices[index] : 0) + elementIndexOffset));
             int view = views.Count; views.Add(new { buffer = 0, byteOffset = offset, byteLength = mesh.Positions.Count * 4, target = 34962 });
             int accessor = accessors.Count; accessors.Add(new { bufferView = view, componentType = 5125, count = mesh.Positions.Count, type = "SCALAR" });
             return accessor;

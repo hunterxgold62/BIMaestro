@@ -1,4 +1,4 @@
-import { validateAssets, exportPaths, type Asset } from "./assets.ts";
+import { validateAssets, exportPaths, maxR2PackageBytes, type Asset } from "./assets.ts";
 import { validateMarkup } from "./markup.ts";
 import { updateReservationLot } from "./lots.ts";
 import { validateAnalysis } from "./analysis.ts";
@@ -227,13 +227,13 @@ async function startPublication(req: Request, body: any) {
   const packageBytes = Number(body.packageBytes);
   let assets: Asset[] | null;
   try { assets = validateAssets(body.assets, packageBytes); } catch { throw new HttpError(400, "Liste de fichiers invalide"); }
+  const useR2 = body.storageBackend === "r2" && !!assets;
   const packageSha256 = String(body.packageSha256 ?? "").toLowerCase();
-  if (!Number.isSafeInteger(packageBytes) || packageBytes <= 0 || packageBytes > (assets ? 512 * 1024 * 1024 : maxPackageBytes)) {
+  if (!Number.isSafeInteger(packageBytes) || packageBytes <= 0 || packageBytes > (useR2 ? maxR2PackageBytes : assets ? 512 * 1024 * 1024 : maxPackageBytes)) {
     throw new HttpError(413, "Taille de paquet invalide");
   }
   if (!/^[0-9a-f]{64}$/.test(packageSha256)) throw new HttpError(400, "Empreinte SHA-256 invalide");
   await cleanupExpiredPublications();
-  const useR2 = body.storageBackend === "r2" && !!assets;
   if (!useR2) {
     const { data: storedBytes, error: storageUsageError } = await admin.rpc("mep_viewer_storage_bytes");
     if (storageUsageError) throw new HttpError(500, "Quota de stockage indisponible");

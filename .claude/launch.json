@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "C:/Users/plemert/bimaestro-site", "run", "dev", "--", "-p", "3005"],
       "port": 3005
+    },
+    {
+      "name": "apercu-step-famille",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["prototypes/step-famille/serve.mjs"],
+      "port": 5178
     }
   ]
 }

@@ -1,0 +1,183 @@
+{
+  "generatedAtUtc": "2026-11-25T10:43:35.577Z",
+  "clientTimezone": "Europe/Paris",
+  "status": "passed",
+  "testChecks": 100,
+  "tests": [
+    {
+      "name": "registry-tests",
+      "exitCode": 0,
+      "checks": 28,
+      "log": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\output\\time-tracking-validation-20261125\\registry-tests.log"
+    },
+    {
+      "name": "service-tests",
+      "exitCode": 0,
+      "checks": 21,
+      "log": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\output\\time-tracking-validation-20261125\\service-tests.log"
+    },
+    {
+      "name": "logger-tests-final",
+      "exitCode": 0,
+      "checks": 14,
+      "log": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\output\\time-tracking-validation-20261125\\logger-tests-final.log"
+    },
+    {
+      "name": "window-tests",
+      "exitCode": 0,
+      "checks": 15,
+      "log": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\output\\time-tracking-validation-20261125\\window-tests.log"
+    },
+    {
+      "name": "manual-groups-tests",
+      "exitCode": 0,
+      "checks": 11,
+      "log": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\output\\time-tracking-validation-20261125\\manual-groups-tests.log"
+    },
+    {
+      "name": "selection-modern-tests-final",
+      "exitCode": 0,
+      "checks": 4,
+      "log": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\output\\time-tracking-validation-20261125\\selection-modern-tests-final.log"
+    },
+    {
+      "name": "selection-2022-tests-final",
+      "exitCode": 0,
+      "checks": 7,
+      "log": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\output\\time-tracking-validation-20261125\\selection-2022-tests-final.log"
+    }
+  ],
+  "builds": [
+    {
+      "versions": [
+        2022,
+        2023
+      ],
+      "configuration": "Release",
+      "framework": "net48",
+      "exitCode": 0,
+      "dll": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\BIMaestro\\bin\\Release\\BIMaestro.dll",
+      "sha256": "db2829037002e77e8373e9fa4777519d12be57688d4b303a9ccc50b21e892df4",
+      "bytes": 48087040,
+      "builtAtUtc": "2026-11-25T10:41:57.545Z",
+      "log": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\output\\time-tracking-validation-20261125\\revit2023-release-final.log"
+    },
+    {
+      "versions": [
+        2024
+      ],
+      "configuration": "Release2024",
+      "framework": "net48",
+      "exitCode": 0,
+      "dll": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\BIMaestro\\bin\\Release2024\\BIMaestro.dll",
+      "sha256": "af7e3a725f218af23d867354d00785310238915e06d0eda26edc65e0d6575e3d",
+      "bytes": 48087552,
+      "builtAtUtc": "2026-11-25T10:42:33.258Z",
+      "log": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\output\\time-tracking-validation-20261125\\revit2024-release-final.log"
+    },
+    {
+      "versions": [
+        2025
+      ],
+      "configuration": "Release",
+      "framework": "net8.0-windows",
+      "exitCode": 0,
+      "dll": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\BIMaestro\\bin\\Revit2025\\Release\\BIMaestro.dll",
+      "sha256": "c772a638e7b3545f0a8627f1c0195c59f0ce29e3327b198260e5c06ed6873282",
+      "bytes": 48094208,
+      "builtAtUtc": "2026-11-25T10:42:06.938Z",
+      "log": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\output\\time-tracking-validation-20261125\\revit2025-release-final.log"
+    },
+    {
+      "versions": [
+        2026
+      ],
+      "configuration": "Release",
+      "framework": "net8.0-windows",
+      "exitCode": 0,
+      "dll": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\BIMaestro\\bin\\Revit2026\\Release\\BIMaestro.dll",
+      "sha256": "5596bb439738ea0a06249bd2f59eb01d3610b98704bcc9e8d9e47d6a6da36f9e",
+      "bytes": 48094208,
+      "builtAtUtc": "2026-11-25T10:42:07.831Z",
+      "log": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\output\\time-tracking-validation-20261125\\revit2026-release-final.log"
+    },
+    {
+      "versions": [
+        2027
+      ],
+      "configuration": "Release",
+      "framework": "net10.0-windows",
+      "exitCode": 0,
+      "dll": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\BIMaestro\\bin\\Revit2027\\Release\\BIMaestro.dll",
+      "sha256": "a0732d89855b2b74f8122c6efb10bfccf91017d7ce02204812d24bdd0102eb88",
+      "bytes": 48093696,
+      "builtAtUtc": "2026-11-25T10:42:45.518Z",
+      "log": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\output\\time-tracking-validation-20261125\\revit2027-release-final.log"
+    }
+  ],
+  "apiCompatibility": [
+    {
+      "version": 2022,
+      "checkedMembers": 1152,
+      "missingTypes": 0,
+      "missingMembers": 0,
+      "failedAdapters": 0,
+      "report": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\output\\time-tracking-validation-20261125\\api-2022-final.json"
+    },
+    {
+      "version": 2023,
+      "checkedMembers": 1152,
+      "missingTypes": 0,
+      "missingMembers": 0,
+      "failedAdapters": 0,
+      "report": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\output\\time-tracking-validation-20261125\\api-2023-final.json"
+    },
+    {
+      "version": 2024,
+      "checkedMembers": 1152,
+      "missingTypes": 0,
+      "missingMembers": 0,
+      "failedAdapters": 0,
+      "report": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\output\\time-tracking-validation-20261125\\api-2024-final.json"
+    },
+    {
+      "version": 2025,
+      "checkedMembers": 1152,
+      "missingTypes": 0,
+      "missingMembers": 0,
+      "failedAdapters": 0,
+      "report": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\output\\time-tracking-validation-20261125\\api-2025-final.json"
+    },
+    {
+      "version": 2026,
+      "checkedMembers": 1152,
+      "missingTypes": 0,
+      "missingMembers": 0,
+      "failedAdapters": 0,
+      "report": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\output\\time-tracking-validation-20261125\\api-2026-final.json"
+    },
+    {
+      "version": 2027,
+      "checkedMembers": 1152,
+      "missingTypes": 0,
+      "missingMembers": 0,
+      "failedAdapters": 0,
+      "report": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\output\\time-tracking-validation-20261125\\api-2027-final.json"
+    }
+  ],
+  "featureSourceSha256": {
+    "BIMaestro/app et excel/temps revit/ExcelLogger.cs": "81b4fb4a52571340dcd843d05ceba913b30d27bf76bd3b5dfad96c13b0c3aca6",
+    "BIMaestro/app et excel/temps revit/TimeProjectTracking.cs": "debd38dd926268aaa28300e887a57c5251bb70d65afd9ccecedcf0e8f32769cd",
+    "BIMaestro/app et excel/temps revit/TimeTrackingRegistry.cs": "18052891c4aaea5ad7689f06ab27de3928d1fa73c824ad2de5d46bf23d334983",
+    "BIMaestro/app et excel/temps revit/TimeTrackingDecisionWindow.cs": "29a4d91e06ce124657cdc2cdcfae7591f90b1cb237de3fd058095954b828a020",
+    "BIMaestro/app et excel/temps revit/TimeSeriesDashboardWindow.xaml.cs": "ea538c2a71ae899a24533d5383fa930a1722b2e3595b27931dbadb2a63e66f0f",
+    "BIMaestro/app et excel/RevitSelectionChangedSubscription.cs": "5836104d306d138962c3d76bb9975a809a8fe7791de4ec38f96225e57f20d819",
+    "BIMaestro/app et excel/BIMaestroApp.cs": "a3a37477b421389fbc7f763c6dcefbac09805f5c840a5915c82f4bf5f825df23",
+    "BIMaestro/commands/MEP Booster/MepBoosterService.cs": "51b07f0a3df3556c1d8ec89f799a1e1a78d6c836372a897b9301a4b5440a692f"
+  },
+  "validationLimits": [
+    "Revit and native UI boundaries are deterministic stubs in orchestration/logger tests; the real WPF window was rendered offscreen.",
+    "No interactive RVT conversion or live Revit session was performed.",
+    "Revit 2022 uses the 2023 build, as specified by the existing installer; its API references were checked separately."
+  ]
+}

@@ -13,6 +13,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -40,6 +41,7 @@ namespace BIMaestro.ModelLoading
             public DateTime LastOpened;
             public bool? IsWorkshared;
             public DateTime? LastSynchronized;
+            public string LastSynchronizedBy;
             public double? Hours, WeekHours, LastSessionHours;
             public List<Preview> Views = new List<Preview>();
             public List<string> Aliases = new List<string>();
@@ -59,7 +61,9 @@ namespace BIMaestro.ModelLoading
         private static int _opening;
         private static bool _stopping;
         private static bool _databaseReady;
-        private static string _requestedPath;
+        private static string _requestedPath, _requestedCentralPath;
+        private static int _syncLookupGeneration = -1;
+        private static Task<CentralSync> _syncLookup;
         private static IntPtr _hostMainWindow, _displayHandle;
         private static readonly object LogGate = new object();
         private static Task _logWrites = Task.CompletedTask;
@@ -111,6 +115,9 @@ namespace BIMaestro.ModelLoading
                 if (string.IsNullOrWhiteSpace(path) || !path.EndsWith(".rvt", StringComparison.OrdinalIgnoreCase)) return;
                 _databaseReady = false;
                 _requestedPath = path;
+                _requestedCentralPath = Catalog.TryGetValue(ModelOpeningHistory.Normalize(path), out var known) && known.IsWorkshared == true
+                    ? known.File
+                    : ReadCentralPathFromLocalFile(path);
                 Interlocked.Exchange(ref _opening, 1);
                 TraceOpening("opening " + Path.GetFileName(path));
                 var d = _dispatcher;
@@ -145,10 +152,134 @@ namespace BIMaestro.ModelLoading
                 _window?.Close(); _window = new OpeningWindow(model, _openingTip);
                 _window.Show();
                 _window.PresentAboveHost();
+                if (_syncLookupGeneration != generation)
+                {
+                    _syncLookupGeneration = generation;
+                    string centralPath = _requestedCentralPath ?? (model.IsWorkshared == true ? model.File : path);
+                    _syncLookup = Task.Run(() => ReadCentralSync(centralPath, generation));
+                }
+                _ = UpdateOpeningSync(_window, _syncLookup, generation);
                 TraceOpening("shown generation=" + generation);
             }
             catch (Exception ex) { TraceOpening("show-failed " + ex); }
         }
+        // File metadata is read on Revit's thread only for a local disk and only
+        // when there is no known central. Network journal reads run separately.
+        private static string ReadCentralPathFromLocalFile(string path)
+        {
+            try
+            {
+                string drive = Path.GetPathRoot(path);
+                if (drive == null || drive.Length != 3 || new DriveInfo(drive).DriveType != DriveType.Fixed)
+                    return null;
+                using var info = BasicFileInfo.Extract(path);
+                return info.IsWorkshared && !string.IsNullOrWhiteSpace(info.CentralPath) ? info.CentralPath : null;
+            }
+            catch { return null; }
+        }
+
+        private sealed class CentralSync
+        {
+            public DateTime When;
+            public string User;
+        }
+
+        private sealed class SyncSession
+        {
+            public string User;
+            public int? TimeBias;
+            public bool Started, SavedToCentral;
+        }
+
+        private static readonly Regex SyncLogEvent = new Regex(
+            @"^\s*\$(?<id>[0-9a-fA-F]+)\s+(?<when>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d{1,7})?)\s+(?<operation>\S+)",
+            RegexOptions.CultureInvariant);
+
+        private static CentralSync ReadCentralSync(string centralPath, int generation)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(centralPath) || !Path.IsPathRooted(centralPath)
+                    || !string.Equals(Path.GetExtension(centralPath), ".rvt", StringComparison.OrdinalIgnoreCase))
+                    return null;
+
+                string name = Path.GetFileNameWithoutExtension(centralPath);
+                string journal = Path.Combine(Path.GetDirectoryName(centralPath), name + "_backup", name + ".slog");
+                using var stream = new FileStream(journal, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                using var reader = new StreamReader(stream, Encoding.Unicode, detectEncodingFromByteOrderMarks: true);
+                return ReadCentralSync(reader, () => generation != Volatile.Read(ref _generation));
+            }
+            catch { return null; }
+        }
+
+        private static CentralSync ReadCentralSync(TextReader reader, Func<bool> cancelled)
+        {
+            var sessions = new Dictionary<string, SyncSession>(StringComparer.OrdinalIgnoreCase);
+            SyncSession header = null;
+            CentralSync latest = null;
+            int lineNumber = 0;
+            string line;
+            while ((line = reader.ReadLine()) != null)
+            {
+                if ((++lineNumber & 255) == 0 && cancelled()) return null;
+                if (header != null)
+                {
+                    string field = line.Trim();
+                    if (field.StartsWith("user=\"", StringComparison.Ordinal) && field.EndsWith("\"", StringComparison.Ordinal) && field.Length > 6)
+                        header.User = field.Substring(6, field.Length - 7).Trim();
+                    if (field.StartsWith("timebias=", StringComparison.Ordinal)
+                        && int.TryParse(field.Substring(9), NumberStyles.Integer, CultureInfo.InvariantCulture, out int bias)
+                        && Math.Abs((long)bias) <= 14 * 60)
+                        header.TimeBias = bias;
+                }
+
+                var entry = SyncLogEvent.Match(line);
+                if (!entry.Success) continue;
+                header = null;
+                string id = entry.Groups["id"].Value;
+                string operation = entry.Groups["operation"].Value;
+                if (operation == ">Session")
+                {
+                    sessions[id] = header = new SyncSession();
+                    continue;
+                }
+
+                if (!sessions.TryGetValue(id, out var session)) continue;
+                if (operation == "<Session") sessions.Remove(id);
+                else if (operation == ">STC")
+                {
+                    session.Started = true;
+                    session.SavedToCentral = false;
+                }
+                else if (operation == "<STC:Save" && session.Started) session.SavedToCentral = true;
+                else if (operation.IndexOf(":Error", StringComparison.OrdinalIgnoreCase) >= 0
+                    || operation.IndexOf(":Cancel", StringComparison.OrdinalIgnoreCase) >= 0
+                    || operation == ".STC:ReconnectInMiddle")
+                    session.Started = false;
+                else if (operation == "<STC")
+                {
+                    if (session.Started && session.SavedToCentral
+                        && DateTime.TryParseExact(entry.Groups["when"].Value, "yyyy-MM-dd HH:mm:ss.FFFFFFF",
+                            CultureInfo.InvariantCulture, DateTimeStyles.None, out var when))
+                    {
+                        if (session.TimeBias.HasValue)
+                            when = new DateTimeOffset(when, TimeSpan.FromMinutes(-session.TimeBias.Value)).LocalDateTime;
+                        if (latest == null || when >= latest.When)
+                            latest = new CentralSync { When = when, User = session.User };
+                    }
+                    session.Started = false;
+                }
+            }
+            return latest;
+        }
+
+        private static async Task UpdateOpeningSync(OpeningWindow window, Task<CentralSync> lookup, int generation)
+        {
+            var sync = await lookup;
+            if (sync != null && generation == _generation && _opening != 0 && _window == window)
+                window.ShowCentralSync(sync);
+        }
+
         private static void TraceOpening(string message)
         {
             string line = DateTime.UtcNow.ToString("O") + " " + message + Environment.NewLine;
@@ -198,7 +329,11 @@ namespace BIMaestro.ModelLoading
                         model.Aliases.AddRange(previous.Aliases ?? new List<string>());
                         if (previous.LastOpened > model.LastOpened) model.LastOpened = previous.LastOpened;
                         model.IsWorkshared ??= previous.IsWorkshared;
-                        if (model.IsWorkshared == true) model.LastSynchronized = previous.LastSynchronized;
+                        if (model.IsWorkshared == true)
+                        {
+                            model.LastSynchronized = previous.LastSynchronized;
+                            model.LastSynchronizedBy = previous.LastSynchronizedBy;
+                        }
                     }
                     model.Aliases = model.Aliases.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
                     model.Views = ModelOpeningHistory.ReadPreviews(model, Path.Combine(_dataRoot, "CacheVignettes", "VueEnSurvol"));
@@ -255,6 +390,7 @@ namespace BIMaestro.ModelLoading
                 var prior = Find(key);
                 Models[key] = new Snapshot { Name = doc.Title, File = key, LastOpened = DateTime.Now,
                     IsWorkshared = doc.IsWorkshared, LastSynchronized = doc.IsWorkshared ? prior?.LastSynchronized : null,
+                    LastSynchronizedBy = doc.IsWorkshared ? prior?.LastSynchronizedBy : null,
                     Aliases = new[] { key, doc.PathName }.Where(v => !string.IsNullOrWhiteSpace(v)).ToList(), Views = prior?.Views?.ToList() ?? new List<Preview>() };
                 PendingPreviewCatalogs.Enqueue(doc);
                 Aliases[key] = doc.PathName; _nextSnapshot = DateTime.UtcNow.AddSeconds(15);
@@ -335,7 +471,9 @@ namespace BIMaestro.ModelLoading
                 if (string.IsNullOrWhiteSpace(key)) return;
                 if (!Models.TryGetValue(key, out var model))
                     Models[key] = model = new Snapshot { Name = doc.Title, File = key };
-                model.IsWorkshared = true; model.LastSynchronized = DateTime.Now;
+                model.IsWorkshared = true;
+                model.LastSynchronized = DateTime.Now;
+                model.LastSynchronizedBy = doc.Application.Username;
                 Aliases[key] = doc.PathName;
                 SaveSnapshots();
             }
@@ -380,9 +518,16 @@ namespace BIMaestro.ModelLoading
                             if (model.IsWorkshared == true)
                             {
                                 if (!model.LastSynchronized.HasValue || old?.LastSynchronized > model.LastSynchronized)
+                                {
                                     model.LastSynchronized = old?.LastSynchronized;
+                                    model.LastSynchronizedBy = old?.LastSynchronizedBy;
+                                }
                             }
-                            else model.LastSynchronized = null;
+                            else
+                            {
+                                model.LastSynchronized = null;
+                                model.LastSynchronizedBy = null;
+                            }
                             model.Views = model.Views.Concat(old?.Views ?? new List<Preview>()).Where(v => !string.IsNullOrWhiteSpace(v.Path) && File.Exists(v.Path))
                                 .OrderByDescending(v => v.Seen).GroupBy(v => v.Path, StringComparer.OrdinalIgnoreCase).Select(g => g.First()).Take(3).ToList();
                             var current = live.Where(v => string.Equals(v.DocumentId, copy.Key, StringComparison.OrdinalIgnoreCase)).ToList();
@@ -444,6 +589,10 @@ namespace BIMaestro.ModelLoading
             private readonly int _generationAtCreation = _generation;
             private const int ExtendedStyle = -20;
             private const long NoActivate = 0x08000000, ToolWindow = 0x00000080;
+
+            private readonly Grid _history;
+            private readonly DateTime? _cachedSyncTime;
+            private TextBlock _syncValue;
 
             public OpeningWindow(Snapshot model, ModelOpeningTips.Tip openingTip = null)
             {
@@ -508,11 +657,9 @@ namespace BIMaestro.ModelLoading
                 history.RowDefinitions.Add(new RowDefinition { Height = new GridLength(29) }); history.RowDefinitions.Add(new RowDefinition { Height = new GridLength(29) });
                 AddFact(history, 0, "Dernière ouverture", model.LastOpened == default ? "—" : DateLabel(model.LastOpened));
                 AddFact(history, 1, "Dernière session", model.LastSessionHours.HasValue ? Duration(model.LastSessionHours.Value) : "—");
-                if (model.IsWorkshared == true)
-                {
-                    history.RowDefinitions.Add(new RowDefinition { Height = new GridLength(29) });
-                    AddFact(history, 2, "Dernière synchro connue", model.LastSynchronized.HasValue ? DateLabel(model.LastSynchronized.Value) : "Pas encore observée");
-                }
+                _history = history;
+                _cachedSyncTime = model.LastSynchronized;
+                if (model.IsWorkshared == true) SetSyncFact(model.LastSynchronized, model.LastSynchronizedBy);
                 Grid.SetRow(history, 2); right.Children.Add(history);
                 var tip = new StackPanel(); tip.Children.Add(Text("LE SAVIEZ-VOUS ?", 10, "#26776E", true));
                 // Reuse the same tip even if the startup history index refreshes this card.
@@ -537,6 +684,26 @@ namespace BIMaestro.ModelLoading
                     _image.Source = null;
                 };
             }
+            internal void ShowCentralSync(CentralSync sync)
+            {
+                if (_cachedSyncTime.HasValue && _cachedSyncTime.Value > sync.When) return;
+                Height = 625;
+                SetSyncFact(sync.When, sync.User);
+            }
+            private void SetSyncFact(DateTime? when, string user)
+            {
+                if (_syncValue == null)
+                {
+                    _history.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto, MinHeight = 29 });
+                    _syncValue = AddFact(_history, 2, "Dernière synchro connue", "");
+                    _syncValue.MaxWidth = 210;
+                }
+
+                _syncValue.Text = when.HasValue ? DateLabel(when.Value) : "Pas encore observée";
+                if (when.HasValue && !string.IsNullOrWhiteSpace(user))
+                    _syncValue.Text += " · par " + user;
+            }
+
             internal void PresentAboveHost()
             {
                 _presentationRequested = true;
@@ -612,10 +779,11 @@ namespace BIMaestro.ModelLoading
                 }
                 catch { }
             }
-            private static void AddFact(Grid grid, int row, string label, string value)
+            private static TextBlock AddFact(Grid grid, int row, string label, string value)
             {
                 var key = Text(label, 12, "#74858F"); key.VerticalAlignment = VerticalAlignment.Center; Grid.SetRow(key, row); grid.Children.Add(key);
                 var content = Text(value, 12, "#344E5B", true); content.VerticalAlignment = VerticalAlignment.Center; content.Margin = new Thickness(12, 0, 0, 0); Grid.SetRow(content, row); Grid.SetColumn(content, 1); grid.Children.Add(content);
+                return content;
             }
             private static string DateLabel(DateTime when)
             {

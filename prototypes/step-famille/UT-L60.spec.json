@@ -1,0 +1,2825 @@
+{
+ "name": "Chaudière UT-L 60",
+ "step": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\ENGIE - LE MANS - General\\6. Plans DAO\\X1. Chaufferie\\3.SYNTHESE\\Lot 02 - Gaz\\3.Reçu le 18-11-2026\\MNE-LCI-EXE-MNM-1007-B-Maquette 3D chaudiere UT-L 60.STEP",
+ "stepUpAxis": "Y",
+ "stepFloorY": -1750,
+ "expectedBBoxMm": {
+  "min": [
+   -2521.3014625104165,
+   -2305.5408849502005,
+   0
+  ],
+  "max": [
+   8218,
+   1842.4999999999952,
+   4540
+  ]
+ },
+ "parameters": {
+  "Modèle": "UT-L 60",
+  "Source CAO": "MNE-LCI-EXE-MNM-1007-B-Maquette 3D chaudiere UT-L 60.STEP"
+ },
+ "connectors": [
+  {
+   "name": "Départ eau chaude DN350",
+   "system": "SupplyHydronic",
+   "diameter": 350,
+   "p": [
+    5940,
+    0,
+    4202
+   ],
+   "dir": [
+    0,
+    0,
+    1
+   ],
+   "note": "Bride DN350 PN16 libre ; la lyre « départ eau chaude » est sur ce piquage"
+  },
+  {
+   "name": "Retour eau chaude DN350",
+   "system": "ReturnHydronic",
+   "diameter": 350,
+   "p": [
+    3940,
+    0,
+    4052
+   ],
+   "dir": [
+    0,
+    0,
+    1
+   ],
+   "note": "Bride DN350 PN16 libre (déduit : l'autre piquage est le départ)"
+  },
+  {
+   "name": "Sortie fumées DN900",
+   "system": "Flue",
+   "diameter": 900,
+   "p": [
+    8218,
+    0,
+    2030
+   ],
+   "dir": [
+    1,
+    0,
+    0
+   ],
+   "note": "Bride fumées DIN 24154 DN900 du carneau"
+  },
+  {
+   "name": "Arrivée gaz DN125",
+   "system": "Gas",
+   "diameter": 125,
+   "p": [
+    4800,
+    1650,
+    612
+   ],
+   "dir": [
+    1,
+    0,
+    0
+   ],
+   "note": "Extrémité amont de la ligne GN145 (robinet KSN DN125)"
+  },
+  {
+   "name": "Évent gaz DN25",
+   "system": "GasVent",
+   "diameter": 25,
+   "p": [
+    822,
+    1650,
+    1068
+   ],
+   "dir": [
+    1,
+    0,
+    0
+   ],
+   "note": "Bride DN25 de la panoplie d'évent (à confirmer)"
+  }
+ ],
+ "primitives": [
+  {
+   "kind": "cyl",
+   "group": "Corps",
+   "name": "D195-PE-UT-L60 / D195-PE-UTL60_0_164834",
+   "a": [
+    -441.8457581058746,
+    0,
+    1750
+   ],
+   "b": [
+    7872,
+    0,
+    1750
+   ],
+   "r": 1612
+  },
+  {
+   "kind": "box",
+   "group": "Corps",
+   "name": "Berceau (déduit)",
+   "min": [
+    -241.8457581058746,
+    -967.1999999999999,
+    0
+   ],
+   "max": [
+    7672,
+    967.1999999999999,
+    1750
+   ]
+  },
+  {
+   "kind": "cyl",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN148 / Pipe1-D195-PE-GN148 / Bride à collerette acier C22-8_DN080 PN40",
+   "a": [
+    1400.9999999999993,
+    1650,
+    611.5
+   ],
+   "b": [
+    1458.9999999999998,
+    1650,
+    611.5
+   ],
+   "r": 100
+  },
+  {
+   "kind": "cyl",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN148 / Pipe1-D195-PE-GN148 / Réduction concentrique acier DIN 2616 St35.8 CL1_DN150  DN80",
+   "a": [
+    1260.999999999999,
+    1650,
+    611.5
+   ],
+   "b": [
+    1400.9999999999998,
+    1650,
+    611.5
+   ],
+   "r": 84.2
+  },
+  {
+   "kind": "cyl",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN148 / Pipe1-D195-PE-GN148 / Bride à collerette acier C22-8_DN125 PN16",
+   "a": [
+    -562,
+    0,
+    1134.4999999999995
+   ],
+   "b": [
+    -562,
+    0,
+    1189.5000000000005
+   ],
+   "r": 125
+  },
+  {
+   "kind": "cyl",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN148 / Pipe1-D195-PE-GN148 / Réduction concentrique acier DIN 2616 St35.8 CL1_DN125  DN100",
+   "a": [
+    -562,
+    0,
+    1007.4979999999997
+   ],
+   "b": [
+    -562,
+    0,
+    1134.4980000000005
+   ],
+   "r": 69.8
+  },
+  {
+   "kind": "cyl",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN148 / Pipe1-D195-PE-GN148 / Bride à collerette acier C22-8_DN100 PN16",
+   "a": [
+    -562,
+    0,
+    955.4979999999995
+   ],
+   "b": [
+    -562,
+    0,
+    1007.4980000000003
+   ],
+   "r": 110
+  },
+  {
+   "kind": "cyl",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN148 / Pipe1-D195-PE-GN148 / Bride à collerette acier C22-8_DN100 PN16",
+   "a": [
+    -562,
+    0,
+    859.4979999999996
+   ],
+   "b": [
+    -562,
+    0,
+    911.4980000000004
+   ],
+   "r": 110
+  },
+  {
+   "kind": "cyl",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN148 / Pipe1-D195-PE-GN148 / Bride à collerette acier C22-8_DN100 PN16",
+   "a": [
+    -562,
+    207.49999999999594,
+    611.5
+   ],
+   "b": [
+    -562,
+    155.4999999999952,
+    611.5
+   ],
+   "r": 110
+  },
+  {
+   "kind": "cyl",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN148 / Pipe1-D195-PE-GN148 / Bride à collerette acier C22-8_DN100 PN16",
+   "a": [
+    -562,
+    865.4999999999958,
+    611.5
+   ],
+   "b": [
+    -562,
+    813.4999999999949,
+    611.5
+   ],
+   "r": 110
+  },
+  {
+   "kind": "cyl",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN148 / Pipe1-D195-PE-GN148 / Réduction concentrique acier DIN 2616 St35.8 CL1_DN150  DN100",
+   "a": [
+    -304,
+    1650,
+    611.5
+   ],
+   "b": [
+    -163.9999999999994,
+    1650,
+    611.5
+   ],
+   "r": 84.2
+  },
+  {
+   "kind": "box",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN148 / Pipe1-D195-PE-GN148 / Coude acier  DIN2605 ST35.8_DN100",
+   "min": [
+    -619.1500000000001,
+    1497.9999999999948,
+    554.3479999999913
+   ],
+   "max": [
+    -409.99999999999955,
+    1707.1499999999949,
+    668.6479999999915
+   ]
+  },
+  {
+   "kind": "cyl",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN148 / Pipe1-D195-PE-GN148 / Bride à collerette acier C22-8_DN100 PN16",
+   "a": [
+    -409.9999999999997,
+    1650,
+    611.5
+   ],
+   "b": [
+    -357.9999999999994,
+    1650,
+    611.5
+   ],
+   "r": 110
+  },
+  {
+   "kind": "cyl",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN148 / Pipe1-D195-PE-GN148 / Bride à collerette acier C22-8_DN100 PN16",
+   "a": [
+    -356.0000000000004,
+    1650,
+    611.5
+   ],
+   "b": [
+    -303.9999999999989,
+    1650,
+    611.5
+   ],
+   "r": 110
+  },
+  {
+   "kind": "box",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN148 / Pipe1-D195-PE-GN148 / Coude acier  DIN2605 ST35.8_DN100",
+   "min": [
+    -619.1500000000012,
+    -57.1500000000043,
+    554.3479999999988
+   ],
+   "max": [
+    -504.8500000000006,
+    151.99999999999554,
+    763.498
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN148 / Pipe1-D195-PE-GN148 / DN150^Pipe1-D195-PE-GN148_DN150, 1",
+   "min": [
+    -160.49800000000027,
+    1590.4969643631462,
+    551.9949643631439
+   ],
+   "max": [
+    1257.4979999999998,
+    1709.5030356368432,
+    671.0010356368443
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN148 / Pipe1-D195-PE-GN148 / DN100^Pipe1-D195-PE-GN148_DN100, 2",
+   "min": [
+    -602.4111525448114,
+    868.9999999999953,
+    571.0868474551805
+   ],
+   "max": [
+    -521.5888474551884,
+    1494.4999999999955,
+    651.9091525448066
+   ]
+  },
+  {
+   "kind": "cyl",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN148 / D195-PE-Panoplie event gaz UT-L 60 / Soupape FRSBV-1010 DN25",
+   "a": [
+    582,
+    1811.9999999999911,
+    1068
+   ],
+   "b": [
+    582,
+    1619.9999999999886,
+    1068
+   ],
+   "r": 70
+  },
+  {
+   "kind": "box",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN148 / D195-PE-Panoplie event gaz UT-L 60 / Vanne à sphère laiton 1p - ref.620006",
+   "min": [
+    720.0040103270147,
+    1626.035991582632,
+    780.9979999999214
+   ],
+   "max": [
+    768.003982650016,
+    1711.9999999999845,
+    929.4975914988249
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN148 / D195-PE-Panoplie event gaz UT-L 60 / Vanne à sphère laiton 1p - ref.620006",
+   "min": [
+    380.00001032701425,
+    1626.0359915826327,
+    780.9979999999202
+   ],
+   "max": [
+    427.99998265001557,
+    1711.9999999999852,
+    929.4975914988238
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN148 / D195-PE-GN148 - inox detendeur",
+   "min": [
+    554.7573593128802,
+    1646.8272471420837,
+    493.4979999999923
+   ],
+   "max": [
+    1702.446152422897,
+    1810.4999999999993,
+    787.5905081543938
+   ]
+  },
+  {
+   "kind": "cyl",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN148 / Asm instrum pression_PI 0ø / Manomètre_Manomtre D100 - 1_2\" ",
+   "a": [
+    174,
+    1681.9999999999966,
+    916
+   ],
+   "b": [
+    174,
+    1633.9999999999961,
+    916
+   ],
+   "r": 55.2
+  },
+  {
+   "kind": "box",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN148 / Asm instrum pression_PI 0ø / Robinet d''isolement manomètre 2 voies_Manomtre D100 - 1_2\" ",
+   "min": [
+    148.75952447972645,
+    1636.4999999999955,
+    722.997999999993
+   ],
+   "max": [
+    199.2404755202707,
+    1729.9999999999957,
+    842.9979999999931
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN148 / Asm instrum pression_PT 0ø / Robinet d''isolement manomètre 2 voies_Manomtre D100 - 1_2\" ",
+   "min": [
+    -31.24047552027359,
+    1636.4999999999955,
+    722.9979999999939
+   ],
+   "max": [
+    19.240475520270664,
+    1729.9999999999957,
+    842.9979999999941
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN148 / Asm instrum pression_PT 0ø / Transmetteur de pression_Transmetteur de pression",
+   "min": [
+    -24.117333157178596,
+    1631.8826668428198,
+    824.997999999994
+   ],
+   "max": [
+    12.117333157174357,
+    1684.9999999999966,
+    954.9979999999941
+   ]
+  },
+  {
+   "kind": "cyl",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN148 / RS 251 DN80-385",
+   "a": [
+    1581,
+    1650,
+    200.49799999999755
+   ],
+   "b": [
+    1581,
+    1650,
+    1255.497999999997
+   ],
+   "r": 192.5
+  },
+  {
+   "kind": "box",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN148 / Manchette DRZ - DN100 mit BSV - V00-E",
+   "min": [
+    -785.4255324544207,
+    213.49999999999523,
+    466.6979999999967
+   ],
+   "max": [
+    -457.9999999999998,
+    815.4999999999959,
+    941.5340792030884
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN148 / Clapet gaz DMK DN100",
+   "min": [
+    -629.0000000000018,
+    -315.0000000000035,
+    867.4999516600795
+   ],
+   "max": [
+    -494.99999999999426,
+    83.59999999999658,
+    1000.3058893524573
+   ]
+  },
+  {
+   "kind": "cyl",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN145 / Pipe1-D195-PE-GN145 / Bride à collerette acier C22-8_DN080 PN40",
+   "a": [
+    1872.999999999799,
+    1650,
+    611.5
+   ],
+   "b": [
+    1930.9999999997995,
+    1650,
+    611.5
+   ],
+   "r": 100
+  },
+  {
+   "kind": "cyl",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN145 / Pipe1-D195-PE-GN145 / Réduction concentrique acier DIN 2616 St35.8 CL1_DN150  DN80",
+   "a": [
+    1927.9999999997988,
+    1650,
+    611.5
+   ],
+   "b": [
+    2067.9999999997995,
+    1650,
+    611.5
+   ],
+   "r": 84.2
+  },
+  {
+   "kind": "cyl",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN145 / Pipe1-D195-PE-GN145 / Bride à collerette acier C22-8_DN150 PN16",
+   "a": [
+    2817.9999999997985,
+    1650,
+    611.5
+   ],
+   "b": [
+    2872.9999999997995,
+    1650,
+    611.5
+   ],
+   "r": 142.5
+  },
+  {
+   "kind": "cyl",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN145 / Pipe1-D195-PE-GN145 / Bride à collerette acier C22-8_DN125 PN16",
+   "a": [
+    3951.9999999997985,
+    1650,
+    611.5
+   ],
+   "b": [
+    4006.9999999997995,
+    1650,
+    611.5
+   ],
+   "r": 125
+  },
+  {
+   "kind": "cyl",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN145 / Pipe1-D195-PE-GN145 / Réduction concentrique acier DIN 2616 St35.8 CL1_DN150  DN125",
+   "a": [
+    3808.499999999798,
+    1650,
+    611.5
+   ],
+   "b": [
+    3948.499999999799,
+    1650,
+    611.5
+   ],
+   "r": 84.2
+  },
+  {
+   "kind": "cyl",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN145 / Pipe1-D195-PE-GN145 / Bride à collerette acier C22-8_DN150 PN16",
+   "a": [
+    3056.999999999799,
+    1650,
+    611.5
+   ],
+   "b": [
+    3111.9999999998,
+    1650,
+    611.5
+   ],
+   "r": 142.5
+  },
+  {
+   "kind": "box",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN145 / Pipe1-D195-PE-GN145 / DN150^Pipe1-D195-PE-GN145_DN150",
+   "min": [
+    2065.001999999799,
+    1590.4969643631462,
+    551.9949643631503
+   ],
+   "max": [
+    2814.4999999998,
+    1709.503035636843,
+    671.0010356368505
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN145 / Pipe1-D195-PE-GN145 / DN150_1^Pipe1-D195-PE-GN145_DN150",
+   "min": [
+    3115.4999999997985,
+    1590.496964363146,
+    551.9949643631548
+   ],
+   "max": [
+    3804.997999999799,
+    1709.5030356368427,
+    671.0010356368546
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN145 / Pipe1-D195-PE-GN145 / Ensemble tole de fixation plaque CE reduite_8346-8347 / 8346-Tôle de fixation plaque CE reduite ",
+   "min": [
+    2612.9999999997985,
+    1652.499999999995,
+    710.648000000001
+   ],
+   "max": [
+    2732.999999999799,
+    1654.499999999996,
+    845.6480000000015
+   ]
+  },
+  {
+   "kind": "cyl",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN145 / Compteur QA_e_DN150",
+   "a": [
+    2874.999999999798,
+    1650,
+    611.5
+   ],
+   "b": [
+    3054.999999999799,
+    1650,
+    611.5
+   ],
+   "r": 110
+  },
+  {
+   "kind": "cyl",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN145 / Asm instrum pression_PI 0ø / Manomètre_Manomtre D100 - 1_2\" ",
+   "a": [
+    2313,
+    1681.9999999999966,
+    916.7
+   ],
+   "b": [
+    2313,
+    1633.9999999999961,
+    916.7
+   ],
+   "r": 55.2
+  },
+  {
+   "kind": "box",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN145 / Asm instrum pression_PI 0ø / Robinet d''isolement manomètre 2 voies_Manomtre D100 - 1_2\" ",
+   "min": [
+    2287.759524479526,
+    1636.4999999999955,
+    723.748000000001
+   ],
+   "max": [
+    2338.2404755200705,
+    1729.9999999999957,
+    843.7480000000012
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN145 / Asm instrum pression_PT 0ø / Robinet d''isolement manomètre 2 voies_Manomtre D100 - 1_2\" ",
+   "min": [
+    3356.759524479526,
+    1636.499999999995,
+    723.7480000000039
+   ],
+   "max": [
+    3407.2404755200705,
+    1729.9999999999952,
+    843.748000000004
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN145 / Asm instrum pression_PT 0ø / Transmetteur de pression_Transmetteur de pression",
+   "min": [
+    3363.8826668426213,
+    1631.8826668428194,
+    825.7480000000039
+   ],
+   "max": [
+    3400.1173331569744,
+    1684.9999999999961,
+    955.748000000004
+   ]
+  },
+  {
+   "kind": "cyl",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN145 / KSN 75-125-16-B",
+   "a": [
+    4370.999999999798,
+    1650,
+    611.5
+   ],
+   "b": [
+    4799.69375595967,
+    1650,
+    611.5
+   ],
+   "r": 125
+  },
+  {
+   "kind": "cyl",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-PE-GN145 / GF 60125 DN125",
+   "a": [
+    4189,
+    1831.9999999999923,
+    611.5
+   ],
+   "b": [
+    4189,
+    1466.9999999999916,
+    611.5
+   ],
+   "r": 140.5
+  },
+  {
+   "kind": "box",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-Support gaz au sol - DN150 / D195-Support gaz au sol - Poteau - DN150",
+   "min": [
+    985.0000000000007,
+    1522.4999999999939,
+    0.001761370814847396
+   ],
+   "max": [
+    1185.0000000000007,
+    1727.4999999999939,
+    386.4317613708149
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-Support gaz au sol - DN150 / D195-Support tuyauterie - DN150_DN150",
+   "min": [
+    985.0000000000006,
+    1513.3746877513677,
+    342.4317613708147
+   ],
+   "max": [
+    1185.0000000000007,
+    1786.6253122486203,
+    634.0853786407722
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-Support gaz au sol - DN150 / D195-Support gaz au sol - Poteau - DN150",
+   "min": [
+    3554.999999999801,
+    1522.499999999991,
+    0.0017613708253065852
+   ],
+   "max": [
+    3754.999999999801,
+    1727.499999999991,
+    386.43176137082537
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-Support gaz au sol - DN150 / D195-Support tuyauterie - DN150_DN150",
+   "min": [
+    3554.999999999801,
+    1513.3746877513647,
+    342.43176137082514
+   ],
+   "max": [
+    3754.999999999801,
+    1786.6253122486173,
+    634.0853786407827
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-Support gaz au sol - DN150 / D195-Support gaz au sol - Poteau - DN150",
+   "min": [
+    2375.9999999998017,
+    1522.499999999991,
+    0.0017613708200769906
+   ],
+   "max": [
+    2575.9999999998017,
+    1727.499999999991,
+    386.43176137082014
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-Support gaz au sol - DN150 / D195-Support tuyauterie - DN150_DN150",
+   "min": [
+    2375.9999999998017,
+    1513.3746877513647,
+    342.4317613708199
+   ],
+   "max": [
+    2575.9999999998017,
+    1786.6253122486173,
+    634.0853786407774
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Gaz",
+   "name": "D195-PE-Rampe gaz UT-L 60 / D195-support rampe gaz sur porte UTL60_DN100 ",
+   "min": [
+    -585.9516129032284,
+    1049.9999999999943,
+    512.4979999999946
+   ],
+   "max": [
+    -199.0000000000025,
+    1099.9999999999952,
+    710.4979999999946
+   ]
+  },
+  {
+   "kind": "cyl",
+   "group": "Eau",
+   "name": "D195-PE-RZ 350 PN16 / D195-PE-Pipe1- RZ 350  PN 16 / Bride à collerette acier C22-8_DN350 PN16",
+   "a": [
+    3940,
+    0,
+    3502
+   ],
+   "b": [
+    3940,
+    0,
+    3584
+   ],
+   "r": 260
+  },
+  {
+   "kind": "cyl",
+   "group": "Eau",
+   "name": "D195-PE-RZ 350 PN16 / D195-PE-Pipe1- RZ 350  PN 16 / Bride à collerette acier C22-8_DN350 PN16",
+   "a": [
+    3940,
+    0,
+    3970
+   ],
+   "b": [
+    3940,
+    0,
+    4052
+   ],
+   "r": 260
+  },
+  {
+   "kind": "cyl",
+   "group": "Eau",
+   "name": "D195-PE-RZ 350 PN16 / D195-PE-Pipe1- RZ 350  PN 16 / Bride à collerette acier C22-8_DN150 PN16",
+   "a": [
+    3535,
+    0,
+    3777
+   ],
+   "b": [
+    3590,
+    0,
+    3777
+   ],
+   "r": 142.5
+  },
+  {
+   "kind": "box",
+   "group": "Eau",
+   "name": "D195-PE-RZ 350 PN16 / D195-PE-Pipe1- RZ 350  PN 16 / DN150^D195-PE-Pipe1- RZ 350  PN 16_DN150, 2",
+   "min": [
+    3590,
+    -59.50303563684805,
+    3717.496964363152
+   ],
+   "max": [
+    3790,
+    59.50303563684802,
+    3836.503035636848
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Eau",
+   "name": "D195-PE-RZ 350 PN16 / D195-PE-Pipe1- RZ 350  PN 16 / DN350^D195-PE-Pipe1- RZ 350  PN 16_DN350",
+   "min": [
+    3814.2764143050317,
+    -125.72358569496826,
+    3584
+   ],
+   "max": [
+    4065.7235856949683,
+    125.72358569496804,
+    3970
+   ]
+  },
+  {
+   "kind": "cyl",
+   "group": "Eau",
+   "name": "D195-PE-RZ 350 PN16 / Bride pleine acier_DN150 PN16",
+   "a": [
+    3511,
+    0,
+    3777
+   ],
+   "b": [
+    3533,
+    0,
+    3777
+   ],
+   "r": 142.5
+  },
+  {
+   "kind": "cyl",
+   "group": "Eau",
+   "name": "D195-PE-RZ-350  PN16 / D195-PE-Pipe1-RZ-350  PN16 / Bride à collerette acier C22-8_DN350 PN16",
+   "a": [
+    5940,
+    0,
+    3502
+   ],
+   "b": [
+    5940,
+    0,
+    3584
+   ],
+   "r": 260
+  },
+  {
+   "kind": "cyl",
+   "group": "Eau",
+   "name": "D195-PE-RZ-350  PN16 / D195-PE-Pipe1-RZ-350  PN16 / Bride à collerette acier C22-8_DN350 PN16",
+   "a": [
+    5940,
+    0,
+    4120
+   ],
+   "b": [
+    5940,
+    0,
+    4202
+   ],
+   "r": 260
+  },
+  {
+   "kind": "box",
+   "group": "Eau",
+   "name": "D195-PE-RZ-350  PN16 / D195-PE-Pipe1-RZ-350  PN16 / DN025^D195-PE-Pipe1-RZ-350  PN16_DN025, 1",
+   "min": [
+    5928.085250737006,
+    -460.1258680824953,
+    4017.085250737007
+   ],
+   "max": [
+    5951.914749262994,
+    -169.38145928642876,
+    4040.914749262993
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Eau",
+   "name": "D195-PE-RZ-350  PN16 / D195-PE-Pipe1-RZ-350  PN16 / DN350^D195-PE-Pipe1-RZ-350  PN16_DN350, 1",
+   "min": [
+    5814.276414305032,
+    -125.72358569496828,
+    3584
+   ],
+   "max": [
+    6065.723585694968,
+    125.72358569496805,
+    4120
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Eau",
+   "name": "D195-PE-RZ-350  PN16 / D195-Lyre départ eau chaude_lyre / DN020_2-D165-PE-Lyre départ eau chaude UT-L 64_DN020",
+   "min": [
+    5969.002000000008,
+    -507.6364542894108,
+    3718.485413792997
+   ],
+   "max": [
+    6301.000000000006,
+    -488.6152818754926,
+    3737.506586206923
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Eau",
+   "name": "D195-PE-RZ-350  PN16 / D195-Lyre départ eau chaude_lyre / DN020-D165-PE-Lyre départ eau chaude UT-L 64_DN020, 1",
+   "min": [
+    5625.000000000007,
+    -507.63645428941084,
+    3718.485413793005
+   ],
+   "max": [
+    5910.998000000008,
+    -488.6152818754926,
+    3737.5065862069305
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Eau",
+   "name": "D195-PE-RZ-350  PN16 / D195-Lyre départ eau chaude_lyre / ARI-FABA-plus-040-BW-(45-040) -  DN20",
+   "min": [
+    6301.0000000000055,
+    -672.3354785334479,
+    3711.666063295477
+   ],
+   "max": [
+    6451.0000000000055,
+    -481.79593137797684,
+    3902.205610450946
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Eau",
+   "name": "D195-PE-RZ-350  PN16 / D195-Lyre départ eau chaude_lyre / assemblage PI / Manomètres_Manomtre D100 - 1_2\" ",
+   "min": [
+    5608.304933341488,
+    -544.7949156407643,
+    3864.9979999999705
+   ],
+   "max": [
+    5716.669047558326,
+    -436.430801423926,
+    4011.247999999971
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Eau",
+   "name": "D195-PE-RZ-350  PN16 / D195-Lyre départ eau chaude_lyre / assemblage PI / Robinet d''isolement manomètre 2voies_Manomtre D100 - 1_2\" ",
+   "min": [
+    5595.583746104328,
+    -572.5421219781332,
+    3762.9979999999705
+   ],
+   "max": [
+    5683.50000000001,
+    -484.625868082452,
+    3882.997999999971
+   ]
+  },
+  {
+   "kind": "cyl",
+   "group": "Eau",
+   "name": "D195-PE-RZ-350  PN16 / D195-Lyre départ eau chaude_lyre / ARI-FABA DN20-PN40",
+   "a": [
+    5940,
+    -445.6258680823539,
+    3874
+   ],
+   "b": [
+    5940,
+    -698.9258680825869,
+    3874
+   ],
+   "r": 63
+  },
+  {
+   "kind": "box",
+   "group": "Eau",
+   "name": "D195-PE-RZ-350  PN16 / D195-Lyre départ eau chaude_lyre / Pressostat type DSB_Manomtre D100 - 1_2\" ",
+   "min": [
+    5747.50000000001,
+    -533.1258680824519,
+    3767.9979999999673
+   ],
+   "max": [
+    5832.500000000012,
+    -475.62586808245175,
+    3967.9979999999678
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Eau",
+   "name": "D195-PE-RZ-350  PN16 / D195-Lyre départ eau chaude_lyre / Pressostat type DSB_Manomtre D100 - 1_2\" ",
+   "min": [
+    6197.500000000008,
+    -533.125868082452,
+    3767.9979999999573
+   ],
+   "max": [
+    6282.50000000001,
+    -475.6258680824518,
+    3967.9979999999578
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Eau",
+   "name": "D195-PE-RZ-350  PN16 / D195-Lyre départ eau chaude_lyre / Pressostat type DSB_Manomtre D100 - 1_2\" ",
+   "min": [
+    6047.500000000009,
+    -533.1258680824519,
+    3767.997999999961
+   ],
+   "max": [
+    6132.500000000011,
+    -475.62586808245175,
+    3967.9979999999614
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Eau",
+   "name": "D195-PE-RZ-350  PN16 / Sonde E4B Limiteur de niveau",
+   "min": [
+    5585.910110752602,
+    -353.008311971121,
+    4017.8216915446187
+   ],
+   "max": [
+    5824.0023776008,
+    -115.99762239919929,
+    4235.15326914885
+   ]
+  },
+  {
+   "kind": "cyl",
+   "group": "Eau",
+   "name": "D195-PE-RZ-350  PN16 / C718-debitmetre thermatel",
+   "a": [
+    5940,
+    348.5500000000001,
+    3722
+   ],
+   "b": [
+    5940,
+    169.74876925009016,
+    3722
+   ],
+   "r": 51
+  },
+  {
+   "kind": "box",
+   "group": "Eau",
+   "name": "D195-PE-RZ-350  PN16 / Sonde de temperature TRG5-6X_Lg160mm",
+   "min": [
+    6062.563724610383,
+    117.5166941741906,
+    3940.2667450466856
+   ],
+   "max": [
+    6318.670957091077,
+    378.715976286842,
+    4011.667375009965
+   ]
+  },
+  {
+   "kind": "cyl",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / Pipe1-D195-PE-UTL-60-Recirculation / Bride plate inox ep8mm_DN200 PN6",
+   "a": [
+    8041,
+    0,
+    2599.999000000001
+   ],
+   "b": [
+    8041,
+    0,
+    2607.999000000001
+   ],
+   "r": 160
+  },
+  {
+   "kind": "cyl",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / Pipe1-D195-PE-UTL-60-Recirculation / Bride plate inox ep8mm_DN200 PN6",
+   "a": [
+    -1653.9996413098593,
+    -958.7,
+    1231
+   ],
+   "b": [
+    -1645.9996413098575,
+    -958.7,
+    1231
+   ],
+   "r": 160
+  },
+  {
+   "kind": "cyl",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / Pipe1-D195-PE-UTL-60-Recirculation / Bride plate inox ep8mm_DN200 PN6",
+   "a": [
+    -1602.001641309859,
+    -958.7,
+    1231
+   ],
+   "b": [
+    -1594.0016413098572,
+    -958.7,
+    1231
+   ],
+   "r": 160
+  },
+  {
+   "kind": "box",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / Pipe1-D195-PE-UTL-60-Recirculation / Coude inox 3D à 90_DN200",
+   "min": [
+    7736.000000000001,
+    1060.0000000000011,
+    3058.450000000008
+   ],
+   "max": [
+    8150.550000000001,
+    1474.5500000000025,
+    3277.5500000000084
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / Pipe1-D195-PE-UTL-60-Recirculation / Coude inox 3D à 90_DN200",
+   "min": [
+    7931.45,
+    -109.5499999999987,
+    2863.00000000001
+   ],
+   "max": [
+    8150.55,
+    305.00000000000273,
+    3277.55000000001
+   ]
+  },
+  {
+   "kind": "cyl",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / Pipe1-D195-PE-UTL-60-Recirculation / Bride plate inox ep8mm_DN200 PN6",
+   "a": [
+    172.9989999999938,
+    1365,
+    3168
+   ],
+   "b": [
+    180.99900000000557,
+    1365,
+    3168
+   ],
+   "r": 160
+  },
+  {
+   "kind": "cyl",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / Pipe1-D195-PE-UTL-60-Recirculation / Bride plate inox ep8mm_DN200 PN6",
+   "a": [
+    183.0009999999289,
+    1365,
+    3168
+   ],
+   "b": [
+    191.001000000071,
+    1365,
+    3168
+   ],
+   "r": 160
+  },
+  {
+   "kind": "cyl",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / Pipe1-D195-PE-UTL-60-Recirculation / Té égal inox roulé soudé - 5624 bene inox_DN200",
+   "a": [
+    -2002.0006413098583,
+    -958.7,
+    1231
+   ],
+   "b": [
+    -1646.0006413098579,
+    -958.7,
+    1231
+   ],
+   "r": 109.6
+  },
+  {
+   "kind": "cyl",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / Pipe1-D195-PE-UTL-60-Recirculation / Bride plate inox ep8mm_DN200 PN6",
+   "a": [
+    -1824,
+    -780.7068698528674,
+    1231
+   ],
+   "b": [
+    -1824,
+    -788.7068698528674,
+    1231
+   ],
+   "r": 160
+  },
+  {
+   "kind": "cyl",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / Pipe1-D195-PE-UTL-60-Recirculation / Bride plate inox ep8mm_DN200 PN6",
+   "a": [
+    -669,
+    -958.7,
+    1539.4984554909333
+   ],
+   "b": [
+    -669,
+    -958.7,
+    1547.498455490935
+   ],
+   "r": 160
+  },
+  {
+   "kind": "box",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / Pipe1-D195-PE-UTL-60-Recirculation / Coude inox 3D à 90_DN200",
+   "min": [
+    -778.5500000000001,
+    1059.9999999999868,
+    3058.450000000007
+   ],
+   "max": [
+    -363.99999999999903,
+    1474.5500000000009,
+    3277.5500000000457
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / Pipe1-D195-PE-UTL-60-Recirculation / Coude inox 3D à 90_DN200",
+   "min": [
+    -778.5500000000001,
+    -1068.255869852867,
+    2863.0000000000095
+   ],
+   "max": [
+    -559.4499999999987,
+    -653.7058698528666,
+    3277.550000000011
+   ]
+  },
+  {
+   "kind": "cyl",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / Pipe1-D195-PE-UTL-60-Recirculation / Bride plate inox ep8mm_DN200 PN6",
+   "a": [
+    -669,
+    -958.7,
+    1549.5004554909342
+   ],
+   "b": [
+    -669,
+    -958.7,
+    1557.5004554909342
+   ],
+   "r": 160
+  },
+  {
+   "kind": "box",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / Pipe1-D195-PE-UTL-60-Recirculation / D195-tube emboitement recirculation UTL60",
+   "min": [
+    -564.5000119617232,
+    -958.7558698528671,
+    2459.5000000000073
+   ],
+   "max": [
+    -562.5000117370898,
+    -958.6558698528671,
+    2759.5000000000073
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / Pipe1-D195-PE-UTL-60-Recirculation / D195-tube emboitement recirculation UTL60",
+   "min": [
+    -564.5000119617232,
+    -528.7058698528666,
+    3167.950000000004
+   ],
+   "max": [
+    -562.5000117370898,
+    -228.70586985286658,
+    3168.0500000000116
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / Pipe1-D195-PE-UTL-60-Recirculation / D195-tube emboitement recirculation UTL60",
+   "min": [
+    320.9999999999998,
+    1364.9500000000012,
+    3061.500011737097
+   ],
+   "max": [
+    620.9999999999998,
+    1365.050000000001,
+    3063.5000119617303
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / Pipe1-D195-PE-UTL-60-Recirculation / D195-tube emboitement recirculation UTL60",
+   "min": [
+    1481.2499999999998,
+    1364.9500000000014,
+    3061.5000117370973
+   ],
+   "max": [
+    1781.2499999999998,
+    1365.0500000000013,
+    3063.5000119617307
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / Pipe1-D195-PE-UTL-60-Recirculation / D195-tube emboitement recirculation UTL60",
+   "min": [
+    8040.95,
+    618.3750000000014,
+    3061.5000117370982
+   ],
+   "max": [
+    8041.05,
+    918.3750000000014,
+    3063.5000119617316
+   ]
+  },
+  {
+   "kind": "cyl",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / Pipe1-D195-PE-UTL-60-Recirculation / D195-PE-UTL-60-Recirculation cap",
+   "a": [
+    -2010.0006413098586,
+    -958.7,
+    1231
+   ],
+   "b": [
+    -2002.0006413098586,
+    -958.7,
+    1231
+   ],
+   "r": 109.6
+  },
+  {
+   "kind": "box",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / Pipe1-D195-PE-UTL-60-Recirculation / Coude inox 3D à 90_DN200",
+   "min": [
+    -974.0000000000011,
+    -1068.2558698528674,
+    1121.4494554909343
+   ],
+   "max": [
+    -559.4499999999998,
+    -849.1558698528673,
+    1535.9994554909342
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / Pipe1-D195-PE-UTL-60-Recirculation / DN200_9-Pipe1-D195-PE-UTL-60-Recirculation_DN200",
+   "min": [
+    1734.75,
+    1287.5364521210154,
+    3090.5364521210195
+   ],
+   "max": [
+    7732.5,
+    1442.4635478789887,
+    3245.463547878994
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / Pipe1-D195-PE-UTL-60-Recirculation / DN200_11-Pipe1-D195-PE-UTL-60-Recirculation_DN200",
+   "min": [
+    7963.536452121014,
+    308.5000000000013,
+    3090.536452121022
+   ],
+   "max": [
+    8118.463547878986,
+    664.8750000000014,
+    3245.463547878997
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / Pipe1-D195-PE-UTL-60-Recirculation / DN200_12-Pipe1-D195-PE-UTL-60-Recirculation_DN200",
+   "min": [
+    -746.4635478789862,
+    -650.205869852867,
+    3090.5364521210204
+   ],
+   "max": [
+    -591.5364521210137,
+    -338.70586985286616,
+    3245.463547878994
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / Pipe1-D195-PE-UTL-60-Recirculation / DN200_1^Pipe1-D195-PE-UTL-60-Recirculation_DN200, 1",
+   "min": [
+    574.5,
+    1287.5364521210145,
+    3090.5364521210204
+   ],
+   "max": [
+    1669.4999999999998,
+    1442.4635478789871,
+    3245.4635478789933
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / Pipe1-D195-PE-UTL-60-Recirculation / DN200_13-Pipe1-D195-PE-UTL-60-Recirculation_DN200",
+   "min": [
+    7963.536452121014,
+    728.3750000000005,
+    3090.536452121019
+   ],
+   "max": [
+    8118.463547878986,
+    1056.5000000000014,
+    3245.463547878994
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / Pipe1-D195-PE-UTL-60-Recirculation / DN200_14-Pipe1-D195-PE-UTL-60-Recirculation_DN200",
+   "min": [
+    -1901.464189188845,
+    -788.7078698528675,
+    1153.535907611948
+   ],
+   "max": [
+    -1746.5370934308721,
+    -780.7078698528675,
+    1308.4630033699204
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / Pipe1-D195-PE-UTL-60-Recirculation / DN200_15-Pipe1-D195-PE-UTL-60-Recirculation_DN200",
+   "min": [
+    -1654.0006413098583,
+    -1036.1694177318539,
+    1153.5359076119478
+   ],
+   "max": [
+    -1646.0006413098583,
+    -881.2423219738812,
+    1308.4630033699204
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / Pipe1-D195-PE-UTL-60-Recirculation / DN200_1^Pipe1-D195-PE-UTL-60-Recirculation_DN200, 6",
+   "min": [
+    -1590.500641309859,
+    -1036.169417731859,
+    1153.5359076119478
+   ],
+   "max": [
+    -977.4999999999989,
+    -881.2423219738812,
+    1308.4630033699204
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / Pipe1-D195-PE-UTL-60-Recirculation / DN200_16-Pipe1-D195-PE-UTL-60-Recirculation_DN200",
+   "min": [
+    -1602.0006413098592,
+    -1036.169417731854,
+    1153.5359076119478
+   ],
+   "max": [
+    -1594.000641309857,
+    -881.242321973881,
+    1308.4630033699204
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / Pipe1-D195-PE-UTL-60-Recirculation / DN200_1^Pipe1-D195-PE-UTL-60-Recirculation_DN200, 5",
+   "min": [
+    -746.4635478789862,
+    -1036.1694177318536,
+    1560.999455490934
+   ],
+   "max": [
+    -591.5364521210136,
+    -881.2423219738808,
+    2649.5000000000073
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / Pipe1-D195-PE-UTL-60-Recirculation / DN200_17-Pipe1-D195-PE-UTL-60-Recirculation_DN200",
+   "min": [
+    -746.4635478789862,
+    -1036.1694177318536,
+    2713.0000000000073
+   ],
+   "max": [
+    -591.5364521210136,
+    -881.2423219738808,
+    2859.5000000000114
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / Pipe1-D195-PE-UTL-60-Recirculation / DN200_18-Pipe1-D195-PE-UTL-60-Recirculation_DN200",
+   "min": [
+    -746.4635478789862,
+    -275.20586985286513,
+    3090.5364521210186
+   ],
+   "max": [
+    -591.5364521210137,
+    1056.500000000001,
+    3245.4635478789933
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / Pipe1-D195-PE-UTL-60-Recirculation / DN200_19-Pipe1-D195-PE-UTL-60-Recirculation_DN200",
+   "min": [
+    194.49999999999903,
+    1287.536452121015,
+    3090.5364521210176
+   ],
+   "max": [
+    511.00000000000074,
+    1442.4635478789876,
+    3245.4635478789933
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / Pipe1-D195-PE-UTL-60-Recirculation / DN200_1^Pipe1-D195-PE-UTL-60-Recirculation_DN200, 2",
+   "min": [
+    -360.4999999999995,
+    1287.536452121015,
+    3090.5364521210204
+   ],
+   "max": [
+    169.49799999999973,
+    1442.4635478789876,
+    3245.4635478789933
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / Pipe1-D195-PE-UTL-60-Recirculation / DN200_20-Pipe1-D195-PE-UTL-60-Recirculation_DN200",
+   "min": [
+    172.9979999999975,
+    1287.5364521210145,
+    3090.5364521210204
+   ],
+   "max": [
+    180.9980000000018,
+    1442.4635478789878,
+    3245.4635478789933
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / Pipe1-D195-PE-UTL-60-Recirculation / DN200_1^Pipe1-D195-PE-UTL-60-Recirculation_DN200, 3",
+   "min": [
+    7963.536452121014,
+    -77.46354787898528,
+    2611.500000000001
+   ],
+   "max": [
+    8118.463547878986,
+    77.46354787898736,
+    2859.50000000001
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / Pipe1-D195-PE-UTL-60-Recirculation / DN200_22-Pipe1-D195-PE-UTL-60-Recirculation_DN200",
+   "min": [
+    7963.536452121012,
+    -77.46354787898531,
+    2599.999999999984
+   ],
+   "max": [
+    8118.463547878986,
+    77.46354787898731,
+    2608.000000000018
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / Vanne de recirculation DN200+servo / Vanne de recirculation DN200",
+   "min": [
+    -1664.0006413098583,
+    -1351.705869852867,
+    1102.499455490934
+   ],
+   "max": [
+    -1584.0006413098583,
+    -830.2058698528668,
+    1359.499455490934
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / Vanne de recirculation DN200+servo / servomoteur vanne de recirculation (lamtec)",
+   "min": [
+    -1694.0006413098583,
+    -1544.7058698528667,
+    1166.999455490934
+   ],
+   "max": [
+    -1554.0006413098583,
+    -1351.7058698528667,
+    1381.999455490934
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / D195-support recirculation sur passerelle UTL60_DN200",
+   "min": [
+    854.9999999999876,
+    950.0000000000006,
+    3144.990234375008
+   ],
+   "max": [
+    964.999999999988,
+    1519.000000000002,
+    3405.0000000000077
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / D195-support recirculation sur passerelle UTL60_DN200",
+   "min": [
+    2804.9999999999873,
+    950.000000000001,
+    3144.9902343750077
+   ],
+   "max": [
+    2914.9999999999873,
+    1519.0000000000025,
+    3405.0000000000073
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / D195-support recirculation sur passerelle UTL60_DN200",
+   "min": [
+    4644.999999999987,
+    950.000000000001,
+    3144.990234375008
+   ],
+   "max": [
+    4754.999999999988,
+    1519.0000000000025,
+    3405.000000000008
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / D195-support recirculation sur passerelle UTL60_DN200",
+   "min": [
+    6247.999999999986,
+    950.0000000000015,
+    3144.990234375008
+   ],
+   "max": [
+    6357.999999999987,
+    1519.000000000003,
+    3405.000000000008
+   ]
+  },
+  {
+   "kind": "cyl",
+   "group": "Brûleur",
+   "name": "D195-PE-UTL-60-Recirculation / D195-Cap ligne recirculation bruleur",
+   "a": [
+    -2007.0006413098583,
+    -958.7,
+    1231
+   ],
+   "b": [
+    -2002.0006413098583,
+    -958.7,
+    1231
+   ],
+   "r": 110
+  },
+  {
+   "kind": "box",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / D195-Collier clip-grip à visser UTL60",
+   "min": [
+    621.4999999999998,
+    1210.366955273162,
+    3134.6492267369367
+   ],
+   "max": [
+    664.5999999999999,
+    1399.2537931833185,
+    3304.553420977928
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / D195-Manchette souple recirculation UTL60",
+   "min": [
+    413.50000000000017,
+    1268.069902209905,
+    3071.0699022099116
+   ],
+   "max": [
+    668.5000000000002,
+    1461.9300977900964,
+    3264.930097790103
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / D195-support recirculation montant sur porte UTL60_DN200",
+   "min": [
+    -692.0097656249999,
+    -1112.7058698528667,
+    2185.2497277454722
+   ],
+   "max": [
+    -198.99999999999972,
+    -804.7058698528667,
+    2235.2497277454727
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / D195-support recirculation montant sur porte UTL60_DN200",
+   "min": [
+    -692.0097656249999,
+    203.50000000005156,
+    3013.999999999998
+   ],
+   "max": [
+    -198.99999999999983,
+    253.50000000006338,
+    3321.999999999998
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Recirculation",
+   "name": "D195-PE-UTL-60-Recirculation / D195-Collier clip-grip à visser UTL60",
+   "min": [
+    418.49999999999955,
+    1209.9932972763713,
+    3106.854360964945
+   ],
+   "max": [
+    461.59999999999974,
+    1374.5415305366075,
+    3308.4718750794586
+   ]
+  },
+  {
+   "kind": "cyl",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Nouveau bruleur-53898-101-Brennerabmessungen M 10001.5",
+   "a": [
+    -2374,
+    1009.9999999999956,
+    1751
+   ],
+   "b": [
+    -2374,
+    -830.5000254741456,
+    1751
+   ],
+   "r": 1000
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-Caisson air bruleur",
+   "min": [
+    -2445.50149112034,
+    -827.0008151721236,
+    1967.4506050086595
+   ],
+   "max": [
+    -1323.5006287486508,
+    197.500014259095,
+    2191.450605008667
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-isolant phonique caisson",
+   "min": [
+    -2403.501490871648,
+    -773.5008996613358,
+    2159.45060500866
+   ],
+   "max": [
+    -1377.5011104583662,
+    193.4999715535091,
+    2189.450605008667
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-tole perforé caisson",
+   "min": [
+    -2401.501490022511,
+    -771.5008979630613,
+    2169.4506050086516
+   ],
+   "max": [
+    -1379.5011113075025,
+    194.49995287248157,
+    2190.450605008676
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-panneau de fond caisson / D195-PE-Tole de fond caisson",
+   "min": [
+    -2440.5006583771174,
+    -818.5009293811354,
+    2160.2506050086586
+   ],
+   "max": [
+    -1328.5006332430398,
+    -786.8999868383963,
+    2760.250605008666
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-panneau de fond caisson / D195-PE-isolant panneau fond caisson",
+   "min": [
+    -2439.7006576978074,
+    -817.7009304001023,
+    2161.0506050086587
+   ],
+   "max": [
+    -1329.3006322240751,
+    -787.6999875177048,
+    2759.4506050086657
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-panneau de coté caisson / D195-PE-Tole de coté caisson",
+   "min": [
+    -2441.3010549243845,
+    -817.9009317587215,
+    2159.4506050086657
+   ],
+   "max": [
+    -2409.7006583771263,
+    -317.9009066244281,
+    2761.4506050086657
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-panneau de coté caisson / D195-PE-isolant panneau coté caisson",
+   "min": [
+    -2440.50105594335,
+    -786.9009310794227,
+    2160.2506050086654
+   ],
+   "max": [
+    -2410.5006583771255,
+    -318.7009056054625,
+    2760.650605008666
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-panneau de dessus caisson / D195-PE-Tole de dessus caisson",
+   "min": [
+    -2439.501050678692,
+    -817.9009259845861,
+    2730.2506050086595
+   ],
+   "max": [
+    -1329.5006362999345,
+    -317.90001401096777,
+    2762.2506050086654
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-panneau de dessus caisson / D195-PE-isolant panneau dessus caisson",
+   "min": [
+    -2408.5010559433567,
+    -785.9009039070197,
+    2731.4506050086593
+   ],
+   "max": [
+    -1360.5006592266393,
+    -318.7000140109674,
+    2761.450605008665
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-panneau de coté caisson / D195-PE-Tole de coté caisson",
+   "min": [
+    -1359.3010549247688,
+    -817.900007047857,
+    2159.450605008662
+   ],
+   "max": [
+    -1327.7006320542444,
+    -317.8999878575265,
+    2761.450605008663
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-panneau de coté caisson / D195-PE-isolant panneau coté caisson",
+   "min": [
+    -1358.5010559437342,
+    -786.9000123125214,
+    2160.250605008662
+   ],
+   "max": [
+    -1328.50065837751,
+    -318.699986838561,
+    2760.6506050086628
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-panneau de coté-2 caisson / D195-PE-Tole de coté-2 caisson",
+   "min": [
+    -2441.3014879845673,
+    -317.9009300606267,
+    2159.450605008663
+   ],
+   "max": [
+    -2409.3010583209452,
+    192.0990937150455,
+    2761.4506050086684
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-panneau de coté-2 caisson / D195-PE-isolant panneau coté-2 caisson",
+   "min": [
+    -2440.501489003535,
+    -317.1009310795914,
+    2160.250605008665
+   ],
+   "max": [
+    -2410.501057301979,
+    191.29909439435448,
+    2760.6506050086664
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-panneau de coté-2 caisson / D195-PE-Tole perforée coté-2 caisson",
+   "min": [
+    -2409.3014875600124,
+    -315.40090458649837,
+    2162.9506050086648
+   ],
+   "max": [
+    -2408.501058745513,
+    189.59909609263025,
+    2757.950605008666
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-panneau de coté-2 caisson / D195-PE-Tole de coté-2 caisson",
+   "min": [
+    -1359.7014879849544,
+    -317.90001163338394,
+    2159.4506050086575
+   ],
+   "max": [
+    -1327.7010583213273,
+    192.10001214228936,
+    2761.450605008662
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-panneau de coté-2 caisson / D195-PE-isolant panneau coté-2 caisson",
+   "min": [
+    -1358.5014890039179,
+    -317.1000123126926,
+    2160.2506050086595
+   ],
+   "max": [
+    -1328.501057302362,
+    191.30001316125345,
+    2760.65060500866
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-panneau de coté-2 caisson / D195-PE-Tole perforée coté-2 caisson",
+   "min": [
+    -1360.5014875603833,
+    -315.40001401096856,
+    2162.9506050086593
+   ],
+   "max": [
+    -1359.7010587458847,
+    189.5999866681605,
+    2757.95060500866
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-panneau de dessus-2 caisson / D195-PE-Tole de dessus-2 caisson",
+   "min": [
+    -2439.501483738876,
+    -317.90090305805035,
+    2730.2506050086613
+   ],
+   "max": [
+    -1329.5010625670188,
+    192.09998513971158,
+    2762.2506050086677
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-panneau de dessus-2 caisson / D195-PE-isolant panneau dessus-2 caisson",
+   "min": [
+    -2407.501489003541,
+    -317.1009030580505,
+    2731.450605008661
+   ],
+   "max": [
+    -1361.5010573023537,
+    191.29998513971196,
+    2761.4506050086675
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-panneau de dessus-2 caisson / D195-PE-Tole perforée dessus-2 caisson",
+   "min": [
+    -2407.001487560007,
+    -315.4009026334821,
+    2729.450605008661
+   ],
+   "max": [
+    -1362.0010587458878,
+    189.5999847151437,
+    2730.250605008667
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-panneau interieur caisson / D195-PE-Tole interieur caisson_Dfaut<Brut d''usinage>",
+   "min": [
+    -2402.001487802681,
+    -217.9008965076668,
+    2584.2506050086595
+   ],
+   "max": [
+    -1367.0011434169762,
+    192.09997858928418,
+    2616.250605008668
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-panneau interieur caisson / D195-PE-isolant panneau interieur caisson",
+   "min": [
+    -2401.201489003544,
+    -217.10089770852127,
+    2585.450605008662
+   ],
+   "max": [
+    -1367.8011422161137,
+    191.29997979014496,
+    2615.4506050086684
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-panneau interieur caisson / D195-PE-Tole perforée panneau interieur caisson",
+   "min": [
+    -2399.5014854371666,
+    -212.90089626498892,
+    2583.450605008662
+   ],
+   "max": [
+    -1369.5011457824917,
+    187.09997834661232,
+    2584.250605008668
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-cornière de fixation panneau interieur caisson",
+   "min": [
+    -1390.7014811918393,
+    -312.90003540925125,
+    2581.450605008667
+   ],
+   "max": [
+    -1360.7010608687306,
+    187.0999858190089,
+    2631.4506050086675
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-cornière de fixation panneau interieur caisson",
+   "min": [
+    -2408.3014865081254,
+    -311.63967153576874,
+    2581.450605008673
+   ],
+   "max": [
+    -2378.3010661850167,
+    188.3603496924915,
+    2631.450605008674
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-panneau interieur caisson / D195-PE-Tole interieur caisson_Dfaut<Brut d''usinage>",
+   "min": [
+    -2402.001487802682,
+    -217.9008965076667,
+    2444.2506050086595
+   ],
+   "max": [
+    -1367.0011434169771,
+    192.0999785892843,
+    2476.250605008668
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-panneau interieur caisson / D195-PE-isolant panneau interieur caisson",
+   "min": [
+    -2401.201489003545,
+    -217.10089770852116,
+    2445.450605008662
+   ],
+   "max": [
+    -1367.8011422161146,
+    191.29997979014507,
+    2475.4506050086684
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-panneau interieur caisson / D195-PE-Tole perforée panneau interieur caisson",
+   "min": [
+    -2399.5014854371675,
+    -212.9008962649888,
+    2443.450605008662
+   ],
+   "max": [
+    -1369.5011457824926,
+    187.09997834661243,
+    2444.250605008668
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-cornière de fixation panneau interieur caisson",
+   "min": [
+    -2408.301486508124,
+    -311.6396715357708,
+    2441.450605008674
+   ],
+   "max": [
+    -2378.3010661850153,
+    188.36034969248945,
+    2491.4506050086748
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-cornière de fixation panneau interieur caisson",
+   "min": [
+    -1390.701481191842,
+    -312.9000354092532,
+    2441.450605008668
+   ],
+   "max": [
+    -1360.7010608687333,
+    187.09998581900703,
+    2491.4506050086684
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-panneau interieur caisson / D195-PE-Tole interieur caisson_Dfaut<Brut d''usinage>",
+   "min": [
+    -2402.0014878026823,
+    -217.90089650766657,
+    2304.250605008659
+   ],
+   "max": [
+    -1367.0011434169778,
+    192.0999785892844,
+    2336.2506050086677
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-panneau interieur caisson / D195-PE-isolant panneau interieur caisson",
+   "min": [
+    -2401.2014890035452,
+    -217.10089770852105,
+    2305.450605008661
+   ],
+   "max": [
+    -1367.8011422161153,
+    191.2999797901452,
+    2335.4506050086675
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-panneau interieur caisson / D195-PE-Tole perforée panneau interieur caisson",
+   "min": [
+    -2399.501485437168,
+    -212.9008962649887,
+    2303.450605008661
+   ],
+   "max": [
+    -1369.5011457824933,
+    187.09997834661255,
+    2304.2506050086677
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-cornière de fixation panneau interieur caisson",
+   "min": [
+    -2408.301486508125,
+    -311.6396715357706,
+    2301.450605008674
+   ],
+   "max": [
+    -2378.301066185016,
+    188.36034969248962,
+    2351.4506050086748
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-cornière de fixation panneau interieur caisson",
+   "min": [
+    -1390.7014811918427,
+    -312.90003540925306,
+    2301.4506050086675
+   ],
+   "max": [
+    -1360.701060868734,
+    187.0999858190071,
+    2351.4506050086684
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-Tole perforée fond caisson_Dfaut<Brut d''usinage>",
+   "min": [
+    -2409.7010549243973,
+    -786.9009032277113,
+    2165.4506050086625
+   ],
+   "max": [
+    -1359.300660075775,
+    -319.90001299199946,
+    2755.4506050086693
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-cornière de fixation panneau dessus caisson",
+   "min": [
+    -1390.5014811918356,
+    -312.9000352394206,
+    2699.450605008662
+   ],
+   "max": [
+    -1360.5010608687228,
+    187.099985988839,
+    2729.450605008664
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-cornière de fixation panneau dessus-2 caisson",
+   "min": [
+    -1390.101048131654,
+    -772.900034899586,
+    2699.450605008661
+   ],
+   "max": [
+    -1360.1006702654252,
+    -322.90001367130776,
+    2729.4506050086616
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-cornière de fixation panneau dessus caisson",
+   "min": [
+    -2408.5014854371725,
+    -312.90090390720377,
+    2699.4506050086684
+   ],
+   "max": [
+    -2378.5010651140587,
+    187.09911732105584,
+    2729.4506050086698
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-cornière de fixation panneau dessus-2 caisson",
+   "min": [
+    -2408.9010523769825,
+    -772.9009042466744,
+    2699.4506050086675
+   ],
+   "max": [
+    -2378.9006745107536,
+    -322.9008830183961,
+    2729.450605008668
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-poignée manutention caisson",
+   "min": [
+    -2521.3006617736446,
+    -812.9009343061346,
+    2385.6506050086673
+   ],
+   "max": [
+    -2441.300636299538,
+    -782.9009368535615,
+    2535.650605008668
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-poignée manutention caisson",
+   "min": [
+    -2521.301029450232,
+    -352.9009996898954,
+    2386.1328384478006
+   ],
+   "max": [
+    -2441.3010319976706,
+    -322.90093175889274,
+    2536.132838447802
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-poignée manutention caisson",
+   "min": [
+    -1327.7006566792347,
+    -812.8999861590823,
+    2386.132838447794
+   ],
+   "max": [
+    -1247.700659226674,
+    -782.8999182280795,
+    2536.1328384477947
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-poignée manutention caisson",
+   "min": [
+    -1327.7010523773686,
+    -352.8999810644132,
+    2385.6506050086605
+   ],
+   "max": [
+    -1247.7010269032617,
+    -322.8999836118402,
+    2535.650605008662
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-poignée manutention caisson",
+   "min": [
+    -2521.301086342453,
+    -312.900934306315,
+    2385.6506050086673
+   ],
+   "max": [
+    -2441.301060868346,
+    -282.90093685374194,
+    2535.6506050086687
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-poignée manutention caisson",
+   "min": [
+    -2521.3014625104165,
+    157.09900030992077,
+    2386.132838447801
+   ],
+   "max": [
+    -2441.3014650578552,
+    187.09906824092366,
+    2536.1328384478024
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-poignée manutention caisson",
+   "min": [
+    -1327.701081248039,
+    -312.89998615926197,
+    2386.132838447794
+   ],
+   "max": [
+    -1247.701083795478,
+    -282.89991822825914,
+    2536.132838447795
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Brûleur",
+   "name": "D195-PE-Nouveau bruleur-M10001.5 VM75 / D195-PE-Ens caisson C929 + adaptation / D195-PE-Ens caisson air bruleur / D195-PE-poignée manutention caisson",
+   "min": [
+    -1327.701485437557,
+    157.10001893540613,
+    2385.650605008661
+   ],
+   "max": [
+    -1247.7014599634501,
+    187.10001638797914,
+    2535.650605008662
+   ]
+  },
+  {
+   "kind": "cyl",
+   "group": "Fumées",
+   "name": "D195-PE-Carneau UTL-60 / D195-PE-Carneau UTL-60 pipe / Bride fumées DIN24154_DN900",
+   "a": [
+    7864,
+    0,
+    2030
+   ],
+   "b": [
+    7872,
+    0,
+    2030
+   ],
+   "r": 499
+  },
+  {
+   "kind": "box",
+   "group": "Fumées",
+   "name": "D195-PE-Carneau UTL-60 / D195-PE-Carneau UTL-60 pipe / D195-PE-Carneau UTL-60",
+   "min": [
+    7866,
+    -1.0000000000000229,
+    1587.0011286696094
+   ],
+   "max": [
+    8216,
+    443,
+    2473
+   ]
+  },
+  {
+   "kind": "cyl",
+   "group": "Fumées",
+   "name": "D195-PE-Carneau UTL-60 / D195-PE-Carneau UTL-60 pipe / Bride fumées DIN24154_DN900",
+   "a": [
+    8210,
+    0,
+    2030
+   ],
+   "b": [
+    8218,
+    0,
+    2030
+   ],
+   "r": 499
+  },
+  {
+   "kind": "cyl",
+   "group": "Fumées",
+   "name": "D195-PE-Carneau UTL-60 / D195-PE-Carneau UTL-60 pipe / D195-PE-Carneau UTL-60 piquage haut_Dfaut<Brut d''usinage>",
+   "a": [
+    8041,
+    0,
+    2436
+   ],
+   "b": [
+    8041,
+    0,
+    2596
+   ],
+   "r": 109.6
+  },
+  {
+   "kind": "cyl",
+   "group": "Fumées",
+   "name": "D195-PE-Carneau UTL-60 / D195-PE-Carneau UTL-60 pipe / D195-PE-Carneau UTL-60 bride DN200 PN6",
+   "a": [
+    8041,
+    0,
+    2590
+   ],
+   "b": [
+    8041,
+    0,
+    2598
+   ],
+   "r": 160
+  },
+  {
+   "kind": "box",
+   "group": "Gaz",
+   "name": "D195-PE-Carneau UTL-60 / Sonde O2 LS2 / Tube prelevement gaz pour sonde LS2",
+   "min": [
+    7961.201892128893,
+    -1.812086837643676,
+    2020.3391244864742
+   ],
+   "max": [
+    7981.991684878911,
+    411.7789382246348,
+    2076.5619210962677
+   ]
+  },
+  {
+   "kind": "box",
+   "group": "Fumées",
+   "name": "D195-PE-Carneau UTL-60 / Sonde O2 LS2 / Sonde 650R1000_LS2",
+   "min": [
+    7904.327261121154,
+    392.2483866521791,
+    1926.6918480976324
+   ],
+   "max": [
+    7990.860625564524,
+    619.2739549705852,
+    2096.739353560854
+   ]
+  }
+ ]
+}

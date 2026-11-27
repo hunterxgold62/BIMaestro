@@ -48,6 +48,7 @@ namespace BIMaestro.PropertiesAppearance
                 if(i<after.Count&&!_originNumbers.ContainsKey(after[i]))
                 {var original=_context.PreviewRows.FirstOrDefault(r=>r.OrderKey==after[i].OrderKey);_originNumbers[after[i]]=original!=null&&_originNumbers.TryGetValue(original,out var number)?number:"＋";}
                 UIElement right = i < after.Count ? PreviewCell(after[i], true) : new Border();
+                if (_compare.IsChecked != true) { if (i < after.Count) { var single = (FrameworkElement)right; single.Margin = new Thickness(0, 0, 3, 3); _rows.Children.Add(single); } continue; }
                 var pair = Pair(left, right); pair.Margin = new Thickness(0, 0, 3, 3); _rows.Children.Add(pair);
             }
             if (before.Count == 0) _rows.Children.Add(Label(_context.PreviewRows.Count == 0 ? UiLanguage.Get("PropertiesAppearanceWindow.Order.OpenAProjectAndDisplayThePropertiesPalette") : UiLanguage.Get("PropertiesAppearanceWindow.Order.NoPropertyMatchesThisSearch"), 14, false, true));

@@ -36,9 +36,9 @@ namespace BIMaestro.VideoGames
     internal sealed class GameMepPublishClient
     {
         internal const int RevitLimitMb = 50;
-        internal const int NavisworksLimitMb = 100;
+        internal const int NavisworksLimitMb = 2048;
         internal const long Megabyte = 1024L * 1024;
-        private const long MaxAssetBytes = 48 * Megabyte;
+        internal const long MaxAssetBytes = 48 * Megabyte;
         private const int MaxAssets = 4096;
         private const string FunctionUrl =
             "https://xqovxfgghbqxwsadzhzl.functions.supabase.co/mep-share";
@@ -208,7 +208,8 @@ namespace BIMaestro.VideoGames
                             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
                         }
                         else request.Headers.TryAddWithoutValidation("x-upsert", "false");
-                        request.Content = new ByteArrayContent(asset.Bytes);
+                        request.Content = new StreamContent(asset.OpenRead());
+                        request.Content.Headers.ContentLength = asset.Size;
                         request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
                         using (var upload = await Client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token).ConfigureAwait(false))
                         {

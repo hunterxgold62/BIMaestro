@@ -112,16 +112,15 @@ public static class ExcelLogger
         lock (_stateLock)
         {
             _uiApp = uiApp;
-            var key = BuildDocumentKey(document);
+            var key = _sessions.FirstOrDefault(x => x.Value.LastKnownDocument?.Equals(document) == true).Key ?? BuildDocumentKey(document);
 
             if (_sessions.TryGetValue(key, out var ws))
             {
-                ws.RefreshMetadata(document, uiApp);
+                // Keep the metadata/path captured for this session, including a last-moment Save As.
                 ws.StopSegment();
 
-                EndDocumentSessionLog(document, uiApp, ws);
+                PersistFinishedSession(key, ws);
                 _sessions.Remove(key);
-                RemoveSnapshot(key);
 
                 if (string.Equals(_currentDocKey, key, StringComparison.Ordinal))
                 {
@@ -145,16 +144,20 @@ public static class ExcelLogger
 
     public static void OnIdling(UIApplication uiApp)
     {
+        WorkSession active = null;
         lock (_stateLock)
         {
             _uiApp = uiApp;
             if (_activity == null || _uiApp == null) return;
 
+            if (_currentDoc != null && _currentDoc.IsValidObject && BuildDocumentKey(_currentDoc) != _currentDocKey)
+                ActivateDocument(_currentDoc, uiApp);
             var change = _activity.Update();
 
             if (_currentDocKey == null || !_sessions.TryGetValue(_currentDocKey, out var ws))
                 return;
 
+            active = ws;
             if (change == ActivityChange.BecameInactive)
             {
                 ws.Pause();
@@ -170,6 +173,7 @@ public static class ExcelLogger
                 UpsertSnapshotIfDue(_currentDocKey, ws);
             }
         }
+        BIMaestro.Dashboard.TimeProjectTracking.Process(active, uiApp);
     }
 
     // Detached values only: the dashboard never retains or accesses Revit documents.
@@ -184,6 +188,7 @@ public static class ExcelLogger
                 {
                     DocumentId = entry.DocumentId, Name = entry.DocumentName,
                     SessionId = entry.Classification?.SessionId,
+                    DocumentIdentity = entry.Classification?.DocumentIdentity,
                     Version = entry.RevitVersion, When = entry.When,
                     Hours = entry.Duration.TotalHours,
                     Kind = entry.Classification?.DocumentKind,
@@ -191,6 +196,39 @@ public static class ExcelLogger
                     Path = entry.Classification?.CentralPath ?? entry.Classification?.LocalPath
                 }).ToList();
         }
+    }
+
+    // Full history for the recognition question, independent of dashboard date/version filters.
+    internal static List<TimeDashboardEntry> ReadTrackingHistory()
+    {
+        var rows = new List<TimeDashboardEntry>();
+        bool read = false;
+        WithStorageLock(() =>
+        {
+            read = true;
+            string file = Path.Combine(LogDirectory, "Historique_Temps_Revit.xlsx");
+            if (!File.Exists(file)) return;
+            using var stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            using var book = new XSSFWorkbook(stream);
+            var sheet = book.GetSheet(WorksheetName);
+            if (sheet == null) throw new InvalidDataException("Historique_Temps_Revit is missing.");
+            var format = new DataFormatter();
+            for (int i = sheet.FirstRowNum + 1; i <= sheet.LastRowNum; i++)
+            {
+                var row = sheet.GetRow(i);
+                if (row == null || !format.FormatCellValue(row.GetCell(0)).Equals("Fermé", StringComparison.OrdinalIgnoreCase)) continue;
+                var cell = row.GetCell(6);
+                double hours = 0;
+                if (cell?.CellType == NPOI.SS.UserModel.CellType.Numeric) hours = cell.NumericCellValue * 24;
+                else if (TimeSpan.TryParse(format.FormatCellValue(cell), CultureInfo.InvariantCulture, out var span)
+                    || TimeSpan.TryParse(format.FormatCellValue(cell), CultureInfo.GetCultureInfo("fr-FR"), out span)) hours = span.TotalHours;
+                if (hours <= 0 || double.IsNaN(hours) || double.IsInfinity(hours)) continue;
+                rows.Add(new TimeDashboardEntry { DocumentId = TimeLogMetadataExtractor.NormalizeDocumentId(format.FormatCellValue(row.GetCell(1))),
+                    DocumentIdentity = format.FormatCellValue(row.GetCell(18)), Name = format.FormatCellValue(row.GetCell(2)), Hours = hours });
+            }
+        });
+        if (!read) throw new IOException("Time history is busy in another Revit session.");
+        return rows;
     }
 
     public static void Shutdown()
@@ -208,18 +246,14 @@ public static class ExcelLogger
 
                     ws.StopSegment();
 
-                    if (ws.LastKnownDocument != null && _uiApp != null)
-                        EndDocumentSessionLog(ws.LastKnownDocument, _uiApp, ws);
-                    else
-                        EndDocumentSessionLogFallback(key, ws.DocumentName, ws.RevitVersion, ws.GetTotalActiveDuration(), ws.GetDailySeconds(), ws.Classification);
-
-                    RemoveSnapshot(key);
+                    PersistFinishedSession(key, ws);
                 }
             }
             catch { }
             finally
             {
-                RemoveSnapshotsForCurrentProcess();
+                // Failed workbook writes must remain recoverable after Revit exits.
+                FlushPendingSnapshots();
                 _sessions.Clear();
                 _currentDoc = null;
                 _currentDocKey = null;
@@ -230,11 +264,21 @@ public static class ExcelLogger
     private static WorkSession EnsureSession(Document document, UIApplication uiApp, out string key)
     {
         key = BuildDocumentKey(document);
-
+        var previous = _sessions.FirstOrDefault(x => x.Value.LastKnownDocument?.Equals(document) == true);
+        if (previous.Value != null && !string.Equals(previous.Key, key, StringComparison.Ordinal))
+        {
+            // Save As: finish the old path before starting a fresh session at the new path.
+            var old = previous.Value;
+            old.StopSegment();
+            PersistFinishedSession(previous.Key, old);
+            _sessions.Remove(previous.Key);
+            if (_currentDocKey == previous.Key) _currentDocKey = null;
+        }
         if (!_sessions.TryGetValue(key, out var ws))
         {
             ws = new WorkSession
             {
+                DocumentKey = key,
                 LastKnownDocument = document,
                 DocumentName = SafeGetDocumentName(document),
                 RevitVersion = SafeGetRevitVersion(uiApp),
@@ -242,6 +286,7 @@ public static class ExcelLogger
             };
 
             _sessions[key] = ws;
+            BIMaestro.Dashboard.TimeProjectTracking.Observe(ws);
             StartDocumentSessionLog(document, uiApp, ws.Classification);
             UpsertSnapshot(key, ws, true);
         }
@@ -392,7 +437,8 @@ public static class ExcelLogger
             "Windows User",
             "Machine",
             "Process ID",
-            "Project Info JSON"
+            "Project Info JSON",
+            "Document Identity"
         };
 
         var row = ws.GetRow(0) ?? ws.CreateRow(0);
@@ -473,7 +519,14 @@ public static class ExcelLogger
         catch { }
     }
 
-    private static void LogClosedSession(
+    private static void PersistFinishedSession(string key, WorkSession session)
+    {
+        UpsertSnapshot(key, session, true);
+        if (LogClosedSession(key, session.DocumentName, session.RevitVersion, session.GetActiveSlices(), session.GetTotalActiveDuration(), session.Classification))
+            RemoveSnapshot(key);
+    }
+
+    private static bool LogClosedSession(
         string documentKey,
         string documentName,
         string revitVersion,
@@ -484,9 +537,9 @@ public static class ExcelLogger
         try
         {
             var entries = BuildClosedLogEntries(documentKey, documentName, revitVersion, activeSlices, fallbackDuration, classification);
-            AppendLogEntries(entries);
+            return WithStorageLock(() => { AppendLogEntriesCore(entries); return true; });
         }
-        catch { }
+        catch { return false; }
     }
 
     private static List<LogEntry> BuildClosedLogEntries(
@@ -560,6 +613,19 @@ public static class ExcelLogger
             EnsureHeader(ws, workbook);
             var durationStyle = GetDurationStyle(workbook, ws);
 
+            // A recovered snapshot must not append a previously committed session twice.
+            var committed = new HashSet<string>(StringComparer.Ordinal);
+            var formatter = new DataFormatter();
+            for (int i = ws.FirstRowNum + 1; i <= ws.LastRowNum; i++)
+            {
+                var existing = ws.GetRow(i);
+                if (existing == null || formatter.FormatCellValue(existing.GetCell(0)) != "Fermé") continue;
+                string id = formatter.FormatCellValue(existing.GetCell(7));
+                if (!string.IsNullOrWhiteSpace(id)) committed.Add(id);
+            }
+            list = list.Where(x => x.EventType != "Fermé" || string.IsNullOrWhiteSpace(x.Classification?.SessionId)
+                || !committed.Contains(x.Classification.SessionId)).ToList();
+            if (list.Count == 0) return;
             int lastRow = Math.Max(ws.LastRowNum, 0);
             foreach (var entry in list)
             {
@@ -587,6 +653,7 @@ public static class ExcelLogger
                 SetCellValue(row, 15, entry.Classification?.MachineName);
                 SetCellValue(row, 16, entry.Classification?.ProcessId);
                 SetCellValue(row, 17, entry.Classification?.ProjectInfoJson);
+                SetCellValue(row, 18, entry.Classification?.DocumentIdentity);
             }
 
             SaveWorkbook(workbook, _excelFilePath);
@@ -601,8 +668,8 @@ public static class ExcelLogger
 
     public static void EndDocumentSessionLog(Document document, UIApplication uiApp, WorkSession session)
     {
-        string documentKey = SafeGetDocumentKey(document);
-        string documentName = SafeGetDocumentName(document);
+        string documentKey = session?.DocumentKey ?? SafeGetDocumentKey(document);
+        string documentName = session?.DocumentName ?? SafeGetDocumentName(document);
         string revitVersion = SafeGetRevitVersion(uiApp);
 
         var classification = session?.Classification
@@ -978,7 +1045,8 @@ public static class ExcelLogger
                     WindowsUser = DecodeField(parts[17]),
                     MachineName = DecodeField(parts[18]),
                     ProcessId = DecodeField(parts[19]),
-                    ProjectInfoJson = DecodeField(parts[20])
+                    ProjectInfoJson = DecodeField(parts[20]),
+                    DocumentIdentity = parts.Length >= 22 ? DecodeField(parts[21]) : null
                 };
             }
 
@@ -1122,11 +1190,16 @@ public static class ExcelLogger
                         EncodeField(s.Classification?.WindowsUser),
                         EncodeField(s.Classification?.MachineName),
                         EncodeField(s.Classification?.ProcessId),
-                        EncodeField(s.Classification?.ProjectInfoJson)
+                        EncodeField(s.Classification?.ProjectInfoJson),
+                        EncodeField(s.Classification?.DocumentIdentity)
                     }));
                 }
             }
 
+            // Windows refuses File.Copy over a hidden destination when the source is visible.
+            // Clear only this logger-owned flag before updating the snapshot, then restore it.
+            if (File.Exists(SnapshotPath))
+                File.SetAttributes(SnapshotPath, File.GetAttributes(SnapshotPath) & ~FileAttributes.Hidden);
             CopyFileWithRetry(tempPath, SnapshotPath, true);
 
             try { File.SetAttributes(SnapshotPath, FileAttributes.Hidden); } catch { }
@@ -1304,7 +1377,7 @@ public static class ExcelLogger
     private static T WithStorageLock<T>(Func<T> action)
     {
         T result = default(T);
-        WithStorageLock(() => result = action());
+        WithStorageLock(() => { result = action(); });
         return result;
     }
 
@@ -1323,6 +1396,7 @@ public static class ExcelLogger
 public class TimeDashboardEntry
 {
     public string SessionId;
+    public string DocumentIdentity;
     public string DocumentId, Name, Version, Kind, Parameters, Path;
     public DateTime When;
     public double Hours;
@@ -1331,6 +1405,7 @@ public class TimeDashboardEntry
 public class TimeLogMetadata
 {
     public string SessionId { get; set; }
+    public string DocumentIdentity { get; set; }
     public string DocumentKind { get; set; }
     public string IsWorkshared { get; set; }
     public string CentralPath { get; set; }
@@ -1354,6 +1429,7 @@ public static class TimeLogMetadataExtractor
         return new TimeLogMetadata
         {
             SessionId = Guid.NewGuid().ToString("N"),
+            DocumentIdentity = GetDocumentIdentity(document),
             DocumentKind = GetDocumentKind(FirstNonEmpty(localPath, centralPath, documentKey, documentName)),
             IsWorkshared = SafeIsWorkshared(document),
             CentralPath = centralPath,
@@ -1394,6 +1470,31 @@ public static class TimeLogMetadataExtractor
         };
     }
 
+    private static readonly System.Reflection.PropertyInfo CreationGuidProperty = typeof(Document).GetProperty("CreationGUID");
+    internal static string GetDocumentIdentity(Document document)
+    {
+        try
+        {
+            if (document == null || document.IsLinked) return null;
+            // CreationGUID is native and persisted by Revit 2024+. Reflection keeps 2023 loadable.
+            if (CreationGuidProperty?.GetValue(document) is Guid guid && guid != Guid.Empty)
+                return "creation:" + guid.ToString("N");
+            return GetOlderDocumentIdentity(document);
+        }
+        catch { return null; }
+    }
+
+    internal static string GetOlderDocumentIdentity(Document document)
+    {
+        try
+        {
+            string uniqueId = document == null || document.IsLinked ? null : document.IsFamilyDocument
+                ? document.OwnerFamily?.UniqueId : document.ProjectInformation?.UniqueId;
+            return string.IsNullOrWhiteSpace(uniqueId) ? null : "element:" + uniqueId;
+        }
+        catch { return null; }
+    }
+
     public static string NormalizeDocumentId(string documentId)
     {
         if (string.IsNullOrWhiteSpace(documentId))
@@ -1413,7 +1514,7 @@ public static class TimeLogMetadataExtractor
         catch { return null; }
     }
 
-    private static string TryGetCentralPath(Document document)
+    internal static string TryGetCentralPath(Document document)
     {
         try
         {
@@ -1573,11 +1674,16 @@ public class WorkSession
     private TimeSpan _activeAccum = TimeSpan.Zero;
     private bool _isPaused = true;
 
+    public string DocumentKey { get; set; }
+    public string TrackingLocation { get; set; }
+    public bool TrackingPromptHandled { get; set; }
+    public DateTime TrackingRetryUtc { get; set; }
     public Document LastKnownDocument { get; set; }
     public string DocumentName { get; set; }
     public string RevitVersion { get; set; }
     public TimeLogMetadata Classification { get; set; }
     public bool HasOpenSegment => _segmentStart != null;
+    public bool IsActivelyCounting => HasOpenSegment && !_isPaused;
 
     public void RefreshMetadata(Document document, UIApplication uiApp)
     {
@@ -1603,6 +1709,8 @@ public class WorkSession
             if (!string.IsNullOrWhiteSpace(Classification?.SessionId))
                 updated.SessionId = Classification.SessionId;
 
+            if (string.IsNullOrWhiteSpace(updated.DocumentIdentity))
+                updated.DocumentIdentity = Classification?.DocumentIdentity;
             Classification = updated;
         }
         catch { }

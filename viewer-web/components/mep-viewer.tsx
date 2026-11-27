@@ -27,7 +27,7 @@ import { SectionControls } from '@/components/section-controls';
 import { SectionOutline } from '@/lib/mep-section-outline';
 import { sectionFromFace, sectionPlanes, sectionContains, maximumSections, type FaceSection } from '@/lib/mep-section';
 import { BuildingVisibility, blocksView, isObjectVisible } from '@/lib/mep-visibility';
-import { ModelStream, tileBounds, disposeModel } from '@/lib/mep-stream';
+import { ModelStream, tileBounds, disposeModel, usesProgressiveTiles } from '@/lib/mep-stream';
 import { isReservationHost, hostDepthCm } from '@/lib/mep-host';
 import { ModelPreparation } from '@/lib/mep-prepare';
 import { AsyncWallCutouts } from '@/lib/mep-cutouts-async';
@@ -368,6 +368,7 @@ export function MepViewer() {
   const [highContrast, setHighContrast] = useState(true);
   const [resolved, setResolved] = useState<ResolvedShare | null>(null);
   const [viewerPackage, setViewerPackage] = useState<ViewerPackage | null>(null);
+  const progressive = useMemo(() => usesProgressiveTiles(viewerPackage?.manifest.tiles), [viewerPackage]);
   const [scenario, setScenario] = useState<Scenario | null>(null);
   const { graph, calculating, calculationError } = useMepCalculation(viewerPackage?.replay.graph, scenario);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
@@ -524,6 +525,7 @@ export function MepViewer() {
     const initialGraph = graphStateRef.current;
     const initialHiddenSystems = hiddenSystemsRef.current;
     let disposed = false;
+    const overviewParts = new Map<string, THREE.Object3D[]>();
     let sceneReady = !viewerPackage, geometryReady = !viewerPackage, cutsPending = false;
     let openingReleased = !viewerPackage;
     if (viewerPackage) queueMicrotask(() => { if (!disposed) { setOpening(true); setLoadedZones(0); } });
@@ -936,12 +938,21 @@ export function MepViewer() {
       const refreshGeometry = () => {
         if (disposed) return;
         setLoadedZones(stream?.count || 0);
-        if (stream?.loading || geometryReady) return;
+        if (progressive) {
+          for (const [name, parts] of overviewParts) {
+            for (const part of parts) part.visible = !stream?.has(name);
+          }
+          if (geometryReady) {
+            buildingVisibility?.setMeshes(pickables.filter((mesh): mesh is THREE.Mesh => mesh instanceof THREE.Mesh));
+          }
+        }
+        if (!progressive && (stream?.loading || geometryReady)) return;
         if (geometryTimer !== undefined) return;
         geometryTimer = window.setTimeout(() => {
           geometryTimer = undefined;
           if (disposed) return;
-          if (stream?.loading || geometryReady) return;
+          if (!progressive && (stream?.loading || geometryReady)) return;
+          if (progressive && geometryReady) resetGeometry();
           geometryReady = true;
           const meshes = pickables.filter((mesh): mesh is THREE.Mesh => mesh instanceof THREE.Mesh);
           if (buildingVisibility) buildingVisibility.setMeshes(meshes);
@@ -1055,8 +1066,23 @@ export function MepViewer() {
           for (const [key, door] of doors) { door.meshes = door.meshes.filter(mesh => !removed.has(mesh)); if (!door.meshes.length) doors.delete(key); }
           scene.remove(model);
           buildingVisibility?.setMeshes(pickables.filter((mesh): mesh is THREE.Mesh => mesh instanceof THREE.Mesh));
-        }, refreshGeometry, setError, useR2Storage(resolved!.publication.id, resolved!.storageBackend));
+        }, refreshGeometry, setError, useR2Storage(resolved!.publication.id, resolved!.storageBackend), progressive);
         streamRef.current = stream;
+        if (progressive) {
+          refreshGeometry();
+          if (viewerPackage.overviewUrl) new GLTFLoader().load(viewerPackage.overviewUrl, ({ scene: overview }) => {
+            if (disposed) { disposeModel(overview); return; }
+            overview.traverse(part => {
+              const name = part.userData.lodTileName;
+              if (typeof name !== 'string') return;
+              const parts = overviewParts.get(name) || [];
+              parts.push(part);
+              overviewParts.set(name, parts);
+              part.visible = !stream?.has(name);
+            });
+            scene.add(overview);
+          }, undefined, () => { if (!disposed) setError('L’aperçu global est indisponible. Les zones détaillées restent accessibles.'); });
+        }
       } else new GLTFLoader().load(viewerPackage.modelUrl, ({ scene: model }) => { void addModel(model).catch(caught => { if (!disposed) setError(caught instanceof Error ? caught.message : 'Préparation impossible'); }); }, undefined, () => { if (!disposed) setError('La géométrie 3D ne peut pas être ouverte.'); });
       let renderedPathCount = 0, fallbackPathCount = 0;
       const connectorsByIndex = new Map(initialGraph?.connectors.map((connector) => [connector.index, connector]) || []);
@@ -1569,7 +1595,7 @@ export function MepViewer() {
       if (draftOpenRef.current) { pressed.clear(); wheelMoveRemaining = 0; }
       const now = performance.now(); const delta = Math.min((now - previousFrameTime) / 1000, .05); previousFrameTime = now;
       if (vrVisit.active) {
-        stream?.update(now); vrVisit.step(delta); selection.sync();
+        stream?.update(now, camera.position); vrVisit.step(delta); selection.sync();
         for (const visual of flowVisuals) {
           visual.current.time.value = now / 1000;
           visual.current.active.value = THREE.MathUtils.damp(visual.current.active.value, visual.targetActive, 8, delta);
@@ -1596,7 +1622,7 @@ export function MepViewer() {
         }
         qualityFrames = 0; qualityStart = now;
       }
-      stream?.update(now);
+      stream?.update(now, navigationModeRef.current === 'orbit' ? controls.target : camera.position);
       // React commits the clicked tool between frames. Return to aiming after
       // selecting a measure, section face, relocation or dimension target.
       if (menuActivationPending) {
@@ -2119,7 +2145,7 @@ export function MepViewer() {
         if (renderable.material) (Array.isArray(renderable.material) ? renderable.material : [renderable.material]).forEach((material) => material.dispose());
       });
     };
-  }, [viewerPackage, propertiesByIndex, propertiesByKey, applyFlowFocus, resolved, changeNavigationMode]);
+  }, [viewerPackage, progressive, propertiesByIndex, propertiesByKey, applyFlowFocus, resolved, changeNavigationMode]);
 
   useEffect(() => {
     viewActionsRef.current?.updateMepState(graph, hiddenSystems);
@@ -2340,12 +2366,12 @@ export function MepViewer() {
         <p className="selection-instruction">{inputDevice === 'gamepad' ? `Vise un objet au centre de l’écran puis appuie sur ${navigationMode === 'maquette' ? 'RT' : 'A'} pour ouvrir sa fiche.` : 'Pointe un objet puis effectue un clic gauche pour ouvrir sa fiche complète.'}</p>
       </>}
     </aside>
-    <footer className="statusbar"><output>{calculating ? "Recalcul des flux…" : calculationError || "Flux indicatifs · aucun débit ni pression calculés"}</output>{cutting && <output>Découpe en cours… vous pouvez continuer à naviguer</output>}<div><Waves size={14}/><span>Fluides</span><b className={flowsVisible ? '' : 'off'}>{flowsVisible ? 'ACTIFS' : 'ARRÊTÉS'}</b></div><div>{flightMode && navigationMode === 'maquette' ? <Plane size={14}/> : <Footprints size={14}/>}<span>MODE</span><b>{navigationMode === 'orbit' ? 'NAVIGATION WEB' : flightMode ? 'VOL LIBRE' : 'MARCHE'}</b></div><div><Users size={14}/><span>{viewerPackage?.manifest.tiles ? loadedZones + ' / ' + viewerPackage.manifest.tiles.length + ' zones chargées' : resolved ? 'Scénario synchronisé' : 'Aperçu local'}</span><i/></div></footer>
+    <footer className="statusbar"><output>{calculating ? "Recalcul des flux…" : calculationError || "Flux indicatifs · aucun débit ni pression calculés"}</output>{cutting && <output>Découpe en cours… vous pouvez continuer à naviguer</output>}<div><Waves size={14}/><span>Fluides</span><b className={flowsVisible ? '' : 'off'}>{flowsVisible ? 'ACTIFS' : 'ARRÊTÉS'}</b></div><div>{flightMode && navigationMode === 'maquette' ? <Plane size={14}/> : <Footprints size={14}/>}<span>MODE</span><b>{navigationMode === 'orbit' ? 'NAVIGATION WEB' : flightMode ? 'VOL LIBRE' : 'MARCHE'}</b></div><div><Users size={14}/><span>{viewerPackage?.manifest.tiles ? progressive ? loadedZones + ' zones détaillées en mémoire' : loadedZones + ' / ' + viewerPackage.manifest.tiles.length + ' zones chargées' : resolved ? 'Scénario synchronisé' : 'Aperçu local'}</span><i/></div></footer>
   </main>{opening && <div className="model-opening" aria-live="polite" aria-busy="true">
     <div className="model-opening-card"><LoaderCircle className="spin" aria-hidden="true"/>
-      <h1>{loading ? 'Ouverture du partage…' : cutting ? 'Préparation des réservations…' : 'Chargement complet de la maquette…'}</h1>
-      <p>La navigation sera disponible lorsque toute la maquette sera prête.</p>
-      {!loading && viewerPackage?.manifest.tiles && <><progress aria-label="Géométrie préparée" value={loadedZones} max={viewerPackage.manifest.tiles.length}/><span>{loadedZones} / {viewerPackage.manifest.tiles.length} zones préparées</span></>}
+      <h1>{loading ? 'Ouverture du partage…' : cutting ? 'Préparation des réservations…' : progressive ? 'Ouverture de la maquette…' : 'Chargement complet de la maquette…'}</h1>
+      <p>{progressive ? 'Les zones détaillées se chargent autour de la vue.' : 'La navigation sera disponible lorsque toute la maquette sera prête.'}</p>
+      {!loading && viewerPackage?.manifest.tiles && !progressive && <><progress aria-label="Géométrie préparée" value={loadedZones} max={viewerPackage.manifest.tiles.length}/><span>{loadedZones} / {viewerPackage.manifest.tiles.length} zones préparées</span></>}
       {error && <div className="opening-error" role="alert"><p>{error}</p><Button onClick={() => window.location.reload()}>Recharger la page</Button></div>}
     </div>
   </div>}</>;

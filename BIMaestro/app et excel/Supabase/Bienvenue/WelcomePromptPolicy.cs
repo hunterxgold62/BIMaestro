@@ -52,7 +52,7 @@ namespace BIMaestro.Welcome
         internal static void TutorialClosed(WelcomeState state, bool opened, DateTime now)
         {
             state.TutorialOfferCompleted = opened;
-            state.TutorialSnoozeUntilUtc = opened ? (DateTime?)null : now.AddDays(1);
+            state.TutorialSnoozeUntilUtc = opened ? (DateTime?)null : now.AddDays(7);
         }
     }
 }

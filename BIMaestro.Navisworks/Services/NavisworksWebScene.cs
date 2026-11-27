@@ -23,7 +23,7 @@ namespace BIMaestro.Navisworks.Services
 
         // Read the Navisworks document and COM fragments on its UI thread.
         public static async Task<(GameSceneData Scene, List<int> ModelIndexByElement)> CaptureAsync(Document document, string title,
-            IReadOnlyList<Model> models, IReadOnlyList<WebModelScope> scopes, IProgress<string> progress, CancellationToken cancellation)
+            IReadOnlyList<Model> models, IReadOnlyList<WebModelScope> scopes, IProgress<string> progress, CancellationToken cancellation, Media3D.Vector3D? sourceOrigin)
         {
             var scene = new GameSceneData { ViewName = "Navisworks", SourceDocumentId = "navisworks:" + HashKey(Path.GetFullPath(document.FileName).ToUpperInvariant()) };
             scene.MepGraph.DocumentTitle = title;
@@ -148,9 +148,7 @@ namespace BIMaestro.Navisworks.Services
                 }
             }
 
-            if (scene.Meshes.Count == 0)
-                throw new InvalidOperationException("Aucune géométrie 3D visible dans les maquettes sélectionnées.");
-            scene.NormalizeCoordinates(eye, forward, useMeshBounds: true);
+            if (scene.Meshes.Count > 0) scene.NormalizeCoordinates(eye, forward, useMeshBounds: true, sourceOrigin: sourceOrigin);
             return (scene, modelIndexByElement);
         }
 
@@ -174,15 +172,17 @@ namespace BIMaestro.Navisworks.Services
             return true;
         }
 
-        internal static Media3D.Point3D FindSpawn(GameSceneData scene, CancellationToken cancellation)
+        internal static (Media3D.Point3D Point, double Score)[] FindSpawns(GameSceneData scene, List<int> modelByElement, int modelCount, CancellationToken cancellation)
         {
             var target = scene.ViewEye - new Media3D.Vector3D(0, 0, 5.28);
-            var best = target;
-            double bestScore = double.PositiveInfinity;
+            var best = new (Media3D.Point3D Point, double Score)[modelCount];
+            for (int i = 0; i < best.Length; i++) best[i] = (target, double.PositiveInfinity);
             foreach (var mesh in scene.Meshes)
             {
                 cancellation.ThrowIfCancellationRequested();
-                if (scene.Elements[mesh.ElementIndices[0]].Category != "Sols" || mesh.IsTransparent) continue;
+                int element = mesh.ElementIndices[0];
+                if (scene.Elements[element].Category != "Sols" || mesh.IsTransparent) continue;
+                int model = modelByElement[element];
                 for (int i = 0; i < mesh.Indices.Count; i += 3)
                 {
                     var a = mesh.Positions[mesh.Indices[i]];
@@ -201,9 +201,7 @@ namespace BIMaestro.Navisworks.Services
                         : a + (ab + ac) / 3;
                     var delta = point - target;
                     double score = delta.X * delta.X + delta.Y * delta.Y + 4 * delta.Z * delta.Z;
-                    if (score >= bestScore) continue;
-                    bestScore = score;
-                    best = point + new Media3D.Vector3D(0, 0, .04);
+                    if (score < best[model].Score) best[model] = (point + new Media3D.Vector3D(0, 0, .04), score);
                 }
             }
             return best;

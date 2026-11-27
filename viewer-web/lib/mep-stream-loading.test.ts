@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { gzipSync } from 'fflate';
 import { resolveTiles } from './mep-api';
-import { ModelStream } from './mep-stream';
+import { ModelStream, usesProgressiveTiles } from './mep-stream';
 import { digest } from './mep-package';
 vi.mock('./mep-api', () => ({ resolveTiles: vi.fn() }));
 vi.mock('fflate', async importOriginal => {
@@ -42,7 +42,7 @@ it('waits for every detailed tile and retains edited walls for the entire sessio
     const wall = models[0].children[0] as THREE.Mesh;
     const cutGeometry = new THREE.BoxGeometry(.5, .5, .5); wall.geometry = cutGeometry;
     const downloads = fetcher.mock.calls.length, changes = changed.mock.calls.length;
-    // Camera movement no longer participates in the loader API.
+    // Small shares retain every detailed tile for the session.
     for (let now = 100000; now < 1000000; now += 1000) stream.update(now);
     expect(wall.geometry).toBe(cutGeometry); expect(remove).not.toHaveBeenCalled();
     expect(fetcher).toHaveBeenCalledTimes(downloads); expect(changed).toHaveBeenCalledTimes(changes);
@@ -78,3 +78,31 @@ it('does not attach prepared geometry after the viewer is closed', async () => {
   await vi.waitFor(() => expect(remove).toHaveBeenCalledOnce());
   expect(stream.count).toBe(0); expect(changed).not.toHaveBeenCalled();
 });
+
+it('loads nearby detail within the memory budget and releases it after moving', async () => {
+  const { tiles } = await fixture(7);
+  const bytes = 64 * 1024 * 1024;
+  const largeBuffer = new Uint8Array(bytes);
+  const compressed = gzipSync(largeBuffer);
+  const hash = await digest(compressed);
+  for (const tile of tiles) Object.assign(tile, { decodedBytes: bytes, size: compressed.length, sha256: hash });
+  vi.mocked(resolveTiles).mockImplementation(async (_token, _revision, names) => ({
+    tiles: names.map(name => ({ name, url: 'https://example.test/' + name, bytes: compressed.length, sha256: hash })),
+  }));
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(compressed)));
+  const remove = vi.fn(), error = vi.fn();
+  expect(usesProgressiveTiles(tiles)).toBe(true);
+  const stream = new ModelStream(tiles, 'test', 1, vi.fn(), remove, vi.fn(), error, false, true);
+  try {
+    stream.update(performance.now(), new THREE.Vector3(0, 0, 0));
+    await vi.waitFor(() => expect(stream.count).toBe(3), { timeout: 5000 });
+    expect(stream.has(tiles[0].name)).toBe(true);
+    expect(stream.has(tiles[6].name)).toBe(false);
+    expect(stream.readyAt(new THREE.Vector3(600, 0, 0))).toBe(false);
+    stream.update(performance.now() + 500, new THREE.Vector3(600, 0, 0));
+    await vi.waitFor(() => expect(stream.readyAt(new THREE.Vector3(600, 0, 0))).toBe(true), { timeout: 5000 });
+    expect(stream.has(tiles[0].name)).toBe(false);
+    expect(remove).toHaveBeenCalledTimes(3);
+    expect(error).not.toHaveBeenCalled();
+  } finally { stream.dispose(); }
+}, 15000);

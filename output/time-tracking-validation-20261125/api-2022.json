@@ -1,0 +1,91 @@
+{
+  "plugin": "C:\\Users\\plemert\\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\\Documents\\BIMaestro\\BIMaestro\\bin\\Release\\BIMaestro.dll",
+  "host": "C:/Program Files/Autodesk/Revit 2022",
+  "checkedMembers": 1156,
+  "missingTypes": [
+    {
+      "assembly": "RevitAPIUI",
+      "type": "Autodesk.Revit.UI.Events.SelectionChangedEventArgs"
+    }
+  ],
+  "missingMembers": [
+    {
+      "assembly": "RevitAPIUI",
+      "type": "Autodesk.Revit.UI.UIControlledApplication",
+      "member": "add_SelectionChanged",
+      "signature": "System.Void(System.EventHandler\u00601\u003CAutodesk.Revit.UI.Events.SelectionChangedEventArgs\u003E)\u00600"
+    },
+    {
+      "assembly": "RevitAPIUI",
+      "type": "Autodesk.Revit.UI.Events.SelectionChangedEventArgs",
+      "member": "GetDocument",
+      "signature": "Autodesk.Revit.DB.Document()\u00600"
+    },
+    {
+      "assembly": "RevitAPIUI",
+      "type": "Autodesk.Revit.UI.Events.SelectionChangedEventArgs",
+      "member": "GetSelectedElements",
+      "signature": "System.Collections.Generic.ISet\u00601\u003CAutodesk.Revit.DB.ElementId\u003E()\u00600"
+    },
+    {
+      "assembly": "RevitAPIUI",
+      "type": "Autodesk.Revit.UI.UIControlledApplication",
+      "member": "remove_SelectionChanged",
+      "signature": "System.Void(System.EventHandler\u00601\u003CAutodesk.Revit.UI.Events.SelectionChangedEventArgs\u003E)\u00600"
+    }
+  ],
+  "callers": [
+    {
+      "caller": ".BIMaestroApp::OnStartup",
+      "failure": {
+        "assembly": "RevitAPIUI",
+        "type": "Autodesk.Revit.UI.UIControlledApplication",
+        "member": "add_SelectionChanged",
+        "signature": "System.Void(System.EventHandler\u00601\u003CAutodesk.Revit.UI.Events.SelectionChangedEventArgs\u003E)\u00600"
+      }
+    },
+    {
+      "caller": ".BIMaestroApp::OnSelectionChangedSafe",
+      "failure": {
+        "assembly": "RevitAPIUI",
+        "type": "Autodesk.Revit.UI.Events.SelectionChangedEventArgs",
+        "member": "GetDocument",
+        "signature": "Autodesk.Revit.DB.Document()\u00600"
+      }
+    },
+    {
+      "caller": ".BIMaestroApp::OnSelectionChangedSafe",
+      "failure": {
+        "assembly": "RevitAPIUI",
+        "type": "Autodesk.Revit.UI.Events.SelectionChangedEventArgs",
+        "member": "GetSelectedElements",
+        "signature": "System.Collections.Generic.ISet\u00601\u003CAutodesk.Revit.DB.ElementId\u003E()\u00600"
+      }
+    },
+    {
+      "caller": "BIMaestro.MepBooster.MepBoosterService::Initialize",
+      "failure": {
+        "assembly": "RevitAPIUI",
+        "type": "Autodesk.Revit.UI.UIControlledApplication",
+        "member": "add_SelectionChanged",
+        "signature": "System.Void(System.EventHandler\u00601\u003CAutodesk.Revit.UI.Events.SelectionChangedEventArgs\u003E)\u00600"
+      }
+    },
+    {
+      "caller": "BIMaestro.MepBooster.MepBoosterService::Shutdown",
+      "failure": {
+        "assembly": "RevitAPIUI",
+        "type": "Autodesk.Revit.UI.UIControlledApplication",
+        "member": "remove_SelectionChanged",
+        "signature": "System.Void(System.EventHandler\u00601\u003CAutodesk.Revit.UI.Events.SelectionChangedEventArgs\u003E)\u00600"
+      }
+    }
+  ],
+  "runtimeAdapters": {
+    "Floor shape editor": true,
+    "Roof shape editor": true,
+    "Add/Draw shape point": true,
+    "Add/Draw split line": true,
+    "ElementId numeric constructor": true
+  }
+}

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -9,6 +10,7 @@ using Autodesk.Navisworks.Api;
 using BIMaestro.Navisworks.Services;
 using BIMaestro.VideoGames;
 using Licensing;
+using Point3D = System.Windows.Media.Media3D.Point3D;
 
 namespace BIMaestro.Navisworks.UI
 {
@@ -20,7 +22,22 @@ namespace BIMaestro.Navisworks.UI
         private static readonly string[] ScopeLabels = { "Complet", "Extérieur uniquement", "Carcasse simplifiée", "Simplifier toute la maquette" };
         private readonly WebModelScope[] _scopes;
         private const int PublicationLimitMb = GameMepPublishClient.NavisworksLimitMb;
-        private readonly NumericUpDown _targetWeight = new NumericUpDown { Minimum = 1, Maximum = PublicationLimitMb, Value = PublicationLimitMb, Width = 58 };
+        private string _tileDirectory;
+        private sealed class PreparedModel
+        {
+            public GameElementData[] Elements;
+            public GameMepWebAsset[] Tiles;
+            public Point3D Spawn;
+            public double SpawnScore;
+            public long TriangleCount;
+            public long TransferBytes => Tiles.Sum(tile => tile.Size);
+        }
+        private readonly Dictionary<int, PreparedModel> _prepared = new Dictionary<int, PreparedModel>();
+        private readonly System.Windows.Forms.Timer _selectionTimer = new System.Windows.Forms.Timer { Interval = 180 };
+        private GameSceneData _referenceScene;
+        private int _nextElementIndex;
+        private int _nextTileNumber;
+        private readonly NumericUpDown _targetWeight = new NumericUpDown { Minimum = 1, Maximum = PublicationLimitMb, Value = 100, Width = 58 };
         private readonly ComboBox _scope = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 205, Enabled = false };
         private readonly ListView _modelList = new ListView
         {
@@ -104,12 +121,13 @@ namespace BIMaestro.Navisworks.UI
             layout.Controls.Add(LinkRow("Édition", _editor));
             Controls.Add(layout);
 
-            ResetPreparation(_models.Length);
-            _modelList.ItemCheck += (_, e) =>
+            SelectionChanged();
+            _selectionTimer.Tick += async (_, __) =>
             {
-                if (e.NewValue != e.CurrentValue)
-                    ResetPreparation(_modelList.CheckedIndices.Count + (e.NewValue == CheckState.Checked ? 1 : -1));
+                _selectionTimer.Stop();
+                await RunAsync(AssembleSelectionAsync);
             };
+            _modelList.ItemChecked += (_, __) => SelectionChanged();
             _modelList.SelectedIndexChanged += (_, __) => ShowScope();
             _scope.SelectedIndexChanged += (_, __) =>
             {
@@ -119,10 +137,15 @@ namespace BIMaestro.Navisworks.UI
                 if (_scopes[index] == scope) return;
                 _scopes[index] = scope;
                 _modelList.Items[index].SubItems[2].Text = ScopeLabels[(int)scope];
-                _modelList.Items[index].SubItems[1].Text = "—";
-                ResetPreparation(_modelList.CheckedIndices.Count);
+                InvalidateModel(index);
+                SelectionChanged();
             };
-            _targetWeight.ValueChanged += (_, __) => ResetPreparation(_modelList.CheckedIndices.Count);
+            _targetWeight.ValueChanged += (_, __) =>
+            {
+                foreach (int index in _prepared.Keys.Where(i => _scopes[i] == WebModelScope.SimplifiedShell ||
+                    _scopes[i] == WebModelScope.SimplifiedModel).ToArray()) InvalidateModel(index);
+                SelectionChanged();
+            };
             _prepare.Click += async (_, __) => await RunAsync(PrepareAsync);
             _license.TextChanged += (_, __) => LoadLinks();
             _publish.Click += async (_, __) => await RunAsync(PublishAsync);
@@ -144,19 +167,58 @@ namespace BIMaestro.Navisworks.UI
                 _modelList.Items[i].Checked = isChecked;
         }
 
-        private void ResetPreparation(int selectedCount)
+        private void SelectionChanged()
         {
+            _selectionTimer.Stop();
             _scene = null;
             _package = null;
             _canPublish = false;
             _publish.Enabled = _export.Enabled = false;
-            _prepare.Enabled = selectedCount > 0;
+            var selected = _modelList.CheckedIndices.Cast<int>().ToArray();
+            int missing = selected.Count(index => !_prepared.ContainsKey(index));
+            _prepare.Enabled = missing > 0;
             _size.Text = string.Empty;
-            _viewer.Clear();
-            _editor.Clear();
-            _status.Text = selectedCount == 0
-                ? "Cochez au moins une maquette."
-                : $"{selectedCount} / {_models.Length} maquettes sélectionnées.";
+            LoadLinks();
+            if (selected.Length == 0) _status.Text = "Cochez au moins une maquette.";
+            else if (missing > 0)
+            {
+                long bytes = selected.Where(_prepared.ContainsKey).Sum(index => _prepared[index].TransferBytes);
+                if (bytes > 0) _size.Text = $"Zones déjà calculées : {FormatEstimate(bytes)}";
+                _status.Text = $"{missing} maquette(s) à calculer sur {selected.Length}.";
+            }
+            else
+            {
+                _status.Text = "Mise à jour de la sélection…";
+                _selectionTimer.Start();
+            }
+        }
+
+        private void InvalidateModel(int index)
+        {
+            if (_prepared.TryGetValue(index, out var model))
+            {
+                _prepared.Remove(index);
+                foreach (var tile in model.Tiles)
+                {
+                    try { tile.DeleteFile(); }
+                    catch (IOException) { }
+                    catch (UnauthorizedAccessException) { }
+                }
+            }
+            _modelList.Items[index].SubItems[1].Text = "—";
+            if (_prepared.Count != 0) return;
+            DeleteTileDirectory();
+            _referenceScene = null;
+            _nextElementIndex = _nextTileNumber = 0;
+        }
+
+        private void DeleteTileDirectory()
+        {
+            if (_tileDirectory == null) return;
+            try { Directory.Delete(_tileDirectory, recursive: true); }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+            _tileDirectory = null;
         }
 
         private static Control LinkRow(string label, TextBox link)
@@ -178,125 +240,202 @@ namespace BIMaestro.Navisworks.UI
 
         private async Task PrepareAsync(CancellationToken cancellation)
         {
-            var selectedIndices = _modelList.CheckedIndices.Cast<int>().ToArray();
+            var selectedIndices = _modelList.CheckedIndices.Cast<int>().Where(index => !_prepared.ContainsKey(index)).ToArray();
+            if (selectedIndices.Length == 0)
+            {
+                await AssembleSelectionAsync(cancellation);
+                return;
+            }
             var selected = selectedIndices.Select(index => _models[index]).ToArray();
             var scopes = selectedIndices.Select(index => _scopes[index]).ToArray();
             var exterior = scopes.Select(scope => scope == WebModelScope.Exterior || scope == WebModelScope.SimplifiedShell).ToArray();
             bool adjustDetail = scopes.Contains(WebModelScope.SimplifiedShell) || scopes.Contains(WebModelScope.SimplifiedModel);
             int targetWeight = Decimal.ToInt32(_targetWeight.Value);
-            ResetPreparation(selected.Length);
+            long cachedBytes = _modelList.CheckedIndices.Cast<int>().Where(_prepared.ContainsKey).Sum(index => _prepared[index].TransferBytes);
             _status.Text = "Extraction de la géométrie…";
             await Task.Delay(1, cancellation);
             IProgress<string> extraction = new Progress<string>(message => _status.Text = message);
-            var (scene, modelIndexByElement) = await NavisworksWebScene.CaptureAsync(_document, _title, selected, scopes, extraction, cancellation);
-            var compressedBytesPerModel = new double[selected.Length];
+            var (scene, modelIndexByElement) = await NavisworksWebScene.CaptureAsync(_document, _title, selected, scopes, extraction, cancellation, _referenceScene?.SourceOrigin);
             _status.Text = "Préparation et compression des GLB…";
             IProgress<int> packing = new Progress<int>(tiles => _status.Text = tiles == 0
                 ? "Préparation et compression des GLB…" : $"Compression des GLB… {tiles:N0} zones préparées");
-            var (package, removedParts, adjustedShellDetail, simplifiedTubes) = await Task.Run(() =>
+            _tileDirectory ??= Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "BIMaestro-Web-" + Guid.NewGuid().ToString("N"))).FullName;
+            string batchDirectory = Directory.CreateDirectory(Path.Combine(_tileDirectory, Guid.NewGuid().ToString("N"))).FullName;
+            bool stored = false;
+            try
             {
-                var filtered = ExteriorVisibility.Filter(scene, modelIndexByElement, exterior, extraction, cancellation);
-                GameMepWebPackageResult BuildPackage()
+                var (models, removedParts, adjustedShellDetail, simplifiedTubes) = await Task.Run(() =>
                 {
-                    Array.Clear(compressedBytesPerModel, 0, compressedBytesPerModel.Length);
-                    scene.SpawnFootPosition = NavisworksWebScene.FindSpawn(scene, cancellation);
-                    packing.Report(0);
-                    var progressInterval = Stopwatch.StartNew();
-                    GameMepWebPackage.PrepareStaticAssets(scene, cancellation, (mesh, bytes) =>
+                    var filtered = ExteriorVisibility.Filter(scene, modelIndexByElement, exterior, extraction, cancellation);
+                    GameMepWebPackageResult BuildPackage()
                     {
-                        int modelIndex = modelIndexByElement[mesh.ElementIndices[0]];
-                        compressedBytesPerModel[modelIndex] += bytes;
-                    }, tiles =>
-                    {
-                        if (progressInterval.ElapsedMilliseconds < 250) return;
-                        packing.Report(tiles);
-                        progressInterval.Restart();
-                    });
-                    return GameMepWebPackage.Build(scene, _title);
-                }
-
-                var candidate = BuildPackage();
-                bool adjusted = false;
-                if (adjustDetail && !GameMepPublishClient.FitsPublication(candidate, targetWeight))
-                {
-                    var reducibleMeshes = scene.Meshes.Select((mesh, index) =>
-                        (Mesh: mesh, Index: index, Scope: scopes[modelIndexByElement[mesh.ElementIndices[0]]]))
-                        .Where(entry => entry.Scope == WebModelScope.SimplifiedShell || entry.Scope == WebModelScope.SimplifiedModel)
-                        .Where(entry => entry.Scope != WebModelScope.SimplifiedModel ||
-                            !SimplifiedShellMesh.IsInteriorGeometryProtected(scene.Elements[entry.Mesh.ElementIndices[0]]))
-                        .Select(entry => (entry.Mesh, entry.Index, entry.Scope,
-                            Detailed: SimplifiedShellMesh.HasVariedSurfaceNormals(entry.Mesh, cancellation)))
-                        .Where(entry => entry.Scope != WebModelScope.SimplifiedModel || !entry.Detailed)
-                        .ToArray();
-                    var lastAttempt = Enumerable.Repeat(SimplifiedShellMesh.InitialSubdivisions, reducibleMeshes.Length).ToArray();
-                    foreach (var step in SimplifiedShellMesh.BudgetSteps())
-                    {
-                        cancellation.ThrowIfCancellationRequested();
-                        bool reduced = false;
-                        for (int i = 0; i < reducibleMeshes.Length; i++)
+                        packing.Report(0);
+                        foreach (string file in Directory.EnumerateFiles(batchDirectory, "tile-*.glb.gz")) File.Delete(file);
+                        var progressInterval = Stopwatch.StartNew();
+                        GameMepWebPackage.PrepareStaticAssets(scene, cancellation, reportTileCount: tiles =>
                         {
-                            var entry = reducibleMeshes[i];
-                            int subdivisions = entry.Detailed ? step.Detailed : step.Flat;
-                            if (lastAttempt[i] == subdivisions) continue;
-                            lastAttempt[i] = subdivisions;
-                            var mesh = entry.Scope == WebModelScope.SimplifiedModel
-                                ? SimplifiedShellMesh.ReduceInterior(entry.Mesh, subdivisions, cancellation)
-                                : SimplifiedShellMesh.Reduce(entry.Mesh, subdivisions, cancellation);
-                            if (mesh.Indices.Count >= scene.Meshes[entry.Index].Indices.Count) continue;
-                            scene.Meshes[entry.Index] = mesh;
-                            reduced = true;
+                            if (progressInterval.ElapsedMilliseconds < 250) return;
+                            packing.Report(tiles);
+                            progressInterval.Restart();
+                        }, tileDirectory: batchDirectory, modelIndex: mesh => modelIndexByElement[mesh.ElementIndices[0]],
+                            elementIndexOffset: _nextElementIndex, firstTileNumber: _nextTileNumber);
+                        return adjustDetail ? GameMepWebPackage.Build(scene, _title) : null;
+                    }
+
+                    bool FitsTarget(GameMepWebPackageResult candidate) =>
+                        GameMepPublishClient.FitsPublication(candidate, targetWeight) &&
+                        cachedBytes + candidate.Bytes.LongLength + candidate.Assets.Sum(tile => tile.Size) <= targetWeight * GameMepPublishClient.Megabyte;
+                    var candidate = scene.Meshes.Count > 0 ? BuildPackage() : null;
+                    bool adjusted = false;
+                    if (adjustDetail && candidate != null && !FitsTarget(candidate))
+                    {
+                        var reducibleMeshes = scene.Meshes.Select((mesh, index) =>
+                            (Mesh: mesh, Index: index, Scope: scopes[modelIndexByElement[mesh.ElementIndices[0]]]))
+                            .Where(entry => entry.Scope == WebModelScope.SimplifiedShell || entry.Scope == WebModelScope.SimplifiedModel)
+                            .Where(entry => entry.Scope != WebModelScope.SimplifiedModel ||
+                                !SimplifiedShellMesh.IsInteriorGeometryProtected(scene.Elements[entry.Mesh.ElementIndices[0]]))
+                            .Select(entry => (entry.Mesh, entry.Index, entry.Scope,
+                                Detailed: SimplifiedShellMesh.HasVariedSurfaceNormals(entry.Mesh, cancellation)))
+                            .Where(entry => entry.Scope != WebModelScope.SimplifiedModel || !entry.Detailed)
+                            .ToArray();
+                        var lastAttempt = Enumerable.Repeat(SimplifiedShellMesh.InitialSubdivisions, reducibleMeshes.Length).ToArray();
+                        foreach (var step in SimplifiedShellMesh.BudgetSteps())
+                        {
+                            cancellation.ThrowIfCancellationRequested();
+                            bool reduced = false;
+                            for (int i = 0; i < reducibleMeshes.Length; i++)
+                            {
+                                var entry = reducibleMeshes[i];
+                                int subdivisions = entry.Detailed ? step.Detailed : step.Flat;
+                                if (lastAttempt[i] == subdivisions) continue;
+                                lastAttempt[i] = subdivisions;
+                                var mesh = entry.Scope == WebModelScope.SimplifiedModel
+                                    ? SimplifiedShellMesh.ReduceInterior(entry.Mesh, subdivisions, cancellation)
+                                    : SimplifiedShellMesh.Reduce(entry.Mesh, subdivisions, cancellation);
+                                if (mesh.Indices.Count >= scene.Meshes[entry.Index].Indices.Count) continue;
+                                scene.Meshes[entry.Index] = mesh;
+                                reduced = true;
+                            }
+                            if (!reduced) continue;
+                            adjusted = true;
+                            scene.OriginalRenderTriangleCount = scene.Meshes.Sum(mesh => mesh.Indices.Count / 3);
+                            candidate = BuildPackage();
+                            if (FitsTarget(candidate)) break;
                         }
-                        if (!reduced) continue;
-                        adjusted = true;
-                        scene.OriginalRenderTriangleCount = scene.Meshes.Sum(mesh => mesh.Indices.Count / 3);
-                        candidate = BuildPackage();
-                        if (GameMepPublishClient.FitsPublication(candidate, targetWeight)) break;
                     }
-                }
-                int tubes = 0;
-                if (scopes.Contains(WebModelScope.SimplifiedModel) && !GameMepPublishClient.FitsPublication(candidate, targetWeight))
+                    int tubes = 0;
+                    if (scopes.Contains(WebModelScope.SimplifiedModel) && candidate != null && !FitsTarget(candidate))
+                    {
+                        extraction.Report("Recherche de tronçons droits à alléger…");
+                        for (int i = 0; i < scene.Meshes.Count; i++)
+                        {
+                            cancellation.ThrowIfCancellationRequested();
+                            var mesh = scene.Meshes[i];
+                            int element = mesh.ElementIndices[0];
+                            if (scopes[modelIndexByElement[element]] != WebModelScope.SimplifiedModel) continue;
+                            string category = scene.Elements[element].Category;
+                            if (category == "Murs" || category == "Sols") continue;
+                            var reduced = StraightTubeMesh.Simplify(mesh, cancellation);
+                            if (ReferenceEquals(mesh, reduced)) continue;
+                            scene.Meshes[i] = reduced;
+                            tubes++;
+                        }
+                        if (tubes > 0)
+                        {
+                            scene.OriginalRenderTriangleCount = scene.Meshes.Sum(mesh => mesh.Indices.Count / 3);
+                            candidate = BuildPackage();
+                        }
+                    }
+                    var spawns = NavisworksWebScene.FindSpawns(scene, modelIndexByElement, selected.Length, cancellation);
+                    var tilesByModel = scene.WebTiles.ToLookup(tile => tile.ModelIndex);
+                    var trianglesByModel = scene.Meshes.ToLookup(mesh => modelIndexByElement[mesh.ElementIndices[0]], mesh => mesh.Indices.Count / 3);
+                    var elementsByModel = scene.Elements.ToLookup(element => modelIndexByElement[element.WebElementIndex]);
+                    foreach (var element in scene.Elements) element.WebElementIndex = checked(element.WebElementIndex + _nextElementIndex);
+                    var prepared = Enumerable.Range(0, selected.Length).Select(i => new PreparedModel
+                    {
+                        Elements = elementsByModel[i].ToArray(),
+                        Tiles = tilesByModel[i].ToArray(),
+                        Spawn = spawns[i].Point,
+                        SpawnScore = spawns[i].Score,
+                        TriangleCount = trianglesByModel[i].Sum(count => (long)count)
+                    }).ToArray();
+                    return (prepared, filtered.Before - filtered.After, adjusted, tubes);
+                }, cancellation);
+
+                cancellation.ThrowIfCancellationRequested();
+                scene.Meshes.Clear();
+                if (_referenceScene == null && scene.WebTiles.Count > 0)
                 {
-                    extraction.Report("Recherche de tronçons droits à alléger…");
-                    for (int i = 0; i < scene.Meshes.Count; i++)
-                    {
-                        cancellation.ThrowIfCancellationRequested();
-                        var mesh = scene.Meshes[i];
-                        int element = mesh.ElementIndices[0];
-                        if (scopes[modelIndexByElement[element]] != WebModelScope.SimplifiedModel) continue;
-                        string category = scene.Elements[element].Category;
-                        if (category == "Murs" || category == "Sols") continue;
-                        var reduced = StraightTubeMesh.Simplify(mesh, cancellation);
-                        if (ReferenceEquals(mesh, reduced)) continue;
-                        scene.Meshes[i] = reduced;
-                        tubes++;
-                    }
-                    if (tubes > 0)
-                    {
-                        scene.OriginalRenderTriangleCount = scene.Meshes.Sum(mesh => mesh.Indices.Count / 3);
-                        candidate = BuildPackage();
-                    }
+                    _referenceScene = scene.CopyForWebExport(Array.Empty<GameElementData>());
+                    _referenceScene.WebTiles.Clear();
+                    _referenceScene.WebOverviewGlb = Array.Empty<byte>();
+                    _referenceScene.WebPropertiesJson = "[]";
                 }
-                return (candidate, filtered.Before - filtered.After, adjusted, tubes);
+                _nextElementIndex = checked(_nextElementIndex + scene.Elements.Count);
+                _nextTileNumber = checked(_nextTileNumber + scene.WebTiles.Count);
+                for (int i = 0; i < selectedIndices.Length; i++)
+                {
+                    _prepared.Add(selectedIndices[i], models[i]);
+                    _modelList.Items[selectedIndices[i]].SubItems[1].Text = FormatEstimate(models[i].TransferBytes);
+                }
+                stored = true;
+                await AssembleSelectionAsync(cancellation);
+                if (removedParts > 0) _status.Text += $" {removedParts:N0} pièces masquées écartées de l’export.";
+                if (adjustedShellDetail) _status.Text += " Surfaces planes secondaires réduites.";
+                if (simplifiedTubes > 0) _status.Text += $" {simplifiedTubes:N0} tronçons droits allégés.";
+            }
+            finally
+            {
+                if (!stored)
+                {
+                    try { Directory.Delete(batchDirectory, recursive: true); }
+                    catch (IOException) { }
+                    catch (UnauthorizedAccessException) { }
+                }
+            }
+        }
+
+        private async Task AssembleSelectionAsync(CancellationToken cancellation)
+        {
+            var selected = _modelList.CheckedIndices.Cast<int>().ToArray();
+            if (selected.Length == 0 || selected.Any(index => !_prepared.ContainsKey(index))) return;
+            var models = selected.Select(index => _prepared[index]).Where(model => model.Tiles.Length > 0).ToArray();
+            if (models.Length == 0)
+            {
+                _status.Text = "Aucune géométrie 3D visible dans les maquettes sélectionnées.";
+                return;
+            }
+
+            _status.Text = "Mise à jour de l’index et de l’aperçu…";
+            var (scene, package) = await Task.Run(() =>
+            {
+                var subset = _referenceScene.CopyForWebExport(models.SelectMany(model => model.Elements));
+                foreach (var tile in models.SelectMany(model => model.Tiles)) subset.WebTiles.Add(tile);
+                subset.SpawnFootPosition = models.OrderBy(model => model.SpawnScore).First().Spawn;
+                subset.OriginalRenderTriangleCount = checked((int)models.Sum(model => model.TriangleCount));
+                subset.VisibleElementCount = subset.Elements.Count;
+                cancellation.ThrowIfCancellationRequested();
+                GameMepWebPackage.SetWebMetadata(subset);
+                cancellation.ThrowIfCancellationRequested();
+                return (subset, GameMepWebPackage.Build(subset, _title));
             }, cancellation);
 
             cancellation.ThrowIfCancellationRequested();
-            scene.Meshes.Clear();
             _scene = scene;
             _package = package;
-            foreach (ListViewItem row in _modelList.Items)
-                row.SubItems[1].Text = "—";
-            for (int i = 0; i < selectedIndices.Length; i++)
-                _modelList.Items[selectedIndices[i]].SubItems[1].Text = FormatEstimate(compressedBytesPerModel[i]);
-            var geometryBytes = _scene.WebTiles.Sum(tile => tile.DecodedBytes) + _scene.WebOverviewGlb.LongLength;
-            var transferBytes = _package.Bytes.LongLength + _package.Assets.Sum(asset => asset.Size);
-            _canPublish = GameMepPublishClient.FitsPublication(_package, PublicationLimitMb);
-            _size.Text = $"Géométrie GLB : {geometryBytes / 1048576d:F1} Mo · Transfert : {transferBytes / 1048576d:F1} Mo / {PublicationLimitMb} Mo";
-            _status.Text = _canPublish ? "Prêt à publier." : "Limite de publication dépassée. Décochez des maquettes puis recalculez le poids.";
-            if (adjustDetail && transferBytes > targetWeight * GameMepPublishClient.Megabyte)
-                _status.Text += $" Cible de {targetWeight} Mo non atteinte avec les réductions disponibles.";
-            if (removedParts > 0) _status.Text += $" {removedParts:N0} pièces masquées écartées de l’export.";
-            if (adjustedShellDetail) _status.Text += " Surfaces planes secondaires réduites.";
-            if (simplifiedTubes > 0) _status.Text += $" {simplifiedTubes:N0} tronçons droits allégés.";
+            long geometryBytes = scene.WebTiles.Sum(tile => tile.DecodedBytes) + scene.WebOverviewGlb.LongLength;
+            long transferBytes = package.Bytes.LongLength + package.Assets.Sum(asset => asset.Size);
+            _canPublish = GameMepPublishClient.FitsPublication(package, PublicationLimitMb);
+            _size.Text = $"Géométrie GLB : {geometryBytes / 1048576d:F1} Mo · Transfert : {transferBytes / 1048576d:F1} Mo / 2 Go";
+            _status.Text = _canPublish
+                ? $"Prêt à publier en {package.Assets.Count:N0} zones."
+                : package.Bytes.LongLength > GameMepPublishClient.MaxAssetBytes
+                    ? "L’index des données dépasse 48 Mo. Décochez des maquettes."
+                    : "Limite de publication dépassée. Décochez des maquettes.";
+            int targetWeight = Decimal.ToInt32(_targetWeight.Value);
+            if (selected.Any(i => _scopes[i] == WebModelScope.SimplifiedShell || _scopes[i] == WebModelScope.SimplifiedModel) &&
+                transferBytes > targetWeight * GameMepPublishClient.Megabyte)
+                _status.Text += $" Cible de {targetWeight} Mo non atteinte.";
             LoadLinks();
         }
 
@@ -369,6 +508,7 @@ namespace BIMaestro.Navisworks.UI
 
         private async Task RunAsync(Func<CancellationToken, Task> action)
         {
+            _selectionTimer.Stop();
             _operation = new CancellationTokenSource();
             _modelList.Enabled = _scopeButtons.Enabled = _scope.Enabled = _targetWeight.Enabled = false;
             _publish.Enabled = _export.Enabled = _license.Enabled = false;
@@ -386,7 +526,7 @@ namespace BIMaestro.Navisworks.UI
                 _modelList.Enabled = _scopeButtons.Enabled = true;
                 ShowScope();
                 _targetWeight.Enabled = true;
-                _prepare.Enabled = _modelList.CheckedIndices.Count > 0;
+                _prepare.Enabled = _package == null && _modelList.CheckedIndices.Count > 0;
                 _close.Text = "Fermer";
             }
         }
@@ -399,6 +539,11 @@ namespace BIMaestro.Navisworks.UI
                 e.Cancel = true;
             }
             base.OnFormClosing(e);
+            if (!e.Cancel)
+            {
+                _selectionTimer.Dispose();
+                DeleteTileDirectory();
+            }
         }
     }
 }

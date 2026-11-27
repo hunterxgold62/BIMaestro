@@ -94,7 +94,7 @@ namespace BIMaestro.Dashboard
                         if (double.IsNaN(hours) || double.IsInfinity(hours) || hours < 0) { invalid++; continue; }
                         if (hours == 0) continue;
                         saved.Add(new Entry { Id = Normalize(Cell(row, 1, format)), Name = Cell(row, 2, format), Version = Cell(row, 3, format), When = when, Hours = hours,
-                            Kind = Cell(row, 8, format), Path = First(Cell(row, 10, format), Cell(row, 11, format), Cell(row, 1, format)), Parameters = Cell(row, 17, format) });
+                            Kind = Cell(row, 8, format), Path = First(Cell(row, 10, format), Cell(row, 11, format), Cell(row, 1, format)), Parameters = Cell(row, 17, format), Identity = Cell(row, 18, format) });
                     }
                 }
                 _saved = saved;
@@ -103,15 +103,22 @@ namespace BIMaestro.Dashboard
             }
             catch (Exception ex) { _loadError = UiLanguage.Get("TimeSeriesDashboardWindow.xaml.UnableToReadHistory") + ex.Message; }
             // Current-process open sessions are not yet present as closed rows in the workbook.
-            _all = _saved.Select(x => new Entry { Id = x.Id, Name = x.Name, Version = x.Version, Kind = x.Kind, Path = x.Path, Parameters = x.Parameters, When = x.When, Hours = x.Hours }).Concat(ExcelLogger.GetDashboardEntries().Select(x => new Entry {
-                Id = Normalize(x.DocumentId), Name = x.Name, Version = x.Version, Kind = x.Kind,
+            _all = _saved.Select(x => new Entry { Id = x.Id, Name = x.Name, Version = x.Version, Kind = x.Kind, Path = x.Path, Parameters = x.Parameters, Identity = x.Identity, When = x.When, Hours = x.Hours }).Concat(ExcelLogger.GetDashboardEntries().Select(x => new Entry {
+                Id = Normalize(x.DocumentId), Name = x.Name, Version = x.Version, Kind = x.Kind, Identity = x.DocumentIdentity,
                 Path = First(x.Path, x.DocumentId), Parameters = x.Parameters, When = x.When, Hours = x.Hours, Live = true
             })).Where(x => x.Hours > 0 && !double.IsNaN(x.Hours) && !double.IsInfinity(x.Hours)).ToList();
             _groupError = null;
             try
             {
                 var groups = TimeProjectGroups.Load(_groupsPath);
-                foreach (var entry in _all) { entry.SourceId = entry.Id; entry.Id = groups.Resolve(entry.Id); }
+                var tracking = TimeTrackingRegistry.Load(TimeProjectTracking.RegistryPath);
+                foreach (var entry in _all)
+                {
+                    entry.SourceId = entry.Id;
+                    entry.Pending = tracking.IsPending(entry.Identity, entry.SourceId);
+                    entry.Id = groups.Resolve(tracking.Resolve(entry.Identity, entry.SourceId));
+                    if (entry.Pending) entry.Name = UiLanguage.Get("TimeTracking.PendingLabel") + entry.Name;
+                }
             }
             catch (Exception ex) { _groupError = UiLanguage.Get("TimeDashboard.GroupsError") + ex.Message; }
             RebuildChoices();
@@ -164,6 +171,11 @@ namespace BIMaestro.Dashboard
                 MessageBox.Show(this, UiLanguage.Get("TimeDashboard.SelectDocuments"), "BIMaestro");
                 return;
             }
+            if (selected.Any(x => x.Id.StartsWith("time-pending:", StringComparison.Ordinal)))
+            {
+                MessageBox.Show(this, UiLanguage.Get("TimeTracking.PendingGroupHelp"), "BIMaestro");
+                return;
+            }
             string question = UiLanguage.Get(separate ? "TimeDashboard.SeparateQuestion" : "TimeDashboard.GroupQuestion");
             if (MessageBox.Show(this, question + "\n\n" + string.Join("\n", selected.Select(x => x.Name + "\n" + x.Path)),
                 "BIMaestro", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
@@ -171,7 +183,10 @@ namespace BIMaestro.Dashboard
             {
                 var selectedIds = new HashSet<string>(selected.Select(x => x.Id), StringComparer.OrdinalIgnoreCase);
                 var sources = new HashSet<string>(_all.Where(x => selectedIds.Contains(x.Id)).Select(x => x.SourceId ?? x.Id), StringComparer.OrdinalIgnoreCase);
+                var tracking = TimeTrackingRegistry.Load(TimeProjectTracking.RegistryPath);
+                var trackedProjects = _all.Where(x => selectedIds.Contains(x.Id)).Select(x => tracking.Resolve(x.Identity, x.SourceId)).ToList();
                 TimeProjectGroups.Update(_groupsPath, selectedIds, separate);
+                if (separate) TimeTrackingRegistry.SeparateProjects(TimeProjectTracking.RegistryPath, trackedProjects);
                 Reload();
                 var resultingIds = new HashSet<string>(_all.Where(x => sources.Contains(x.SourceId ?? x.Id)).Select(x => x.Id), StringComparer.OrdinalIgnoreCase);
                 foreach (var choice in _choices) choice.Selected = resultingIds.Contains(choice.Id);
@@ -229,7 +244,7 @@ namespace BIMaestro.Dashboard
             Picker.ItemsSource = _choices.Where(x => available.Contains(x.Id)).ToList();
             _batch = false;
             RefreshDetail();
-            Status.Text = _loadError ?? _groupError ?? (UiLanguage.Get("TimeSeriesDashboardWindow.xaml.LocalHistoryActiveTimeAndOngoingSessionsUpdated") + DateTime.Now.ToString("HH:mm") +
+            Status.Text = _loadError ?? _groupError ?? TimeProjectTracking.LastError ?? (UiLanguage.Get("TimeSeriesDashboardWindow.xaml.LocalHistoryActiveTimeAndOngoingSessionsUpdated") + DateTime.Now.ToString("HH:mm") +
                 (_invalidRows > 0 ? " · " + _invalidRows + UiLanguage.Get("TimeSeriesDashboardWindow.xaml.UnreadableRowSSkipped") : ""));
         }
         private bool MatchesFilters(Entry x)
@@ -257,7 +272,7 @@ namespace BIMaestro.Dashboard
             }).OrderByDescending(x => x.Day).ToList();
             DailyTable.ItemsSource = daily;
             ActivityTable.ItemsSource = _detail.OrderByDescending(x => x.When).Select(x => new ActivitySlice {
-                When = x.When, Name = x.Name, Hours = x.Hours, Live = x.Live
+                When = x.When, Name = x.Name, Hours = x.Hours, Live = x.Live, Pending = x.Pending
             }).ToList();
             var peak = daily.OrderByDescending(x => x.Hours).ThenByDescending(x => x.Day).FirstOrDefault();
             DetailAverage.Text = valid && activeDays > 0 ? UiLanguage.Get("TimeSeriesDashboardWindow.xaml.AverageActiveDay") + Duration(hours / activeDays) : UiLanguage.Get("TimeSeriesDashboardWindow.xaml.AverageActiveDay2");
@@ -386,7 +401,7 @@ namespace BIMaestro.Dashboard
             if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out double days) || double.TryParse(value, NumberStyles.Float, CultureInfo.GetCultureInfo("fr-FR"), out days)) return days * 24;
             return double.NaN;
         }
-        internal class Entry { public string Id, SourceId, Name, Path, Version, Kind, Parameters; public DateTime When; public double Hours; public bool Live; }
+        internal class Entry { public string Id, SourceId, Identity, Name, Path, Version, Kind, Parameters; public DateTime When; public double Hours; public bool Live, Pending; }
         [Obfuscation(Exclude = true, ApplyToMembers = true)]
         internal class ActivityDay
         {
@@ -405,7 +420,8 @@ namespace BIMaestro.Dashboard
             public double Hours { get; set; }
             public bool Live { get; set; }
             public string Duration => TimeSeriesDashboardWindow.Duration(Hours);
-            public string State => Live ? UiLanguage.Get("TimeSeriesDashboardWindow.xaml.OngoingSession") : UiLanguage.Get("TimeSeriesDashboardWindow.xaml.Recorded");
+            public bool Pending { get; set; }
+            public string State => Pending ? UiLanguage.Get("TimeTracking.PendingState") : Live ? UiLanguage.Get("TimeSeriesDashboardWindow.xaml.OngoingSession") : UiLanguage.Get("TimeSeriesDashboardWindow.xaml.Recorded");
         }
         [Obfuscation(Exclude = true, ApplyToMembers = true)]
         internal class Total { public string Id { get; set; } public string Name { get; set; } public string Path { get; set; } public double Hours { get; set; } public string Duration => TimeSeriesDashboardWindow.Duration(Hours); public int Days { get; set; } public DateTime Last { get; set; } public string Versions { get; set; } public double Share { get; set; } public string ShareLabel => Share.ToString("0.#", CultureInfo.CurrentCulture) + " %"; }

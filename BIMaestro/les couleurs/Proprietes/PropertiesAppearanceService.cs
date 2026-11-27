@@ -163,9 +163,12 @@ namespace BIMaestro.PropertiesAppearance
             public string GetName()=>"Actualisation atomique de la palette";
             public void Execute(UIApplication app){_next=DateTime.MinValue;ProcessIdling(app);}
         }
+        // Lets the open editor follow the Revit selection.
+        internal static event Action ContextChanged;
         internal static void NotifyContextChanging()
         {
             _next=DateTime.MinValue;
+            try{ContextChanged?.Invoke();}catch{}
             // Revit can reuse the same native HWND for a different selection.
             // Never let WM_PAINT reapply a closure captured for the previous owner.
             if(_renderer!=null)_renderer.BeforePaint=null;

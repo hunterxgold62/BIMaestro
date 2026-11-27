@@ -51,6 +51,7 @@ namespace BIMaestro.MepBooster
         }
 
         private static MepBoosterService _instance;
+        private IDisposable _selectionSubscription;
         private static PushButton _button;
         internal static bool IsEnabled => _instance?._enabled == true;
         internal static Action<Document, ElementId, IEnumerable<ElementId>> TutorialCopy;
@@ -233,13 +234,13 @@ namespace BIMaestro.MepBooster
             _timer = new DispatcherTimer(DispatcherPriority.Normal, _palette.Dispatcher) { Interval = TimeSpan.FromMilliseconds(100) };
             _timer.Tick += Tick;
             var application = BIMaestroApp.UIControlledApp;
-            application.SelectionChanged += SelectionChanged;
+            _selectionSubscription = new BIMaestro.Compatibility.RevitSelectionChangedSubscription(application, SelectionChanged);
             application.ViewActivated += ViewActivated;
             application.ControlledApplication.DocumentChanged += DocumentChanged;
             application.ControlledApplication.DocumentClosing += DocumentClosing;
         }
 
-        private void SelectionChanged(object sender, SelectionChangedEventArgs args)
+        private void SelectionChanged(Document document, ICollection<ElementId> ids)
         {
             if (_copyBusy) return;
             if (!_enabled) return;
@@ -572,7 +573,8 @@ namespace BIMaestro.MepBooster
             catch (UnauthorizedAccessException) { }
             service._enabled = false; service._timer.Stop(); service._mouse?.Dispose();
             var application = BIMaestroApp.UIControlledApp;
-            application.SelectionChanged -= service.SelectionChanged;
+            service._selectionSubscription?.Dispose();
+            service._selectionSubscription = null;
             application.ViewActivated -= service.ViewActivated;
             application.ControlledApplication.DocumentChanged -= service.DocumentChanged;
             application.ControlledApplication.DocumentClosing -= service.DocumentClosing;

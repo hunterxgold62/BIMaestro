@@ -1,0 +1,5 @@
+PASS Modern host uses its native selection event without polling
+PASS Native event forwards document and selected IDs without a hard event-argument reference
+PASS Native host does not duplicate notifications through idling
+PASS Native handler is detached exactly once on shutdown
+Selection compatibility checks passed

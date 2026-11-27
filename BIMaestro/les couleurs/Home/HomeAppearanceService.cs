@@ -33,6 +33,7 @@ namespace BIMaestro.Home
         static string resourceScript;
         static string resourceRevision;
         static string historyJson, historyRevision;
+        static ExternalEvent openEvent;
         static readonly System.Runtime.CompilerServices.ConditionalWeakTable<object, BrowserState> browserStates = new System.Runtime.CompilerServices.ConditionalWeakTable<object, BrowserState>();
         internal static string CurrentStyle { get; private set; } = "native";
         internal static bool HistoryEnabled { get; private set; }
@@ -54,6 +55,8 @@ namespace BIMaestro.Home
             }
             catch (Exception ex) { Log("Preferences: " + ex.Message); }
             application.Idling += OnIdling;
+            // Opening a document is refused inside Idling; an external event runs it in a valid API context.
+            if (openEvent == null) openEvent = ExternalEvent.Create(new OpenHandler());
             initialized = true;
             if (HistoryEnabled) HomeHistoryCatalog.RequestRefresh();
         }
@@ -92,7 +95,8 @@ namespace BIMaestro.Home
         {
             var ui = sender as UIApplication;
             if (ui == null) return;
-            ProcessOpen(ui);
+            bool waitingOpen; lock (requestGate) waitingOpen = openPath != null;
+            if (waitingOpen) openEvent?.Raise();
             if (DateTime.UtcNow < nextTick) return;
             nextTick = DateTime.UtcNow.AddSeconds(1);
             if (CurrentStyle == "native" && !HistoryEnabled && !restorePending) return;
@@ -161,12 +165,27 @@ namespace BIMaestro.Home
                 // Revit performs its normal version, worksharing and missing-file checks.
                 app.OpenAndActivateDocument(path);
             }
-            catch (Exception ex) { error = UiLanguage.Get("HomeAppearanceService.UnableToOpen") + ex.Message; }
+            catch (Exception ex) when (ex.GetType().Name == "OperationCanceledException") { Log("Open cancelled: " + path); }
+            catch (Exception ex) { Log("Open " + path + ": " + ex); error = DescribeOpenFailure(path, ex); }
             lock (requestGate)
             {
                 acknowledgementGeneration++;
                 acknowledgement = "if(window.BIMaestroHomeHistory)window.BIMaestroHomeHistory.acknowledgeOpen(" + JsonConvert.SerializeObject(id) + "," + JsonConvert.SerializeObject(error) + ");";
             }
+        }
+        static string DescribeOpenFailure(string path, Exception ex)
+        {
+            string key;
+            bool exists; try { exists = File.Exists(path); } catch { exists = false; }
+            if (!exists) key = "HomeAppearanceService.OpenMissing";
+            else if (ex is UnauthorizedAccessException || (ex.Message ?? "").IndexOf("access", StringComparison.OrdinalIgnoreCase) >= 0) key = "HomeAppearanceService.OpenDenied";
+            else key = "HomeAppearanceService.OpenFailed";
+            return UiLanguage.Get("HomeAppearanceService.UnableToOpen") + UiLanguage.Get(key);
+        }
+        sealed class OpenHandler : IExternalEventHandler
+        {
+            public void Execute(UIApplication app) => ProcessOpen(app);
+            public string GetName() => "BIMaestro - ouverture depuis l'historique";
         }
         static bool Evaluate(object browser, string script)
         {
@@ -204,7 +223,10 @@ namespace BIMaestro.Home
                         if (response.Restored) restorePending = false;
                         lock (requestGate) { if (response.Ack != 0 && response.Ack == acknowledgementGeneration) acknowledgement = null; }
                         if (response.Request != null && HomeHistoryCatalog.IsKnownPath(response.Request.Path))
+                        {
                             lock (requestGate) { if (openPath == null) { openPath = response.Request.Path; openId = response.Request.Id; } }
+                            openEvent?.Raise();
+                        }
                     }
                     catch (Exception ex) { Log("Browser response: " + ex.Message); }
                     finally { lock (pending) pending.Remove(browser); }

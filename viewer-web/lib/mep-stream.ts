@@ -5,6 +5,14 @@ import type { ModelTile } from './mep-contract';
 import { fetchR2PilotAsset, resolveTiles } from './mep-api';
 import { digest } from './mep-package';
 
+const MiB = 1024 * 1024;
+const detailBudget = 192 * MiB;
+const walkRadius = 8;
+
+export function usesProgressiveTiles(tiles?: ModelTile[]) {
+  return !!tiles && tiles.reduce((bytes, tile) => bytes + tile.decodedBytes, 0) > 384 * MiB;
+}
+
 export function tileBounds(tile: ModelTile) {
   return new THREE.Box3(new THREE.Vector3(...tile.bounds.slice(0, 3)), new THREE.Vector3(...tile.bounds.slice(3, 6)));
 }
@@ -36,9 +44,9 @@ export class ModelStream {
   private elementTiles = new Map<number, string[]>();
   constructor(readonly tiles: ModelTile[], private token: string, private revision: number,
     private add: (model: THREE.Group) => void | Promise<void>, private remove: (model: THREE.Group) => void,
-    private changed: () => void, private error: (message: string) => void, private r2Pilot = false) {
-    // Every detailed tile belongs to this session, independently of the camera.
-    this.wanted = new Set(tiles.map(tile => tile.name));
+    private changed: () => void, private error: (message: string) => void, private r2Pilot = false,
+    private progressive = false) {
+    if (!progressive) this.wanted = new Set(tiles.map(tile => tile.name));
     for (const tile of tiles) {
       if (r2Pilot) this.signed.set(tile.name, { url: '', bytes: tile.size, sha256: tile.sha256, expires: Infinity });
       this.boxes.set(tile.name, tileBounds(tile));
@@ -52,14 +60,42 @@ export class ModelStream {
     return !!members?.length && members.every(name => this.loaded.has(name));
   }
   readyAt(point: THREE.Vector3) {
-    return this.tiles.every(tile => this.boxes.get(tile.name)!.distanceToPoint(point) > 8 || this.loaded.has(tile.name));
+    return this.tiles.every(tile => this.boxes.get(tile.name)!.distanceToPoint(point) > walkRadius || this.loaded.has(tile.name));
   }
   get loading() { return this.loaded.size !== this.tiles.length || this.pending.size > 0 || this.signing; }
   get count() { return this.loaded.size; }
-  update(now: number) {
+  has(name: string) { return this.loaded.has(name); }
+  update(now: number, focus?: THREE.Vector3) {
     if (this.stopped || now - this.lastUpdate < 500) return;
     this.lastUpdate = now;
+    if (this.progressive && focus) this.updateWanted(focus);
     this.pump(now);
+  }
+  private updateWanted(focus: THREE.Vector3) {
+    const ordered = this.tiles.map(tile => {
+      const distance = this.boxes.get(tile.name)!.distanceToPoint(focus);
+      return { tile, priority: distance <= walkRadius ? distance : Math.max(walkRadius, distance - (this.wanted.has(tile.name) ? 4 : 0)) };
+    }).sort((a, b) => a.priority - b.priority);
+    const wanted = new Set<string>();
+    let bytes = 0;
+    for (const { tile } of ordered) {
+      if (bytes + tile.decodedBytes > detailBudget) continue;
+      wanted.add(tile.name);
+      bytes += tile.decodedBytes;
+    }
+    this.wanted = wanted;
+    for (const [name, pending] of this.pending) {
+      if (!wanted.has(name)) pending.abort();
+    }
+    let removed = false;
+    for (const [name, model] of this.loaded) {
+      if (wanted.has(name)) continue;
+      this.loaded.delete(name);
+      this.remove(model);
+      disposeModel(model);
+      removed = true;
+    }
+    if (removed) this.changed();
   }
   private pump(now: number) {
     if (this.stopped) return;

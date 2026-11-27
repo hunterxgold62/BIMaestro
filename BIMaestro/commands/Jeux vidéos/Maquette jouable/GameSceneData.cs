@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
 
@@ -9,7 +10,27 @@ namespace BIMaestro.VideoGames
     {
         public string Name { get; set; } = "";
         [Newtonsoft.Json.JsonIgnore] public byte[] Bytes { get; set; } = Array.Empty<byte>();
-        public long Size => Bytes.LongLength;
+        private string _filePath;
+        private long _fileSize;
+        public long Size => _filePath == null ? Bytes.LongLength : _fileSize;
+
+        public void StoreOnDisk(string path)
+        {
+            File.WriteAllBytes(path, Bytes);
+            _fileSize = Bytes.LongLength;
+            _filePath = path;
+            Bytes = Array.Empty<byte>();
+        }
+
+        public Stream OpenRead() => _filePath == null
+            ? (Stream)new MemoryStream(Bytes, writable: false)
+            : File.OpenRead(_filePath);
+        public void DeleteFile()
+        {
+            if (_filePath != null) File.Delete(_filePath);
+        }
+        [Newtonsoft.Json.JsonIgnore] public int ModelIndex { get; set; }
+        [Newtonsoft.Json.JsonIgnore] public IReadOnlyList<GameMeshData> Overview { get; set; } = Array.Empty<GameMeshData>();
         public string Sha256 { get; set; } = "";
         public long DecodedBytes { get; set; }
         public double[] Bounds { get; set; } = Array.Empty<double>();
@@ -106,6 +127,7 @@ namespace BIMaestro.VideoGames
     internal sealed class GameMeshData
     {
         public string WebTileName { get; set; } = string.Empty;
+        public int WebElementIndexOffset { get; set; }
         public Point3DCollection Positions { get; } = new Point3DCollection();
         public Int32Collection Indices { get; } = new Int32Collection();
         public IList<Color> VertexColors { get; } = new List<Color>();
@@ -393,14 +415,15 @@ namespace BIMaestro.VideoGames
         public IList<GameMeshData> Meshes { get; } = new List<GameMeshData>();
         public IList<GameDoorData> Doors { get; } = new List<GameDoorData>();
         public IList<GameRoomData> Rooms { get; } = new List<GameRoomData>();
-        public IList<GameElementData> Elements { get; } = new List<GameElementData>();
+        public IList<GameElementData> Elements { get; private set; } = new List<GameElementData>();
         public IList<GameTriangle> Triangles { get; } = new List<GameTriangle>();
         public GameMepGraphData MepGraph { get; set; } = new GameMepGraphData();
         public IList<GameMepWebAsset> WebTiles { get; private set; } = new List<GameMepWebAsset>();
-        internal GameSceneData CopyForWebExport()
+        internal GameSceneData CopyForWebExport(IEnumerable<GameElementData>? elements = null)
         {
             var copy = (GameSceneData)MemberwiseClone();
             copy.WebTiles = new List<GameMepWebAsset>(WebTiles);
+            if (elements != null) copy.Elements = new List<GameElementData>(elements);
             return copy;
         }
         public byte[] WebOverviewGlb { get; set; } = Array.Empty<byte>();
@@ -420,7 +443,7 @@ namespace BIMaestro.VideoGames
         public Point3D SpawnFootPosition { get; set; }
         public double InitialYawRadians { get; private set; }
 
-        public void NormalizeCoordinates(Point3D viewEye, Vector3D viewForward, bool useMeshBounds = false)
+        public void NormalizeCoordinates(Point3D viewEye, Vector3D viewForward, bool useMeshBounds = false, Vector3D? sourceOrigin = null)
         {
             if (Triangles.Count == 0 && !useMeshBounds)
             {
@@ -463,7 +486,7 @@ namespace BIMaestro.VideoGames
 
             // Recentrer autour de l'origine améliore fortement la précision WPF sur
             // les projets utilisant de grandes coordonnées partagées.
-            var offset = new Vector3D(
+            var offset = sourceOrigin.HasValue ? -sourceOrigin.Value : new Vector3D(
                 -((minX + maxX) * 0.5),
                 -((minY + maxY) * 0.5),
                 -minZ);

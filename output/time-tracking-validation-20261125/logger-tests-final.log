@@ -1,0 +1,15 @@
+PASS Isolated journal initialized
+PASS Native creation identity is recorded in session metadata
+PASS Legacy API fallback uses the persistent project-information identity
+PASS Save As closes old session and starts exactly one new session
+PASS Save As retains old duration, original path and identity
+PASS Closing persists the last session with its new path and identity
+PASS Closed deferred session remains identifiable as pending
+PASS Both persisted file sessions add to the chosen project exactly once
+PASS Durable snapshot includes the model identity
+PASS Crash recovery restores the deferred session and its identity
+PASS Replaying a committed snapshot never duplicates its session
+PASS Failed workbook write leaves its final snapshot after shutdown
+PASS Last session is recoverable once the workbook is unlocked
+PASS Older v3 snapshots without an identity remain readable
+Journal lifecycle checks passed

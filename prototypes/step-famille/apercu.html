@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>Aperçu famille légère</title>
+<style>html,body{margin:0;height:100%;background:#f4f5f7;font:13px Segoe UI,sans-serif}#l{position:absolute;left:12px;top:10px;background:#fff;padding:8px 12px;border-radius:6px;box-shadow:0 1px 4px #0002}</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head><body><div id="l"></div><script src="spec.js"></script><script>
+const colors={Corps:0x9aa3ad,"Brûleur":0xd9534f,Gaz:0xf0ad4e,Recirculation:0xc8ccd2,"Fumées":0x555b63,Eau:0x3a7bd5};
+const scene=new THREE.Scene();scene.background=new THREE.Color(0xf4f5f7);
+const cam=new THREE.PerspectiveCamera(35,innerWidth/innerHeight,10,200000);
+const r=new THREE.WebGLRenderer({antialias:true});r.setSize(innerWidth,innerHeight);document.body.appendChild(r.domElement);
+scene.add(new THREE.HemisphereLight(0xffffff,0x888888,0.9));const dl=new THREE.DirectionalLight(0xffffff,0.6);dl.position.set(1,-2,3);scene.add(dl);
+const g=new THREE.Group();g.rotation.x=-Math.PI/2;scene.add(g); // Revit Z vers le haut
+for(const p of SPEC.primitives){const m=new THREE.MeshLambertMaterial({color:colors[p.group]});let mesh;
+ if(p.kind==="box"){const s=p.max.map((v,k)=>Math.max(v-p.min[k],1));mesh=new THREE.Mesh(new THREE.BoxGeometry(...s),m);mesh.position.set(...p.min.map((v,k)=>v+s[k]/2));}
+ else{const a=new THREE.Vector3(...p.a),b=new THREE.Vector3(...p.b);const L=a.distanceTo(b)||1;mesh=new THREE.Mesh(new THREE.CylinderGeometry(p.r,p.r,L,40),m);mesh.position.copy(a.clone().add(b).multiplyScalar(.5));mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),b.clone().sub(a).normalize());}
+ g.add(mesh);}
+for(const c of SPEC.connectors){const o=new THREE.Vector3(...c.p),d=new THREE.Vector3(...c.dir);g.add(new THREE.ArrowHelper(d,o,Math.max(600,c.diameter*2),0x1a9c4a,250,160));}
+const bb=SPEC.expectedBBoxMm,cx=(bb.min[0]+bb.max[0])/2,cy=(bb.min[1]+bb.max[1])/2,cz=(bb.min[2]+bb.max[2])/2;
+cam.position.set(cx+9000,cz+7000,-cy+13000);const ctl=new THREE.OrbitControls(cam,r.domElement);ctl.target.set(cx,cz,-cy);ctl.update();
+document.getElementById("l").innerHTML="<b>"+SPEC.name+"</b> — "+SPEC.primitives.length+" volumes, "+SPEC.connectors.length+" connecteurs (flèches vertes)<br>"+Object.entries(colors).map(([k,v])=>'<span style="color:#'+v.toString(16).padStart(6,"0")+'">■</span> '+k).join(" &nbsp;");
+(function loop(){requestAnimationFrame(loop);r.render(scene,cam)})();
+onresize=()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();r.setSize(innerWidth,innerHeight)};
+</script></body></html>

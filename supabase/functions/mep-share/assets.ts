@@ -1,3 +1,5 @@
+export const maxR2PackageBytes = 2 * 1024 * 1024 * 1024;
+
 export type Asset = { name: string; bytes: number; sha256: string };
 export function validateAssets(value: unknown, total: number): Asset[] | null {
   if (value === undefined) return null;
@@ -8,7 +10,7 @@ export function validateAssets(value: unknown, total: number): Asset[] | null {
       !Number.isSafeInteger(item.bytes) || item.bytes <= 0 || item.bytes > 48 * 1024 * 1024 || !/^[0-9a-f]{64}$/.test(item.sha256)) throw new Error('Fichier invalide');
     names.add(item.name); return { name: item.name, bytes: item.bytes, sha256: item.sha256 };
   });
-  if (!names.has('index.zip') || assets.reduce((sum, item) => sum + item.bytes, 0) !== total || total > 512 * 1024 * 1024) throw new Error('Taille totale invalide');
+  if (!names.has('index.zip') || assets.reduce((sum, item) => sum + item.bytes, 0) !== total || total > maxR2PackageBytes) throw new Error('Taille totale invalide');
   return assets;
 }
 export function exportPaths(item: { storage_path: string; manifest?: { assets?: Asset[] } }) {

@@ -24,6 +24,7 @@ public class BIMaestroApp : IExternalApplication
 
 
     private UIApplication _uiApp;
+    private IDisposable _selectionChangedSubscription;
     private bool _dedicatedFamilyLinkStarted;
     private bool _hasResetWhenOff = false;
     private bool _hasShownTimeTrackingError = false;
@@ -141,7 +142,7 @@ public class BIMaestroApp : IExternalApplication
             application.ControlledApplication.DocumentOpened += OnDocumentOpenedSafe;
             application.ControlledApplication.DocumentClosing += OnDocumentClosingSafe;
             application.ViewActivated += OnViewActivatedSafe;
-            application.SelectionChanged += OnSelectionChangedSafe;
+            _selectionChangedSubscription = new BIMaestro.Compatibility.RevitSelectionChangedSubscription(application, OnSelectionChangedSafe);
             application.Idling += OnIdlingSafe;
             BIMaestro.ModelLoading.ModelOpeningService.Initialize(application);
 
@@ -175,6 +176,8 @@ public class BIMaestroApp : IExternalApplication
 
     public Result OnShutdown(UIControlledApplication application)
     {
+        _selectionChangedSubscription?.Dispose();
+        _selectionChangedSubscription = null;
         BIMaestro.ModelLoading.ModelOpeningService.Shutdown(application);
         BIMaestro.Home.HomeAppearanceService.Shutdown(application);
         BIMaestro.Welcome.WelcomeManager.Shutdown(application);
@@ -382,13 +385,11 @@ public class BIMaestroApp : IExternalApplication
                     : 260);
     }
 
-    private void OnSelectionChangedSafe(object sender, SelectionChangedEventArgs args)
+    private void OnSelectionChangedSafe(Document doc, System.Collections.Generic.ICollection<ElementId> selectedIds)
     {
         try
         {
             BIMaestro.PropertiesAppearance.PropertiesAppearanceService.NotifyContextChanging();
-            var doc = args.GetDocument();
-            var selectedIds = args.GetSelectedElements();
             BIMaestro.ViewHover.ViewDeckChangeService.CaptureSelection(doc, selectedIds);
             Analyse.ElementHistoryTracker.CaptureSelectedElementDetails(doc, selectedIds);
             Analyse.ElementHistoryHoverInfoService.OnSelectionChanged(

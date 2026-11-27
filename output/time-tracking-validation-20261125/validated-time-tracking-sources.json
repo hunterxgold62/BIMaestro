@@ -1,0 +1,10 @@
+{
+  "BIMaestro/app et excel/temps revit/ExcelLogger.cs": "81b4fb4a52571340dcd843d05ceba913b30d27bf76bd3b5dfad96c13b0c3aca6",
+  "BIMaestro/app et excel/temps revit/TimeProjectTracking.cs": "debd38dd926268aaa28300e887a57c5251bb70d65afd9ccecedcf0e8f32769cd",
+  "BIMaestro/app et excel/temps revit/TimeTrackingRegistry.cs": "18052891c4aaea5ad7689f06ab27de3928d1fa73c824ad2de5d46bf23d334983",
+  "BIMaestro/app et excel/temps revit/TimeTrackingDecisionWindow.cs": "29a4d91e06ce124657cdc2cdcfae7591f90b1cb237de3fd058095954b828a020",
+  "BIMaestro/app et excel/temps revit/TimeSeriesDashboardWindow.xaml.cs": "ea538c2a71ae899a24533d5383fa930a1722b2e3595b27931dbadb2a63e66f0f",
+  "BIMaestro/app et excel/RevitSelectionChangedSubscription.cs": "5836104d306d138962c3d76bb9975a809a8fe7791de4ec38f96225e57f20d819",
+  "BIMaestro/app et excel/BIMaestroApp.cs": "a3a37477b421389fbc7f763c6dcefbac09805f5c840a5915c82f4bf5f825df23",
+  "BIMaestro/commands/MEP Booster/MepBoosterService.cs": "51b07f0a3df3556c1d8ec89f799a1e1a78d6c836372a897b9301a4b5440a692f"
+}

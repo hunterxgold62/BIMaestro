@@ -1,0 +1,11 @@
+PASS No implicit merging of paths
+PASS 2024 and 2026 files persist in one project
+PASS Unrelated model stays separate
+PASS Old and new durations add exactly once
+PASS Existing groups merge transitively
+PASS Separating restores all original paths
+PASS Stale cross-session selections require a refresh
+PASS Grouping and undo retain total recorded time
+PASS Single-file merge is a no-op
+PASS Independent project groups coexist
+PASS Unreadable mappings are reported and never overwritten

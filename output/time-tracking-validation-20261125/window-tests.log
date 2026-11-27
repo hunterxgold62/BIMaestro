@@ -1,0 +1,16 @@
+PASS Closing without a decision defaults to later: fr
+PASS All three choices remain usable at 644 px: fr
+PASS Existing and pending durations are visible: fr
+PASS All window text is translated: fr
+PASS All three choices remain usable at 504 px: fr
+PASS Existing and pending durations are visible: fr
+PASS All window text is translated: fr
+PASS Closing without a decision defaults to later: en
+PASS All three choices remain usable at 644 px: en
+PASS Existing and pending durations are visible: en
+PASS All window text is translated: en
+PASS All three choices remain usable at 504 px: en
+PASS Existing and pending durations are visible: en
+PASS All window text is translated: en
+PASS Selecting another recognized project changes the decision target
+Previews: C:\Users\plemert\OneDrive - SAS H.C.M. HOLDING CABINET MERLIN\Documents\BIMaestro\output\time-tracking-preview

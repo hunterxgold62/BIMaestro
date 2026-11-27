@@ -58,12 +58,15 @@ namespace BIMaestro.PropertiesAppearance
             _scope.SelectionChanged += (_, __) => ScopeChanged(); _scope.MinHeight = 30; _scope.Padding = new Thickness(8, 4, 8, 4); scope.Children.Add(_scope);
             right.Children.Add(scope);
 
-            // Appearance tab.
-            BindText(_selection, 15, true); _selection.Margin = new Thickness(0, 0, 0, 2); _appearancePage.Children.Add(_selection);
-            BindText(_selectionHint, 12, false, true); _selectionHint.Margin = new Thickness(0, 0, 0, 10); _appearancePage.Children.Add(_selectionHint);
-            _appearancePage.Children.Add(_groupTools);
-            BuildAppearanceEditor(); _appearancePage.Children.Add(_editor);
-            _savedRules.Content = _rules; _appearancePage.Children.Add(_savedRules);
+            // Appearance tab: ready-made themes until a row is clicked, then the editor for that row.
+            BuildThemesPage(); _appearancePage.Children.Add(_themesPage);
+            _selectionPage.Children.Add(BackToThemes());
+            BindText(_selection, 15, true); _selection.Margin = new Thickness(0, 0, 0, 2); _selectionPage.Children.Add(_selection);
+            BindText(_selectionHint, 12, false, true); _selectionHint.Margin = new Thickness(0, 0, 0, 10); _selectionPage.Children.Add(_selectionHint);
+            _selectionPage.Children.Add(_groupTools);
+            BuildAppearanceEditor(); _selectionPage.Children.Add(_editor);
+            _savedRules.Content = _rules; _selectionPage.Children.Add(_savedRules);
+            _appearancePage.Children.Add(_selectionPage);
             right.Children.Add(_appearancePage);
 
             // Rules tab.

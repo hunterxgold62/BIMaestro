@@ -87,7 +87,7 @@
                                         Click="OpenDemo_Click"/>
                             </StackPanel>
                             <TextBlock Margin="0,12,0,0" Style="{StaticResource TrustText}"
-                                       Text="Fermez avec la croix pour revoir cette proposition demain."/>
+                                       Text="Fermez avec la croix pour revoir cette proposition dans une semaine."/>
                         </StackPanel>
                     </Border>
                     <StackPanel x:Name="EmailContent">

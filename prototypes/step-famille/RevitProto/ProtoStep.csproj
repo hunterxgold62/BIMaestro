@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Prototype isolé : STEP -> famille Revit 2026. Ne fait pas partie de BIMaestro. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <AssemblyName>BIMaestro.ProtoStep</AssemblyName>
+    <RootNamespace>BIMaestro.ProtoStep</RootNamespace>
+    <Nullable>disable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <OutputPath>bin\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <UseWPF>true</UseWPF>
+    <RevitInstallDir>C:\Program Files\Autodesk\Revit 2026</RevitInstallDir>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="RevitAPI"><HintPath>$(RevitInstallDir)\RevitAPI.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="RevitAPIUI"><HintPath>$(RevitInstallDir)\RevitAPIUI.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\UT-L60.spec.json" Link="UT-L60.spec.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\spec2.json" Link="spec2.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

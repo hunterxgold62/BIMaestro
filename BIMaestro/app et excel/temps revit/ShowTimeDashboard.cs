@@ -23,13 +23,18 @@ namespace BIMaestro.Dashboard
         {
             try
             {
-                string activePath = cdata.Application?.ActiveUIDocument?.Document?.PathName;
+                var document = cdata.Application?.ActiveUIDocument?.Document;
+                string activePath = document?.PathName;
 
                 if (_pendingOpen != null)
                 {
                     _pendingOpen.Stop();
                     _pendingOpen = null;
-                    OpenDocumentLocation(activePath);
+                    string localPath = GetExplorerPath(activePath);
+                    string centralPath = GetExplorerPath(TimeLogMetadataExtractor.TryGetCentralPath(document));
+                    OpenDocumentLocation(localPath);
+                    if (!string.Equals(centralPath, localPath, StringComparison.OrdinalIgnoreCase))
+                        OpenDocumentLocation(centralPath);
                     return Result.Succeeded;
                 }
 
@@ -74,13 +79,25 @@ namespace BIMaestro.Dashboard
             }
         }
 
-        private static void OpenDocumentLocation(string activePath)
+        private static string GetExplorerPath(string path)
         {
+            if (string.IsNullOrWhiteSpace(path)) return null;
+
             try
             {
-                if (string.IsNullOrWhiteSpace(activePath)) return;
+                return Path.IsPathRooted(path) ? Path.GetFullPath(path) : null;
+            }
+            catch (ArgumentException) { return null; }
+            catch (NotSupportedException) { return null; }
+            catch (PathTooLongException) { return null; }
+        }
 
-                string fullPath = Path.GetFullPath(activePath);
+        private static void OpenDocumentLocation(string fullPath)
+        {
+            if (fullPath == null) return;
+
+            try
+            {
                 if (File.Exists(fullPath))
                 {
                     Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{fullPath}\"") { UseShellExecute = true });

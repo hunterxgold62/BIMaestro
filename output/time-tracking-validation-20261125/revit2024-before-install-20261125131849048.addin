@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RevitAddIns>
+  <AddIn Type="Application">
+    <Name>BIMaestro</Name>
+    <Assembly>C:\Users\plemert\AppData\Local\BIMaestro\Bin\Revit2024-Pastille-20261124-1334\BIMaestro.dll</Assembly>
+    <AddInId>{E3B0C442-98FC-1C14-9AF7-7D7CE11B9A09}</AddInId>
+    <FullClassName>BIMaestroApp</FullClassName>
+    <VendorId>PAUL LEMERT</VendorId>
+    <VendorDescription>Paul LEMERT</VendorDescription>
+  </AddIn>
+</RevitAddIns>

@@ -1,0 +1,22 @@
+PASS First encounter records identity without a question
+PASS New location asks once and ignores nested idle callbacks
+PASS Question separates previous project time from pending work
+PASS Counting pauses for the question and resumes afterward
+PASS Decide later does not repeat during the same opening
+PASS Deferring leaves a durable pending assignment
+PASS Next opening offers all deferred sessions plus the current session
+PASS Continue links both files to one project
+PASS Choosing a project keeps a single combined total
+PASS Repeated returns to old and new files never prompt again
+PASS Start new project commits a separate remembered assignment
+PASS Question never restarts counting for an already inactive session
+PASS A background document cannot interrupt the active model
+PASS No question appears while another application has focus
+PASS Question waits while Revit is disabled by another dialog
+PASS Question appears once Revit becomes available
+PASS Unsaved models do not create a misleading durable path
+PASS Dialog failure reports the issue, restores counting and retains pending assignment
+PASS A fresh opening retries after a dialog failure without a stuck global guard
+PASS Registry failure is reported and throttled
+PASS Successful retry clears the stale failure state
+21 service checks passed
